@@ -3,19 +3,33 @@ name: CI
 on:
   pull_request:
     branches: [develop, main]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - ".github/ISSUE_TEMPLATE/**"
+      - "LICENSE"
   push:
     branches: [develop, main]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - ".github/ISSUE_TEMPLATE/**"
+      - "LICENSE"
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-jobs:
-  validate:
-    name: Validate (typecheck + lint + test)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+env:
+  PNPM_VERSION: 10.29.1
+  NODE_VERSION: 20
 
+jobs:
+  # ── Job rapido: instala deps + prepara cache (los demas jobs lo reutilizan) ──
+  setup:
+    name: Setup (install + cache)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,57 +37,158 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10.29.1
+          version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
-      - name: Typecheck
+      - name: Generate Prisma Client
+        run: cd apps/api && pnpm prisma generate
+
+  # ── Lint paralelo ──
+  lint:
+    name: Lint (Biome)
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+      - run: pnpm lint
+
+  # ── Typecheck paralelo ──
+  typecheck:
+    name: Typecheck (tsc)
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+      - name: Generate Prisma Client
+        run: cd apps/api && pnpm prisma generate
+      - name: Typecheck workspace
         run: |
           pnpm exec tsc --noEmit -p apps/web
           pnpm exec tsc --noEmit -p apps/api
           pnpm exec tsc --noEmit -p packages/shared-types
 
-      - name: Lint (Biome)
-        run: pnpm lint
-
-      - name: Test
-        run: pnpm test
-
-  commitlint:
-    name: Commitlint (PR title + commits)
+  # ── Tests con Postgres real ──
+  test:
+    name: Test (vitest + postgres)
+    needs: setup
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    timeout-minutes: 5
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nexott
+          POSTGRES_PASSWORD: nexott_ci
+          POSTGRES_DB: nexott_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://nexott:nexott_ci@localhost:5432/nexott_ci?schema=public
+      SESSION_SECRET: ci_dummy_secret_minimum_32_chars_long_for_validation
+      NODE_ENV: test
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+      - name: Generate Prisma Client
+        run: cd apps/api && pnpm prisma generate
+      - name: Apply migrations
+        run: cd apps/api && pnpm prisma migrate deploy
+      - name: Run tests
+        run: pnpm test
+
+  # ── Build (verifica que el build de produccion funciona) ──
+  build:
+    name: Build (turbo)
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+      - name: Generate Prisma Client
+        run: cd apps/api && pnpm prisma generate
+      - name: Build all packages
+        run: pnpm build
+
+  # ── Validacion de mensajes de commit (solo en PRs) ──
+  commitlint:
+    name: Commitlint (PR title + commits)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
         with:
-          version: 10.29.1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
+      - run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
       - name: Validate PR title
         run: echo "${{ github.event.pull_request.title }}" | pnpm exec commitlint
-
       - name: Validate commits in PR
         run: pnpm exec commitlint --from=${{ github.event.pull_request.base.sha }} --to=${{ github.event.pull_request.head.sha }} --verbose

@@ -1,0 +1,120 @@
+name: Smoke test — staging
+
+# Se ejecuta ~2 minutos despues de cada push a develop, dando tiempo a Railway
+# a desplegar. Si los healthchecks fallan, abre un issue automaticamente.
+#
+# Tambien se puede ejecutar manualmente desde Actions.
+
+on:
+  push:
+    branches: [develop]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - ".github/ISSUE_TEMPLATE/**"
+      - "LICENSE"
+  workflow_dispatch:
+
+concurrency:
+  group: smoke-staging-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  wait-for-deploy:
+    name: Esperar deploy Railway (~2min)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sleep 120s
+        run: sleep 120
+
+  smoke:
+    name: Smoke test endpoints staging
+    needs: wait-for-deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      WEB_URL: ${{ vars.STAGING_WEB_URL }}
+      API_URL: ${{ vars.STAGING_API_URL }}
+
+    steps:
+      - name: Verify config
+        run: |
+          if [ -z "$WEB_URL" ] || [ -z "$API_URL" ]; then
+            echo "::error::Faltan variables STAGING_WEB_URL o STAGING_API_URL en repo settings."
+            echo "Configurar en: Settings → Secrets and variables → Actions → Variables"
+            exit 1
+          fi
+          echo "WEB_URL=$WEB_URL"
+          echo "API_URL=$API_URL"
+
+      - name: Health API (esperado: 200 + database=ok)
+        run: |
+          set -e
+          response=$(curl -sS -w "\n%{http_code}" "$API_URL/api/health")
+          body=$(echo "$response" | sed '$d')
+          status=$(echo "$response" | tail -n1)
+          echo "Body: $body"
+          echo "Status: $status"
+          if [ "$status" != "200" ]; then
+            echo "::error::API health no devolvio 200 (devolvio $status)"
+            exit 1
+          fi
+          if ! echo "$body" | grep -q '"database":"ok"'; then
+            echo "::error::API health reporta BD no operativa"
+            exit 1
+          fi
+
+      - name: Health Web (esperado: 200 + index.html con app)
+        run: |
+          set -e
+          status=$(curl -sS -o /tmp/web.html -w "%{http_code}" "$WEB_URL/healthz")
+          if [ "$status" != "200" ]; then
+            echo "::error::Web /healthz no devolvio 200 (devolvio $status)"
+            exit 1
+          fi
+          # Tambien verificar que la SPA root sirve el HTML con react bundles
+          html_status=$(curl -sS -o /tmp/spa.html -w "%{http_code}" "$WEB_URL/")
+          if [ "$html_status" != "200" ]; then
+            echo "::error::Web / no devolvio 200 (devolvio $html_status)"
+            exit 1
+          fi
+          if ! grep -qi "<div id=\"root\"" /tmp/spa.html; then
+            echo "::error::index.html no contiene <div id=\"root\">. Build mal servido?"
+            exit 1
+          fi
+
+  notify-failure:
+    name: Crear issue si fallo
+    needs: smoke
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const date = new Date().toISOString()
+            const sha = context.sha.slice(0, 7)
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[smoke-staging] Deploy roto — ${date}`,
+              labels: ["bug", "deployment", "staging"],
+              body: [
+                `**Smoke test de staging fallo tras el deploy de \`${sha}\`**.`,
+                ``,
+                `- Commit: ${context.sha}`,
+                `- Workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+                ``,
+                `## Pasos sugeridos`,
+                `1. Revisar logs de Railway en \`api-staging\` y \`web-staging\`.`,
+                `2. Verificar healthcheck \`/api/health\` y \`/healthz\` manualmente.`,
+                `3. Si la BD no responde: revisar \`postgres-staging\` y \`DATABASE_URL\`.`,
+                `4. Si fue un cambio reciente: \`git revert ${sha}\` o rollback en Railway UI.`,
+              ].join("\n"),
+            })

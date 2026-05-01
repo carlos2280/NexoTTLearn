@@ -1,0 +1,120 @@
+name: Smoke test — production
+
+# Identico a smoke-staging pero contra production. Se ejecuta tras push a main.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - ".github/ISSUE_TEMPLATE/**"
+      - "LICENSE"
+  workflow_dispatch:
+
+concurrency:
+  group: smoke-production-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  wait-for-deploy:
+    name: Esperar deploy Railway (~2min)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sleep 120s
+        run: sleep 120
+
+  smoke:
+    name: Smoke test endpoints production
+    needs: wait-for-deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      WEB_URL: ${{ vars.PRODUCTION_WEB_URL }}
+      API_URL: ${{ vars.PRODUCTION_API_URL }}
+
+    steps:
+      - name: Verify config
+        run: |
+          if [ -z "$WEB_URL" ] || [ -z "$API_URL" ]; then
+            echo "::error::Faltan variables PRODUCTION_WEB_URL o PRODUCTION_API_URL en repo settings."
+            exit 1
+          fi
+          echo "WEB_URL=$WEB_URL"
+          echo "API_URL=$API_URL"
+
+      - name: Health API
+        run: |
+          set -e
+          response=$(curl -sS -w "\n%{http_code}" "$API_URL/api/health")
+          body=$(echo "$response" | sed '$d')
+          status=$(echo "$response" | tail -n1)
+          echo "Body: $body"
+          if [ "$status" != "200" ]; then
+            echo "::error::API health no devolvio 200 (devolvio $status)"
+            exit 1
+          fi
+          if ! echo "$body" | grep -q '"database":"ok"'; then
+            echo "::error::API health reporta BD no operativa"
+            exit 1
+          fi
+
+      - name: Health Web
+        run: |
+          set -e
+          status=$(curl -sS -o /tmp/web.html -w "%{http_code}" "$WEB_URL/healthz")
+          if [ "$status" != "200" ]; then
+            echo "::error::Web /healthz no devolvio 200 (devolvio $status)"
+            exit 1
+          fi
+          html_status=$(curl -sS -o /tmp/spa.html -w "%{http_code}" "$WEB_URL/")
+          if [ "$html_status" != "200" ]; then
+            echo "::error::Web / no devolvio 200 (devolvio $html_status)"
+            exit 1
+          fi
+          if ! grep -qi "<div id=\"root\"" /tmp/spa.html; then
+            echo "::error::index.html no contiene <div id=\"root\">"
+            exit 1
+          fi
+
+  notify-failure:
+    name: Crear issue critico si fallo
+    needs: smoke
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const date = new Date().toISOString()
+            const sha = context.sha.slice(0, 7)
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🔴 [PROD] Deploy roto — ${date}`,
+              labels: ["bug", "deployment", "production", "critical"],
+              body: [
+                `**🔴 PRODUCCION CAIDA — smoke test fallo tras deploy de \`${sha}\`**`,
+                ``,
+                `- Commit: ${context.sha}`,
+                `- Workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+                ``,
+                `## ⚡ Accion inmediata`,
+                `1. Rollback en Railway UI: \`api-prod\` → Deployments → click deploy verde anterior → Redeploy.`,
+                `2. Repetir en \`web-prod\`.`,
+                `3. Investigar la causa (logs Railway + commit que rompio).`,
+                ``,
+                `## Si rollback no es opcion`,
+                `- BD migrada irreversiblemente: contactar admin BD.`,
+                `- Revertir commit: \`git revert ${sha}\` y abrir hotfix.`,
+                ``,
+                `## Postmortem`,
+                `Documentar causa raiz y prevencion en este issue al cerrar.`,
+              ].join("\n"),
+            })
