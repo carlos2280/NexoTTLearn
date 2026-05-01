@@ -1,0 +1,2 @@
+echo "→ Ejecutando make validate antes del push (typecheck + lint + test)…"
+make validate
