@@ -14,7 +14,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@carlos2280/nexott-ui": "^0.1.0",
+    "@carlos2280/nexott-ui": "^0.2.0",
     "@hookform/resolvers": "3.9.1",
     "@lit/react": "^1.0.8",
     "@nexott-learn/shared-types": "workspace:*",
