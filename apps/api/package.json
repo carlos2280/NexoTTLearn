@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "nest start --watch",
-    "build": "nest build",
+    "build": "nest build && tsc-alias -p tsconfig.build.json",
     "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit",
     "lint": "cd ../.. && biome check apps/api/src/ apps/api/prisma/seed.ts",
     "lint:fix": "cd ../.. && biome check --write apps/api/src/ apps/api/prisma/seed.ts",
     "test": "vitest run --passWithNoTests",
@@ -50,6 +51,8 @@
     "@types/supertest": "6.0.2",
     "prisma": "6.1.0",
     "supertest": "7.0.0",
+    "tsc-alias": "1.8.10",
+    "tsconfig-paths": "4.2.0",
     "tsx": "4.19.2",
     "typescript": "5.7.3",
     "vitest": "2.1.8"

@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "start": "node server.js",
+    "typecheck": "tsc --noEmit",
     "lint": "cd ../.. && biome check apps/web/src/ apps/web/server.js",
     "lint:fix": "cd ../.. && biome check --write apps/web/src/ apps/web/server.js",
     "test": "vitest run --passWithNoTests",
