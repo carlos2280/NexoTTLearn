@@ -1,0 +1,49 @@
+// NexoTT Learn - Schema Prisma
+// Inicialmente solo Auth. Crece por dominio conforme avancen los sprints.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════
+// USUARIOS Y AUTENTICACION
+// ═══════════════════════════════════════════
+
+model Usuario {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  nombre       String
+  apellido     String
+  passwordHash String
+  rol          String  @default("PARTICIPANTE") // PARTICIPANTE | ADMIN
+  avatar       String?
+  activo       Boolean @default(true)
+
+  // MFA
+  mfaEnabled Boolean @default(false)
+  mfaSecret  String?
+
+  // Seguridad
+  debeCambiarPassword Boolean   @default(false)
+  passwordCambiadoEn  DateTime?
+  ultimoLoginEn       DateTime?
+  intentosFallidos    Int       @default(0)
+  bloqueadoHasta      DateTime?
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@map("usuarios")
+}
+
+// ═══════════════════════════════════════════
+// SESIONES (connect-pg-simple)
+// ═══════════════════════════════════════════
+// La tabla "session" la maneja connect-pg-simple automaticamente.
+// Se crea con su SQL oficial en la primera ejecucion (createTableIfMissing: true).
+// No se modela en Prisma porque la libreria espera una estructura especifica.
