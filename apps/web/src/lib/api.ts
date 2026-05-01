@@ -1,4 +1,7 @@
-const BASE = "/api"
+// En dev: proxy de vite redirige /api a localhost:4000 (ver vite.config.ts).
+// En prod: VITE_API_URL apunta al dominio absoluto de la API (ej. https://api.nexott.tld).
+//          Vite la inlinea al bundle en build-time.
+const BASE = `${import.meta.env.VITE_API_URL ?? ""}/api`
 
 export class ApiError extends Error {
   readonly status: number

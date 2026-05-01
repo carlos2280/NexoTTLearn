@@ -384,7 +384,7 @@ Las siguientes excepciones estan **documentadas en `biome.json` como overrides p
 |----------|------|-----------|---------|
 | `apps/api/src/**` | NestJS source | `useImportType` | NestJS DI rompe con `import type` para inyectables. Ver "NestJS DI — trampas conocidas". |
 | `apps/api/src/**` | NestJS source | `noParameterProperties` | `constructor(private readonly x: Service)` es el patron idiomatico de DI en NestJS. Forzar properties explicitas duplica codigo y rompe la convencion del framework. |
-| `apps/api/prisma/seed.ts`, `apps/api/scripts/**` | Scripts internos | `noConsoleLog`, `noConsole` | Los scripts CLI necesitan stdout para reportar progreso. |
+| `apps/api/prisma/seed.ts`, `apps/api/scripts/**`, `apps/web/server.js` | Scripts/runtime servidor | `noConsoleLog`, `noConsole`, `noNodejsModules` | Los scripts CLI y el server.js de produccion necesitan stdout para logs y modulos node nativos (path, url, module). |
 | Tests | `*.test.{ts,tsx}` | `noExplicitAny`, `noNonNullAssertion` | Los tests aceptan estos atajos para fixtures y mocks puntuales. |
 | `useFilenamingConvention` | (global) | acepta `PascalCase` ademas de kebab/camel | Convencion estandar de React: componentes en PascalCase (`LoginPage.tsx`, `RutaProtegida.tsx`). |
 | `packages/*/src/index.ts` | API publica del paquete | `noBarrelFile`, `noReExportAll` | El `index.ts` de un paquete es por definicion el barrel publico. Bloquearlo obligaria a importar `@nexott-learn/shared-types/auth` en vez de `@nexott-learn/shared-types`. |
