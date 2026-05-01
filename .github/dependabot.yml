@@ -1,0 +1,80 @@
+# Dependabot — actualizaciones automaticas de dependencias
+#
+# Crea PRs cada lunes con bumps de deps.
+# Agrupa por ecosistema y por tipo (minor/patch vs major) para no saturar.
+#
+# Las actualizaciones major requieren revision manual; minor/patch normalmente
+# son seguros y se pueden mergear con un vistazo si CI pasa.
+#
+# Docs: https://docs.github.com/code-security/dependabot/dependabot-version-updates
+
+version: 2
+updates:
+  # ── pnpm workspace (raiz + apps + packages) ──
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Santiago
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - automated
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+    groups:
+      # Agrupa minor + patch para reducir ruido
+      minor-and-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+      # Major se separa para revision manual (uno por uno)
+      typescript-stack:
+        patterns:
+          - "typescript"
+          - "@types/*"
+          - "tsx"
+        update-types: ["major"]
+      nestjs-stack:
+        patterns:
+          - "@nestjs/*"
+        update-types: ["major"]
+      react-stack:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "react-router-dom"
+        update-types: ["major"]
+      vite-stack:
+        patterns:
+          - "vite"
+          - "@vitejs/*"
+          - "vitest"
+        update-types: ["major"]
+    ignore:
+      # Ignorar major bumps de Prisma (migraciones manuales requeridas)
+      - dependency-name: "@prisma/client"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "prisma"
+        update-types: ["version-update:semver-major"]
+
+  # ── GitHub Actions ──
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Santiago
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - github-actions
+      - automated
+    commit-message:
+      prefix: "ci(deps)"
+      include: scope

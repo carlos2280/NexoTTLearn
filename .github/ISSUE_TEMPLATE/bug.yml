@@ -1,0 +1,41 @@
+name: 🐛 Bug
+description: Reportar un comportamiento inesperado
+labels: [bug]
+body:
+  - type: textarea
+    id: descripcion
+    attributes:
+      label: Descripcion del bug
+      description: Que esperabas que pasara y que paso en su lugar.
+      placeholder: Al hacer X esperaba Y pero ocurrio Z.
+    validations:
+      required: true
+
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Pasos para reproducir
+      placeholder: |
+        1. Ir a /login
+        2. Ingresar email X y password Y
+        3. Click en "Ingresar"
+        4. Observar error en consola
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ambiente
+    attributes:
+      label: Ambiente
+      options:
+        - Local (desarrollo)
+        - Staging
+        - Production
+    validations:
+      required: true
+
+  - type: textarea
+    id: contexto
+    attributes:
+      label: Contexto adicional
+      description: Logs, screenshots, navegador, version OS si es relevante.
