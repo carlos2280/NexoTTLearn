@@ -1,5 +1,5 @@
-// NexoTT Learn - Schema Prisma
-// Inicialmente solo Auth. Crece por dominio conforme avancen los sprints.
+// NexoTT Learn — Schema Prisma
+// Sprint 1: Auth + núcleo de cursos + inscripciones + progreso + entregas
 
 generator client {
   provider = "prisma-client-js"
@@ -10,40 +10,584 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ═══════════════════════════════════════════
-// USUARIOS Y AUTENTICACION
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// ENUMS
+// ═══════════════════════════════════════════════════════════════
+
+enum RolUsuario {
+  PARTICIPANTE
+  ADMIN
+  VIEWER
+  SUPER_ADMIN
+}
+
+enum NivelCurso {
+  BASICO
+  INTERMEDIO
+  AVANZADO
+}
+
+enum EstadoCurso {
+  BORRADOR
+  PUBLICADO
+  DESHABILITADO
+}
+
+enum EstadoModulo {
+  BORRADOR
+  PUBLICADO
+}
+
+enum TipoContenido {
+  LECTURA
+  EJEMPLO_CODIGO
+  EJERCICIO
+  TEST
+  VIDEO
+  RECURSO
+}
+
+enum EstadoConvocatoria {
+  ABIERTA
+  EN_CURSO
+  CERRADA
+  CANCELADA
+}
+
+enum TipoInscripcion {
+  ASIGNADA
+  VOLUNTARIA
+}
+
+enum EstadoInscripcion {
+  ACTIVA
+  COMPLETADA
+  PAUSADA
+  ABANDONADA
+}
+
+enum PrioridadModulo {
+  OBLIGATORIO
+  RECOMENDADO
+  OPCIONAL
+}
+
+enum OrigenAsignacion {
+  ASIGNADA
+  VOLUNTARIA
+}
+
+enum EstadoProgreso {
+  NO_INICIADO
+  EN_PROGRESO
+  COMPLETADO
+}
+
+enum EtiquetaLogro {
+  EXCELENCIA
+  APROBADO
+  EN_DESARROLLO
+  INSUFICIENTE
+}
+
+enum EstadoEntrega {
+  PENDIENTE
+  REVISANDO
+  APROBADA
+  RECHAZADA
+  REQUIERE_REVISION
+}
+
+// ═══════════════════════════════════════════════════════════════
+// USUARIOS Y AUTENTICACIÓN
+// ═══════════════════════════════════════════════════════════════
 
 model Usuario {
-  id           String  @id @default(cuid())
-  email        String  @unique
+  id           String     @id @default(cuid())
+  email        String     @unique
   nombre       String
   apellido     String
-  passwordHash String
-  rol          String  @default("PARTICIPANTE") // PARTICIPANTE | ADMIN
+  passwordHash String     @map("password_hash")
+  rol          RolUsuario @default(PARTICIPANTE)
   avatar       String?
-  activo       Boolean @default(true)
+  activo       Boolean    @default(true)
 
   // MFA
-  mfaEnabled Boolean @default(false)
-  mfaSecret  String?
+  mfaEnabled Boolean @default(false) @map("mfa_enabled")
+  mfaSecret  String? @map("mfa_secret")
 
   // Seguridad
-  debeCambiarPassword Boolean   @default(false)
-  passwordCambiadoEn  DateTime?
-  ultimoLoginEn       DateTime?
-  intentosFallidos    Int       @default(0)
-  bloqueadoHasta      DateTime?
+  debeCambiarPassword Boolean   @default(true)  @map("debe_cambiar_password")
+  passwordCambiadoEn  DateTime? @map("password_cambiado_en")
+  ultimoLoginEn       DateTime? @map("ultimo_login_en")
+  intentosFallidos    Int       @default(0)      @map("intentos_fallidos")
+  bloqueadoHasta      DateTime? @map("bloqueado_hasta")
 
-  creadoEn      DateTime @default(now())
-  actualizadoEn DateTime @updatedAt
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt       @map("actualizado_en")
+
+  // Relaciones
+  convocatoriasCreadas  Convocatoria[]    @relation("ConvocatoriaCreador")
+  inscripciones         Inscripcion[]     @relation("InscripcionUsuario")
+  inscripcionesGestor   Inscripcion[]     @relation("InscripcionGestor")
+  progresosCurso        ProgresoCurso[]
+  progresosModulo       ProgresoModulo[]
+  progresosContenido    ProgresoContenido[]
+  entregas              Entrega[]
+  entregaDrafts         EntregaDraft[]
+  diagnosticos          Diagnostico[]
 
   @@map("usuarios")
 }
 
-// ═══════════════════════════════════════════
-// SESIONES (connect-pg-simple)
-// ═══════════════════════════════════════════
-// La tabla "session" la maneja connect-pg-simple automaticamente.
-// Se crea con su SQL oficial en la primera ejecucion (createTableIfMissing: true).
-// No se modela en Prisma porque la libreria espera una estructura especifica.
+// ═══════════════════════════════════════════════════════════════
+// ÁREAS DE COMPETENCIA
+// ═══════════════════════════════════════════════════════════════
+
+model AreaCompetencia {
+  id          String  @id @default(cuid())
+  nombre      String  @unique
+  descripcion String?
+  color       String?
+  orden       Int?
+
+  creadoEn DateTime @default(now()) @map("creado_en")
+
+  // Relaciones
+  modulos Modulo[]
+
+  @@map("areas_competencia")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CURSOS
+// ═══════════════════════════════════════════════════════════════
+
+model Curso {
+  id          String      @id @default(cuid())
+  titulo      String
+  slug        String      @unique
+  descripcion String?
+  imagenUrl   String?     @map("imagen_url")
+  nivel       NivelCurso  @default(BASICO)
+  estado      EstadoCurso @default(BORRADOR)
+
+  // Umbrales de logro (escala 0-100, configurables por curso)
+  umbralExcelencia   Float @default(90) @map("umbral_excelencia")
+  umbralAprobado     Float @default(70) @map("umbral_aprobado")
+  umbralEnDesarrollo Float @default(50) @map("umbral_en_desarrollo")
+
+  // Umbrales de diagnóstico (% de brecha, configurables por curso)
+  umbralDiagnosticoObligatorio Float @default(20) @map("umbral_diagnostico_obligatorio")
+  umbralDiagnosticoRecomendado Float @default(5)  @map("umbral_diagnostico_recomendado")
+
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt       @map("actualizado_en")
+
+  // Relaciones
+  modulos        Modulo[]
+  convocatorias  Convocatoria[]
+  inscripciones  Inscripcion[]
+  progresosCurso ProgresoCurso[]
+  tipoPesos      CursoTipoPeso[]
+  diagnosticos   Diagnostico[]
+
+  @@map("cursos")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PESOS POR TIPO DE ACTIVIDAD
+// ═══════════════════════════════════════════════════════════════
+
+model CursoTipoPeso {
+  cursoId String @map("curso_id")
+  // Tipos nivel módulo: quiz | ejercicio | codigo | mini_proyecto
+  // Tipos nivel curso:  proyecto | entrevista
+  tipo    String
+  peso    Float
+  // 'modulo' para pesos intra-módulo, 'curso' para pesos a nivel curso
+  nivel   String @default("modulo")
+
+  curso Curso @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+
+  @@id([cursoId, tipo])
+  @@map("curso_tipo_pesos")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MÓDULOS
+// ═══════════════════════════════════════════════════════════════
+
+model Modulo {
+  id                String       @id @default(cuid())
+  cursoId           String       @map("curso_id")
+  titulo            String
+  slug              String
+  descripcion       String?
+  orden             Int
+  duracionEstimada  Int?         @map("duracion_estimada")
+  estado            EstadoModulo @default(BORRADOR)
+  puntajeObjetivo   Float?       @map("puntaje_objetivo")
+  // Peso en la nota del curso. null = peso igual entre módulos
+  peso              Float?
+  areaId            String?      @map("area_id")
+
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt       @map("actualizado_en")
+
+  // Relaciones
+  curso             Curso            @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  area              AreaCompetencia? @relation(fields: [areaId], references: [id])
+  secciones         Seccion[]
+  progresosModulo   ProgresoModulo[]
+  asignaciones      AsignacionModulo[]
+  resultadosDiag    ResultadoDiagnostico[]
+  moduloOrigen      ModuloOrigen?    @relation("ModuloClonado")
+  origenDe          ModuloOrigen[]   @relation("ModuloFuente")
+
+  @@unique([cursoId, slug])
+  @@unique([cursoId, orden])
+  @@index([cursoId, orden])
+  @@index([areaId])
+  @@map("modulos")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TRAZABILIDAD DE CLONADO
+// ═══════════════════════════════════════════════════════════════
+
+model ModuloOrigen {
+  moduloId       String  @id @map("modulo_id")
+  moduloOrigenId String? @map("modulo_origen_id")
+  cursoOrigenId  String? @map("curso_origen_id")
+  clonadoPor     String? @map("clonado_por")
+
+  clonadoEn DateTime @default(now()) @map("clonado_en")
+
+  modulo       Modulo  @relation("ModuloClonado", fields: [moduloId], references: [id], onDelete: Cascade)
+  moduloOrigen Modulo? @relation("ModuloFuente", fields: [moduloOrigenId], references: [id], onDelete: SetNull)
+
+  @@map("modulos_origen")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SECCIONES
+// ═══════════════════════════════════════════════════════════════
+
+model Seccion {
+  id       String @id @default(cuid())
+  moduloId String @map("modulo_id")
+  titulo   String
+  orden    Int
+
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt       @map("actualizado_en")
+
+  // Relaciones
+  modulo     Modulo      @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  contenidos Contenido[]
+
+  @@unique([moduloId, orden])
+  @@map("secciones")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONTENIDOS DINÁMICOS
+// ═══════════════════════════════════════════════════════════════
+
+model Contenido {
+  id        String        @id @default(cuid())
+  seccionId String        @map("seccion_id")
+  tipo      TipoContenido
+  titulo    String
+  orden     Int
+  // Estructura variable según tipo (LECTURA: {bloques}, VIDEO: {url}, EJERCICIO: {archivos}, etc.)
+  contenido Json
+  metadata  Json?
+  // soft delete: true = no visible para participante, entregas conservadas
+  archivado Boolean @default(false)
+
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt       @map("actualizado_en")
+
+  // Relaciones
+  seccion           Seccion             @relation(fields: [seccionId], references: [id], onDelete: Cascade)
+  progresosContenido ProgresoContenido[]
+  entregas          Entrega[]
+  entregaDrafts     EntregaDraft[]
+
+  @@unique([seccionId, orden])
+  @@index([seccionId, orden])
+  @@map("contenidos_dinamicos")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONVOCATORIAS
+// ═══════════════════════════════════════════════════════════════
+
+model Convocatoria {
+  id             String             @id @default(cuid())
+  cursoId        String             @map("curso_id")
+  titulo         String
+  empresaCliente String?            @map("empresa_cliente")
+  descripcion    String?
+  estado         EstadoConvocatoria @default(ABIERTA)
+  fechaInicio    DateTime?          @map("fecha_inicio")
+  fechaLimite    DateTime?          @map("fecha_limite")
+  creadoPorId    String?            @map("creado_por_id")
+
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt       @map("actualizado_en")
+
+  // Relaciones
+  curso         Curso         @relation(fields: [cursoId], references: [id])
+  creadoPor     Usuario?      @relation("ConvocatoriaCreador", fields: [creadoPorId], references: [id])
+  inscripciones Inscripcion[]
+
+  @@index([cursoId, estado])
+  @@map("convocatorias")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INSCRIPCIONES
+// ═══════════════════════════════════════════════════════════════
+
+model Inscripcion {
+  id             String            @id @default(cuid())
+  usuarioId      String            @map("usuario_id")
+  cursoId        String            @map("curso_id")
+  convocatoriaId String?           @map("convocatoria_id")
+  tipo           TipoInscripcion
+  estado         EstadoInscripcion @default(ACTIVA)
+  // null = auto-inscripción voluntaria
+  inscritoPorId  String?           @map("inscrito_por_id")
+  fechaInscripcion DateTime        @default(now()) @map("fecha_inscripcion")
+  fechaCompletado  DateTime?       @map("fecha_completado")
+  fechaLimite      DateTime?       @map("fecha_limite")
+
+  // Relaciones
+  usuario       Usuario            @relation("InscripcionUsuario", fields: [usuarioId], references: [id])
+  curso         Curso              @relation(fields: [cursoId], references: [id])
+  convocatoria  Convocatoria?      @relation(fields: [convocatoriaId], references: [id])
+  inscritoPor   Usuario?           @relation("InscripcionGestor", fields: [inscritoPorId], references: [id])
+  asignaciones  AsignacionModulo[]
+  progresoCurso ProgresoCurso?
+  progresosModulo    ProgresoModulo[]
+  progresosContenido ProgresoContenido[]
+  entregas      Entrega[]
+
+  @@unique([usuarioId, cursoId, convocatoriaId])
+  @@index([usuarioId])
+  @@index([cursoId])
+  @@index([convocatoriaId])
+  @@index([fechaLimite])
+  @@map("inscripciones")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ASIGNACIONES DE MÓDULO
+// ═══════════════════════════════════════════════════════════════
+
+model AsignacionModulo {
+  id            String           @id @default(cuid())
+  inscripcionId String           @map("inscripcion_id")
+  moduloId      String           @map("modulo_id")
+  prioridad     PrioridadModulo  @default(OPCIONAL)
+  origen        OrigenAsignacion @default(VOLUNTARIA)
+  diagnosticoId String?          @map("diagnostico_id")
+  fechaLimite   DateTime?        @map("fecha_limite")
+
+  // Relaciones
+  inscripcion  Inscripcion  @relation(fields: [inscripcionId], references: [id], onDelete: Cascade)
+  modulo       Modulo       @relation(fields: [moduloId], references: [id])
+  diagnostico  Diagnostico? @relation(fields: [diagnosticoId], references: [id])
+
+  @@unique([inscripcionId, moduloId])
+  @@index([fechaLimite])
+  @@map("asignaciones_modulo")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DIAGNÓSTICOS
+// ═══════════════════════════════════════════════════════════════
+
+model Diagnostico {
+  id        String   @id @default(cuid())
+  usuarioId String   @map("usuario_id")
+  cursoId   String   @map("curso_id")
+  titulo    String?
+  fecha     DateTime @default(now())
+  notas     String?
+
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  // Relaciones
+  usuario     Usuario                @relation(fields: [usuarioId], references: [id])
+  curso       Curso                  @relation(fields: [cursoId], references: [id])
+  resultados  ResultadoDiagnostico[]
+  asignaciones AsignacionModulo[]
+
+  @@map("diagnosticos")
+}
+
+model ResultadoDiagnostico {
+  id            String @id @default(cuid())
+  diagnosticoId String @map("diagnostico_id")
+  moduloId      String @map("modulo_id")
+  puntaje       Float
+  brecha        Float
+  // CUMPLE | CERCA | NO_CUMPLE
+  estado        String
+  observaciones String?
+
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  // Relaciones
+  diagnostico Diagnostico @relation(fields: [diagnosticoId], references: [id], onDelete: Cascade)
+  modulo      Modulo      @relation(fields: [moduloId], references: [id])
+
+  @@unique([diagnosticoId, moduloId])
+  @@map("resultados_diagnostico")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PROGRESO
+// ═══════════════════════════════════════════════════════════════
+
+model ProgresoCurso {
+  id                String         @id @default(cuid())
+  inscripcionId     String         @unique @map("inscripcion_id")
+  usuarioId         String         @map("usuario_id")
+  cursoId           String         @map("curso_id")
+  estado            EstadoProgreso @default(NO_INICIADO)
+  porcentaje        Float          @default(0)
+  notaFinal         Float?         @map("nota_final")
+  etiquetaLogro     EtiquetaLogro? @map("etiqueta_logro")
+  modulosCompletados Int           @default(0) @map("modulos_completados")
+  modulosTotales    Int            @default(0) @map("modulos_totales")
+  // Tiempo en minutos
+  tiempoTotal       Int            @default(0) @map("tiempo_total")
+  iniciadoEn        DateTime?      @map("iniciado_en")
+  completadoEn      DateTime?      @map("completado_en")
+
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  // Relaciones
+  inscripcion Inscripcion @relation(fields: [inscripcionId], references: [id], onDelete: Cascade)
+  usuario     Usuario     @relation(fields: [usuarioId], references: [id])
+  curso       Curso       @relation(fields: [cursoId], references: [id])
+
+  @@index([usuarioId])
+  @@index([cursoId])
+  @@map("progresos_curso")
+}
+
+model ProgresoModulo {
+  id            String         @id @default(cuid())
+  inscripcionId String         @map("inscripcion_id")
+  usuarioId     String         @map("usuario_id")
+  moduloId      String         @map("modulo_id")
+  estado        EstadoProgreso @default(NO_INICIADO)
+  porcentaje    Float          @default(0)
+  // null si no hay evaluables o no hay entregas todavía
+  puntaje       Float?
+  tiempoTotal   Int            @default(0) @map("tiempo_total")
+  iniciadoEn    DateTime?      @map("iniciado_en")
+  completadoEn  DateTime?      @map("completado_en")
+
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  // Relaciones
+  inscripcion Inscripcion @relation(fields: [inscripcionId], references: [id])
+  usuario     Usuario     @relation(fields: [usuarioId], references: [id])
+  modulo      Modulo      @relation(fields: [moduloId], references: [id])
+
+  @@unique([inscripcionId, moduloId])
+  @@index([usuarioId])
+  @@index([inscripcionId])
+  @@map("progresos_modulo")
+}
+
+model ProgresoContenido {
+  id            String   @id @default(cuid())
+  inscripcionId String   @map("inscripcion_id")
+  usuarioId     String   @map("usuario_id")
+  contenidoId   String   @map("contenido_id")
+  vistoEn       DateTime @default(now()) @map("visto_en")
+
+  // Relaciones
+  inscripcion Inscripcion @relation(fields: [inscripcionId], references: [id])
+  usuario     Usuario     @relation(fields: [usuarioId], references: [id])
+  contenido   Contenido   @relation(fields: [contenidoId], references: [id])
+
+  @@unique([inscripcionId, contenidoId])
+  @@index([inscripcionId])
+  @@map("progresos_contenido")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ENTREGAS
+// ═══════════════════════════════════════════════════════════════
+
+model Entrega {
+  id            String        @id @default(cuid())
+  usuarioId     String        @map("usuario_id")
+  contenidoId   String        @map("contenido_id")
+  inscripcionId String        @map("inscripcion_id")
+  // Estructura variable según tipo (respuestas de test, código, URL, etc.)
+  contenido     Json
+  estado        EstadoEntrega @default(PENDIENTE)
+  puntaje       Float?
+  retroalimentacion String?
+  // Datos de revisión IA
+  scoreIa       Float?        @map("score_ia")
+  flagsIa       Json?         @map("flags_ia")
+  // Datos de ejecución (ejercicios de código)
+  stdout        String?
+  stderr        String?
+  testsPasados  Int?          @map("tests_pasados")
+  testsTotal    Int?          @map("tests_total")
+  intentos      Int           @default(1)
+  creadoEn      DateTime      @default(now()) @map("creado_en")
+  evaluadoEn    DateTime?     @map("evaluado_en")
+
+  // Relaciones
+  usuario     Usuario     @relation(fields: [usuarioId], references: [id])
+  contenido_  Contenido   @relation(fields: [contenidoId], references: [id])
+  inscripcion Inscripcion @relation(fields: [inscripcionId], references: [id])
+  archivos    ArchivoEntrega[]
+
+  @@index([usuarioId])
+  @@index([contenidoId])
+  @@index([estado])
+  @@index([inscripcionId])
+  @@map("entregas")
+}
+
+model EntregaDraft {
+  usuarioId   String @map("usuario_id")
+  contenidoId String @map("contenido_id")
+  archivos    Json
+
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  // Relaciones
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id])
+  contenido Contenido @relation(fields: [contenidoId], references: [id])
+
+  @@id([usuarioId, contenidoId])
+  @@map("entrega_drafts")
+}
+
+model ArchivoEntrega {
+  id        String  @id @default(cuid())
+  entregaId String  @map("entrega_id")
+  path      String
+  content   String
+  readOnly  Boolean @default(false) @map("read_only")
+
+  // Relaciones
+  entrega Entrega @relation(fields: [entregaId], references: [id], onDelete: Cascade)
+
+  @@map("archivos_entrega")
+}

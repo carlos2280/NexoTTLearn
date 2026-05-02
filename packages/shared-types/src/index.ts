@@ -7,4 +7,6 @@ export {
   type UsuarioPublico,
   loginResponseSchema,
   type LoginResponse,
+  cambiarPasswordSchema,
+  type CambiarPasswordInput,
 } from "./auth"

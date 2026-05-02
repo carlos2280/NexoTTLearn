@@ -11,9 +11,11 @@ import {
   UsePipes,
 } from "@nestjs/common"
 import {
+  type CambiarPasswordInput,
   type LoginInput,
   type LoginResponse,
   type UsuarioPublico,
+  cambiarPasswordSchema,
   loginSchema,
 } from "@nexott-learn/shared-types"
 import type { Request } from "express"
@@ -49,6 +51,21 @@ export class AuthController {
     await new Promise<void>((resolve, reject) => {
       req.session?.destroy((err) => (err ? reject(err) : resolve()))
     })
+  }
+
+  @Post("cambiar-password")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(SesionGuard)
+  @UsePipes(new ZodValidationPipe(cambiarPasswordSchema))
+  async cambiarPassword(
+    @Body() input: CambiarPasswordInput,
+    @UsuarioActual() usuario: UsuarioSesion | undefined,
+  ): Promise<void> {
+    if (!usuario) {
+      throw new UnauthorizedException("Sesion no valida")
+    }
+
+    await this.authService.cambiarPassword(usuario.id, input.passwordActual, input.passwordNuevo)
   }
 
   @Get("me")
