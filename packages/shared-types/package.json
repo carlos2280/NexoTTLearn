@@ -3,16 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "sideEffects": false,
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     }
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
     "lint": "cd ../.. && biome check packages/shared-types/src/",
-    "typecheck": "tsc --noEmit"
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "zod": "3.24.1"
