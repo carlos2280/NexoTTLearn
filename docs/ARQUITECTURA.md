@@ -384,10 +384,12 @@ Las siguientes excepciones estan **documentadas en `biome.json` como overrides p
 |----------|------|-----------|---------|
 | `apps/api/src/**` | NestJS source | `useImportType` | NestJS DI rompe con `import type` para inyectables. Ver "NestJS DI — trampas conocidas". |
 | `apps/api/src/**` | NestJS source | `noParameterProperties` | `constructor(private readonly x: Service)` es el patron idiomatico de DI en NestJS. Forzar properties explicitas duplica codigo y rompe la convencion del framework. |
+| `apps/api/src/**` | NestJS source | `noNodejsModules` | El backend NestJS siempre corre en Node. Usar `node:crypto`, `node:fs`, etc. es esperado y necesario (cifrado MFA, TLS, etc.). La regla aplica mejor a codigo isomorphic/UI. |
 | `apps/api/prisma/seed.ts`, `apps/api/scripts/**`, `apps/web/server.js` | Scripts/runtime servidor | `noConsoleLog`, `noConsole`, `noNodejsModules` | Los scripts CLI y el server.js de produccion necesitan stdout para logs y modulos node nativos (path, url, module). |
 | Tests | `*.test.{ts,tsx}` | `noExplicitAny`, `noNonNullAssertion` | Los tests aceptan estos atajos para fixtures y mocks puntuales. |
 | `useFilenamingConvention` | (global) | acepta `PascalCase` ademas de kebab/camel | Convencion estandar de React: componentes en PascalCase (`LoginPage.tsx`, `RutaProtegida.tsx`). |
 | `packages/*/src/index.ts` | API publica del paquete | `noBarrelFile`, `noReExportAll` | El `index.ts` de un paquete es por definicion el barrel publico. Bloquearlo obligaria a importar `@nexott-learn/shared-types/auth` en vez de `@nexott-learn/shared-types`. |
+| `apps/web/src/**/*.tsx` | React + Web Components | `noReactSpecificProps` | TypeScript de React tipa estricto `className` en elementos HTML; `class` en JSX solo es valido para custom elements (Web Components nexott-ui). El conflicto entre la regla de biome (favor WC) y el tipado de React se resuelve permitiendo `className` solo en `.tsx`. Para WC siempre usamos sus props nativas. |
 
 Cualquier supresion **inline** (`// biome-ignore`) requiere comentario explicando el porque.
 

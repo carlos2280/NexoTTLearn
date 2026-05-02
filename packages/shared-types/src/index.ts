@@ -9,4 +9,23 @@ export {
   type LoginResponse,
   cambiarPasswordSchema,
   type CambiarPasswordInput,
+  loginResultSchema,
+  type LoginResult,
+  type MfaPendingSetup,
+  type MfaPendingVerify,
+  verifyMfaSchema,
+  type VerifyMfaInput,
+  verifyMfaResponseSchema,
+  type VerifyMfaResponse,
+  confirmMfaSetupSchema,
+  type ConfirmMfaSetupInput,
+  confirmMfaSetupResponseSchema,
+  type ConfirmMfaSetupResponse,
 } from "./auth"
+
+export {
+  API_ERROR_CODES,
+  type ApiErrorCode,
+  apiErrorBodySchema,
+  type ApiErrorBody,
+} from "./api-errors"

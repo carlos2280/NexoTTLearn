@@ -112,9 +112,12 @@ model Usuario {
   avatar       String?
   activo       Boolean    @default(true)
 
-  // MFA
-  mfaEnabled Boolean @default(false) @map("mfa_enabled")
-  mfaSecret  String? @map("mfa_secret")
+  // MFA (TOTP RFC 6238). mfaSecret guarda el secreto base32 cifrado at-rest.
+  // mfaConfirmadoEn marca cuando el usuario completo el setup (escaneo + verificacion).
+  // mfaEnabled solo es true cuando hay secret confirmado.
+  mfaEnabled      Boolean   @default(false) @map("mfa_enabled")
+  mfaSecret       String?   @map("mfa_secret")
+  mfaConfirmadoEn DateTime? @map("mfa_confirmado_en")
 
   // Seguridad
   debeCambiarPassword Boolean   @default(true)  @map("debe_cambiar_password")
@@ -136,8 +139,42 @@ model Usuario {
   entregas              Entrega[]
   entregaDrafts         EntregaDraft[]
   diagnosticos          Diagnostico[]
+  authEventos           AuthEvento[]
 
   @@map("usuarios")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AUDITORIA DE AUTENTICACION
+// ═══════════════════════════════════════════════════════════════
+
+enum AuthEventoTipo {
+  LOGIN_OK
+  LOGIN_FALLIDO
+  LOGIN_BLOQUEADO
+  MFA_SETUP_INICIADO
+  MFA_ACTIVADO
+  MFA_VERIFICADO
+  MFA_FALLIDO
+  PASSWORD_CAMBIADO
+  LOGOUT
+}
+
+model AuthEvento {
+  id        String         @id @default(cuid())
+  usuarioId String?        @map("usuario_id")
+  email     String?
+  tipo      AuthEventoTipo
+  ip        String?
+  userAgent String?        @map("user_agent")
+  metadata  Json?
+  creadoEn  DateTime       @default(now()) @map("creado_en")
+
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId, creadoEn])
+  @@index([tipo, creadoEn])
+  @@map("auth_eventos")
 }
 
 // ═══════════════════════════════════════════════════════════════

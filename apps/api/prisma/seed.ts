@@ -8,9 +8,17 @@ async function main() {
   const adminPassword = "Admin1234!"
   const passwordHash = await bcrypt.hash(adminPassword, 12)
 
+  // En seed reseteamos siempre a estado inicial (idempotente para dev local).
+  // Esto permite re-ejecutar `pnpm db:seed` y volver al flujo de "primer acceso".
   const admin = await prisma.usuario.upsert({
     where: { email: adminEmail },
-    update: {},
+    update: {
+      passwordHash,
+      debeCambiarPassword: true,
+      activo: true,
+      intentosFallidos: 0,
+      bloqueadoHasta: null,
+    },
     create: {
       email: adminEmail,
       nombre: "Admin",
@@ -29,7 +37,13 @@ async function main() {
 
   const participante = await prisma.usuario.upsert({
     where: { email: participanteEmail },
-    update: {},
+    update: {
+      passwordHash: participanteHash,
+      debeCambiarPassword: true,
+      activo: true,
+      intentosFallidos: 0,
+      bloqueadoHasta: null,
+    },
     create: {
       email: participanteEmail,
       nombre: "Carlos",
