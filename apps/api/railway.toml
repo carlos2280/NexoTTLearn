@@ -8,7 +8,7 @@
 
 [build]
 builder = "RAILPACK"
-buildCommand = "pnpm install --frozen-lockfile && pnpm turbo build --filter=@nexott-learn/api"
+buildCommand = "pnpm install --frozen-lockfile && pnpm --filter=@nexott-learn/api exec prisma generate && pnpm turbo build --filter=@nexott-learn/api"
 watchPatterns = [
   "apps/api/**",
   "packages/shared-types/**",
