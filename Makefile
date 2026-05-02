@@ -60,6 +60,13 @@ lib-build: ## Compila la librería nexott-ui (../nexott-ui)
 lib-rebuild: lib-build install ## Compila la librería y reinstala (refresca enlace)
 	@printf "$(C_GREEN)✓ Librería recompilada y enlazada$(C_RESET)\n"
 
+.PHONY: lib-refresh
+lib-refresh: lib-build ## Recompila lib + reinstala link pnpm + limpia cache Vite
+	@printf "$(C_BLUE)→ Refrescando link pnpm…$(C_RESET)\n"
+	@pnpm install --silent
+	@$(MAKE) vite-cache-clear
+	@printf "$(C_GREEN)✓ Librería recompilada y enlazada. Reinicia 'make dev' si está corriendo.$(C_RESET)\n"
+
 .PHONY: lib-storybook
 lib-storybook: ## Levanta Storybook de la librería (localhost:6006)
 	cd $(LIB) && pnpm storybook
@@ -106,6 +113,11 @@ dev: kill ## Levanta web + api en paralelo (foreground)
 	@printf "$(C_BLUE)→ Levantando web + api…$(C_RESET)\n"
 	pnpm dev
 
+.PHONY: dev-fresh
+dev-fresh: kill vite-cache-clear ## Levanta dev con cache de Vite limpio (tras lib-build)
+	@printf "$(C_BLUE)→ Levantando web + api con cache limpio…$(C_RESET)\n"
+	pnpm dev
+
 .PHONY: dev-web
 dev-web: ## Levanta solo el frontend (Vite, localhost:5173)
 	pnpm dev:web
@@ -113,6 +125,12 @@ dev-web: ## Levanta solo el frontend (Vite, localhost:5173)
 .PHONY: dev-api
 dev-api: ## Levanta solo el backend (Nest, localhost:4000)
 	pnpm dev:api
+
+.PHONY: vite-cache-clear
+vite-cache-clear: ## Limpia el cache de pre-bundling de Vite
+	@printf "$(C_YELLOW)→ Limpiando cache de Vite…$(C_RESET)\n"
+	@rm -rf apps/web/node_modules/.vite
+	@printf "$(C_GREEN)✓ Cache de Vite limpio$(C_RESET)\n"
 
 # ─────────────────────────────────────────────────────────
 # Procesos
