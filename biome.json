@@ -90,10 +90,11 @@
       }
     },
     {
-      "include": ["apps/api/prisma/seed.ts", "apps/api/scripts/**"],
+      "include": ["apps/api/prisma/seed.ts", "apps/api/scripts/**", "apps/web/server.js"],
       "linter": {
         "rules": {
-          "suspicious": { "noConsoleLog": "off", "noConsole": "off" }
+          "suspicious": { "noConsoleLog": "off", "noConsole": "off" },
+          "correctness": { "noNodejsModules": "off" }
         }
       }
     },

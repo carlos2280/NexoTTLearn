@@ -1,0 +1,37 @@
+name: ✨ Feature
+description: Proponer una nueva funcionalidad
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: Problema que resuelve
+      description: Que necesidad cubre? A quien afecta?
+    validations:
+      required: true
+
+  - type: textarea
+    id: propuesta
+    attributes:
+      label: Propuesta
+      description: Como funcionaria? UI/UX si aplica.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: prioridad
+    attributes:
+      label: Prioridad sugerida
+      options:
+        - Critica (bloquea otra cosa)
+        - Alta (siguiente sprint)
+        - Media (en algun sprint)
+        - Baja (nice to have)
+    validations:
+      required: true
+
+  - type: input
+    id: sprint
+    attributes:
+      label: Sprint sugerido
+      placeholder: "Sprint 1, 2, 3, 4 o post-MVP"

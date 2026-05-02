@@ -1,0 +1,32 @@
+# CODEOWNERS — NexoTT Learn
+#
+# Cuando se abre un PR que toca un archivo, GitHub asigna automaticamente
+# a los owners listados aqui como reviewers requeridos.
+#
+# Sintaxis: <patron> <usuarios o teams>
+# Docs: https://docs.github.com/es/repositories/managing-your-repositorys-settings-and-security/customizing-your-repository/about-code-owners
+
+# Default: cualquier cambio
+*                               @carlos2280
+
+# Configuracion critica del repo
+.github/                        @carlos2280
+.husky/                         @carlos2280
+biome.json                      @carlos2280
+commitlint.config.js            @carlos2280
+turbo.json                      @carlos2280
+package.json                    @carlos2280
+pnpm-lock.yaml                  @carlos2280
+.release-please-config.json     @carlos2280
+
+# Deployment
+**/railway.toml                 @carlos2280
+docs/DEPLOYMENT.md              @carlos2280
+docs/REPO-SETTINGS.md           @carlos2280
+
+# BD: las migraciones requieren revision extra
+apps/api/prisma/                @carlos2280
+
+# Auth: cambios sensibles
+apps/api/src/auth/              @carlos2280
+apps/api/src/common/guards/     @carlos2280

@@ -28,8 +28,15 @@ cd ../NexoTTLearn
 # 2. Crear .env (basado en .env.example)
 cp .env.example .env
 
-# 3. Crear el enlace local a la libreria
-# Crear archivo .pnpmfile.cjs (NO se commitea, esta en .gitignore):
+# 3. Crear .env.tokens con NODE_AUTH_TOKEN (NO se commitea, esta en .gitignore)
+# El token es un Personal Access Token de GitHub con scope read:packages
+# (https://github.com/settings/tokens/new). Necesario para instalar @carlos2280/nexott-ui
+# desde GitHub Packages cuando NO esta activo el override local.
+echo 'export NODE_AUTH_TOKEN=ghp_TU_TOKEN' > .env.tokens
+
+# 4. (OPCIONAL) Crear enlace local a la libreria si vas a iterar sobre nexott-ui en paralelo
+# Si no necesitas el dev paralelo, salta este paso. Veras la version publicada de nexott-ui.
+# Si lo creas, recuerda: NUNCA commitear el lockfile resultante (ver "Trabajo en paralelo").
 cat > .pnpmfile.cjs << 'EOF'
 const path = require("path")
 const nexottUiPath = path.resolve(__dirname, "../nexott-ui")
@@ -42,10 +49,12 @@ function readPackage(pkg) {
 module.exports = { hooks: { readPackage } }
 EOF
 
-# 4. Setup completo (install + Postgres + migrate + seed)
+# 5. Setup completo (install + Postgres + migrate + seed)
+# Si tienes .pnpmfile.cjs, usa --no-frozen-lockfile la primera vez:
+source .env.tokens && pnpm install --no-frozen-lockfile
 make setup
 
-# 5. Levantar todo
+# 6. Levantar todo
 make dev
 ```
 
@@ -69,6 +78,74 @@ La libreria vive en un repo aparte (`../nexott-ui`). En desarrollo local se cons
 |------|-----------------|-----------------|
 | **Local** | `file:../nexott-ui` (enlace) | `.pnpmfile.cjs` presente |
 | **Publicada** | `@carlos2280/nexott-ui: ^X.Y.Z` desde GitHub Packages | `.pnpmfile.cjs` ausente o renombrado |
+
+### ⚠️ Regla critica: lockfile y dev paralelo
+
+El `pnpm-lock.yaml` que se commitea **DEBE apuntar a la version publicada** de `nexott-ui` en GitHub Packages. NUNCA debe contener `file:/home/...` ni `pnpmfileChecksum`.
+
+**Que pasa si commiteo un lockfile contaminado**: CI falla con `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`, Railway no puede deployar, todo el pipeline se rompe.
+
+**Como se contamina sin querer**: si ejecutas `pnpm install` con `.pnpmfile.cjs` activo, pnpm regenera el lockfile apuntando al path local. Si commiteas, problema.
+
+**Proteccion automatica**: hay un hook `pre-commit` que rechaza commits de `pnpm-lock.yaml` con paths locales o `pnpmfileChecksum`. Si ves el error del hook, sigue las instrucciones de "Regenerar lockfile limpio" mas abajo.
+
+### Workflow recomendado para dev paralelo
+
+#### Caso 1: Solo tocas codigo de la app (no deps)
+
+```bash
+# .pnpmfile.cjs activo, lockfile commiteado limpio
+pnpm install --no-frozen-lockfile   # solo la primera vez tras clonar
+make dev
+# trabajas, commiteas archivos pero NUNCA pnpm-lock.yaml
+git add apps/web/src/...
+git commit -m "feat(cursos): ..."
+```
+
+El lockfile en disco se modifica al usar `--no-frozen-lockfile`, pero **NO lo stageas**. El hook pre-commit te protege si lo intentas.
+
+#### Caso 2: Necesitas agregar/actualizar una dependencia
+
+Cuando quieras hacer `pnpm add <paquete>` o cambiar una version, **DEBES** regenerar el lockfile limpio para poder commitearlo. Sigue "Regenerar lockfile limpio" mas abajo.
+
+#### Caso 3: Iterando sobre nexott-ui
+
+```bash
+# Asumes que ya tienes .pnpmfile.cjs activo
+# Editas codigo en ../nexott-ui/src/
+make lib-rebuild   # rebuild de la libreria + reinstall en NexoTTLearn
+# Vite hace HMR, ves los cambios al instante
+```
+
+### Regenerar lockfile limpio (solo cuando cambias deps)
+
+Procedimiento documentado y probado:
+
+```bash
+# 1. Cargar el token (necesario para resolver nexott-ui desde GH Packages)
+source .env.tokens
+
+# 2. Desactivar pnpmfile temporalmente
+mv .pnpmfile.cjs .pnpmfile.cjs.bak
+
+# 3. Borrar lockfile y reinstalar limpio
+rm -rf pnpm-lock.yaml node_modules apps/*/node_modules packages/*/node_modules
+pnpm install
+
+# 4. Verificar que el lockfile NO contiene paths locales
+grep -c "file:/home" pnpm-lock.yaml          # debe dar 0
+grep "pnpmfileChecksum" pnpm-lock.yaml       # no debe imprimir nada
+
+# 5. Commitear pnpm-lock.yaml limpio
+git add pnpm-lock.yaml package.json apps/*/package.json
+git commit -m "chore(deps): ..."
+
+# 6. Restaurar pnpmfile y volver al flujo dev
+mv .pnpmfile.cjs.bak .pnpmfile.cjs
+pnpm install --no-frozen-lockfile
+```
+
+> **Tip**: si la version de `nexott-ui` que necesitas aun no esta publicada en GH Packages, **publicala primero** desde su repo (`make publish` o el workflow de release-please).
 
 ### Ciclo de desarrollo con la libreria
 
@@ -377,6 +454,19 @@ make lib-rebuild   # rebuild + reinstall
 make ps         # ver pids
 kill -9 <pid>   # mano dura
 ```
+
+### `pnpm-lock.yaml staged contiene paths LOCALES` al hacer commit
+
+El hook pre-commit detecto que tienes el lockfile contaminado por `.pnpmfile.cjs`. Sigue "Regenerar lockfile limpio" en la seccion "Trabajar con la libreria de UI".
+
+### `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH` al hacer pnpm install
+
+El lockfile committeado contiene `pnpmfileChecksum` pero tu shell no tiene `.pnpmfile.cjs` (o viceversa). Soluciones:
+
+- Si quieres dev paralelo: crea `.pnpmfile.cjs` (ver setup inicial) y ejecuta `pnpm install --no-frozen-lockfile`.
+- Si NO quieres dev paralelo: borra `.pnpmfile.cjs` si existe, ejecuta `pnpm install` normal.
+
+Si el lockfile committeado es el contaminado (no deberia, hay un hook que lo previene), regenerarlo con el procedimiento documentado.
 
 ### Postgres no arranca
 

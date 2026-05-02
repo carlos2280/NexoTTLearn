@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentacion del proyecto
+    url: https://github.com/carlos2280/NexoTTLearn/tree/develop/docs
+    about: Antes de abrir un issue, revisa README, ARQUITECTURA, CONTRIBUTING y DEPLOYMENT.

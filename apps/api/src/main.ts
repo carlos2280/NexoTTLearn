@@ -9,15 +9,29 @@ import helmet from "helmet"
 import passport from "passport"
 import { AppModule } from "./app.module"
 
+const ORIGENES_DEV = ["http://localhost:5173", "http://localhost:3000"]
+
+function obtenerOrigenesPermitidos(): string[] {
+  const extra = [process.env.WEB_ORIGIN, process.env.WEB_ORIGIN_EXTRA]
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .flatMap((value) => value.split(",").map((parte) => parte.trim()))
+    .filter((value) => value.length > 0)
+  return [...ORIGENES_DEV, ...extra]
+}
+
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ["log", "error", "warn", "debug"],
   })
 
-  const port = Number(process.env.API_PORT ?? 4000)
+  // Railway / heroku-style proxies: necesario para que `secure: true` cookies funcionen
+  app.set("trust proxy", 1)
+
+  const port = Number(process.env.PORT ?? process.env.API_PORT ?? 4000)
   const sessionSecret = process.env.SESSION_SECRET
   const databaseUrl = process.env.DATABASE_URL
   const isProd = process.env.NODE_ENV === "production"
+  const origenesPermitidos = obtenerOrigenesPermitidos()
 
   if (!sessionSecret || sessionSecret.length < 32) {
     throw new Error("SESSION_SECRET debe tener al menos 32 caracteres")
@@ -31,16 +45,11 @@ async function bootstrap(): Promise<void> {
 
   app.enableCors({
     origin: (origin, callback) => {
-      const permitidos = [
-        "http://localhost:5173",
-        "http://localhost:3000",
-        process.env.WEB_ORIGIN,
-      ].filter(Boolean)
-      if (!origin || permitidos.includes(origin)) {
+      if (!origin || origenesPermitidos.includes(origin)) {
         callback(null, true)
-      } else {
-        callback(new Error(`Origen no permitido: ${origin}`))
+        return
       }
+      callback(new Error(`Origen no permitido: ${origin}`))
     },
     credentials: true,
   })
@@ -60,8 +69,8 @@ async function bootstrap(): Promise<void> {
       cookie: {
         httpOnly: true,
         secure: isProd,
-        sameSite: isProd ? "strict" : "lax",
-        maxAge: 1000 * 60 * 60 * 8, // 8 horas
+        sameSite: isProd ? "none" : "lax",
+        maxAge: 1000 * 60 * 60 * 8,
       },
     }),
   )
@@ -71,8 +80,12 @@ async function bootstrap(): Promise<void> {
 
   app.setGlobalPrefix("api")
 
-  await app.listen(port)
-  Logger.log(`API escuchando en http://localhost:${port}/api`, "Bootstrap")
+  await app.listen(port, "0.0.0.0")
+  Logger.log(`API escuchando en puerto ${port} (env=${process.env.NODE_ENV})`, "Bootstrap")
+  Logger.log(
+    `Origenes CORS permitidos: ${origenesPermitidos.join(", ") || "(ninguno extra)"}`,
+    "Bootstrap",
+  )
 }
 
 bootstrap().catch((err) => {
