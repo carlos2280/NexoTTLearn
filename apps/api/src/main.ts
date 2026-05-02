@@ -8,6 +8,7 @@ import session from "express-session"
 import helmet from "helmet"
 import passport from "passport"
 import { AppModule } from "./app.module"
+import { ApiExceptionFilter } from "./common/errors/api-exception.filter"
 
 const ORIGENES_DEV = ["http://localhost:5173", "http://localhost:3000"]
 
@@ -79,6 +80,8 @@ async function bootstrap(): Promise<void> {
   app.use(passport.session())
 
   app.setGlobalPrefix("api")
+  // biome-ignore lint/correctness/useHookAtTopLevel: NestJS app.useGlobalFilters no es un hook React, es API de Nest
+  app.useGlobalFilters(new ApiExceptionFilter())
 
   await app.listen(port, "0.0.0.0")
   Logger.log(`API escuchando en puerto ${port} (env=${process.env.NODE_ENV})`, "Bootstrap")

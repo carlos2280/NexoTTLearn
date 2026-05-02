@@ -84,8 +84,17 @@
       "include": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"],
       "linter": {
         "rules": {
-          "suspicious": { "noExplicitAny": "off" },
-          "style": { "noNonNullAssertion": "off" }
+          "suspicious": {
+            "noExplicitAny": "off",
+            "noExportsInTest": "off",
+            "noMisplacedAssertion": "off"
+          },
+          "style": { "noNonNullAssertion": "off" },
+          "performance": { "noDelete": "off", "useTopLevelRegex": "off" },
+          "correctness": { "noUndeclaredDependencies": "off" },
+          "complexity": { "noExcessiveCognitiveComplexity": "off" },
+          "security": { "noGlobalEval": "off" },
+          "nursery": { "noSecrets": "off" }
         }
       }
     },
@@ -105,6 +114,9 @@
           "style": {
             "useImportType": "off",
             "noParameterProperties": "off"
+          },
+          "correctness": {
+            "noNodejsModules": "off"
           }
         }
       }
@@ -116,6 +128,16 @@
           "performance": {
             "noBarrelFile": "off",
             "noReExportAll": "off"
+          }
+        }
+      }
+    },
+    {
+      "include": ["apps/web/src/**/*.tsx"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noReactSpecificProps": "off"
           }
         }
       }
