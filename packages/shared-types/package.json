@@ -3,15 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "sideEffects": false,
-  "types": "./dist/index.d.ts",
+  "types": "./dist/cjs/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js",
+      "types": "./dist/cjs/index.d.ts"
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.build.esm.json",
     "typecheck": "tsc --noEmit",
     "lint": "cd ../.. && biome check packages/shared-types/src/",
     "clean": "rm -rf dist"
