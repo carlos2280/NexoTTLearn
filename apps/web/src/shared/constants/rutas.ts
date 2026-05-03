@@ -22,9 +22,15 @@ export const RUTAS = {
   admin: {
     bandeja: "/admin",
     cursos: "/admin/cursos",
+    cursoNuevo: "/admin/cursos/nuevo",
     cursoEditar: (id: string): string => `/admin/cursos/${id}`,
     seguimiento: "/admin/seguimiento",
     centroRevision: "/admin/centro-revision",
+    centroRevisionTab: (tab: "entregas" | "proyectos"): string =>
+      `/admin/centro-revision?tab=${tab}`,
     personas: "/admin/personas",
+    diagnosticos: "/admin/diagnosticos",
+    diagnosticoNuevo: "/admin/diagnosticos/nuevo",
+    configuracion: "/admin/configuracion",
   },
 } as const

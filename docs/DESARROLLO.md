@@ -131,6 +131,7 @@ mv .pnpmfile.cjs .pnpmfile.cjs.bak
 # 3. Borrar lockfile y reinstalar limpio
 rm -rf pnpm-lock.yaml node_modules apps/*/node_modules packages/*/node_modules
 pnpm install
+# El postinstall del workspace api genera Prisma Client automaticamente.
 
 # 4. Verificar que el lockfile NO contiene paths locales
 grep -c "file:/home" pnpm-lock.yaml          # debe dar 0
