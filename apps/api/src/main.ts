@@ -86,7 +86,7 @@ async function bootstrap(): Promise<void> {
   await app.listen(port, "0.0.0.0")
   Logger.log(`API escuchando en puerto ${port} (env=${process.env.NODE_ENV})`, "Bootstrap")
   Logger.log(
-    `Origenes CORS permitidos: ${origenesPermitidos.join(", ") || "(ninguno extra)"}`,
+    `Origenes CORS permitidos: ${origenesPermitidos.join(", ") || "(ninguno)"}`,
     "Bootstrap",
   )
 }
