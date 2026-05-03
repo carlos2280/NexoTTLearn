@@ -29,3 +29,18 @@ export {
   apiErrorBodySchema,
   type ApiErrorBody,
 } from "./api-errors"
+
+export {
+  adminDashboardResponseSchema,
+  type AdminDashboardResponse,
+  dashboardKpiSchema,
+  type DashboardKpi,
+  dashboardColaItemSchema,
+  type DashboardColaItem,
+  dashboardColaRevisionSchema,
+  type DashboardColaRevision,
+  dashboardAlertaSchema,
+  type DashboardAlerta,
+  dashboardActividadSchema,
+  type DashboardActividad,
+} from "./admin-dashboard"
