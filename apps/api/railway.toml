@@ -20,7 +20,7 @@ watchPatterns = [
 ]
 
 [deploy]
-startCommand = "cd apps/api && pnpm prisma migrate deploy && node -e \"if(process.env.RUN_SEED==='true'){require('child_process').execSync('pnpm exec tsx scripts/seed-curso-demo.ts',{stdio:'inherit'})}\" && node dist/main.js"
+startCommand = "cd apps/api && pnpm prisma migrate deploy && node -e \"if(process.env.RUN_SEED==='true'){require('child_process').execSync('pnpm exec prisma db seed',{stdio:'inherit'});require('child_process').execSync('pnpm exec tsx scripts/seed-curso-demo.ts',{stdio:'inherit'})}\" && node dist/main.js"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
