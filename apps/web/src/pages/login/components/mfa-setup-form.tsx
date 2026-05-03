@@ -96,8 +96,10 @@ export function MfaSetupForm({ initialPending, onSuccess }: MfaSetupFormProps): 
             state={error ? "error" : ""}
             helper={error ?? ""}
             disabled={isVerifying}
-            onNxtTotpChange={(e) => setCode(e.detail.value)}
-            onNxtTotpComplete={async (e) => {
+            onNxtTotpChange={(e: CustomEvent<{ value: string; complete: boolean }>) =>
+              setCode(e.detail.value)
+            }
+            onNxtTotpComplete={async (e: CustomEvent<{ value: string }>) => {
               await onComplete(e.detail.value)
             }}
           />
