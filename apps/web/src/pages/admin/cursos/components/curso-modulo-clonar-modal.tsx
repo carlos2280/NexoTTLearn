@@ -104,21 +104,21 @@ export function CursoModuloClonarModal({
             </NxtSelectOption>
           ))}
         </NxtSelect>
-
-        <Stack direction="row" justify="end" gap="md">
-          <NxtButton variant="ghost" onNxtButtonClick={cerrarYResetear}>
-            Cancelar
-          </NxtButton>
-          <NxtButton
-            variant="primary"
-            disabled={!moduloOrigenId || clonarMutation.isPending}
-            loading={clonarMutation.isPending}
-            onNxtButtonClick={ejecutar}
-          >
-            Clonar modulo
-          </NxtButton>
-        </Stack>
       </Stack>
+
+      <div slot="footer">
+        <NxtButton variant="ghost" onNxtButtonClick={cerrarYResetear}>
+          Cancelar
+        </NxtButton>
+        <NxtButton
+          variant="primary"
+          disabled={!moduloOrigenId || clonarMutation.isPending}
+          loading={clonarMutation.isPending}
+          onNxtButtonClick={ejecutar}
+        >
+          Clonar modulo
+        </NxtButton>
+      </div>
     </NxtModal>
   )
 }
