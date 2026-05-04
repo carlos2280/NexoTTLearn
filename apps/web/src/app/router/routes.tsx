@@ -1,4 +1,7 @@
 import { BandejaAdminPage } from "@/pages/admin/bandeja/bandeja-admin.page"
+import { CursoEditarPage } from "@/pages/admin/cursos/curso-editar.page"
+import { CursosAdminPage } from "@/pages/admin/cursos/cursos-admin.page"
+import { ModuloSeccionesPage } from "@/pages/admin/cursos/modulo-secciones.page"
 import { BandejaPage } from "@/pages/bandeja/bandeja.page"
 import { CambiarPasswordPage } from "@/pages/cambiar-password/cambiar-password.page"
 import { LoginPage } from "@/pages/login/login.page"
@@ -36,6 +39,13 @@ export function AppRoutes() {
           <Route element={<GuardRol rol="ADMIN" />}>
             <Route element={<LayoutAdmin />}>
               <Route path={RUTAS.admin.bandeja} element={<BandejaAdminPage />} />
+              <Route path={RUTAS.admin.cursos} element={<CursosAdminPage />} />
+              <Route path={RUTAS.admin.cursoNuevo} element={<CursoEditarPage />} />
+              <Route path={RUTAS.admin.cursoEditar(":id")} element={<CursoEditarPage />} />
+              <Route
+                path={RUTAS.admin.cursoModuloSecciones(":id", ":moduloId")}
+                element={<ModuloSeccionesPage />}
+              />
             </Route>
           </Route>
         </Route>
