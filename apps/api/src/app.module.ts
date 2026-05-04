@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config"
 import { APP_GUARD } from "@nestjs/core"
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler"
 import { AreasCompetenciaModule } from "./admin/areas-competencia/areas-competencia.module"
+import { ContenidosModule } from "./admin/contenidos/contenidos.module"
 import { CursosModule } from "./admin/cursos/cursos.module"
 import { DashboardModule } from "./admin/dashboard/dashboard.module"
 import { ModulosModule } from "./admin/modulos/modulos.module"
@@ -33,6 +34,7 @@ import { HealthModule } from "./health/health.module"
     CursosModule,
     ModulosModule,
     SeccionesModule,
+    ContenidosModule,
     AreasCompetenciaModule,
   ],
   providers: [
