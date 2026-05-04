@@ -55,6 +55,59 @@ async function main() {
     },
   })
 
+  // ────────────────────────────────────────────────────────────────
+  // Areas de competencia (catalogo inicial). Idempotente via upsert por
+  // nombre (es @unique en el schema). Mantener color sincronizado con
+  // areaColorSchema en packages/shared-types/src/admin-modulos.ts.
+  // ────────────────────────────────────────────────────────────────
+  const areas = [
+    {
+      nombre: "Frontend",
+      color: "indigo",
+      orden: 1,
+      descripcion: "Interfaces, UX, frameworks web",
+    },
+    {
+      nombre: "Backend",
+      color: "emerald",
+      orden: 2,
+      descripcion: "APIs, servicios, persistencia",
+    },
+    {
+      nombre: "Cloud",
+      color: "cyan",
+      orden: 3,
+      descripcion: "Infraestructura, despliegues, escalabilidad",
+    },
+    {
+      nombre: "DevOps",
+      color: "amber",
+      orden: 4,
+      descripcion: "CI/CD, observabilidad, operacion",
+    },
+    {
+      nombre: "Datos",
+      color: "violet",
+      orden: 5,
+      descripcion: "Bases de datos, analitica, ETL",
+    },
+    {
+      nombre: "Mobile",
+      color: "rose",
+      orden: 6,
+      descripcion: "iOS, Android, multiplataforma",
+    },
+  ] as const
+
+  for (const a of areas) {
+    await prisma.areaCompetencia.upsert({
+      where: { nombre: a.nombre },
+      update: { color: a.color, orden: a.orden, descripcion: a.descripcion },
+      create: a,
+    })
+  }
+  console.info(`Seed: ${areas.length} areas de competencia upserted.`)
+
   console.info("Seed completo.")
   console.info(`Admin: ${admin.email} / ${adminPassword}`)
   console.info(`Participante: ${participante.email} / ${participantePassword}`)

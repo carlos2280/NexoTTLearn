@@ -2,7 +2,10 @@ import { Module } from "@nestjs/common"
 import { ConfigModule } from "@nestjs/config"
 import { APP_GUARD } from "@nestjs/core"
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler"
+import { AreasCompetenciaModule } from "./admin/areas-competencia/areas-competencia.module"
+import { CursosModule } from "./admin/cursos/cursos.module"
 import { DashboardModule } from "./admin/dashboard/dashboard.module"
+import { ModulosModule } from "./admin/modulos/modulos.module"
 import { AuthModule } from "./auth/auth.module"
 import { PrismaModule } from "./common/prisma/prisma.module"
 import { HealthModule } from "./health/health.module"
@@ -26,6 +29,9 @@ import { HealthModule } from "./health/health.module"
     AuthModule,
     HealthModule,
     DashboardModule,
+    CursosModule,
+    ModulosModule,
+    AreasCompetenciaModule,
   ],
   providers: [
     {
