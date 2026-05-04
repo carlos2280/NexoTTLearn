@@ -1,4 +1,9 @@
-import type { CursoAdminDetalle, CursoAdminItem, CursoStatus } from "@nexott-learn/shared-types"
+import type {
+  CursoAdminDetalle,
+  CursoAdminItem,
+  CursoStatus,
+  CursoTipoPeso as CursoTipoPesoApi,
+} from "@nexott-learn/shared-types"
 import type { EstadoCurso, NivelCurso } from "@prisma/client"
 import { ICON_COLORS, ICON_INITIALS_MAX, PALABRAS_REGEX } from "./cursos.types"
 
@@ -63,12 +68,14 @@ export type CursoAdminDetalleRow = CursoAdminRow & {
   umbralExcelencia: number
   umbralAprobado: number
   umbralEnDesarrollo: number
+  tipoPesos: ReadonlyArray<{ tipo: string; peso: number; nivel: string }>
 }
 
 /**
  * Convierte una fila Prisma de Curso al detalle completo que consume el
  * formulario de edicion del admin. Reusa la base de mapCursoARow y agrega los
- * campos del tab General (nivel, umbrales, estado BD nativo).
+ * campos del tab General (nivel, umbrales, estado BD nativo) mas los pesos
+ * (decision P3.1).
  */
 export function mapCursoADetalle(row: CursoAdminDetalleRow): CursoAdminDetalle {
   return {
@@ -78,6 +85,22 @@ export function mapCursoADetalle(row: CursoAdminDetalleRow): CursoAdminDetalle {
     umbralExcelencia: row.umbralExcelencia,
     umbralAprobado: row.umbralAprobado,
     umbralEnDesarrollo: row.umbralEnDesarrollo,
+    tipoPesos: row.tipoPesos.map(mapTipoPeso),
+  }
+}
+
+// Mapea una fila de la tabla `curso_tipo_pesos` al shape del shared-types.
+// `activo = peso > 0` se deriva aqui (no se persiste) para que el toggle del
+// formulario lea el valor sin recalcularlo en el front.
+function mapTipoPeso(row: { tipo: string; peso: number; nivel: string }): CursoTipoPesoApi {
+  // Cast a los enums de shared-types: el service garantiza que las filas
+  // creadas desde el endpoint son validas. Filas legacy con tipo/nivel fuera
+  // del enum se filtrarian aqui en lugar de explotar al validar la respuesta.
+  return {
+    tipo: row.tipo as CursoTipoPesoApi["tipo"],
+    peso: row.peso,
+    nivel: row.nivel as CursoTipoPesoApi["nivel"],
+    activo: row.peso > 0,
   }
 }
 

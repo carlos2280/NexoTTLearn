@@ -1,6 +1,12 @@
-import { ConflictException, Injectable, NotFoundException } from "@nestjs/common"
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common"
 import type {
   ActualizarCursoInput,
+  ActualizarPesosCursoInput,
   CrearCursoInput,
   CursoAdminDetalle,
   ObtenerCursosAdminResponse,
@@ -14,6 +20,7 @@ import {
   mapCursoARow,
 } from "./cursos.mapper"
 import {
+  ERROR_CURSO_DESHABILITADO,
   ERROR_CURSO_NO_ENCONTRADO,
   ERROR_SLUG_DUPLICADO,
   PRISMA_ERROR_UNIQUE_CONSTRAINT,
@@ -42,6 +49,9 @@ const SELECT_DETALLE = {
     select: {
       progresoCurso: { select: { estado: true } },
     },
+  },
+  tipoPesos: {
+    select: { tipo: true, peso: true, nivel: true },
   },
 } as const satisfies Prisma.CursoSelect
 
@@ -134,6 +144,84 @@ export class CursosService {
     } catch (error) {
       this.traducirErrorPrisma(error)
     }
+  }
+
+  /**
+   * Actualiza los pesos de un curso (decision P3.1).
+   *
+   * Por nivel ('modulo' o 'curso') se hace un "replace": los tipos que vienen
+   * en el input se upsertean, y los tipos del MISMO nivel que NO vienen se
+   * borran. Niveles no tocados en el input no se modifican (PATCH parcial por
+   * nivel). La validacion estructural (suma=100 intra-modulo, <=100 nivel
+   * curso, tipo coherente con nivel) la hace el ZodValidationPipe; aqui solo
+   * se valida el invariante de existencia/estado del curso.
+   */
+  async actualizarPesos(
+    cursoId: string,
+    input: ActualizarPesosCursoInput,
+  ): Promise<CursoAdminDetalle> {
+    const curso = await this.prisma.curso.findUnique({
+      where: { id: cursoId },
+      select: { id: true, estado: true },
+    })
+    if (!curso) {
+      throw new NotFoundException(ERROR_CURSO_NO_ENCONTRADO)
+    }
+    if (curso.estado === "DESHABILITADO") {
+      throw new BadRequestException(ERROR_CURSO_DESHABILITADO)
+    }
+
+    const nivelesEnInput = new Set(input.pesos.map((p) => p.nivel))
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const nivel of nivelesEnInput) {
+        const tiposEnInput = input.pesos.filter((p) => p.nivel === nivel).map((p) => p.tipo)
+
+        // Borra los tipos del mismo nivel que NO vienen en el input.
+        // Esto hace que desactivar la entrevista (mandar solo proyecto en
+        // nivel='curso') la elimine fisicamente de la BD.
+        await tx.cursoTipoPeso.deleteMany({
+          where: {
+            cursoId,
+            nivel,
+            tipo: { notIn: tiposEnInput },
+          },
+        })
+      }
+
+      // Upsert por (cursoId, tipo) — la PK del modelo. El nivel se actualiza
+      // tambien por si un mismo tipo cambiara de nivel (no deberia, pero si
+      // el front manda algo raro la BD queda consistente).
+      for (const item of input.pesos) {
+        await tx.cursoTipoPeso.upsert({
+          // biome-ignore lint/style/useNamingConvention: nombre del where compuesto generado por Prisma a partir de @@id([cursoId, tipo])
+          where: { cursoId_tipo: { cursoId, tipo: item.tipo } },
+          create: {
+            cursoId,
+            tipo: item.tipo,
+            peso: item.peso,
+            nivel: item.nivel,
+          },
+          update: {
+            peso: item.peso,
+            nivel: item.nivel,
+          },
+        })
+      }
+    })
+
+    // Re-lectura del detalle completo para devolver el estado consolidado al
+    // front (incluye el resto del curso, no solo los pesos).
+    const detalle = await this.prisma.curso.findUnique({
+      where: { id: cursoId },
+      select: SELECT_DETALLE,
+    })
+    if (!detalle) {
+      // Practicamente imposible (acabamos de validar existencia), pero el
+      // tipado de findUnique nos obliga a manejar el caso.
+      throw new NotFoundException(ERROR_CURSO_NO_ENCONTRADO)
+    }
+    return mapCursoADetalle(detalle satisfies CursoAdminDetalleRow)
   }
 
   // Construye el `data` del update aplicando solo los campos que vienen en el

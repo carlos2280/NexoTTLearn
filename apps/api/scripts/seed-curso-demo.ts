@@ -283,12 +283,17 @@ async function crearCursoCompleto(
       umbralEnDesarrollo: 50,
       umbralDiagnosticoObligatorio: 20,
       umbralDiagnosticoRecomendado: 5,
+      // Pesos alineados con la decision P3.1 (MAESTRO-DECISIONES.md):
+      // intra-modulo suma 100, nivel curso lleva proyecto+entrevista (lo que
+      // sobre lo absorben modulos automaticamente al calcular la nota).
       tipoPesos: {
         create: [
           { tipo: "quiz", peso: 20, nivel: "modulo" },
-          { tipo: "ejercicio", peso: 50, nivel: "modulo" },
-          { tipo: "codigo", peso: 30, nivel: "modulo" },
-          { tipo: "modulos", peso: 100, nivel: "curso" },
+          { tipo: "ejercicio", peso: 35, nivel: "modulo" },
+          { tipo: "codigo", peso: 15, nivel: "modulo" },
+          { tipo: "mini_proyecto", peso: 30, nivel: "modulo" },
+          { tipo: "proyecto", peso: 20, nivel: "curso" },
+          { tipo: "entrevista", peso: 10, nivel: "curso" },
         ],
       },
     },

@@ -30,3 +30,5 @@ export const PRISMA_ERROR_UNIQUE_CONSTRAINT = "P2002"
 // Mensajes de error en espanol (regla del proyecto: textos al usuario en ES).
 export const ERROR_CURSO_NO_ENCONTRADO = "Curso no encontrado"
 export const ERROR_SLUG_DUPLICADO = "Ya existe un curso con ese slug"
+export const ERROR_CURSO_DESHABILITADO =
+  "No se pueden modificar los pesos de un curso deshabilitado"

@@ -56,12 +56,169 @@ const umbralSchema = z
   .min(0, "El umbral no puede ser menor a 0")
   .max(100, "El umbral no puede exceder 100")
 
+// ─────────────────────────────────────────────────────────────────
+// Pesos del curso (decision P3.1)
+// Dos niveles: 'modulo' (suma intra-modulo) y 'curso' (proyecto/entrevista).
+// Ver DOCUMENTOS/NEXOTT-LEARN/AUDITORIA/MAESTRO-DECISIONES.md (P3.1) y
+// DOCUMENTOS/NEXOTT-LEARN/ANALISIS/08-SISTEMA-EVALUACION.md (formula).
+// Definidos antes de cursoAdminDetalleSchema porque el detalle los embebe.
+// ─────────────────────────────────────────────────────────────────
+
+// Tipos validos por nivel. Estos arrays son la fuente de verdad: tanto el
+// frontend como el backend los usan para construir formularios y validar.
+export const TIPOS_PESO_INTRA_MODULO = ["quiz", "ejercicio", "codigo", "mini_proyecto"] as const
+export type TipoPesoIntraModulo = (typeof TIPOS_PESO_INTRA_MODULO)[number]
+
+export const TIPOS_PESO_NIVEL_CURSO = ["proyecto", "entrevista"] as const
+export type TipoPesoNivelCurso = (typeof TIPOS_PESO_NIVEL_CURSO)[number]
+
+export const tipoPesoSchema = z.enum([...TIPOS_PESO_INTRA_MODULO, ...TIPOS_PESO_NIVEL_CURSO])
+export type TipoPeso = z.infer<typeof tipoPesoSchema>
+
+export const nivelPesoSchema = z.enum(["modulo", "curso"])
+export type NivelPeso = z.infer<typeof nivelPesoSchema>
+
+// Peso individual: rango 0-100. 0 indica desactivado (toggle off para los
+// niveles 'curso'). El front deriva `activo = peso > 0` en lectura.
+const pesoValorSchema = z
+  .number()
+  .min(0, "El peso no puede ser menor a 0")
+  .max(100, "El peso no puede exceder 100")
+
+// Lectura: el detalle del curso devuelve un array de pesos con `activo`
+// derivado (peso > 0) — el front lo usa para pintar toggles sin recalcular.
+export const cursoTipoPesoSchema = z.object({
+  tipo: tipoPesoSchema,
+  peso: pesoValorSchema,
+  nivel: nivelPesoSchema,
+  activo: z.boolean(),
+})
+export type CursoTipoPeso = z.infer<typeof cursoTipoPesoSchema>
+
+// Defaults que aplican al crear un curso o al hacer seed. Suman 100 en
+// intra-modulo (regla estricta) y 30 en nivel curso (modulos absorben 70).
+export const PESO_QUIZ_DEFAULT = 20
+export const PESO_EJERCICIO_DEFAULT = 35
+export const PESO_CODIGO_DEFAULT = 15
+export const PESO_MINI_PROYECTO_DEFAULT = 30
+export const PESO_PROYECTO_DEFAULT = 20
+export const PESO_ENTREVISTA_DEFAULT = 10
+
+// Tolerancia para comparar sumas con floats. La BD guarda Float, el front
+// puede mandar 33.33 + 33.33 + 33.34 = 100 — sin tolerancia eso falla.
+const SUMA_INTRA_MODULO_OBJETIVO = 100
+const SUMA_NIVEL_CURSO_MAXIMA = 100
+const TOLERANCIA_SUMA = 0.01
+
+// Item del input de actualizacion. Validacion cruzada (tipo vs nivel) se hace
+// con superRefine en el array para reportar errores con `path` correcto.
+const itemPesoInputSchema = z.object({
+  tipo: tipoPesoSchema,
+  peso: pesoValorSchema,
+  nivel: nivelPesoSchema,
+})
+
+type ItemPesoInput = z.infer<typeof itemPesoInputSchema>
+
+// Helpers de validacion. Se extraen del superRefine para bajar la complejidad
+// cognitiva del closure (regla biome noExcessiveCognitiveComplexity).
+function validarCoherenciaTipoNivel(pesos: ItemPesoInput[], ctx: z.RefinementCtx): void {
+  for (let i = 0; i < pesos.length; i += 1) {
+    const item = pesos[i]
+    if (!item) {
+      continue
+    }
+    const esIntra = (TIPOS_PESO_INTRA_MODULO as readonly string[]).includes(item.tipo)
+    if (esIntra && item.nivel !== "modulo") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["pesos", i, "nivel"],
+        message: `El tipo '${item.tipo}' debe tener nivel 'modulo'`,
+      })
+      continue
+    }
+    const esCurso = (TIPOS_PESO_NIVEL_CURSO as readonly string[]).includes(item.tipo)
+    if (esCurso && item.nivel !== "curso") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["pesos", i, "nivel"],
+        message: `El tipo '${item.tipo}' debe tener nivel 'curso'`,
+      })
+    }
+  }
+}
+
+function validarSinDuplicados(pesos: ItemPesoInput[], ctx: z.RefinementCtx): void {
+  const tiposVistos = new Set<string>()
+  for (let i = 0; i < pesos.length; i += 1) {
+    const item = pesos[i]
+    if (!item) {
+      continue
+    }
+    if (tiposVistos.has(item.tipo)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["pesos", i, "tipo"],
+        message: `El tipo '${item.tipo}' esta duplicado`,
+      })
+    }
+    tiposVistos.add(item.tipo)
+  }
+}
+
+function validarSumaIntraModulo(pesos: ItemPesoInput[], ctx: z.RefinementCtx): void {
+  const intraModulo = pesos.filter((p) => p.nivel === "modulo")
+  if (intraModulo.length === 0) {
+    return
+  }
+  const suma = intraModulo.reduce((acc, p) => acc + p.peso, 0)
+  if (Math.abs(suma - SUMA_INTRA_MODULO_OBJETIVO) > TOLERANCIA_SUMA) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["pesos"],
+      message: `La suma de pesos intra-modulo debe ser 100 (recibido: ${suma})`,
+    })
+  }
+}
+
+function validarSumaNivelCurso(pesos: ItemPesoInput[], ctx: z.RefinementCtx): void {
+  const nivelCurso = pesos.filter((p) => p.nivel === "curso")
+  if (nivelCurso.length === 0) {
+    return
+  }
+  const suma = nivelCurso.reduce((acc, p) => acc + p.peso, 0)
+  if (suma - SUMA_NIVEL_CURSO_MAXIMA > TOLERANCIA_SUMA) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["pesos"],
+      message: `La suma de pesos a nivel curso no puede exceder 100 (recibido: ${suma})`,
+    })
+  }
+}
+
+export const actualizarPesosCursoInputSchema = z
+  .object({
+    pesos: z.array(itemPesoInputSchema),
+  })
+  .superRefine((data, ctx) => {
+    validarCoherenciaTipoNivel(data.pesos, ctx)
+    validarSinDuplicados(data.pesos, ctx)
+    validarSumaIntraModulo(data.pesos, ctx)
+    validarSumaNivelCurso(data.pesos, ctx)
+  })
+export type ActualizarPesosCursoInput = z.infer<typeof actualizarPesosCursoInputSchema>
+
+// ─────────────────────────────────────────────────────────────────
+// Detalle del curso (incluye pesos)
+// ─────────────────────────────────────────────────────────────────
+
 export const cursoAdminDetalleSchema = cursoAdminItemSchema.extend({
   nivel: nivelCursoSchema,
   estado: estadoCursoSchema,
   umbralExcelencia: umbralSchema,
   umbralAprobado: umbralSchema,
   umbralEnDesarrollo: umbralSchema,
+  tipoPesos: z.array(cursoTipoPesoSchema),
 })
 export type CursoAdminDetalle = z.infer<typeof cursoAdminDetalleSchema>
 
