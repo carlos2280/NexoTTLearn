@@ -1,7 +1,7 @@
 import { RUTAS } from "@/shared/constants/rutas"
 import { NxlEditorToolbar } from "@carlos2280/nexott-ui/learn/react"
 import { NxtBadge, NxtButton, NxtIcon, NxtText } from "@carlos2280/nexott-ui/react"
-import { Stack } from "@carlos2280/nexott-ui/react-primitives"
+import { Box, Stack } from "@carlos2280/nexott-ui/react-primitives"
 import type { ModuloAdminItem, SeccionAdminItem } from "@nexott-learn/shared-types"
 import type { ReactNode } from "react"
 import { useNavigate } from "react-router-dom"
@@ -38,7 +38,7 @@ export function SectionEditorShell({
   const navigate = useNavigate()
 
   return (
-    <>
+    <Box slot="content">
       <NxlEditorToolbar
         cursoTitulo={cursoTitulo}
         moduloTitulo={moduloActivo.titulo}
@@ -103,7 +103,7 @@ export function SectionEditorShell({
           <div className="section-editor__main-inner">{main}</div>
         </main>
       </div>
-    </>
+    </Box>
   )
 }
 
