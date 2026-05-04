@@ -1,19 +1,20 @@
 import { NxtTab, NxtTabs } from "@carlos2280/nexott-ui/react"
 
-export type TabActiva = "general" | "modulos"
+export type TabActiva = "general" | "modulos" | "ponderaciones"
 
 interface CursoTabsProps {
   readonly activa: TabActiva
   readonly onCambioTab: (tab: TabActiva) => void
-  // Si false, el tab Modulos queda disabled (modo crear: aun no hay cursoId).
+  // Si false, los tabs Modulos y Ponderaciones quedan disabled (modo crear:
+  // aun no hay cursoId, no podemos pegarle al endpoint).
   readonly modulosHabilitado: boolean
   readonly modulosCount?: number
   readonly participantesCount?: number
   readonly convocatoriasCount?: number
 }
 
-// Solo "general" y "modulos" estan activos en esta iteracion.
-// Las demas se renderizan disabled como anticipo del nav final.
+// "general", "modulos" y "ponderaciones" estan activos. Las demas se
+// renderizan disabled como anticipo del nav final.
 // TODO(tabs): cuando NxtTab exponga `title`/tooltip nativo, mostrar
 // "Proximamente" al hover. Por ahora el `disabled` ya comunica el estado.
 export function CursoTabs({
@@ -29,7 +30,7 @@ export function CursoTabs({
       variant="underline"
       onNxtTabChange={(event) => {
         const value = event.detail.value
-        if (value === "general" || value === "modulos") {
+        if (value === "general" || value === "modulos" || value === "ponderaciones") {
           onCambioTab(value)
         }
       }}
@@ -43,7 +44,13 @@ export function CursoTabs({
         active={activa === "modulos"}
         disabled={!modulosHabilitado}
       />
-      <NxtTab label="Ponderaciones" value="ponderaciones" icon="bar-chart" disabled={true} />
+      <NxtTab
+        label="Ponderaciones"
+        value="ponderaciones"
+        icon="bar-chart"
+        active={activa === "ponderaciones"}
+        disabled={!modulosHabilitado}
+      />
       <NxtTab
         label="Participantes"
         value="participantes"

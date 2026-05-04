@@ -1,3 +1,4 @@
+import { useCursoAdmin } from "@/features/admin-cursos/hooks/use-curso-admin"
 import { useClonarModulo } from "@/features/admin-modulos/hooks/use-clonar-modulo"
 import { useEliminarModulo } from "@/features/admin-modulos/hooks/use-eliminar-modulo"
 import { useModulosAdmin } from "@/features/admin-modulos/hooks/use-modulos-admin"
@@ -14,6 +15,7 @@ import {
 } from "@carlos2280/nexott-ui/react"
 import { Stack } from "@carlos2280/nexott-ui/react-primitives"
 import { useState } from "react"
+import { CursoEvaluacionFinal } from "./curso-evaluacion-final"
 import { CursoModuloClonarModal } from "./curso-modulo-clonar-modal"
 import { CursoModuloDrawer } from "./curso-modulo-drawer"
 import { CursoModulosEmpty } from "./curso-modulos-empty"
@@ -36,6 +38,10 @@ interface SolicitudEliminar {
 
 export function CursoModulosTab({ cursoId }: CursoModulosTabProps) {
   const modulosQuery = useModulosAdmin(cursoId)
+  // El detalle ya esta cacheado por la pagina padre — useQuery con la misma
+  // queryKey deduplica la peticion. Lo leemos aqui para alimentar el bloque
+  // "Evaluacion final" sin perforar mas props desde la pagina.
+  const detalleQuery = useCursoAdmin(cursoId)
   const reordenarMutation = useReordenarModulos()
   const eliminarMutation = useEliminarModulo()
   // "Duplicar" desde el menu ⋯ de la card clona el modulo dentro del MISMO
@@ -117,6 +123,10 @@ export function CursoModulosTab({ cursoId }: CursoModulosTabProps) {
           onEliminar={(moduloId, titulo) => setEliminarSolicitado({ moduloId, titulo })}
           onReordenar={reordenar}
         />
+      )}
+
+      {detalleQuery.data && (
+        <CursoEvaluacionFinal cursoId={cursoId} tipoPesos={detalleQuery.data.tipoPesos} />
       )}
 
       <CursoModuloDrawer

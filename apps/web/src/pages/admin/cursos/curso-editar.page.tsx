@@ -16,6 +16,7 @@ import { useNavigate, useParams } from "react-router-dom"
 import { CursoFormGeneral } from "./components/curso-form-general"
 import { CursoHeader } from "./components/curso-header"
 import { CursoModulosTab } from "./components/curso-modulos-tab"
+import { CursoPonderacionesTab } from "./components/curso-ponderaciones-tab"
 import { CursoTabs, type TabActiva } from "./components/curso-tabs"
 import { useCursoGeneralForm } from "./hooks/use-curso-general-form"
 
@@ -120,10 +121,11 @@ function CursoEditarContenido({
     onSalirSinCambios()
   }
 
-  // En modo crear el Tab Modulos esta disabled: requiere cursoId para todos
-  // sus endpoints. Se habilita despues de crear el curso (entonces ya hay id).
+  // En modo crear los tabs Modulos y Ponderaciones estan disabled: requieren
+  // cursoId para sus endpoints. Se habilitan despues de crear el curso.
   const modulosHabilitado = modoTipo === "editar" && Boolean(cursoId)
   const enTabGeneral = tabActiva === "general"
+  const tabConCurso = modoTipo === "editar" && cursoId ? cursoId : null
 
   return (
     <Box slot="content" padding={{ base: "lg", md: "xl" }}>
@@ -157,8 +159,10 @@ function CursoEditarContenido({
           >
             <CursoFormGeneral form={form} modo={modoTipo} />
           </form>
-        ) : modoTipo === "editar" && cursoId ? (
-          <CursoModulosTab cursoId={cursoId} />
+        ) : tabActiva === "modulos" && tabConCurso ? (
+          <CursoModulosTab cursoId={tabConCurso} />
+        ) : tabActiva === "ponderaciones" && tabConCurso ? (
+          <CursoPonderacionesTab cursoId={tabConCurso} />
         ) : null}
       </Stack>
 

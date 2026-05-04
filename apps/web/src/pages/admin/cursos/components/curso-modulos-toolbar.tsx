@@ -63,7 +63,9 @@ function ChipPesoTotal({ pesoTotal }: ChipPesoTotalProps) {
 }
 
 function formatearPeso(peso: number | null): string {
-  if (peso === null) return "—"
+  if (peso === null) {
+    return "—"
+  }
   // Mostrar entero si es entero, o 1 decimal en caso contrario.
   return `${Number.isInteger(peso) ? String(peso) : peso.toFixed(1)}%`
 }
