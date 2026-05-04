@@ -188,3 +188,133 @@ body {
   font-size: 9px;
   opacity: 0.6;
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   F5.B Bloques editores (LECTURA / VIDEO / RECURSO)
+   ───────────────────────────────────────────────────────────────── */
+
+/* Loading skeleton dentro del shell del bloque. */
+.bloque-loading {
+  padding: var(--nx-space-2, 8px) 0;
+}
+
+/* Indicador inline de auto-save dentro del cuerpo del bloque. Se ancla a la
+   derecha del editor. Mas discreto que el badge global del topbar. */
+.bloque-save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--nx-text-muted, #6b6b6b);
+  font-family: inherit;
+}
+.bloque-save-status__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentcolor;
+  flex-shrink: 0;
+}
+.bloque-save-status--saving {
+  color: var(--nx-info, #3b82f6);
+}
+.bloque-save-status--saved {
+  color: var(--nx-success, #10b981);
+}
+.bloque-save-status--error {
+  color: var(--nx-danger, #ef4444);
+}
+
+/* LECTURA — el editor ocupa todo el ancho; el indicador se alinea a la
+   derecha bajo el area de edicion. */
+.bloque-lectura {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-2, 8px);
+  width: 100%;
+}
+.bloque-lectura__status {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 18px;
+}
+
+/* VIDEO — campos apilados con un poco de respiro. La preview vive en su
+   propio bloque 16:9. */
+.bloque-video {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-3, 12px);
+  width: 100%;
+}
+.bloque-video__field {
+  width: 100%;
+}
+.bloque-video__preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--nx-radius-md, 10px);
+  overflow: hidden;
+  background: var(--nx-surface, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--nx-ghost-border, rgba(255, 255, 255, 0.06));
+}
+.bloque-video__preview--note {
+  aspect-ratio: auto;
+  padding: var(--nx-space-3, 12px) var(--nx-space-4, 16px);
+  font-size: 13px;
+  color: var(--nx-text-muted, #6b6b6b);
+  background: var(--nx-surface, rgba(255, 255, 255, 0.04));
+  border-style: dashed;
+  text-align: center;
+}
+.bloque-video__frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+.bloque-video__status {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 18px;
+}
+
+/* RECURSO — preview es un link clickeable, no un iframe. */
+.bloque-recurso {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-3, 12px);
+  width: 100%;
+}
+.bloque-recurso__field {
+  width: 100%;
+}
+.bloque-recurso__preview {
+  display: inline-block;
+  max-width: 100%;
+  padding: var(--nx-space-2, 8px) var(--nx-space-3, 12px);
+  border-radius: var(--nx-radius-sm, 8px);
+  background: var(--nx-accent-subtle, rgba(99, 102, 241, 0.06));
+  border: 1px solid var(--nx-ghost-border, rgba(255, 255, 255, 0.06));
+  color: var(--nx-brand, #6366f1);
+  font-size: 13px;
+  text-decoration: none;
+  word-break: break-all;
+  transition: border-color 150ms var(--nx-ease, cubic-bezier(0.2, 0.8, 0.2, 1));
+}
+.bloque-recurso__preview:hover {
+  border-color: var(--nx-brand, #6366f1);
+}
+.bloque-recurso__status {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 18px;
+}
+.bloque-recurso--readonly {
+  padding: var(--nx-space-3, 12px) var(--nx-space-4, 16px);
+  border-radius: var(--nx-radius-md, 10px);
+  background: var(--nx-surface, rgba(255, 255, 255, 0.04));
+  border: 1px dashed var(--nx-ghost-border, rgba(255, 255, 255, 0.06));
+}

@@ -7,8 +7,8 @@ import {
 import { toast } from "@carlos2280/nexott-ui/react"
 import type { ContenidoEmbebido } from "@nexott-learn/shared-types"
 import { useEffect, useRef, useState } from "react"
+import { BloqueRouter } from "../blocks/bloque-router"
 import { useAutoSave } from "../hooks/use-auto-save"
-import { BlockShellPlaceholder } from "./block-shell-placeholder"
 
 interface BlockRowProps {
   readonly cursoId: string
@@ -97,7 +97,7 @@ export function BlockRow({
         maxLength={200}
         onChange={(e) => setTitulo(e.target.value)}
       />
-      <BlockShellPlaceholder tipo={bloque.tipo} />
+      <BloqueRouter cursoId={cursoId} moduloId={moduloId} seccionId={seccionId} bloque={bloque} />
     </NxlBlockShell>
   )
 }
