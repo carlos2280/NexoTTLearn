@@ -29,11 +29,14 @@ export function CursoModulosList({
 }: CursoModulosListProps) {
   const navigate = useNavigate()
 
-  // Click en la card -> navega al editor de secciones (flujo principal del
-  // admin). La edicion de metadatos del modulo (titulo, slug, peso, area...)
-  // queda como accion secundaria dentro del menu ⋯ → Editar.
-  const irASecciones = (moduloId: string): void => {
-    navigate(RUTAS.admin.cursoModuloSecciones(cursoId, moduloId))
+  // Click en la card -> navega al editor de seccion (flujo principal del admin
+  // desde Sprint F4.1). El editor resuelve "primera" -> primera seccion real
+  // (o muestra empty state si el modulo esta vacio). El hub clasico
+  // (`/secciones`) sigue existiendo para enlace directo, pero ya no se navega
+  // desde aqui. La edicion de metadatos del modulo (titulo, slug, peso,
+  // area...) queda como accion secundaria dentro del menu ⋯ → Editar.
+  const irAEditor = (moduloId: string): void => {
+    navigate(RUTAS.admin.cursoModuloSeccionEditor(cursoId, moduloId, "primera"))
   }
 
   return (
@@ -65,7 +68,7 @@ export function CursoModulosList({
           areaColor={item.area?.color ?? "slate"}
           chevron={true}
           incompleteReasons={calcularRazonesIncompleto(item)}
-          onNxlCourseModuleClick={(e) => irASecciones(e.detail.moduleId)}
+          onNxlCourseModuleClick={(e) => irAEditor(e.detail.moduleId)}
           onNxlCourseModuleEdit={(e) => onEditar(e.detail.moduleId)}
           onNxlCourseModuleDuplicate={(e) => onDuplicar(e.detail.moduleId)}
           onNxlCourseModuleDelete={(e) => onEliminar(e.detail.moduleId, item.titulo)}
