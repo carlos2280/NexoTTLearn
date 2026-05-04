@@ -6,6 +6,7 @@ import { AreasCompetenciaModule } from "./admin/areas-competencia/areas-competen
 import { CursosModule } from "./admin/cursos/cursos.module"
 import { DashboardModule } from "./admin/dashboard/dashboard.module"
 import { ModulosModule } from "./admin/modulos/modulos.module"
+import { SeccionesModule } from "./admin/secciones/secciones.module"
 import { AuthModule } from "./auth/auth.module"
 import { PrismaModule } from "./common/prisma/prisma.module"
 import { HealthModule } from "./health/health.module"
@@ -31,6 +32,7 @@ import { HealthModule } from "./health/health.module"
     DashboardModule,
     CursosModule,
     ModulosModule,
+    SeccionesModule,
     AreasCompetenciaModule,
   ],
   providers: [

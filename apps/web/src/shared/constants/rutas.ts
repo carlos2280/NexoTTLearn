@@ -26,6 +26,8 @@ export const RUTAS = {
     cursoEditar: (id: string): string => `/admin/cursos/${id}`,
     cursoModuloSecciones: (cursoId: string, moduloId: string): string =>
       `/admin/cursos/${cursoId}/modulos/${moduloId}/secciones`,
+    cursoModuloSeccionEditor: (cursoId: string, moduloId: string, seccionId: string): string =>
+      `/admin/cursos/${cursoId}/modulos/${moduloId}/secciones/${seccionId}`,
     seguimiento: "/admin/seguimiento",
     centroRevision: "/admin/centro-revision",
     centroRevisionTab: (tab: "entregas" | "proyectos"): string =>

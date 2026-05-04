@@ -89,3 +89,20 @@ export {
   clonarModuloInputSchema,
   type ClonarModuloInput,
 } from "./admin-modulos"
+
+export {
+  tipoContenidoSchema,
+  type TipoContenido,
+  contenidoEmbebidoSchema,
+  type ContenidoEmbebido,
+  seccionAdminItemSchema,
+  type SeccionAdminItem,
+  obtenerSeccionesAdminResponseSchema,
+  type ObtenerSeccionesAdminResponse,
+  crearSeccionInputSchema,
+  type CrearSeccionInput,
+  actualizarSeccionInputSchema,
+  type ActualizarSeccionInput,
+  reordenarSeccionesInputSchema,
+  type ReordenarSeccionesInput,
+} from "./admin-secciones"
