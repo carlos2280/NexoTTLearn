@@ -2,7 +2,12 @@ import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
 import { AdminSidebar } from "@/shared/components/admin-sidebar"
 import { PersonalizationDrawer } from "@/shared/components/personalization-drawer"
 import { UserMenu } from "@/shared/components/user-menu"
-import { NxtLayout, NxtSidebarToggle, NxtTopbar } from "@carlos2280/nexott-ui/react"
+import {
+  NxtLayout,
+  NxtSidebarToggle,
+  NxtToastProvider,
+  NxtTopbar,
+} from "@carlos2280/nexott-ui/react"
 import { Stack } from "@carlos2280/nexott-ui/react-primitives"
 import { useState } from "react"
 import { Outlet } from "react-router-dom"
@@ -33,6 +38,11 @@ export function LayoutAdmin() {
         open={personalizarAbierto}
         onClose={() => setPersonalizarAbierto(false)}
       />
+
+      {/* Provider global de toasts del DS. La API `toast.success(...)` busca
+          este provider montado en el DOM. Lo dejamos en el layout admin
+          porque por ahora solo hay flows admin que usan toast. */}
+      <NxtToastProvider position="top-right" max={4} />
     </NxtLayout>
   )
 }

@@ -139,6 +139,8 @@ jobs:
         run: cd apps/api && pnpm prisma generate
       - name: Apply migrations
         run: cd apps/api && pnpm prisma migrate deploy
+      - name: Build shared-types
+        run: pnpm --filter @nexott-learn/shared-types build
       - name: Run tests
         run: pnpm test
 

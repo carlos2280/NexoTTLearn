@@ -61,9 +61,14 @@ lib-rebuild: lib-build install ## Compila la librería y reinstala (refresca enl
 	@printf "$(C_GREEN)✓ Librería recompilada y enlazada$(C_RESET)\n"
 
 .PHONY: lib-refresh
-lib-refresh: lib-build ## Recompila lib + reinstala link pnpm + limpia cache Vite
-	@printf "$(C_BLUE)→ Refrescando link pnpm…$(C_RESET)\n"
-	@pnpm install --silent
+lib-refresh: lib-build ## Recompila lib + invalida cache pnpm + reinstala + limpia Vite
+	@printf "$(C_BLUE)→ Invalidando cache pnpm de nexott-ui…$(C_RESET)\n"
+	@# pnpm cachea el contenido del paquete file: la primera vez. Si solo
+	@# cambia el dist (sin tocar package.json), no detecta diff y sirve la
+	@# version vieja. Borrar el store interno + el link en apps fuerza re-copia.
+	@rm -rf node_modules/.pnpm/@carlos2280+nexott-ui@file* apps/web/node_modules/@carlos2280
+	@printf "$(C_BLUE)→ Reinstalando link pnpm…$(C_RESET)\n"
+	@pnpm install --no-frozen-lockfile --silent
 	@$(MAKE) vite-cache-clear
 	@printf "$(C_GREEN)✓ Librería recompilada y enlazada. Reinicia 'make dev' si está corriendo.$(C_RESET)\n"
 
@@ -116,6 +121,11 @@ dev: kill ## Levanta web + api en paralelo (foreground)
 .PHONY: dev-fresh
 dev-fresh: kill vite-cache-clear ## Levanta dev con cache de Vite limpio (tras lib-build)
 	@printf "$(C_BLUE)→ Levantando web + api con cache limpio…$(C_RESET)\n"
+	pnpm dev
+
+.PHONY: dev-ui-fresh
+dev-ui-fresh: kill lib-refresh ## Recompila nexott-ui + refresh cache + levanta dev (ciclo completo de iteracion en el DS)
+	@printf "$(C_BLUE)→ Levantando web + api con DS recien compilado…$(C_RESET)\n"
 	pnpm dev
 
 .PHONY: dev-web
