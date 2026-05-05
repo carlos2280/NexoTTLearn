@@ -1,7 +1,9 @@
 import {
+  type EjemploCodigoContenido,
   type LecturaContenido,
   type RecursoContenido,
   type VideoContenido,
+  ejemploCodigoContenidoSchema,
   lecturaContenidoSchema,
   recursoContenidoSchema,
   videoContenidoSchema,
@@ -10,6 +12,7 @@ import {
 export type LecturaPayload = LecturaContenido["contenido"]
 export type VideoPayload = VideoContenido["contenido"]
 export type RecursoPayload = RecursoContenido["contenido"]
+export type EjemploCodigoPayload = EjemploCodigoContenido["contenido"]
 
 // Defaults espejo de los que aplica el back en getDefaultsByTipo cuando crea
 // un bloque sin payload. Se usan como fallback cuando el contenido viene
@@ -25,6 +28,16 @@ export function defaultVideoPayload(): VideoPayload {
 
 export function defaultRecursoPayload(): RecursoPayload {
   return { tipoRecurso: "link", url: "" }
+}
+
+export function defaultEjemploCodigoPayload(): EjemploCodigoPayload {
+  return {
+    explicacion: "",
+    lenguaje: "javascript",
+    codigo: "",
+    esInteractivo: false,
+    preguntasComprension: [],
+  }
 }
 
 // Parsea el campo `contenido` (unknown desde back) con el schema del tipo y
@@ -55,6 +68,16 @@ export function parseRecursoPayload(raw: unknown): RecursoPayload {
   }
   console.warn("[BloqueRecurso] payload invalido, usando default", parsed.error)
   return defaultRecursoPayload()
+}
+
+export function parseEjemploCodigoPayload(raw: unknown): EjemploCodigoPayload {
+  const parsed = ejemploCodigoContenidoSchema.shape.contenido.safeParse(raw)
+  if (parsed.success) {
+    return parsed.data
+  }
+  // biome-ignore lint/nursery/noSecrets: mensaje de log en espanol, no es un secret
+  console.warn("[BloqueEjemploCodigo] payload invalido, usando default", parsed.error)
+  return defaultEjemploCodigoPayload()
 }
 
 // Equals profundo via JSON.stringify para los payloads de F5.B. Suficiente

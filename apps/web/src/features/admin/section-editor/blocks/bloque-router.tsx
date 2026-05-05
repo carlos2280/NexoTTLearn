@@ -1,5 +1,6 @@
 import { useObtenerContenido } from "@/features/admin-contenidos/hooks/use-obtener-contenido"
 import type { ContenidoEmbebido, TipoContenido } from "@nexott-learn/shared-types"
+import { BloqueEjemploCodigo } from "./bloque-ejemplo-codigo"
 import { BloqueLectura } from "./bloque-lectura"
 import { BloqueLoading } from "./bloque-loading"
 import { BloquePlaceholder } from "./bloque-placeholder"
@@ -14,7 +15,7 @@ interface BloqueRouterProps {
 }
 
 function necesitaDetalleParaTipo(tipo: TipoContenido): boolean {
-  return tipo === "LECTURA" || tipo === "VIDEO" || tipo === "RECURSO"
+  return tipo === "LECTURA" || tipo === "VIDEO" || tipo === "RECURSO" || tipo === "EJEMPLO_CODIGO"
 }
 
 // Router por tipo de bloque. Antes de delegar al editor concreto, carga el
@@ -72,7 +73,20 @@ export function BloqueRouter({ cursoId, moduloId, seccionId, bloque }: BloqueRou
         />
       )
     }
-    case "EJEMPLO_CODIGO":
+    case "EJEMPLO_CODIGO": {
+      if (detalleQuery.isLoading || !detalleQuery.data) {
+        return <BloqueLoading />
+      }
+      return (
+        <BloqueEjemploCodigo
+          cursoId={cursoId}
+          moduloId={moduloId}
+          seccionId={seccionId}
+          contenidoId={bloque.id}
+          contenidoRaw={detalleQuery.data.contenido}
+        />
+      )
+    }
     case "EJERCICIO":
     case "TEST":
       return <BloquePlaceholder tipo={tipo} />

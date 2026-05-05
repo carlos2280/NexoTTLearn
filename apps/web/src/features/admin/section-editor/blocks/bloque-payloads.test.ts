@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
+  defaultEjemploCodigoPayload,
   defaultLecturaPayload,
   defaultRecursoPayload,
   defaultVideoPayload,
   jsonEquals,
+  parseEjemploCodigoPayload,
   parseLecturaPayload,
   parseRecursoPayload,
   parseVideoPayload,
@@ -86,6 +88,82 @@ describe("parseRecursoPayload", () => {
   })
 })
 
+describe("parseEjemploCodigoPayload", () => {
+  it("acepta payload completo con preguntasComprension vacio", () => {
+    const raw = {
+      explicacion: "Bucle for clasico",
+      lenguaje: "javascript",
+      codigo: "for (let i = 0; i < 3; i++) {}",
+      esInteractivo: false,
+      preguntasComprension: [],
+    }
+    expect(parseEjemploCodigoPayload(raw)).toEqual(raw)
+    expect(warnSpy).not.toHaveBeenCalled()
+  })
+
+  it("acepta payload con preguntasComprension pobladas", () => {
+    const raw = {
+      explicacion: "Map vs forEach",
+      lenguaje: "typescript",
+      codigo: "const xs = [1,2,3].map(x => x*2)",
+      esInteractivo: true,
+      preguntasComprension: [
+        { pregunta: "Que devuelve map?", respuestaEsperada: "Un nuevo array" },
+        { pregunta: "Y forEach?", respuestaEsperada: "undefined" },
+      ],
+    }
+    expect(parseEjemploCodigoPayload(raw)).toEqual(raw)
+  })
+
+  it("preserva lenguaje libre (legacy) tal cual viene del back", () => {
+    // El schema declara lenguaje como string libre — la UI restringe al set
+    // soportado por NxlCodeEditor, pero al parsear no debemos alterar el dato.
+    const raw = {
+      explicacion: "Hola",
+      lenguaje: "go",
+      codigo: "package main",
+      esInteractivo: false,
+      preguntasComprension: [],
+    }
+    expect(parseEjemploCodigoPayload(raw).lenguaje).toBe("go")
+  })
+
+  it("cae al default si raw es null", () => {
+    expect(parseEjemploCodigoPayload(null)).toEqual(defaultEjemploCodigoPayload())
+    expect(warnSpy).toHaveBeenCalledOnce()
+  })
+
+  it("cae al default si raw no es objeto", () => {
+    expect(parseEjemploCodigoPayload("string suelto")).toEqual(defaultEjemploCodigoPayload())
+  })
+
+  it("cae al default si falta el campo codigo", () => {
+    expect(
+      parseEjemploCodigoPayload({
+        explicacion: "x",
+        lenguaje: "python",
+        esInteractivo: false,
+      }),
+    ).toEqual(defaultEjemploCodigoPayload())
+  })
+
+  it("aplica default a esInteractivo y preguntasComprension cuando faltan", () => {
+    expect(
+      parseEjemploCodigoPayload({
+        explicacion: "x",
+        lenguaje: "javascript",
+        codigo: "1",
+      }),
+    ).toEqual({
+      explicacion: "x",
+      lenguaje: "javascript",
+      codigo: "1",
+      esInteractivo: false,
+      preguntasComprension: [],
+    })
+  })
+})
+
 describe("jsonEquals", () => {
   it("compara objetos planos por valor", () => {
     expect(jsonEquals({ a: 1, b: 2 }, { a: 1, b: 2 })).toBe(true)
@@ -114,5 +192,15 @@ describe("defaults", () => {
 
   it("default recurso es link", () => {
     expect(defaultRecursoPayload()).toEqual({ tipoRecurso: "link", url: "" })
+  })
+
+  it("default ejemplo_codigo espeja al back (javascript + flags off + array vacio)", () => {
+    expect(defaultEjemploCodigoPayload()).toEqual({
+      explicacion: "",
+      lenguaje: "javascript",
+      codigo: "",
+      esInteractivo: false,
+      preguntasComprension: [],
+    })
   })
 })
