@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
   defaultEjemploCodigoPayload,
+  defaultEjercicioPayload,
   defaultLecturaPayload,
   defaultRecursoPayload,
   defaultVideoPayload,
   jsonEquals,
   parseEjemploCodigoPayload,
+  parseEjercicioPayload,
   parseLecturaPayload,
   parseRecursoPayload,
   parseVideoPayload,
@@ -164,6 +166,151 @@ describe("parseEjemploCodigoPayload", () => {
   })
 })
 
+describe("parseEjercicioPayload", () => {
+  it("acepta payload modo guiado completo (roundtrip)", () => {
+    const raw = {
+      modo: "guiado" as const,
+      lenguaje: "javascript" as const,
+      archivosIniciales: [
+        { path: "src/index.js", content: "// hola", readOnly: false },
+        { path: "src/lib.js", content: "export const x = 1", readOnly: true },
+      ],
+      tests: [{ nombre: "x exporta 1", codigo: "expect(x).toBe(1)" }],
+      enunciado: "Implementa la funcion saludar",
+      solucionReferencia: "function saludar() { return 'hi' }",
+      pistas: ["Usa return", "No olvides el string"],
+      restricciones: [],
+      criteriosEvaluacion: ["Devuelve el string correcto"],
+    }
+    expect(parseEjercicioPayload(raw)).toEqual(raw)
+    expect(warnSpy).not.toHaveBeenCalled()
+  })
+
+  it("acepta payload modo reto completo (roundtrip)", () => {
+    const raw = {
+      modo: "reto" as const,
+      lenguaje: "python" as const,
+      archivosIniciales: [{ path: "main.py", content: "", readOnly: false }],
+      tests: [{ nombre: "main devuelve 0", codigo: "assert main() == 0" }],
+      pistas: [],
+      restricciones: ["No usar librerias externas"],
+      criteriosEvaluacion: ["Pasa los tests", "Codigo legible"],
+      contexto: "Sistema de inventario en una tienda",
+      objetivo: "Construir la funcion main que devuelva 0 si todo ok",
+    }
+    expect(parseEjercicioPayload(raw)).toEqual(raw)
+    expect(warnSpy).not.toHaveBeenCalled()
+  })
+
+  it("preserva campos del modo opuesto cuando coexisten (non-destructive en BD)", () => {
+    // Si el admin paso por ambos modos, el draft puede haber persistido campos
+    // de los dos. El parse debe respetarlos — el filtrado por modo es de UI,
+    // no del schema.
+    const raw = {
+      modo: "guiado" as const,
+      lenguaje: "typescript" as const,
+      archivosIniciales: [],
+      tests: [],
+      enunciado: "Resuelve esto",
+      solucionReferencia: "// solucion",
+      pistas: ["pista 1"],
+      contexto: "Contexto previo del modo reto",
+      objetivo: "Objetivo previo",
+      restricciones: ["Restriccion previa"],
+      criteriosEvaluacion: [],
+    }
+    expect(parseEjercicioPayload(raw)).toEqual(raw)
+  })
+
+  it("cae al default si raw es null", () => {
+    expect(parseEjercicioPayload(null)).toEqual(defaultEjercicioPayload())
+    expect(warnSpy).toHaveBeenCalledOnce()
+  })
+
+  it("cae al default si raw no es objeto", () => {
+    expect(parseEjercicioPayload("string suelto")).toEqual(defaultEjercicioPayload())
+  })
+
+  it("cae al default si modo no esta en el enum", () => {
+    expect(
+      parseEjercicioPayload({
+        modo: "experimental",
+        lenguaje: "javascript",
+        archivosIniciales: [],
+        tests: [],
+      }),
+    ).toEqual(defaultEjercicioPayload())
+  })
+
+  it("cae al default si lenguaje no esta en el enum (ej legacy 'go')", () => {
+    expect(
+      parseEjercicioPayload({
+        modo: "guiado",
+        lenguaje: "go",
+        archivosIniciales: [],
+        tests: [],
+      }),
+    ).toEqual(defaultEjercicioPayload())
+  })
+
+  it("acepta react como lenguaje (entra al enum)", () => {
+    const result = parseEjercicioPayload({
+      modo: "guiado",
+      lenguaje: "react",
+      archivosIniciales: [],
+      tests: [],
+    })
+    expect(result.lenguaje).toBe("react")
+  })
+
+  it("aplica defaults vacios a pistas/restricciones/criteriosEvaluacion cuando faltan", () => {
+    expect(
+      parseEjercicioPayload({
+        modo: "guiado",
+        lenguaje: "javascript",
+        archivosIniciales: [],
+        tests: [],
+      }),
+    ).toEqual({
+      modo: "guiado",
+      lenguaje: "javascript",
+      archivosIniciales: [],
+      tests: [],
+      pistas: [],
+      restricciones: [],
+      criteriosEvaluacion: [],
+    })
+  })
+
+  it("aplica defaults vacios a archivosIniciales y tests cuando faltan", () => {
+    const result = parseEjercicioPayload({ modo: "reto", lenguaje: "typescript" })
+    expect(result.archivosIniciales).toEqual([])
+    expect(result.tests).toEqual([])
+  })
+
+  it("cae al default si un archivoInicial no tiene readOnly (campo obligatorio)", () => {
+    expect(
+      parseEjercicioPayload({
+        modo: "guiado",
+        lenguaje: "javascript",
+        archivosIniciales: [{ path: "x.js", content: "" }],
+        tests: [],
+      }),
+    ).toEqual(defaultEjercicioPayload())
+  })
+
+  it("cae al default si un test no tiene codigo", () => {
+    expect(
+      parseEjercicioPayload({
+        modo: "guiado",
+        lenguaje: "javascript",
+        archivosIniciales: [],
+        tests: [{ nombre: "test 1" }],
+      }),
+    ).toEqual(defaultEjercicioPayload())
+  })
+})
+
 describe("jsonEquals", () => {
   it("compara objetos planos por valor", () => {
     expect(jsonEquals({ a: 1, b: 2 }, { a: 1, b: 2 })).toBe(true)
@@ -201,6 +348,20 @@ describe("defaults", () => {
       codigo: "",
       esInteractivo: false,
       preguntasComprension: [],
+    })
+  })
+
+  it("default ejercicio espeja al back (modo guiado + javascript + arrays vacios)", () => {
+    expect(defaultEjercicioPayload()).toEqual({
+      modo: "guiado",
+      lenguaje: "javascript",
+      archivosIniciales: [],
+      tests: [],
+      enunciado: "",
+      solucionReferencia: "",
+      pistas: [],
+      restricciones: [],
+      criteriosEvaluacion: [],
     })
   })
 })

@@ -1,9 +1,11 @@
 import {
   type EjemploCodigoContenido,
+  type EjercicioContenido,
   type LecturaContenido,
   type RecursoContenido,
   type VideoContenido,
   ejemploCodigoContenidoSchema,
+  ejercicioContenidoSchema,
   lecturaContenidoSchema,
   recursoContenidoSchema,
   videoContenidoSchema,
@@ -13,6 +15,7 @@ export type LecturaPayload = LecturaContenido["contenido"]
 export type VideoPayload = VideoContenido["contenido"]
 export type RecursoPayload = RecursoContenido["contenido"]
 export type EjemploCodigoPayload = EjemploCodigoContenido["contenido"]
+export type EjercicioPayload = EjercicioContenido["contenido"]
 
 // Defaults espejo de los que aplica el back en getDefaultsByTipo cuando crea
 // un bloque sin payload. Se usan como fallback cuando el contenido viene
@@ -37,6 +40,23 @@ export function defaultEjemploCodigoPayload(): EjemploCodigoPayload {
     codigo: "",
     esInteractivo: false,
     preguntasComprension: [],
+  }
+}
+
+// Espejo exacto del default que aplica el back en defaults-by-tipo.ts para
+// EJERCICIO. Mantener el orden de claves identico al back y al schema para
+// que jsonEquals (sensible al orden) no produzca falsos positivos al cargar.
+export function defaultEjercicioPayload(): EjercicioPayload {
+  return {
+    modo: "guiado",
+    lenguaje: "javascript",
+    archivosIniciales: [],
+    tests: [],
+    enunciado: "",
+    solucionReferencia: "",
+    pistas: [],
+    restricciones: [],
+    criteriosEvaluacion: [],
   }
 }
 
@@ -78,6 +98,15 @@ export function parseEjemploCodigoPayload(raw: unknown): EjemploCodigoPayload {
   // biome-ignore lint/nursery/noSecrets: mensaje de log en espanol, no es un secret
   console.warn("[BloqueEjemploCodigo] payload invalido, usando default", parsed.error)
   return defaultEjemploCodigoPayload()
+}
+
+export function parseEjercicioPayload(raw: unknown): EjercicioPayload {
+  const parsed = ejercicioContenidoSchema.shape.contenido.safeParse(raw)
+  if (parsed.success) {
+    return parsed.data
+  }
+  console.warn("[BloqueEjercicio] payload invalido, usando default", parsed.error)
+  return defaultEjercicioPayload()
 }
 
 // Equals profundo via JSON.stringify para los payloads de F5.B. Suficiente
