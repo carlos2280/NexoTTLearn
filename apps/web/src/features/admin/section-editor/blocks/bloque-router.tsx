@@ -5,8 +5,8 @@ import { BloqueEjemploCodigo } from "./bloque-ejemplo-codigo"
 import { BloqueEjercicio } from "./bloque-ejercicio"
 import { BloqueLectura } from "./bloque-lectura"
 import { BloqueLoading } from "./bloque-loading"
-import { BloquePlaceholder } from "./bloque-placeholder"
 import { BloqueRecurso } from "./bloque-recurso"
+import { BloqueTest } from "./bloque-test"
 import { BloqueVideo } from "./bloque-video"
 
 interface BloqueRouterProps {
@@ -28,7 +28,7 @@ interface BloqueDetalleProps {
 // Mantener sincronizado con `editoresConDetalle` — el assertion exhaustivo del
 // switch de tipos en runtime garantiza que TipoContenido nuevos no pasen
 // silenciosamente.
-type TipoConDetalle = "LECTURA" | "VIDEO" | "RECURSO" | "EJEMPLO_CODIGO" | "EJERCICIO"
+type TipoConDetalle = "LECTURA" | "VIDEO" | "RECURSO" | "EJEMPLO_CODIGO" | "EJERCICIO" | "TEST"
 
 // Map (no objeto) para no chocar con useNamingConvention sobre las claves del
 // enum TipoContenido, que son SCREAMING_CASE. El Map preserva el tipado del
@@ -39,6 +39,7 @@ const editoresConDetalle = new Map<TipoConDetalle, ComponentType<BloqueDetallePr
   ["RECURSO", BloqueRecurso],
   ["EJEMPLO_CODIGO", BloqueEjemploCodigo],
   ["EJERCICIO", BloqueEjercicio],
+  ["TEST", BloqueTest],
 ])
 
 function tieneDetalle(tipo: TipoContenido): tipo is TipoConDetalle {
@@ -71,10 +72,6 @@ export function BloqueRouter({ cursoId, moduloId, seccionId, bloque }: BloqueRou
         contenidoRaw={detalleQuery.data.contenido}
       />
     )
-  }
-
-  if (tipo === "TEST") {
-    return <BloquePlaceholder tipo={tipo} />
   }
 
   // Assertion exhaustivo: si TipoContenido crece y olvidamos cubrirlo aqui,

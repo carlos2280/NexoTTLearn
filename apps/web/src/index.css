@@ -574,3 +574,155 @@ body {
   justify-content: flex-end;
   min-height: 18px;
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   F7 Bloque editor TEST
+   ───────────────────────────────────────────────────────────────── */
+
+/* Container raiz: stack vertical full-width. Las preguntas se renderizan
+   como tarjetas siempre expandidas — F7 no implementa colapso. */
+.bloque-test {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-4, 16px);
+  width: 100%;
+}
+
+.bloque-test__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-3, 12px);
+}
+
+.bloque-test__section-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-1, 4px);
+}
+
+/* Tarjeta de configuracion global (3 controles). */
+.bloque-test__config {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-3, 12px);
+  padding: var(--nx-space-3, 12px) var(--nx-space-4, 16px);
+  border-radius: var(--nx-radius-md, 10px);
+  background: var(--nx-surface, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--nx-ghost-border, rgba(255, 255, 255, 0.06));
+}
+
+.bloque-test__config-intentos {
+  width: 100%;
+  max-width: 240px;
+}
+
+.bloque-test__empty {
+  padding: var(--nx-space-3, 12px) var(--nx-space-4, 16px);
+  border-radius: var(--nx-radius-md, 10px);
+  background: var(--nx-surface, rgba(255, 255, 255, 0.04));
+  border: 1px dashed var(--nx-ghost-border, rgba(255, 255, 255, 0.06));
+  text-align: center;
+}
+
+.bloque-test__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-3, 12px);
+}
+
+.bloque-test__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-3, 12px);
+  padding: var(--nx-space-3, 12px) var(--nx-space-4, 16px);
+  border-radius: var(--nx-radius-md, 10px);
+  background: var(--nx-surface, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--nx-ghost-border, rgba(255, 255, 255, 0.06));
+}
+
+.bloque-test__item-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-1, 4px);
+}
+
+.bloque-test__item-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-3, 12px);
+}
+
+/* En desktop el select de tipo no necesita ocupar todo el ancho. */
+.bloque-test__item-tipo {
+  width: 100%;
+  max-width: 320px;
+}
+
+.bloque-test__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-1, 4px);
+  width: 100%;
+}
+
+/* Sub-bloque de opciones por tipo de pregunta. */
+.bloque-test__opciones {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-2, 8px);
+  padding: var(--nx-space-3, 12px) var(--nx-space-4, 16px);
+  border-radius: var(--nx-radius-md, 10px);
+  background: var(--nx-surface, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--nx-ghost-border, rgba(255, 255, 255, 0.06));
+}
+
+.bloque-test__opciones-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-2, 8px);
+}
+
+/* Mobile: checkbox/input/eliminar apilados. Desktop (>=720px): inline con
+   el input expandiendose. */
+.bloque-test__opcion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-2, 8px);
+}
+@media (min-width: 720px) {
+  .bloque-test__opcion {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+}
+
+.bloque-test__opcion-correcta {
+  flex: 0 0 auto;
+}
+
+.bloque-test__opcion-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.bloque-test__add {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.bloque-test__item-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.bloque-test__status {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 18px;
+}

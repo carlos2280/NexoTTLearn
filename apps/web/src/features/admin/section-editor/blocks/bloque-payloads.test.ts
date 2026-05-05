@@ -4,12 +4,14 @@ import {
   defaultEjercicioPayload,
   defaultLecturaPayload,
   defaultRecursoPayload,
+  defaultTestPayload,
   defaultVideoPayload,
   jsonEquals,
   parseEjemploCodigoPayload,
   parseEjercicioPayload,
   parseLecturaPayload,
   parseRecursoPayload,
+  parseTestPayload,
   parseVideoPayload,
 } from "./bloque-payloads"
 
@@ -311,6 +313,129 @@ describe("parseEjercicioPayload", () => {
   })
 })
 
+describe("parseTestPayload", () => {
+  it("acepta payload con preguntas mixtas (los 3 tipos) en roundtrip", () => {
+    const raw = {
+      preguntas: [
+        {
+          enunciado: "Cual es el resultado de 2 + 2?",
+          tipo: "seleccion_unica" as const,
+          opciones: [
+            { texto: "3", esCorrecta: false },
+            { texto: "4", esCorrecta: true },
+            { texto: "5", esCorrecta: false },
+          ],
+          explicacion: "Suma basica",
+        },
+        {
+          enunciado: "Cuales son numeros pares?",
+          tipo: "seleccion_multiple" as const,
+          opciones: [
+            { texto: "2", esCorrecta: true },
+            { texto: "3", esCorrecta: false },
+            { texto: "4", esCorrecta: true },
+          ],
+        },
+        {
+          enunciado: "El cielo es azul",
+          tipo: "verdadero_falso" as const,
+          opciones: [
+            { texto: "Verdadero", esCorrecta: true },
+            { texto: "Falso", esCorrecta: false },
+          ],
+        },
+      ],
+      aleatorizar: true,
+      mostrarResultadoInmediato: false,
+      intentosPermitidos: 5,
+    }
+    expect(parseTestPayload(raw)).toEqual(raw)
+    expect(warnSpy).not.toHaveBeenCalled()
+  })
+
+  it("cae al default si raw es null", () => {
+    expect(parseTestPayload(null)).toEqual(defaultTestPayload())
+    expect(warnSpy).toHaveBeenCalledOnce()
+  })
+
+  it("cae al default si raw es undefined", () => {
+    expect(parseTestPayload(undefined)).toEqual(defaultTestPayload())
+    expect(warnSpy).toHaveBeenCalledOnce()
+  })
+
+  it("cae al default si una pregunta tiene tipo invalido", () => {
+    expect(
+      parseTestPayload({
+        preguntas: [
+          {
+            enunciado: "x",
+            tipo: "respuesta_corta",
+            opciones: [],
+          },
+        ],
+        aleatorizar: false,
+        mostrarResultadoInmediato: true,
+        intentosPermitidos: 3,
+      }),
+    ).toEqual(defaultTestPayload())
+    expect(warnSpy).toHaveBeenCalledOnce()
+  })
+
+  it("cae al default si intentosPermitidos es menor a 1", () => {
+    expect(
+      parseTestPayload({
+        preguntas: [],
+        aleatorizar: false,
+        mostrarResultadoInmediato: true,
+        intentosPermitidos: 0,
+      }),
+    ).toEqual(defaultTestPayload())
+    expect(warnSpy).toHaveBeenCalledOnce()
+  })
+
+  it("aplica defaults a preguntas y flags cuando faltan", () => {
+    expect(parseTestPayload({})).toEqual(defaultTestPayload())
+  })
+
+  it("preserva explicacion presente y respeta su ausencia", () => {
+    const conExplicacion = parseTestPayload({
+      preguntas: [
+        {
+          enunciado: "?",
+          tipo: "seleccion_unica",
+          opciones: [{ texto: "a", esCorrecta: true }],
+          explicacion: "Porque si",
+        },
+      ],
+    })
+    expect(conExplicacion.preguntas[0]?.explicacion).toBe("Porque si")
+
+    const sinExplicacion = parseTestPayload({
+      preguntas: [
+        {
+          enunciado: "?",
+          tipo: "seleccion_unica",
+          opciones: [{ texto: "a", esCorrecta: true }],
+        },
+      ],
+    })
+    expect(sinExplicacion.preguntas[0]).not.toHaveProperty("explicacion")
+  })
+
+  it("acepta opciones vacio en una pregunta (estado intermedio valido)", () => {
+    const result = parseTestPayload({
+      preguntas: [
+        {
+          enunciado: "?",
+          tipo: "seleccion_multiple",
+          opciones: [],
+        },
+      ],
+    })
+    expect(result.preguntas[0]?.opciones).toEqual([])
+  })
+})
+
 describe("jsonEquals", () => {
   it("compara objetos planos por valor", () => {
     expect(jsonEquals({ a: 1, b: 2 }, { a: 1, b: 2 })).toBe(true)
@@ -362,6 +487,15 @@ describe("defaults", () => {
       pistas: [],
       restricciones: [],
       criteriosEvaluacion: [],
+    })
+  })
+
+  it("default test espeja al back (sin preguntas, flags por defecto, 3 intentos)", () => {
+    expect(defaultTestPayload()).toEqual({
+      preguntas: [],
+      aleatorizar: false,
+      mostrarResultadoInmediato: true,
+      intentosPermitidos: 3,
     })
   })
 })

@@ -3,11 +3,13 @@ import {
   type EjercicioContenido,
   type LecturaContenido,
   type RecursoContenido,
+  type TestContenido,
   type VideoContenido,
   ejemploCodigoContenidoSchema,
   ejercicioContenidoSchema,
   lecturaContenidoSchema,
   recursoContenidoSchema,
+  testContenidoSchema,
   videoContenidoSchema,
 } from "@nexott-learn/shared-types"
 
@@ -16,6 +18,7 @@ export type VideoPayload = VideoContenido["contenido"]
 export type RecursoPayload = RecursoContenido["contenido"]
 export type EjemploCodigoPayload = EjemploCodigoContenido["contenido"]
 export type EjercicioPayload = EjercicioContenido["contenido"]
+export type TestPayload = TestContenido["contenido"]
 
 // Defaults espejo de los que aplica el back en getDefaultsByTipo cuando crea
 // un bloque sin payload. Se usan como fallback cuando el contenido viene
@@ -57,6 +60,17 @@ export function defaultEjercicioPayload(): EjercicioPayload {
     pistas: [],
     restricciones: [],
     criteriosEvaluacion: [],
+  }
+}
+
+// Espejo exacto del default que aplica el back en defaults-by-tipo.ts para
+// TEST. F7 expone los 4 campos del schema (preguntas + 3 flags) en la UI.
+export function defaultTestPayload(): TestPayload {
+  return {
+    preguntas: [],
+    aleatorizar: false,
+    mostrarResultadoInmediato: true,
+    intentosPermitidos: 3,
   }
 }
 
@@ -107,6 +121,15 @@ export function parseEjercicioPayload(raw: unknown): EjercicioPayload {
   }
   console.warn("[BloqueEjercicio] payload invalido, usando default", parsed.error)
   return defaultEjercicioPayload()
+}
+
+export function parseTestPayload(raw: unknown): TestPayload {
+  const parsed = testContenidoSchema.shape.contenido.safeParse(raw)
+  if (parsed.success) {
+    return parsed.data
+  }
+  console.warn("[BloqueTest] payload invalido, usando default", parsed.error)
+  return defaultTestPayload()
 }
 
 // Equals profundo via JSON.stringify para los payloads de F5.B. Suficiente
