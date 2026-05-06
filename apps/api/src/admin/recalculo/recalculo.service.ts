@@ -71,6 +71,19 @@ export class RecalculoService {
   }
 
   /**
+   * Iter 10 · D-10.1 · agregados por curso en una sola transaccion (sin N+1).
+   * Lee la estructura del curso una vez y todas las entregas del curso de una
+   * vez, luego agrupa en memoria por inscripcionId. Devuelve un Map con una
+   * entrada por inscripcion (incluso si esta sin entregas → AgregadosInscripcion vacio).
+   *
+   * Reusa los helpers puros internos para no duplicar la formula §9.5-§9.8.
+   */
+  snapshotAgregadosPorCurso(cursoId: string, tx?: Tx): Promise<Map<string, AgregadosInscripcion>> {
+    const client = tx ?? this.prisma
+    return calcularAgregadosPorCurso(client, cursoId)
+  }
+
+  /**
    * Recalculo tras evaluar/ajustar una entrega de bloque.
    * Cadena completa modulo → area → curso → etiqueta.
    * `bloqueId` se reserva para optimizaciones futuras (recalcular solo
@@ -527,6 +540,198 @@ function snapshotNivel(
   return { nivel, [idKey]: id, nota } as unknown as Prisma.InputJsonValue
 }
 
+// ──────────────────────────────────────────────────────────────────────
+// Iter 10 · agregados por curso (lectura masiva, sin N+1)
+// ──────────────────────────────────────────────────────────────────────
+
+async function calcularAgregadosPorCurso(
+  client: Pick<
+    Prisma.TransactionClient,
+    "curso" | "inscripcion" | "entregaBloque" | "entregaProyecto"
+  >,
+  cursoId: string,
+): Promise<Map<string, AgregadosInscripcion>> {
+  const cursoEstructura = await leerEstructuraCurso(client, cursoId)
+  if (!cursoEstructura) {
+    return new Map()
+  }
+  const inscripciones = await client.inscripcion.findMany({
+    where: { cursoId },
+    select: { id: true },
+  })
+  const inscripcionIds = inscripciones.map((i) => i.id)
+  if (inscripcionIds.length === 0) {
+    return new Map()
+  }
+
+  const entregasBloque = await client.entregaBloque.findMany({
+    where: {
+      inscripcionId: { in: inscripcionIds },
+      estado: { in: ["EVALUADA", "EVALUADA_AUTOMATICAMENTE"] },
+      nota: { not: null },
+    },
+    select: { inscripcionId: true, bloqueId: true, nota: true },
+  })
+  const entregasProyecto = await client.entregaProyecto.findMany({
+    where: {
+      inscripcionId: { in: inscripcionIds },
+      estado: "EVALUADA",
+      notaFinal: { not: null },
+    },
+    select: {
+      inscripcionId: true,
+      miniProyectoId: true,
+      transversalId: true,
+      notaFinal: true,
+      intento: true,
+      miniProyecto: { select: { moduloId: true } },
+    },
+    orderBy: { intento: "desc" },
+  })
+
+  const mejorPorInscripcion = agruparMejorBloquePorInscripcion(entregasBloque)
+  const proyectoPorInscripcion = agruparProyectoPorInscripcion(entregasProyecto)
+
+  const resultado = new Map<string, AgregadosInscripcion>()
+  for (const insId of inscripcionIds) {
+    const mejor = mejorPorInscripcion.get(insId) ?? new Map<string, Prisma.Decimal>()
+    const np =
+      proyectoPorInscripcion.get(insId) ??
+      ({ ultimaNotaMiniPorModulo: new Map(), ultimaNotaTransversal: null } satisfies NotasProyecto)
+    resultado.set(insId, calcularAgregadosDesdeBuckets(cursoEstructura, mejor, np))
+  }
+  return resultado
+}
+
+function agruparMejorBloquePorInscripcion(
+  entregas: ReadonlyArray<{
+    inscripcionId: string
+    bloqueId: string
+    nota: Prisma.Decimal | null
+  }>,
+): Map<string, Map<string, Prisma.Decimal>> {
+  const map = new Map<string, Map<string, Prisma.Decimal>>()
+  for (const e of entregas) {
+    if (e.nota === null) {
+      continue
+    }
+    let mejor = map.get(e.inscripcionId)
+    if (!mejor) {
+      mejor = new Map<string, Prisma.Decimal>()
+      map.set(e.inscripcionId, mejor)
+    }
+    const prev = mejor.get(e.bloqueId)
+    if (!prev || e.nota.greaterThan(prev)) {
+      mejor.set(e.bloqueId, e.nota)
+    }
+  }
+  return map
+}
+
+function agruparProyectoPorInscripcion(
+  entregas: ReadonlyArray<{
+    inscripcionId: string
+    miniProyectoId: string | null
+    transversalId: string | null
+    notaFinal: Prisma.Decimal | null
+    miniProyecto: { moduloId: string } | null
+  }>,
+): Map<string, NotasProyecto> {
+  const map = new Map<string, NotasProyecto>()
+  for (const e of entregas) {
+    if (e.notaFinal === null) {
+      continue
+    }
+    let np = map.get(e.inscripcionId)
+    if (!np) {
+      np = { ultimaNotaMiniPorModulo: new Map(), ultimaNotaTransversal: null }
+      map.set(e.inscripcionId, np)
+    }
+    if (e.miniProyectoId !== null && e.miniProyecto) {
+      const moduloId = e.miniProyecto.moduloId
+      if (!np.ultimaNotaMiniPorModulo.has(moduloId)) {
+        np.ultimaNotaMiniPorModulo.set(moduloId, e.notaFinal.toNumber())
+      }
+    } else if (e.transversalId !== null && np.ultimaNotaTransversal === null) {
+      np.ultimaNotaTransversal = e.notaFinal.toNumber()
+    }
+  }
+  return map
+}
+
+function calcularAgregadosDesdeBuckets(
+  cursoEstructura: CursoConRelaciones,
+  mejorPorBloque: Map<string, Prisma.Decimal>,
+  np: NotasProyecto,
+): AgregadosInscripcion {
+  const notasModulo = new Map<string, number>()
+  for (const modulo of cursoEstructura.modulos) {
+    const nota = calcularNotaModulo(
+      modulo,
+      cursoEstructura,
+      mejorPorBloque,
+      np.ultimaNotaMiniPorModulo,
+    )
+    if (nota !== null) {
+      notasModulo.set(modulo.id, nota)
+    }
+  }
+  const notasArea = calcularNotasArea(cursoEstructura, notasModulo)
+  const notaCurso = calcularNotaCurso(cursoEstructura, notasArea, np.ultimaNotaTransversal)
+  const etiqueta = derivarEtiquetaLogro(notaCurso, {
+    umbralExcelencia: cursoEstructura.umbralExcelencia,
+    umbralAprobado: cursoEstructura.umbralAprobado,
+    umbralEnDesarrollo: cursoEstructura.umbralEnDesarrollo,
+  })
+  return { notasModulo, notasArea, notaCurso, etiqueta }
+}
+
+async function leerEstructuraCurso(
+  client: Pick<Prisma.TransactionClient, "curso">,
+  cursoId: string,
+): Promise<CursoConRelaciones | null> {
+  const curso = await client.curso.findUnique({
+    where: { id: cursoId },
+    select: {
+      id: true,
+      pesoAreas: true,
+      pesoProyectoTransversal: true,
+      pesoEntrevistaIA: true,
+      pesoActividades: true,
+      pesoMiniProyecto: true,
+      umbralExcelencia: true,
+      umbralAprobado: true,
+      umbralEnDesarrollo: true,
+      cursoAreas: { select: { areaId: true, peso: true } },
+      modulos: {
+        where: { archivadoAt: null },
+        select: {
+          id: true,
+          areaId: true,
+          miniProyectoActivo: true,
+          secciones: {
+            where: { archivadoAt: null },
+            select: {
+              id: true,
+              bloques: {
+                where: { archivadoAt: null },
+                select: { id: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+  return curso as unknown as CursoConRelaciones | null
+}
+
 export type { AgregadosInscripcion, DiffAgregados, RecalcularResultado, RecalcularOptions, Tx }
 // Para testing — exportar los pure helpers internos.
-export const __testing = { calcularAgregados, calcularDiff, emitirLogsRecalculo, agregadosVacios }
+export const __testing = {
+  calcularAgregados,
+  calcularAgregadosPorCurso,
+  calcularDiff,
+  emitirLogsRecalculo,
+  agregadosVacios,
+}

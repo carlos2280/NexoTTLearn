@@ -21,7 +21,8 @@ import type { AgregadosInscripcion } from "./recalculo.types"
 type Stub = ReturnType<typeof vi.fn>
 
 interface PrismaMock {
-  inscripcion: { findUnique: Stub }
+  inscripcion: { findUnique: Stub; findMany: Stub }
+  curso: { findUnique: Stub }
   entregaBloque: { findMany: Stub }
   entregaProyecto: { findMany: Stub }
   logActividad: { create: Stub }
@@ -29,7 +30,8 @@ interface PrismaMock {
 
 function buildPrisma(): PrismaMock {
   return {
-    inscripcion: { findUnique: vi.fn() },
+    inscripcion: { findUnique: vi.fn(), findMany: vi.fn() },
+    curso: { findUnique: vi.fn() },
     entregaBloque: { findMany: vi.fn() },
     entregaProyecto: { findMany: vi.fn() },
     logActividad: { create: vi.fn().mockResolvedValue({ id: "log-recalc" }) },
@@ -442,7 +444,8 @@ describe("recalcularInscripcionCompleta", () => {
   it("tx opcional: usa el cliente pasado en vez de this.prisma", async () => {
     const { service } = buildService()
     const tx: PrismaMock = {
-      inscripcion: { findUnique: vi.fn() },
+      inscripcion: { findUnique: vi.fn(), findMany: vi.fn() },
+      curso: { findUnique: vi.fn() },
       entregaBloque: { findMany: vi.fn().mockResolvedValue([]) },
       entregaProyecto: { findMany: vi.fn().mockResolvedValue([]) },
       logActividad: { create: vi.fn().mockResolvedValue({ id: "log-tx" }) },
@@ -568,5 +571,91 @@ describe("recalcularInscripcionTrasEntregaProyecto", () => {
     expect(result.diff.modulosCambiados[0]?.despues).toBe(95)
     expect(result.diff.etiquetaCambio?.despues).toBe("EXCELENCIA")
     expect(result.logsEmitidos).toBe(4)
+  })
+})
+
+// =============================================================================
+// Iter 10 · snapshotAgregadosPorCurso (sin N+1)
+// =============================================================================
+
+const INSCRIPCION_2_ID = "00000000-0000-0000-0000-0000000000a1"
+const INSCRIPCION_3_ID = "00000000-0000-0000-0000-0000000000a2"
+
+function buildCursoEstructuraMock(curso: CursoMock = {}) {
+  // Solo el "curso" plano, sin envolver en inscripcion. Para curso.findUnique.
+  return buildInscripcionMock(curso).curso
+}
+
+describe("snapshotAgregadosPorCurso", () => {
+  it("curso sin inscripciones devuelve Map vacio", async () => {
+    const { service, prisma } = buildService()
+    prisma.curso.findUnique.mockResolvedValue(buildCursoEstructuraMock())
+    prisma.inscripcion.findMany.mockResolvedValue([])
+
+    const result = await service.snapshotAgregadosPorCurso(CURSO_ID)
+    expect(result.size).toBe(0)
+    // No deben llamarse las queries de entregas si no hay inscripciones.
+    expect(prisma.entregaBloque.findMany).not.toHaveBeenCalled()
+    expect(prisma.entregaProyecto.findMany).not.toHaveBeenCalled()
+  })
+
+  it("curso inexistente devuelve Map vacio (curso.findUnique = null)", async () => {
+    const { service, prisma } = buildService()
+    prisma.curso.findUnique.mockResolvedValue(null)
+
+    const result = await service.snapshotAgregadosPorCurso(CURSO_ID)
+    expect(result.size).toBe(0)
+    expect(prisma.inscripcion.findMany).not.toHaveBeenCalled()
+  })
+
+  it("agrupa entregas por inscripcion sin N+1 (una sola query masiva)", async () => {
+    const { service, prisma } = buildService()
+    prisma.curso.findUnique.mockResolvedValue(buildCursoEstructuraMock())
+    prisma.inscripcion.findMany.mockResolvedValue([
+      { id: INSCRIPCION_ID },
+      { id: INSCRIPCION_2_ID },
+      { id: INSCRIPCION_3_ID },
+    ])
+    prisma.entregaBloque.findMany.mockResolvedValue([
+      { inscripcionId: INSCRIPCION_ID, bloqueId: BLOQUE_1_ID, nota: dec(80) },
+      { inscripcionId: INSCRIPCION_ID, bloqueId: BLOQUE_2_ID, nota: dec(60) },
+      { inscripcionId: INSCRIPCION_2_ID, bloqueId: BLOQUE_1_ID, nota: dec(100) },
+      { inscripcionId: INSCRIPCION_2_ID, bloqueId: BLOQUE_2_ID, nota: dec(100) },
+    ])
+    prisma.entregaProyecto.findMany.mockResolvedValue([])
+
+    const result = await service.snapshotAgregadosPorCurso(CURSO_ID)
+    expect(result.size).toBe(3)
+    expect(result.get(INSCRIPCION_ID)?.notaCurso).toBe(70)
+    expect(result.get(INSCRIPCION_2_ID)?.notaCurso).toBe(100)
+    // Inscripcion 3 sin entregas: agregados vacios pero presente en el map.
+    const ag3 = result.get(INSCRIPCION_3_ID)
+    expect(ag3).toBeDefined()
+    expect(ag3?.notaCurso).toBeNull()
+    expect(ag3?.notasModulo.size).toBe(0)
+    // Una sola llamada por tabla (sin N+1).
+    expect(prisma.entregaBloque.findMany).toHaveBeenCalledTimes(1)
+    expect(prisma.entregaProyecto.findMany).toHaveBeenCalledTimes(1)
+  })
+
+  it("filtra entregas por estado EVALUADA y nota no null (mejor intento por bloque)", async () => {
+    const { service, prisma } = buildService()
+    prisma.curso.findUnique.mockResolvedValue(buildCursoEstructuraMock())
+    prisma.inscripcion.findMany.mockResolvedValue([{ id: INSCRIPCION_ID }])
+    prisma.entregaBloque.findMany.mockResolvedValue([
+      { inscripcionId: INSCRIPCION_ID, bloqueId: BLOQUE_1_ID, nota: dec(40) },
+      { inscripcionId: INSCRIPCION_ID, bloqueId: BLOQUE_1_ID, nota: dec(95) },
+      { inscripcionId: INSCRIPCION_ID, bloqueId: BLOQUE_2_ID, nota: dec(85) },
+    ])
+    prisma.entregaProyecto.findMany.mockResolvedValue([])
+
+    const result = await service.snapshotAgregadosPorCurso(CURSO_ID)
+    // mejor de bloque1=95, bloque2=85 → modulo = 90 → curso = 90 → EXCELENCIA
+    expect(result.get(INSCRIPCION_ID)?.notasModulo.get(MODULO_A_ID)).toBe(90)
+    expect(result.get(INSCRIPCION_ID)?.etiqueta).toBe("EXCELENCIA")
+    // Verificar que el where filtra por estado e in inscripcionIds.
+    const wherePassed = (prisma.entregaBloque.findMany as Stub).mock.calls[0]?.[0]?.where
+    expect(wherePassed?.estado).toEqual({ in: ["EVALUADA", "EVALUADA_AUTOMATICAMENTE"] })
+    expect(wherePassed?.inscripcionId).toEqual({ in: [INSCRIPCION_ID] })
   })
 })
