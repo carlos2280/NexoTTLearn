@@ -205,6 +205,19 @@ export {
 } from "./admin-cursos"
 
 export {
+  upsertEvaluacionInicialAdminInputSchema,
+  type UpsertEvaluacionInicialAdminInput,
+  actualizarEvaluacionInicialAdminInputSchema,
+  type ActualizarEvaluacionInicialAdminInput,
+  evaluacionInicialDetalleAdminSchema,
+  type EvaluacionInicialDetalleAdmin,
+  evaluacionInicialListAdminResponseSchema,
+  type EvaluacionInicialListAdminResponse,
+  evaluacionInicialDeleteAdminResponseSchema,
+  type EvaluacionInicialDeleteAdminResponse,
+} from "./admin-evaluaciones-iniciales"
+
+export {
   estadoModuloSchema,
   type EstadoModuloApi,
   areaColorSchema,
