@@ -616,3 +616,267 @@ export const seccionDeleteAdminResponseSchema = z.object({
   id: z.string(),
 })
 export type SeccionDeleteAdminResponse = z.infer<typeof seccionDeleteAdminResponseSchema>
+
+// ─────────────────────────────────────────────────────────────────
+// BLOQUES · CRUD dentro de una sección
+// ─────────────────────────────────────────────────────────────────
+//
+// MAESTRO §3.3, §3.4 · el bloque es heterogéneo: el shape del payload depende
+// del `tipo`. Modelamos crear/actualizar como discriminatedUnion para que el
+// 400 sea el mismo punto donde el caller se equivoca de forma. Iter A1:
+// `orden` NO se acepta en PATCH; se cambia exclusivamente vía /reordenar.
+
+export const tipoBloqueSchema = z.enum(["PARRAFO", "TIP", "VIDEO", "RECURSO", "CODIGO", "QUIZ"])
+export type TipoBloque = z.infer<typeof tipoBloqueSchema>
+
+export const codigoUbicacionSchema = z.enum(["INLINE", "SEPARADO"])
+export type CodigoUbicacion = z.infer<typeof codigoUbicacionSchema>
+
+export const codigoInteractivoSchema = z.enum(["SOLO_VER", "EDITABLE"])
+export type CodigoInteractivo = z.infer<typeof codigoInteractivoSchema>
+
+export const codigoEvaluableSchema = z.enum(["NINGUNO", "PREGUNTAS", "TESTS"])
+export type CodigoEvaluable = z.infer<typeof codigoEvaluableSchema>
+
+export const lenguajeCodigoSchema = z.enum(["PYTHON", "JAVASCRIPT", "TYPESCRIPT", "REACT"])
+export type LenguajeCodigo = z.infer<typeof lenguajeCodigoSchema>
+
+export const tipVarianteSchema = z.enum(["info", "warning", "best-practice", "gotcha"])
+export type TipVariante = z.infer<typeof tipVarianteSchema>
+
+// ─────────────────────────────────────────────────────────────────
+// Payload por tipo
+// ─────────────────────────────────────────────────────────────────
+
+const payloadParrafoSchema = z
+  .object({
+    contenidoTiptap: z.record(z.unknown()),
+  })
+  .strict()
+
+const payloadTipSchema = z
+  .object({
+    variante: tipVarianteSchema,
+    texto: z.string().trim().min(1, "El texto del tip no puede estar vacio"),
+  })
+  .strict()
+
+const payloadVideoSchema = z
+  .object({
+    url: z.string().trim().url("La URL del video no es valida"),
+    proveedor: z.string().trim().min(1, "El proveedor es obligatorio"),
+  })
+  .strict()
+
+const payloadRecursoSchema = z
+  .object({
+    url: z.string().trim().url("La URL del recurso no es valida"),
+    esDescarga: z.boolean(),
+    descripcion: z.string().trim().max(500).optional(),
+  })
+  .strict()
+
+const archivoCodigoSchema = z
+  .object({
+    nombre: z.string().trim().min(1, "El nombre del archivo es obligatorio"),
+    contenido: z.string(),
+    lenguaje: lenguajeCodigoSchema.optional(),
+  })
+  .strict()
+
+const preguntaCodigoSchema = z
+  .object({
+    enunciado: z.string().trim().min(1, "El enunciado es obligatorio"),
+    opciones: z.array(z.string()).min(2, "Una pregunta debe tener al menos 2 opciones"),
+    correcta: z.union([z.number().int().min(0), z.array(z.number().int().min(0)).min(1)]),
+    tipo: z.enum(["unica", "multiple"]),
+  })
+  .strict()
+
+const payloadCodigoSchema = z
+  .object({
+    archivos: z.array(archivoCodigoSchema).min(1, "Debe incluir al menos un archivo"),
+    pistas: z.array(z.string()).optional(),
+    solucionReferencia: z.string().optional(),
+    metadata: z.record(z.unknown()).optional(),
+    preguntas: z.array(preguntaCodigoSchema).optional(),
+    tests: z.string().optional(),
+  })
+  .strict()
+
+const preguntaQuizSchema = z
+  .object({
+    enunciado: z.string().trim().min(1, "El enunciado es obligatorio"),
+    opciones: z.array(z.string()).min(2, "Una pregunta debe tener al menos 2 opciones"),
+    correcta: z.union([z.number().int().min(0), z.array(z.number().int().min(0)).min(1)]),
+    tipo: z.enum(["unica", "multiple"]),
+  })
+  .strict()
+
+const payloadQuizSchema = z
+  .object({
+    preguntas: z.array(preguntaQuizSchema).min(1, "El quiz debe tener al menos 1 pregunta"),
+  })
+  .strict()
+
+// Schema reutilizable para validar el payload contra un tipo dado.
+// Lo usamos en el service para revalidar en PATCH (donde no viene `tipo`
+// porque lo leemos de DB) y al crear (lo abrazamos en discriminada).
+export function payloadParaTipo(tipo: TipoBloque) {
+  switch (tipo) {
+    case "PARRAFO":
+      return payloadParrafoSchema
+    case "TIP":
+      return payloadTipSchema
+    case "VIDEO":
+      return payloadVideoSchema
+    case "RECURSO":
+      return payloadRecursoSchema
+    case "CODIGO":
+      return payloadCodigoSchema
+    case "QUIZ":
+      return payloadQuizSchema
+    default: {
+      const exhaustive: never = tipo
+      throw new Error(`Tipo de bloque no soportado: ${String(exhaustive)}`)
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// CREAR · discriminada por `tipo`
+// ─────────────────────────────────────────────────────────────────
+
+const crearBloqueParrafoSchema = z
+  .object({
+    tipo: z.literal("PARRAFO"),
+    payload: payloadParrafoSchema,
+    orden: z.number().int().min(0).optional(),
+  })
+  .strict()
+
+const crearBloqueTipSchema = z
+  .object({
+    tipo: z.literal("TIP"),
+    payload: payloadTipSchema,
+    orden: z.number().int().min(0).optional(),
+  })
+  .strict()
+
+const crearBloqueVideoSchema = z
+  .object({
+    tipo: z.literal("VIDEO"),
+    payload: payloadVideoSchema,
+    orden: z.number().int().min(0).optional(),
+  })
+  .strict()
+
+const crearBloqueRecursoSchema = z
+  .object({
+    tipo: z.literal("RECURSO"),
+    payload: payloadRecursoSchema,
+    orden: z.number().int().min(0).optional(),
+  })
+  .strict()
+
+const crearBloqueCodigoSchema = z
+  .object({
+    tipo: z.literal("CODIGO"),
+    payload: payloadCodigoSchema,
+    orden: z.number().int().min(0).optional(),
+    codigoUbicacion: codigoUbicacionSchema,
+    codigoInteractivo: codigoInteractivoSchema,
+    codigoEvaluable: codigoEvaluableSchema,
+    codigoLenguaje: lenguajeCodigoSchema,
+    solucionReferencia: z.string().optional(),
+  })
+  .strict()
+
+const crearBloqueQuizSchema = z
+  .object({
+    tipo: z.literal("QUIZ"),
+    payload: payloadQuizSchema,
+    orden: z.number().int().min(0).optional(),
+  })
+  .strict()
+
+export const crearBloqueAdminInputSchema = z.discriminatedUnion("tipo", [
+  crearBloqueParrafoSchema,
+  crearBloqueTipSchema,
+  crearBloqueVideoSchema,
+  crearBloqueRecursoSchema,
+  crearBloqueCodigoSchema,
+  crearBloqueQuizSchema,
+])
+export type CrearBloqueAdminInput = z.infer<typeof crearBloqueAdminInputSchema>
+
+// ─────────────────────────────────────────────────────────────────
+// ACTUALIZAR (PATCH) · sin `tipo`, sin `orden`
+// ─────────────────────────────────────────────────────────────────
+//
+// El payload se valida aqui de forma permisiva (z.record) y el service
+// re-valida con la discriminada del tipo persistido. Asi atrapamos el caso
+// "campo del tipo X enviado a un bloque de tipo Y" con el mensaje correcto.
+// `.strict()` rechaza llaves desconocidas (incluido `tipo` y `orden`).
+export const actualizarBloqueAdminInputSchema = z
+  .object({
+    payload: z.record(z.unknown()),
+    codigoUbicacion: codigoUbicacionSchema,
+    codigoInteractivo: codigoInteractivoSchema,
+    codigoEvaluable: codigoEvaluableSchema,
+    codigoLenguaje: lenguajeCodigoSchema,
+    solucionReferencia: z.string().nullable(),
+  })
+  .partial()
+  .strict()
+export type ActualizarBloqueAdminInput = z.infer<typeof actualizarBloqueAdminInputSchema>
+
+// ─────────────────────────────────────────────────────────────────
+// REORDENAR
+// ─────────────────────────────────────────────────────────────────
+
+export const reordenarBloquesAdminInputSchema = z
+  .object({
+    items: z
+      .array(
+        z
+          .object({
+            id: z.string().uuid("id debe ser un UUID valido"),
+            orden: z.number().int().min(0),
+          })
+          .strict(),
+      )
+      .min(1, "La lista de items no puede estar vacia"),
+  })
+  .strict()
+export type ReordenarBloquesAdminInput = z.infer<typeof reordenarBloquesAdminInputSchema>
+
+// ─────────────────────────────────────────────────────────────────
+// LECTURA · detalle y listado
+// ─────────────────────────────────────────────────────────────────
+
+export const bloqueDetalleAdminSchema = z.object({
+  id: z.string(),
+  seccionId: z.string(),
+  tipo: tipoBloqueSchema,
+  orden: z.number().int(),
+  codigoUbicacion: codigoUbicacionSchema.nullable(),
+  codigoInteractivo: codigoInteractivoSchema.nullable(),
+  codigoEvaluable: codigoEvaluableSchema.nullable(),
+  codigoLenguaje: lenguajeCodigoSchema.nullable(),
+  payload: z.record(z.unknown()),
+  solucionReferencia: z.string().nullable(),
+  archivadoAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+export type BloqueDetalleAdmin = z.infer<typeof bloqueDetalleAdminSchema>
+
+export const bloqueListAdminResponseSchema = z.array(bloqueDetalleAdminSchema)
+export type BloqueListAdminResponse = z.infer<typeof bloqueListAdminResponseSchema>
+
+export const bloqueDeleteAdminResponseSchema = z.object({
+  tipo: z.literal("ELIMINADO"),
+  id: z.string(),
+})
+export type BloqueDeleteAdminResponse = z.infer<typeof bloqueDeleteAdminResponseSchema>

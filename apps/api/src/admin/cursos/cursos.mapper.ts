@@ -1,4 +1,5 @@
 import type {
+  BloqueDetalleAdmin,
   CursoAreaDetalle,
   CursoAreaIndividualDetalle,
   CursoDetalle,
@@ -495,5 +496,68 @@ export function snapshotCurso(row: CursoDetalleRow): Prisma.InputJsonValue {
     publicadoAt: row.publicadoAt ? row.publicadoAt.toISOString() : null,
     cerradoAt: row.cerradoAt ? row.cerradoAt.toISOString() : null,
     updatedAt: row.updatedAt.toISOString(),
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// BLOQUE DETALLE SELECT + MAPPER
+// ─────────────────────────────────────────────────────────────────
+
+export const BLOQUE_DETALLE_SELECT = {
+  id: true,
+  seccionId: true,
+  tipo: true,
+  orden: true,
+  codigoUbicacion: true,
+  codigoInteractivo: true,
+  codigoEvaluable: true,
+  codigoLenguaje: true,
+  payload: true,
+  solucionReferencia: true,
+  archivadoAt: true,
+  archivadoEstado: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.BloqueSelect
+
+export type BloqueDetalleRow = Prisma.BloqueGetPayload<{ select: typeof BLOQUE_DETALLE_SELECT }>
+
+// MAESTRO §3.4 · admin recibe solucionReferencia, alumno NO. Este mapper se usa
+// SOLO en endpoints admin; el modulo alumno deberá tener su propio mapper que
+// omita el campo. payload es Json y lo devolvemos opaco al consumidor.
+export function mapBloqueDetalle(row: BloqueDetalleRow): BloqueDetalleAdmin {
+  return {
+    id: row.id,
+    seccionId: row.seccionId,
+    tipo: row.tipo,
+    orden: row.orden,
+    codigoUbicacion: row.codigoUbicacion,
+    codigoInteractivo: row.codigoInteractivo,
+    codigoEvaluable: row.codigoEvaluable,
+    codigoLenguaje: row.codigoLenguaje,
+    payload: (row.payload ?? {}) as Record<string, unknown>,
+    solucionReferencia: row.solucionReferencia,
+    archivadoAt: row.archivadoAt ? row.archivadoAt.toISOString() : null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  }
+}
+
+// Snapshot JSON-serializable del bloque para LogActividad. Igual que en
+// snapshotSeccion: convertimos Date a ISO y usamos la forma "ancha" (mismos
+// campos del SELECT para que el log refleje exactamente lo persistido).
+export function snapshotBloque(row: BloqueDetalleRow): Prisma.InputJsonValue {
+  return {
+    id: row.id,
+    seccionId: row.seccionId,
+    tipo: row.tipo,
+    orden: row.orden,
+    codigoUbicacion: row.codigoUbicacion,
+    codigoInteractivo: row.codigoInteractivo,
+    codigoEvaluable: row.codigoEvaluable,
+    codigoLenguaje: row.codigoLenguaje,
+    payload: (row.payload ?? {}) as Prisma.InputJsonValue,
+    solucionReferencia: row.solucionReferencia,
+    archivadoAt: row.archivadoAt ? row.archivadoAt.toISOString() : null,
   }
 }
