@@ -8,6 +8,7 @@ import type {
 } from "@nexott-learn/shared-types"
 import { Prisma } from "@prisma/client"
 import { PrismaService } from "../../common/prisma/prisma.service"
+import { RecalculoService } from "../recalculo/recalculo.service"
 import {
   ENTREGA_BLOQUE_DETALLE_SELECT,
   ENTREGA_BLOQUE_INTENTO_SELECT,
@@ -31,7 +32,10 @@ import {
 
 @Injectable()
 export class CentroRevisionBloquesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly recalculo: RecalculoService,
+  ) {}
 
   // ──────────────────────────────────────────────────────────────────
   // LISTADO · cola filtrable. Por defecto solo PENDIENTE_REVISION
@@ -124,13 +128,16 @@ export class CentroRevisionBloquesService {
     aplicarPatchFeedback(data, input.feedback)
 
     await this.prisma.$transaction(async (tx) => {
+      // Iter 9.9 · snapshot agregado ANTES de mutar la entrega.
+      const agregadosAntes = await this.recalculo.snapshotAgregados(previo.inscripcionId, tx)
+
       const actualizado = await tx.entregaBloque.update({
         where: { id },
         data,
         select: SELECT_LOG,
       })
 
-      await tx.logActividad.create({
+      const logPadre = await tx.logActividad.create({
         data: {
           actorId,
           tipoAccion: "ENTREGA_EVALUADA",
@@ -139,10 +146,18 @@ export class CentroRevisionBloquesService {
           valorAntes,
           valorDespues: snapshotEntregaBloque(actualizado),
         },
+        select: { id: true },
       })
 
-      // TODO Iter 9.9 / 10 · disparar recalculo encadenado
-      //   modulo → area → curso → etiqueta (MAESTRO §17.3, T03).
+      // Iter 9.9 · cadena modulo → area → curso → etiqueta. Idempotente:
+      // si ningun agregado cambia, NO emite logs (A26 caso borde 1).
+      await this.recalculo.recalcularInscripcionTrasEntregaBloque(
+        previo.inscripcionId,
+        previo.bloqueId,
+        actorId,
+        { agregadosAntes, causaLogId: logPadre.id },
+        tx,
+      )
       // TODO post-MVP · emitir notificacion ENTREGA_EVALUADA al participante
       //   (MAESTRO §T06). Sin modulo de notificaciones todavia.
     })
@@ -180,11 +195,10 @@ export class CentroRevisionBloquesService {
     }
     aplicarPatchFeedback(data, input.feedback)
 
-    // TODO Iter 9.9/10 · idempotencia A26 caso borde 1: si
-    //   input.nota === previo.nota Y outputs no cambian, registrar log
-    //   pero NO disparar recalculo encadenado.
-
     await this.prisma.$transaction(async (tx) => {
+      // Iter 9.9 · snapshot agregado ANTES de mutar.
+      const agregadosAntes = await this.recalculo.snapshotAgregados(previo.inscripcionId, tx)
+
       const actualizado = await tx.entregaBloque.update({
         where: { id },
         data,
@@ -193,7 +207,7 @@ export class CentroRevisionBloquesService {
 
       const valorDespues = snapshotEntregaBloque(actualizado)
 
-      await tx.logActividad.create({
+      const logPadre = await tx.logActividad.create({
         data: {
           actorId,
           tipoAccion: "NOTA_AJUSTADA_MANUAL",
@@ -203,10 +217,18 @@ export class CentroRevisionBloquesService {
           valorAntes,
           valorDespues: { ...(valorDespues as Record<string, unknown>), motivo },
         },
+        select: { id: true },
       })
 
-      // TODO Iter 9.9 / 10 · recalculo encadenado.
-      // TODO post-MVP · si etiqueta cambia → RECALCULO_NOTA (T06).
+      // Iter 9.9 · A26 idempotente · si nada cambia, 0 logs RECALCULO_*.
+      await this.recalculo.recalcularInscripcionTrasEntregaBloque(
+        previo.inscripcionId,
+        previo.bloqueId,
+        actorId,
+        { agregadosAntes, causaLogId: logPadre.id },
+        tx,
+      )
+      // TODO post-MVP · si etiqueta cambia → notificacion RECALCULO_NOTA (T06).
     })
 
     return this.obtener(id)

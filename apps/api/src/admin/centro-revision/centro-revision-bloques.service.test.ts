@@ -9,6 +9,7 @@ import {
 import { Prisma } from "@prisma/client"
 import { describe, expect, it, vi } from "vitest"
 import type { PrismaService } from "../../common/prisma/prisma.service"
+import type { RecalculoService } from "../recalculo/recalculo.service"
 import { CentroRevisionBloquesService } from "./centro-revision-bloques.service"
 
 type Stub = ReturnType<typeof vi.fn>
@@ -45,9 +46,27 @@ function buildPrisma(): PrismaMock {
   return prisma
 }
 
+function buildRecalculoMock() {
+  return {
+    snapshotAgregados: vi.fn().mockResolvedValue({
+      notasModulo: new Map(),
+      notasArea: new Map(),
+      notaCurso: null,
+      etiqueta: null,
+    }),
+    recalcularInscripcionTrasEntregaBloque: vi.fn().mockResolvedValue({ logsEmitidos: 0 }),
+    recalcularInscripcionTrasEntregaProyecto: vi.fn().mockResolvedValue({ logsEmitidos: 0 }),
+    recalcularInscripcionCompleta: vi.fn().mockResolvedValue({ logsEmitidos: 0 }),
+  }
+}
+
 function buildService(prisma: PrismaMock = buildPrisma()) {
-  const service = new CentroRevisionBloquesService(prisma as unknown as PrismaService)
-  return { service, prisma }
+  const recalculo = buildRecalculoMock()
+  const service = new CentroRevisionBloquesService(
+    prisma as unknown as PrismaService,
+    recalculo as unknown as RecalculoService,
+  )
+  return { service, prisma, recalculo }
 }
 
 const ACTOR_ID = "00000000-0000-0000-0000-000000000001"
@@ -306,7 +325,7 @@ describe("evaluar", () => {
       evaluadaAt: NOW,
     })
     prisma.entregaBloque.findMany.mockResolvedValue([])
-    prisma.logActividad.create.mockResolvedValue({})
+    prisma.logActividad.create.mockResolvedValue({ id: "log-1" })
   }
 
   it("transiciona PENDIENTE_REVISION → EVALUADA con ajustadaManual=false", async () => {
@@ -468,7 +487,7 @@ describe("ajustar", () => {
       evaluadaAt: NOW,
     })
     prisma.entregaBloque.findMany.mockResolvedValue([])
-    prisma.logActividad.create.mockResolvedValue({})
+    prisma.logActividad.create.mockResolvedValue({ id: "log-1" })
   }
 
   it("EVALUADA → EVALUADA con ajustadaManual=true", async () => {

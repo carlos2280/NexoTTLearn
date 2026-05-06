@@ -9,6 +9,7 @@ import {
 import { Prisma } from "@prisma/client"
 import { describe, expect, it, vi } from "vitest"
 import type { PrismaService } from "../../common/prisma/prisma.service"
+import type { RecalculoService } from "../recalculo/recalculo.service"
 import { calcularNotaFinal } from "./centro-revision-proyectos.mapper"
 import { CentroRevisionProyectosService } from "./centro-revision-proyectos.service"
 
@@ -45,9 +46,27 @@ function buildPrisma(): PrismaMock {
   return prisma
 }
 
+function buildRecalculoMock() {
+  return {
+    snapshotAgregados: vi.fn().mockResolvedValue({
+      notasModulo: new Map(),
+      notasArea: new Map(),
+      notaCurso: null,
+      etiqueta: null,
+    }),
+    recalcularInscripcionTrasEntregaBloque: vi.fn().mockResolvedValue({ logsEmitidos: 0 }),
+    recalcularInscripcionTrasEntregaProyecto: vi.fn().mockResolvedValue({ logsEmitidos: 0 }),
+    recalcularInscripcionCompleta: vi.fn().mockResolvedValue({ logsEmitidos: 0 }),
+  }
+}
+
 function buildService(prisma: PrismaMock = buildPrisma()) {
-  const service = new CentroRevisionProyectosService(prisma as unknown as PrismaService)
-  return { service, prisma }
+  const recalculo = buildRecalculoMock()
+  const service = new CentroRevisionProyectosService(
+    prisma as unknown as PrismaService,
+    recalculo as unknown as RecalculoService,
+  )
+  return { service, prisma, recalculo }
 }
 
 const ACTOR_ID = "00000000-0000-0000-0000-000000000001"
@@ -473,7 +492,7 @@ describe("evaluar", () => {
       evaluadaAt: NOW,
     })
     prisma.entregaProyecto.findMany.mockResolvedValue([])
-    prisma.logActividad.create.mockResolvedValue({})
+    prisma.logActividad.create.mockResolvedValue({ id: "log-1" })
   }
 
   it("evalua MINI calcula notaFinal=71 con pesos default 40/30/30", async () => {
@@ -681,7 +700,7 @@ describe("ajustar", () => {
       evaluadaAt: previo.evaluadaAt,
     })
     prisma.entregaProyecto.findMany.mockResolvedValue([])
-    prisma.logActividad.create.mockResolvedValue({})
+    prisma.logActividad.create.mockResolvedValue({ id: "log-1" })
   }
 
   it("ajusta desde EVALUADA con override notaFinal y NO toca notaCapa* ni pesos", async () => {

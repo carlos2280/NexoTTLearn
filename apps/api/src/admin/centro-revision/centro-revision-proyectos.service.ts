@@ -13,6 +13,7 @@ import type {
 } from "@nexott-learn/shared-types"
 import { Prisma } from "@prisma/client"
 import { PrismaService } from "../../common/prisma/prisma.service"
+import { RecalculoService } from "../recalculo/recalculo.service"
 import {
   ENTREGA_PROYECTO_DETALLE_SELECT,
   ENTREGA_PROYECTO_INTENTO_SELECT,
@@ -51,7 +52,10 @@ import {
 
 @Injectable()
 export class CentroRevisionProyectosService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly recalculo: RecalculoService,
+  ) {}
 
   // ──────────────────────────────────────────────────────────────────
   // LISTADO · cola filtrable. Por defecto solo EN_REVISION.
@@ -167,13 +171,16 @@ export class CentroRevisionProyectosService {
     aplicarPatchTexto(data, "transcripcionCapa3", input.transcripcionCapa3)
 
     await this.prisma.$transaction(async (tx) => {
+      // Iter 9.9 · snapshot agregado ANTES de mutar.
+      const agregadosAntes = await this.recalculo.snapshotAgregados(previo.inscripcionId, tx)
+
       const actualizado = await tx.entregaProyecto.update({
         where: { id },
         data,
         select: SELECT_LOG,
       })
 
-      await tx.logActividad.create({
+      const logPadre = await tx.logActividad.create({
         data: {
           actorId,
           tipoAccion: "PROYECTO_EVALUADO",
@@ -182,11 +189,19 @@ export class CentroRevisionProyectosService {
           valorAntes,
           valorDespues: snapshotEntregaProyecto(actualizado),
         },
+        select: { id: true },
       })
 
-      // TODO Iter 9.9 / 10 · disparar recalculo encadenado tras evaluar
-      //   (mini → modulo → area → curso → etiqueta;
-      //    transversal → curso → etiqueta).
+      // Iter 9.9 · cadena (mini → modulo → area → curso → etiqueta) o
+      // (transversal → curso → etiqueta). El servicio detecta el alcance
+      // por la entrega; en MVP recalcula la inscripcion completa.
+      await this.recalculo.recalcularInscripcionTrasEntregaProyecto(
+        previo.inscripcionId,
+        id,
+        actorId,
+        { agregadosAntes, causaLogId: logPadre.id },
+        tx,
+      )
       // TODO post-MVP · emitir notificacion PROYECTO_REVISADO al participante (T06).
     })
 
@@ -246,11 +261,10 @@ export class CentroRevisionProyectosService {
     // biome-ignore lint/nursery/noSecrets: nombre de campo de dominio, no es un secreto
     aplicarPatchTexto(data, "transcripcionCapa3", input.transcripcionCapa3)
 
-    // TODO Iter 9.9/10 · idempotencia A26 caso borde 1: si
-    //   input.notaFinal === previo.notaFinal Y outputs no cambian, registrar
-    //   log pero NO disparar recalculo encadenado.
-
     await this.prisma.$transaction(async (tx) => {
+      // Iter 9.9 · snapshot agregado ANTES de mutar (idempotencia A26).
+      const agregadosAntes = await this.recalculo.snapshotAgregados(previo.inscripcionId, tx)
+
       const actualizado = await tx.entregaProyecto.update({
         where: { id },
         data,
@@ -266,7 +280,7 @@ export class CentroRevisionProyectosService {
         valorDespuesConMotivo.pesosDerivadosDefensivos = true
       }
 
-      await tx.logActividad.create({
+      const logPadre = await tx.logActividad.create({
         data: {
           actorId,
           tipoAccion: "NOTA_AJUSTADA_MANUAL",
@@ -276,10 +290,18 @@ export class CentroRevisionProyectosService {
           valorAntes,
           valorDespues: valorDespuesConMotivo as Prisma.InputJsonValue,
         },
+        select: { id: true },
       })
 
-      // TODO Iter 9.9/10 · recalculo encadenado tras A26.
-      // TODO post-MVP · si etiqueta cambia → RECALCULO_NOTA (T06).
+      // Iter 9.9 · A26 idempotente · cadena solo emite logs si hay cambio.
+      await this.recalculo.recalcularInscripcionTrasEntregaProyecto(
+        previo.inscripcionId,
+        id,
+        actorId,
+        { agregadosAntes, causaLogId: logPadre.id },
+        tx,
+      )
+      // TODO post-MVP · si etiqueta cambia → notificacion RECALCULO_NOTA (T06).
     })
 
     return this.obtener(id)
