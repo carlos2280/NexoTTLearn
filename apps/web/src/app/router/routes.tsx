@@ -1,8 +1,5 @@
 import { BandejaAdminPage } from "@/pages/admin/bandeja/bandeja-admin.page"
-import { CursoEditarPage } from "@/pages/admin/cursos/curso-editar.page"
-import { CursosAdminPage } from "@/pages/admin/cursos/cursos-admin.page"
-import { ModuloSeccionesPage } from "@/pages/admin/cursos/modulo-secciones.page"
-import { SeccionEditorPage } from "@/pages/admin/cursos/seccion-editor.page"
+import { MantenedoresPage } from "@/pages/admin/mantenedores/mantenedores.page"
 import { BandejaPage } from "@/pages/bandeja/bandeja.page"
 import { CambiarPasswordPage } from "@/pages/cambiar-password/cambiar-password.page"
 import { LoginPage } from "@/pages/login/login.page"
@@ -15,6 +12,11 @@ import { GuardRol } from "./guards/guard-rol"
 import { GuardSesion } from "./guards/guard-sesion"
 import { LayoutAdmin } from "./layouts/layout-admin"
 import { LayoutParticipante } from "./layouts/layout-participante"
+
+// Migración v2 en curso. Pantallas admin de cursos/módulos/secciones se
+// reescriben PR a PR contra el nuevo modelo y viven temporalmente en
+// `pages/admin/_legacy/`. Mantenedores (PR-04F) es la primera pantalla admin
+// completa contra v2.
 
 export function AppRoutes() {
   return (
@@ -40,17 +42,16 @@ export function AppRoutes() {
           <Route element={<GuardRol rol="ADMIN" />}>
             <Route element={<LayoutAdmin />}>
               <Route path={RUTAS.admin.bandeja} element={<BandejaAdminPage />} />
-              <Route path={RUTAS.admin.cursos} element={<CursosAdminPage />} />
-              <Route path={RUTAS.admin.cursoNuevo} element={<CursoEditarPage />} />
-              <Route path={RUTAS.admin.cursoEditar(":id")} element={<CursoEditarPage />} />
+
+              {/* Mantenedores · /admin/mantenedores redirige al tab Áreas
+                  (default durante la migración v2; cambia a Usuarios cuando
+                  ese tab esté implementado). */}
               <Route
-                path={RUTAS.admin.cursoModuloSecciones(":id", ":moduloId")}
-                element={<ModuloSeccionesPage />}
+                path={RUTAS.admin.mantenedores}
+                element={<Navigate to={RUTAS.admin.mantenedoresAreas} replace={true} />}
               />
-              <Route
-                path={RUTAS.admin.cursoModuloSeccionEditor(":id", ":moduloId", ":seccionId")}
-                element={<SeccionEditorPage />}
-              />
+              <Route path={RUTAS.admin.mantenedoresAreas} element={<MantenedoresPage />} />
+              <Route path={RUTAS.admin.mantenedoresUsuarios} element={<MantenedoresPage />} />
             </Route>
           </Route>
         </Route>

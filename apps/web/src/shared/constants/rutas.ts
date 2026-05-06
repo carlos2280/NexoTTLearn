@@ -21,20 +21,20 @@ export const RUTAS = {
   // Administrador
   admin: {
     bandeja: "/admin",
+
+    // Mantenedores · pantalla unificada con tabs (MAESTRO §14.1).
+    // Reemplaza /admin/personas. Default: tab Áreas durante la migración v2,
+    // hasta que el tab Usuarios tenga implementación funcional.
+    mantenedores: "/admin/mantenedores",
+    mantenedoresAreas: "/admin/mantenedores/areas",
+    mantenedoresUsuarios: "/admin/mantenedores/usuarios",
+
+    // En migración v2 — pantallas legacy en pages/admin/_legacy/
+    // Las constantes se mantienen como referencia y vuelven en PR-05/06/09.
     cursos: "/admin/cursos",
-    cursoNuevo: "/admin/cursos/nuevo",
-    cursoEditar: (id: string): string => `/admin/cursos/${id}`,
-    cursoModuloSecciones: (cursoId: string, moduloId: string): string =>
-      `/admin/cursos/${cursoId}/modulos/${moduloId}/secciones`,
-    cursoModuloSeccionEditor: (cursoId: string, moduloId: string, seccionId: string): string =>
-      `/admin/cursos/${cursoId}/modulos/${moduloId}/secciones/${seccionId}`,
-    seguimiento: "/admin/seguimiento",
     centroRevision: "/admin/centro-revision",
-    centroRevisionTab: (tab: "entregas" | "proyectos"): string =>
-      `/admin/centro-revision?tab=${tab}`,
-    personas: "/admin/personas",
+    seguimiento: "/admin/seguimiento",
     diagnosticos: "/admin/diagnosticos",
-    diagnosticoNuevo: "/admin/diagnosticos/nuevo",
     configuracion: "/admin/configuracion",
   },
 } as const

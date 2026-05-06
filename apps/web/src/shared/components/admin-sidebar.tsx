@@ -25,7 +25,7 @@ const ITEMS_ADMIN: ItemSidebar[] = [
   { label: "Diagnosticos", icon: "compass", href: RUTAS.admin.diagnosticos },
   { label: "Seguimiento", icon: "trending-up", href: RUTAS.admin.seguimiento },
   { label: "Revisiones", icon: "check-circle", href: RUTAS.admin.centroRevision, badge: "5" },
-  { label: "Personas", icon: "users", href: RUTAS.admin.personas },
+  { label: "Mantenedores", icon: "users", href: RUTAS.admin.mantenedores },
 ]
 
 const ITEM_FOOTER: ItemSidebar = {
