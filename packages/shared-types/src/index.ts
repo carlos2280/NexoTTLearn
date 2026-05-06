@@ -31,6 +31,27 @@ export {
 } from "./api-errors"
 
 export {
+  estadoAreaSchema,
+  type EstadoArea,
+  areaColorInputSchema,
+  type AreaColorInput,
+  areaSchema,
+  type Area,
+  areaConContadoresSchema,
+  type AreaConContadores,
+  areaListResponseSchema,
+  type AreaListResponse,
+  areaDeleteResponseSchema,
+  type AreaDeleteResponse,
+  listarAreasQuerySchema,
+  type ListarAreasQuery,
+  crearAreaSchema,
+  type CrearAreaInput,
+  actualizarAreaSchema,
+  type ActualizarAreaInput,
+} from "./admin-areas"
+
+export {
   adminDashboardResponseSchema,
   type AdminDashboardResponse,
   dashboardKpiSchema,

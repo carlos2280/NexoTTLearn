@@ -2,14 +2,16 @@ import { Module } from "@nestjs/common"
 import { ConfigModule } from "@nestjs/config"
 import { APP_GUARD } from "@nestjs/core"
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler"
+import { AreasModule } from "./admin/areas/areas.module"
 import { AuthModule } from "./auth/auth.module"
 import { PrismaModule } from "./common/prisma/prisma.module"
 import { HealthModule } from "./health/health.module"
 
-// Migración v2 en curso. Los módulos admin (areas, cursos, módulos, secciones,
+// Migración v2 en curso. Los módulos admin (cursos, módulos, secciones,
 // bloques, dashboard) se reescriben PR a PR contra el schema nuevo. Hasta
 // entonces, el código previo vive en `src/admin/_legacy/` como referencia
 // (excluido del compile, fuera de este árbol).
+// Áreas → reescrito en PR-04 (vive aquí).
 
 @Module({
   imports: [
@@ -29,6 +31,7 @@ import { HealthModule } from "./health/health.module"
     PrismaModule,
     AuthModule,
     HealthModule,
+    AreasModule,
   ],
   providers: [
     {

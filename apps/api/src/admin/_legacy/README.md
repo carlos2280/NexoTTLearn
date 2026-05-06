@@ -8,7 +8,7 @@ Se conservan aquí como **referencia viva** para los PRs que los reescriben. Est
 
 | Carpeta legacy | PR que la reescribe | Modelo v2 destino |
 |---|---|---|
-| `areas-competencia/` | **PR-04** | `Area` (catálogo global con `EstadoArea`) |
+| ~~`areas-competencia/`~~ | ✅ PR-04 (eliminada) | `Area` (catálogo global con `EstadoArea`) |
 | `cursos/` | **PR-05** | `Curso` + `CursoArea` (pesos en pivote) |
 | `modulos/` | **PR-06** | `Modulo` (1:1 área, sin slug, sin estado plano) |
 | `secciones/` | **PR-06** | `Seccion` (sin cambios estructurales mayores) |
