@@ -1,5 +1,16 @@
-// NexoTT Learn — Schema Prisma
-// Sprint 1: Auth + núcleo de cursos + inscripciones + progreso + entregas
+// ============================================================================
+// NexoTT Learn · Schema Prisma v2 (modelo de áreas)
+// ----------------------------------------------------------------------------
+// Fuente: DOCUMENTOS/doc/v2/2-datos/schema.prisma
+//   · MAESTRO.md, transversales T01–T06, flujos críticos A12/A16/A20/A25/A26/S06.
+//   · Toda decisión de modelado está justificada en docs v2/2-datos/.
+//   · Las invariantes que NO pueden enforcearse en Prisma viven en
+//     docs v2/2-datos/INVARIANTES-DB.md y se aplican como migraciones SQL custom.
+//
+// Transcripción literal del schema v2 + apéndice operativo de seguridad
+// (AuthEvento + campos adicionales en Usuario para rate-limiting de login).
+// El apéndice está claramente marcado al final.
+// ============================================================================
 
 generator client {
   provider = "prisma-client-js"
@@ -10,79 +21,146 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ============================================================================
 // ENUMS
-// ═══════════════════════════════════════════════════════════════
+// ============================================================================
 
-enum RolUsuario {
-  PARTICIPANTE
+/// MAESTRO §2.1 · roles del sistema. VIEWER y SUPER_ADMIN existen pero no se gestionan en MVP (§2.5).
+enum Rol {
   ADMIN
+  PARTICIPANTE
   VIEWER
   SUPER_ADMIN
 }
 
-enum NivelCurso {
-  BASICO
-  INTERMEDIO
-  AVANZADO
-}
-
+/// MAESTRO §5 · ciclo de vida del curso.
 enum EstadoCurso {
   BORRADOR
-  PUBLICADO
-  DESHABILITADO
+  ACTIVO
+  CERRADO
 }
 
-enum EstadoModulo {
-  BORRADOR
-  PUBLICADO
-}
-
-enum TipoContenido {
-  LECTURA
-  EJEMPLO_CODIGO
-  EJERCICIO
-  TEST
-  VIDEO
-  RECURSO
-}
-
-enum EstadoConvocatoria {
-  ABIERTA
-  EN_CURSO
-  CERRADA
-  CANCELADA
-}
-
-enum TipoInscripcion {
-  ASIGNADA
-  VOLUNTARIA
-}
-
+/// MAESTRO §6.4 · estados de la inscripción. Nunca DELETE (T01).
 enum EstadoInscripcion {
   ACTIVA
   COMPLETADA
-  PAUSADA
   ABANDONADA
+  CERRADO_SIN_COMPLETAR
 }
 
-enum PrioridadModulo {
+/// MAESTRO §6.3 · una inscripción es de cliente (SOLICITUD) o auto-inscripción (LIBRE).
+enum TipoInscripcion {
+  SOLICITUD
+  LIBRE
+}
+
+/// MAESTRO §7.7 · tipos de asignación de un módulo a una inscripción.
+enum TipoAsignacion {
   OBLIGATORIO
   RECOMENDADO
   OPCIONAL
 }
 
-enum OrigenAsignacion {
-  ASIGNADA
-  VOLUNTARIA
-}
-
-enum EstadoProgreso {
+/// MAESTRO §8.6 · estados del módulo en curso para un participante.
+enum EstadoModuloParticipante {
   NO_INICIADO
   EN_PROGRESO
   COMPLETADO
 }
 
+/// MAESTRO §3.3, §3.4 · tipos de bloque. CÓDIGO se subdivide en 3 dimensiones (§3.4).
+enum TipoBloque {
+  PARRAFO
+  TIP
+  VIDEO
+  RECURSO
+  CODIGO
+  QUIZ
+}
+
+/// MAESTRO §3.4 · CÓDIGO dimensión "Ubicación".
+enum CodigoUbicacion {
+  INLINE
+  SEPARADO
+}
+
+/// MAESTRO §3.4 · CÓDIGO dimensión "Interactivo".
+enum CodigoInteractivo {
+  SOLO_VER
+  EDITABLE
+}
+
+/// MAESTRO §3.4 · CÓDIGO dimensión "Evaluable".
+enum CodigoEvaluable {
+  NINGUNO
+  PREGUNTAS
+  TESTS
+}
+
+/// MAESTRO §3.4 · lenguajes soportados por el IDE embebido (§8.4).
+enum LenguajeCodigo {
+  PYTHON
+  JAVASCRIPT
+  TYPESCRIPT
+  REACT
+}
+
+/// MAESTRO §11.2 · modo de la entrevista IA.
+enum ModoEntrevista {
+  TEXTO
+  VOZ
+}
+
+/// T01 · estado del área del catálogo global.
+enum EstadoArea {
+  ACTIVA
+  OBSOLETA
+}
+
+/// T01 · estado de archivado para módulos, secciones y bloques. Nullable = no archivado.
+enum EstadoArchivado {
+  ARCHIVADO
+}
+
+/// MAESTRO §12.3 · estado de una entrega evaluable individual.
+enum EstadoEntrega {
+  ENVIADA
+  EVALUADA_AUTOMATICAMENTE
+  PENDIENTE_REVISION
+  EVALUADA
+}
+
+/// MAESTRO §10.5 · estado de una entrega de proyecto (mini o transversal).
+enum EstadoEntregaProyecto {
+  ENVIADA
+  EN_REVISION
+  EVALUADA
+}
+
+/// MAESTRO §10.5 · capa de evaluación 3 capas.
+enum CapaEvaluacion {
+  CAPA_1_OBJETIVA
+  CAPA_2_CUALITATIVA_IA
+  CAPA_3_COMPRENSION_IA
+}
+
+/// MAESTRO §11.5 · nivel de confianza del resultado de la entrevista IA.
+enum ConfianzaEntrevistaIA {
+  ALTA
+  MEDIA
+  BAJA
+}
+
+/// MAESTRO §11.6 · estado de la entrevista IA.
+enum EstadoEntrevistaIA {
+  PENDIENTE
+  EN_CURSO
+  APROBADA
+  NO_APROBADA
+  AJUSTADA_MANUAL
+}
+
+/// MAESTRO §9.8 · etiqueta de logro del curso.
 enum EtiquetaLogro {
   EXCELENCIA
   APROBADO
@@ -90,64 +168,913 @@ enum EtiquetaLogro {
   INSUFICIENTE
 }
 
-enum EstadoEntrega {
-  PENDIENTE
-  REVISANDO
-  APROBADA
-  RECHAZADA
-  REQUIERE_REVISION
+/// T02 · tipo de actor que origina un evento de log.
+enum TipoActor {
+  USUARIO
+  SISTEMA
 }
 
-// ═══════════════════════════════════════════════════════════════
-// USUARIOS Y AUTENTICACIÓN
-// ═══════════════════════════════════════════════════════════════
+/// T02 · clasifica el evento del log para consultas y filtros.
+/// Lista derivada de las acciones que MAESTRO §17.2 declara registrables.
+enum TipoAccionLog {
+  // Cursos
+  CURSO_PUBLICADO
+  CURSO_DESPUBLICADO
+  CURSO_CERRADO
+  CURSO_ELIMINADO
 
+  // Pesos
+  PESOS_CAMBIADOS_RETROACTIVO
+
+  // Bloques / secciones / módulos
+  BLOQUE_ARCHIVADO
+  BLOQUE_RESTAURADO
+  SECCION_ARCHIVADA
+  SECCION_RESTAURADA
+  MODULO_ARCHIVADO
+  MODULO_RESTAURADO
+
+  // Asignación / inscripciones
+  MODULOS_ASIGNADOS
+  INSCRIPCION_DESINSCRITA
+  INSCRIPCION_COMPLETADA
+  INSCRIPCION_CERRADA_SIN_COMPLETAR
+  EXPEDIENTE_SELLADO
+
+  // Notas y ajustes
+  NOTA_AJUSTADA_MANUAL
+  PROYECTO_EVALUADO
+  ENTREGA_EVALUADA
+  EXPEDIENTE_AJUSTADO
+
+  // Recálculos en cadena (eventos hijo, T03)
+  RECALCULO_MODULO
+  RECALCULO_AREA
+  RECALCULO_CURSO
+  RECALCULO_ETIQUETA
+
+  // Catálogos
+  AREA_CREADA
+  AREA_ACTUALIZADA
+  AREA_OBSOLETADA
+  AREA_ELIMINADA
+
+  // Personas / autenticación
+  USUARIO_CREADO
+  USUARIO_ACTUALIZADO
+  USUARIO_BLOQUEADO
+  USUARIO_DESBLOQUEADO
+  PASSWORD_RESETEADA
+  MFA_ACTIVADO
+  MFA_DESACTIVADO
+  MFA_RESETEADO
+}
+
+/// T06 · 10 tipos de notificación soportados en MVP. 6 al participante + 4 al admin.
+enum TipoNotificacion {
+  // Participante
+  MODULO_ASIGNADO
+  ENTREGA_EVALUADA
+  PROYECTO_REVISADO
+  DESBLOQUEO
+  RECALCULO_NOTA
+  CURSO_COMPLETADO
+  // Admin
+  NUEVA_ENTREGA
+  NUEVO_PROYECTO
+  ALERTA_PLAGIO
+  CANDIDATO_LISTO
+}
+
+/// MAESTRO §7.3 · clasificación de la brecha del candidato por área.
+enum NivelBrecha {
+  NO_CUMPLE
+  CERCA
+  CUMPLE
+}
+
+// ============================================================================
+// IDENTIDAD Y PERSONAS
+// ============================================================================
+
+/// MAESTRO §2.1, §14.2 · usuario del sistema. Mismo registro puede ser ADMIN o PARTICIPANTE.
+/// MAESTRO §8.1, §8.1.1 · onboarding y MFA opcional.
+/// T01 · usuarios nunca se eliminan, solo se bloquean (§17.1).
 model Usuario {
-  id           String     @id @default(cuid())
-  email        String     @unique
-  nombre       String
-  apellido     String
-  passwordHash String     @map("password_hash")
-  rol          RolUsuario @default(PARTICIPANTE)
-  avatar       String?
-  activo       Boolean    @default(true)
+  id                  String    @id @default(uuid()) @db.Uuid
+  email               String    @unique
+  /// Hash de la contraseña. Nunca se persiste en claro.
+  passwordHash        String
+  /// MAESTRO §8.1 · cuando true, fuerza cambio en el próximo login.
+  debeCambiarPassword Boolean   @default(false)
+  rol                 Rol
+  nombre              String
+  apellido            String
+  /// MAESTRO §8.1.1 · MFA opcional por usuario, default false.
+  mfaActivado         Boolean   @default(false)
+  /// Secret TOTP cifrado en BD; null si MFA no está activado.
+  mfaSecret           String?
+  /// T01 · soft delete vía bloqueo.
+  bloqueado           Boolean   @default(false)
+  bloqueadoAt         DateTime?
+  /// Auditoría mínima.
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  // MFA (TOTP RFC 6238). mfaSecret guarda el secreto base32 cifrado at-rest.
-  // mfaConfirmadoEn marca cuando el usuario completo el setup (escaneo + verificacion).
-  // mfaEnabled solo es true cuando hay secret confirmado.
-  mfaEnabled      Boolean   @default(false) @map("mfa_enabled")
-  mfaSecret       String?   @map("mfa_secret")
-  mfaConfirmadoEn DateTime? @map("mfa_confirmado_en")
+  // ----- APÉNDICE OPERATIVO (no v2 funcional, ver bloque al final) -----
+  /// Operativo · marca cuando el usuario completó el setup de MFA (escaneo + verificación).
+  mfaConfirmadoEn    DateTime?
+  /// Operativo · timestamp del último cambio de password (rotación / política).
+  passwordCambiadoEn DateTime?
+  /// Operativo · timestamp del último login OK (analítica de inactividad).
+  ultimoLoginEn      DateTime?
+  /// Operativo · contador para rate-limiting de login (se reinicia al éxito).
+  intentosFallidos   Int       @default(0)
+  /// Operativo · bloqueo temporal por rate-limiting (distinto del soft delete `bloqueado`).
+  bloqueadoHasta     DateTime?
 
-  // Seguridad
-  debeCambiarPassword Boolean   @default(true)  @map("debe_cambiar_password")
-  passwordCambiadoEn  DateTime? @map("password_cambiado_en")
-  ultimoLoginEn       DateTime? @map("ultimo_login_en")
-  intentosFallidos    Int       @default(0)      @map("intentos_fallidos")
-  bloqueadoHasta      DateTime? @map("bloqueado_hasta")
+  // Relaciones — actor en log y notificaciones, dueño de inscripciones, etc.
+  inscripciones                     Inscripcion[]
+  expedienteEntries                 ExpedienteEntry[]
+  logsComoActor                     LogActividad[]      @relation("logActor")
+  notificacionesRecibidas           Notificacion[]      @relation("notificacionDestinatario")
+  ajustesEvaluacionInicialAplicados EvaluacionInicial[]
+  entregasBloqueEvaluadas           EntregaBloque[]     @relation("entregaBloqueEvaluador")
+  alertasIAResueltas                AlertaIA[]          @relation("alertaIAResolutor")
+  authEventos                       AuthEvento[]
 
-  creadoEn      DateTime @default(now()) @map("creado_en")
-  actualizadoEn DateTime @updatedAt       @map("actualizado_en")
+  @@index([email])
+  @@index([rol])
+  @@index([bloqueado])
+}
+
+// ============================================================================
+// CATÁLOGO GLOBAL DE ÁREAS
+// ============================================================================
+
+/// MAESTRO §4.1, §14.3 · catálogo global de áreas. Pesos y umbrales NO viven aquí.
+/// T01 (Q1.2) · hard delete solo si ningún curso la referencia. En otro caso → OBSOLETA.
+model Area {
+  id          String     @id @default(uuid()) @db.Uuid
+  nombre      String     @unique
+  /// MAESTRO §14.3 · color HEX para mapas, semáforos, badges.
+  color       String
+  descripcion String?
+  /// MAESTRO §14.3 · orden visual en listas.
+  orden       Int        @default(0)
+  estado      EstadoArea @default(ACTIVA)
+  obsoletaAt  DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   // Relaciones
-  convocatoriasCreadas  Convocatoria[]    @relation("ConvocatoriaCreador")
-  inscripciones         Inscripcion[]     @relation("InscripcionUsuario")
-  inscripcionesGestor   Inscripcion[]     @relation("InscripcionGestor")
-  progresosCurso        ProgresoCurso[]
-  progresosModulo       ProgresoModulo[]
-  progresosContenido    ProgresoContenido[]
-  entregas              Entrega[]
-  entregaDrafts         EntregaDraft[]
-  diagnosticos          Diagnostico[]
-  authEventos           AuthEvento[]
+  cursoAreas             CursoArea[]
+  modulos                Modulo[]
+  rubricaEntrevistaItems RubricaEntrevistaItem[]
+  expedienteAreas        ExpedienteEntryArea[]
+  evaluacionesIniciales  EvaluacionInicial[]
 
-  @@map("usuarios")
+  @@index([estado])
+  @@index([orden])
 }
 
-// ═══════════════════════════════════════════════════════════════
-// AUDITORIA DE AUTENTICACION
-// ═══════════════════════════════════════════════════════════════
+// ============================================================================
+// CURSO Y SU CONFIGURACIÓN
+// ============================================================================
 
+/// MAESTRO §6 · curso = solicitud del cliente. No hay cursos genéricos sin cliente.
+/// MAESTRO §6.2 · datos generales + estado + configuración de pesos.
+/// T01 (§17.1) · hard delete solo en BORRADOR sin candidatos (§5.3).
+model Curso {
+  id               String      @id @default(uuid()) @db.Uuid
+  /// MAESTRO §6.2 · empresa cliente (texto libre en MVP, §6.2).
+  empresaCliente   String
+  titulo           String
+  /// MAESTRO §6.2 · slug del curso. Útil para URL del catálogo libre (§6.3).
+  slug             String      @unique
+  descripcion      String?
+  imagenUrl        String?
+  /// MAESTRO §6.2 · duración estimada en horas/días (texto libre o numérico — texto en MVP).
+  duracionEstimada String?
+  fechaInicio      DateTime?
+  deadline         DateTime?
+  estado           EstadoCurso @default(BORRADOR)
+
+  /// MAESTRO §6.3 · permite auto-inscripción libre (catálogo libre).
+  permiteInscripcionLibre Boolean @default(false)
+
+  // ----- Pesos a NIVEL CURSO (suman 100% ±0.01 — T04) -----
+  /// MAESTRO §6.2 · default 70.
+  pesoAreas               Decimal @default(70.0) @db.Decimal(5, 2)
+  /// MAESTRO §6.2 · default 20 si activo, 0 si no.
+  pesoProyectoTransversal Decimal @default(20.0) @db.Decimal(5, 2)
+  /// MAESTRO §6.2 · default 10 si activa, 0 si no.
+  pesoEntrevistaIA        Decimal @default(10.0) @db.Decimal(5, 2)
+
+  // ----- Pesos INTRA-MÓDULO (mismos para todos los módulos del curso) -----
+  /// MAESTRO §6.2, §9.5 · default 70.
+  pesoActividades  Decimal @default(70.0) @db.Decimal(5, 2)
+  /// MAESTRO §6.2, §9.5 · default 30. Si Mini activo en el módulo: > 0 (T04 Q4.2).
+  pesoMiniProyecto Decimal @default(30.0) @db.Decimal(5, 2)
+
+  // ----- Umbrales de etiqueta de logro (configurables, default §9.8) -----
+  /// MAESTRO §6.2, §9.8 · default 90.
+  umbralExcelencia   Int @default(90)
+  /// MAESTRO §6.2, §9.8 · default 70.
+  umbralAprobado     Int @default(70)
+  /// MAESTRO §6.2, §9.8 · default 50.
+  umbralEnDesarrollo Int @default(50)
+
+  // ----- Umbrales de brecha (configurables, default §7.3) -----
+  /// MAESTRO §7.3 · default 10. Brecha ≥ este valor → NO_CUMPLE → OBLIGATORIO sugerido.
+  umbralBrechaNoCumple Int @default(10)
+
+  // Lifecycle
+  publicadoAt   DateTime?
+  cerradoAt     DateTime?
+  /// Trazabilidad de duplicación (§3.7, §6.5). Curso del que se duplicó este.
+  duplicadoDeId String?   @db.Uuid
+  duplicadoDe   Curso?    @relation("CursoDuplicacion", fields: [duplicadoDeId], references: [id], onDelete: SetNull)
+  duplicaciones Curso[]   @relation("CursoDuplicacion")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  cursoAreas          CursoArea[]
+  modulos             Modulo[]
+  proyectoTransversal ProyectoTransversal?
+  entrevistaIAConfig  EntrevistaIAConfig?
+  inscripciones       Inscripcion[]
+
+  @@index([estado])
+  @@index([empresaCliente])
+  @@index([permiteInscripcionLibre, estado])
+  @@index([slug])
+  @@index([duplicadoDeId])
+}
+
+/// MAESTRO §6.2 · áreas que el curso usa, con sus pesos y puntaje objetivo.
+/// Subset del catálogo global (§4.1, §14.3). Pesos y umbrales viven aquí, NO en Area.
+model CursoArea {
+  id              String  @id @default(uuid()) @db.Uuid
+  cursoId         String  @db.Uuid
+  curso           Curso   @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  areaId          String  @db.Uuid
+  area            Area    @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  /// MAESTRO §6.2, T04 · peso del área dentro del curso (suman 100% ±0.01).
+  peso            Decimal @db.Decimal(5, 2)
+  /// MAESTRO §6.2, §7.3 · puntaje objetivo del área (0–100). Brecha = max(0, objetivo − evalInicial).
+  puntajeObjetivo Int
+  /// Orden visual.
+  orden           Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cursoId, areaId])
+  @@index([cursoId])
+  @@index([areaId])
+}
+
+// ============================================================================
+// MÓDULOS, SECCIONES, BLOQUES
+// ============================================================================
+
+/// MAESTRO §3.5 · cada módulo pertenece a UNA área del curso.
+/// T01 (Q1.1) · hard delete solo en BORRADOR sin entregas; en otro caso → archivado.
+model Modulo {
+  id      String @id @default(uuid()) @db.Uuid
+  cursoId String @db.Uuid
+  curso   Curso  @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  /// MAESTRO §3.5 · pertenece a un área del catálogo. La pertenencia al área del curso se valida
+  /// vía CursoArea: el área del módulo debe estar en el subset del curso.
+  areaId  String @db.Uuid
+  area    Area   @relation(fields: [areaId], references: [id], onDelete: Restrict)
+
+  titulo      String
+  descripcion String?
+  orden       Int     @default(0)
+
+  /// MAESTRO §3.6, §10.1 · si el módulo tiene Mini Proyecto activo.
+  miniProyectoActivo Boolean @default(false)
+
+  /// MAESTRO §10.1 · override individual del umbral del Mini. Null → hereda del puntajeObjetivo del área.
+  umbralMiniOverride Int?
+
+  /// MAESTRO §3.7 · trazabilidad de clonación. Módulo del que se clonó este.
+  clonadoDeId String?  @db.Uuid
+  clonadoDe   Modulo?  @relation("ModuloClonacion", fields: [clonadoDeId], references: [id], onDelete: SetNull)
+  clonaciones Modulo[] @relation("ModuloClonacion")
+
+  /// T01 · archivado. Null = no archivado.
+  archivadoAt     DateTime?
+  archivadoEstado EstadoArchivado?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  secciones    Seccion[]
+  miniProyecto MiniProyecto?
+
+  @@index([cursoId, archivadoAt])
+  @@index([areaId])
+  @@index([cursoId, orden])
+  @@index([clonadoDeId])
+}
+
+/// MAESTRO §3.2 · sección = documento rich-text con bloques heterogéneos. Sin tipo, sin tema.
+/// T01 · soft delete con entregas (§3.9).
+model Seccion {
+  id       String @id @default(uuid()) @db.Uuid
+  moduloId String @db.Uuid
+  modulo   Modulo @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  titulo   String
+  /// MAESTRO §3.8 · orden dentro del módulo. Navegación libre entre secciones.
+  orden    Int    @default(0)
+
+  archivadoAt     DateTime?
+  archivadoEstado EstadoArchivado?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  bloques Bloque[]
+
+  @@index([moduloId, orden])
+  @@index([moduloId, archivadoAt])
+}
+
+/// MAESTRO §3.3, §3.4 · bloque dentro de la sección. Es heterogéneo: contenido depende del tipo.
+/// El payload específico se modela en JSONB para mantener la tabla esbelta.
+model Bloque {
+  id        String     @id @default(uuid()) @db.Uuid
+  seccionId String     @db.Uuid
+  seccion   Seccion    @relation(fields: [seccionId], references: [id], onDelete: Cascade)
+  tipo      TipoBloque
+  orden     Int        @default(0)
+
+  /// MAESTRO §3.4 · sólo aplica si tipo = CODIGO.
+  codigoUbicacion   CodigoUbicacion?
+  codigoInteractivo CodigoInteractivo?
+  codigoEvaluable   CodigoEvaluable?
+  codigoLenguaje    LenguajeCodigo?
+
+  /// Contenido del bloque. JSONB con shape distinto según tipo (ver ENTIDADES.md).
+  /// - PARRAFO: { contenidoTiptap: {...} }
+  /// - TIP: { variante: 'info'|'warning'|'best-practice'|'gotcha', texto: '...' }
+  /// - VIDEO: { url, proveedor }
+  /// - RECURSO: { url, esDescarga, descripcion? }
+  /// - CODIGO: { archivos: [...], pistas?: [...], solucionReferencia?: '...', metadata?: {...} }
+  /// - QUIZ: { preguntas: [{ enunciado, opciones, correcta, tipo }, ...] }
+  /// - CODIGO con preguntas: payload extiende con { preguntas: [...] }
+  /// - CODIGO con tests: payload extiende con { tests: '...' }
+  payload Json
+
+  /// MAESTRO §3.4 · solo admin ve la solución de referencia. Persistido pero filtrado en lectura.
+  solucionReferencia String?
+
+  archivadoAt     DateTime?
+  archivadoEstado EstadoArchivado?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  entregas EntregaBloque[]
+
+  @@index([seccionId, orden])
+  @@index([seccionId, archivadoAt])
+  @@index([tipo, codigoEvaluable])
+}
+
+// ============================================================================
+// MINI PROYECTO Y PROYECTO TRANSVERSAL
+// ============================================================================
+
+/// MAESTRO §3.6, §10.1, §10.5 · Mini Proyecto (1 por módulo opcional).
+model MiniProyecto {
+  id        String @id @default(uuid()) @db.Uuid
+  moduloId  String @unique @db.Uuid
+  modulo    Modulo @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  titulo    String
+  enunciado String
+
+  /// MAESTRO §10.5 · pesos de las 3 capas (suman 100% ±0.01 — T04).
+  pesoCapa1 Decimal @default(40.0) @db.Decimal(5, 2)
+  pesoCapa2 Decimal @default(30.0) @db.Decimal(5, 2)
+  pesoCapa3 Decimal @default(30.0) @db.Decimal(5, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entregas EntregaProyecto[]
+}
+
+/// MAESTRO §3.6, §10.2, §10.5 · Proyecto Transversal (1 por curso opcional).
+model ProyectoTransversal {
+  id        String @id @default(uuid()) @db.Uuid
+  cursoId   String @unique @db.Uuid
+  curso     Curso  @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  titulo    String
+  enunciado String
+
+  /// MAESTRO §10.2 · default 70 (configurable a nivel proyecto).
+  umbralAprobacion Int @default(70)
+
+  /// MAESTRO §10.5 · pesos de las 3 capas.
+  pesoCapa1 Decimal @default(40.0) @db.Decimal(5, 2)
+  pesoCapa2 Decimal @default(30.0) @db.Decimal(5, 2)
+  pesoCapa3 Decimal @default(30.0) @db.Decimal(5, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entregas EntregaProyecto[]
+}
+
+// ============================================================================
+// ENTREVISTA FINAL IA (configuración por curso)
+// ============================================================================
+
+/// MAESTRO §11 · entrevista IA configurada a nivel curso/cliente.
+model EntrevistaIAConfig {
+  id      String @id @default(uuid()) @db.Uuid
+  cursoId String @unique @db.Uuid
+  curso   Curso  @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+
+  /// MAESTRO §11.2 · perfil del cliente simulado (rol, empresa, expectativas).
+  perfilCliente   String
+  /// MAESTRO §11.2 · contexto de negocio para el simulador.
+  contextoNegocio String
+
+  /// MAESTRO §11.2 · default 70.
+  umbralAprobacion Int            @default(70)
+  /// MAESTRO §11.2 · default 8.
+  numeroPreguntas  Int            @default(8)
+  /// MAESTRO §11.2 · TEXTO o VOZ.
+  modo             ModoEntrevista @default(TEXTO)
+  /// MAESTRO §11.6 · número máximo de intentos.
+  maxIntentos      Int            @default(3)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  rubricaItems RubricaEntrevistaItem[]
+  sesiones     EntrevistaIASesion[]
+}
+
+/// MAESTRO §11.2 · rúbrica = pesos por área que la entrevista evalúa.
+/// La rúbrica es subset de las áreas del curso (T04 caso borde 4).
+/// Suma de pesos de los items debe ser 100% ±0.01 (T04).
+model RubricaEntrevistaItem {
+  id       String             @id @default(uuid()) @db.Uuid
+  configId String             @db.Uuid
+  config   EntrevistaIAConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  areaId   String             @db.Uuid
+  area     Area               @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  peso     Decimal            @db.Decimal(5, 2)
+
+  @@unique([configId, areaId])
+  @@index([configId])
+}
+
+// ============================================================================
+// INSCRIPCIÓN
+// ============================================================================
+
+/// MAESTRO §6.3, §6.4 · vincula a un participante con un curso.
+/// T01 · I2 · solo una inscripción ACTIVA por (participante, curso).
+model Inscripcion {
+  id             String            @id @default(uuid()) @db.Uuid
+  participanteId String            @db.Uuid
+  participante   Usuario           @relation(fields: [participanteId], references: [id], onDelete: Restrict)
+  cursoId        String            @db.Uuid
+  curso          Curso             @relation(fields: [cursoId], references: [id], onDelete: Restrict)
+  tipo           TipoInscripcion
+  estado         EstadoInscripcion @default(ACTIVA)
+
+  /// MAESTRO §8.7, §17.7 · timestamps de transiciones de estado.
+  inscritaAt            DateTime  @default(now())
+  completadaAt          DateTime?
+  abandonadaAt          DateTime?
+  cerradaSinCompletarAt DateTime?
+
+  // Relaciones
+  asignaciones          Asignacion[]
+  evaluacionesIniciales EvaluacionInicial[]
+  estadosModulo         EstadoModuloInscripcion[]
+  entregasBloque        EntregaBloque[]
+  entregasProyecto      EntregaProyecto[]
+  sesionesEntrevistaIA  EntrevistaIASesion[]
+
+  /// T01 · I2 · unicidad parcial sobre estado=ACTIVA se enforce en INVARIANTES-DB.md
+  /// (Postgres permite unique partial index; ver migración correspondiente).
+  @@index([participanteId, cursoId, estado])
+  @@index([cursoId, estado])
+  @@index([participanteId])
+  @@index([estado])
+  @@index([tipo])
+}
+
+/// MAESTRO §7.7 · asignación de un módulo a una inscripción.
+/// T01 · I2 · LIBRE = todos OPCIONAL inmutable. Validación en aplicación (no en BD).
+model Asignacion {
+  id            String         @id @default(uuid()) @db.Uuid
+  inscripcionId String         @db.Uuid
+  inscripcion   Inscripcion    @relation(fields: [inscripcionId], references: [id], onDelete: Cascade)
+  moduloId      String         @db.Uuid
+  /// FK suave al módulo. Si el módulo se archiva, la asignación persiste pero deja de aportar al cálculo.
+  /// Si el módulo se hard-deletea (solo BORRADOR sin entregas), la asignación se borra en cascada implícita por ese flujo.
+  /// No se modela @relation directa para evitar acoplar el ciclo Curso→Modulo→Asignacion.
+  tipo          TipoAsignacion
+
+  asignadaAt   DateTime  @default(now())
+  /// Para reasignación posterior con log antes/después (A20 caso borde 1).
+  modificadaAt DateTime?
+
+  @@unique([inscripcionId, moduloId])
+  @@index([moduloId])
+  @@index([inscripcionId])
+}
+
+/// MAESTRO §8.6 · estado del módulo por inscripción (NO_INICIADO / EN_PROGRESO / COMPLETADO).
+/// Doble vista en cálculo (§9.5): nota actual vs proyectada se derivan de las entregas.
+model EstadoModuloInscripcion {
+  id            String                   @id @default(uuid()) @db.Uuid
+  inscripcionId String                   @db.Uuid
+  inscripcion   Inscripcion              @relation(fields: [inscripcionId], references: [id], onDelete: Cascade)
+  moduloId      String                   @db.Uuid
+  estado        EstadoModuloParticipante @default(NO_INICIADO)
+
+  /// MAESTRO §8.5 · % avance derivado de bloques interactuados / totales del módulo.
+  /// Cacheado en este registro para evitar recálculo en cada lectura. Recalculado por T03.
+  porcentajeAvance Int @default(0)
+
+  iniciadoAt   DateTime?
+  completadoAt DateTime?
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([inscripcionId, moduloId])
+  @@index([inscripcionId])
+}
+
+// ============================================================================
+// EVALUACIÓN INICIAL (entrevista interna previa)
+// ============================================================================
+
+/// MAESTRO §7.2 · una nota 0-100 por área del curso, capturada por el admin.
+/// MAESTRO §7.5 · NO bloqueante para asignar módulos.
+model EvaluacionInicial {
+  id            String      @id @default(uuid()) @db.Uuid
+  inscripcionId String      @db.Uuid
+  inscripcion   Inscripcion @relation(fields: [inscripcionId], references: [id], onDelete: Cascade)
+  areaId        String      @db.Uuid
+  area          Area        @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  puntaje       Int
+  observaciones String?
+
+  /// Quién la capturó (manual A18 o procesador del Excel A19).
+  capturadaPorId String   @db.Uuid
+  capturadaPor   Usuario  @relation(fields: [capturadaPorId], references: [id], onDelete: Restrict)
+  capturadaAt    DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([inscripcionId, areaId])
+  @@index([inscripcionId])
+  @@index([areaId])
+}
+
+// ============================================================================
+// ENTREGAS DE BLOQUES EVALUABLES
+// ============================================================================
+
+/// MAESTRO §9.4 · cada envío de un bloque evaluable es un intento.
+/// T05 · política "mejor intento" → la nota que cuenta es la máxima de los intentos.
+/// Los intentos previos no se borran (T01 · I1, T05 · I1).
+model EntregaBloque {
+  id            String      @id @default(uuid()) @db.Uuid
+  inscripcionId String      @db.Uuid
+  inscripcion   Inscripcion @relation(fields: [inscripcionId], references: [id], onDelete: Cascade)
+  bloqueId      String      @db.Uuid
+  bloque        Bloque      @relation(fields: [bloqueId], references: [id], onDelete: Restrict)
+
+  /// Número de intento (1, 2, 3...). T05 · ilimitado en MVP.
+  intento Int
+
+  /// Respuesta o código enviado. JSONB porque la forma depende del tipo de bloque y del payload.
+  /// - QUIZ: { respuestas: [...] }
+  /// - CODIGO con preguntas: { respuestas: [...] }
+  /// - CODIGO con tests: { codigo: '...', resultadoTests: {...} }
+  contenido Json
+
+  /// MAESTRO §9.4 · nota 0-100. Calculada automáticamente o ajustada por admin (A26).
+  nota     Decimal? @db.Decimal(5, 2)
+  /// MAESTRO §12.5 · feedback que el admin escribe al revisar.
+  feedback String?
+
+  estado         EstadoEntrega @default(ENVIADA)
+  /// Si fue ajustada manualmente por admin (A26): true.
+  ajustadaManual Boolean       @default(false)
+  /// Quién la evaluó (sistema o admin específico). Null si la evaluación fue automática.
+  evaluadaPorId  String?       @db.Uuid
+  evaluadaPor    Usuario?      @relation("entregaBloqueEvaluador", fields: [evaluadaPorId], references: [id], onDelete: SetNull)
+
+  enviadaAt  DateTime  @default(now())
+  evaluadaAt DateTime?
+
+  @@unique([inscripcionId, bloqueId, intento])
+  @@index([bloqueId, inscripcionId])
+  @@index([estado])
+  @@index([inscripcionId, evaluadaAt])
+  @@index([evaluadaPorId, evaluadaAt])
+}
+
+// ============================================================================
+// ENTREGAS DE PROYECTOS (mini y transversal · 3 capas)
+// ============================================================================
+
+/// MAESTRO §10.1, §10.2, §10.5 · entrega de Mini o Transversal con sus 3 capas.
+/// T05 · política "último intento aprobado".
+/// Una entrega es de un mini O de un transversal (XOR), no ambos.
+model EntregaProyecto {
+  id            String      @id @default(uuid()) @db.Uuid
+  inscripcionId String      @db.Uuid
+  inscripcion   Inscripcion @relation(fields: [inscripcionId], references: [id], onDelete: Cascade)
+
+  /// XOR · uno de los dos, nunca ambos.
+  miniProyectoId String?              @db.Uuid
+  miniProyecto   MiniProyecto?        @relation(fields: [miniProyectoId], references: [id], onDelete: Restrict)
+  transversalId  String?              @db.Uuid
+  transversal    ProyectoTransversal? @relation(fields: [transversalId], references: [id], onDelete: Restrict)
+
+  intento Int
+
+  /// MAESTRO §10.1, §10.2 · entrega de repo Git.
+  urlRepo String
+  rama    String
+
+  /// MAESTRO §10.5 · pesos persistidos en la entrega (snapshot en el momento de evaluación).
+  /// Permite que el cambio de pesos en el config no afecte entregas históricas.
+  pesoCapa1Aplicado Decimal? @db.Decimal(5, 2)
+  pesoCapa2Aplicado Decimal? @db.Decimal(5, 2)
+  pesoCapa3Aplicado Decimal? @db.Decimal(5, 2)
+
+  /// Notas resultantes de cada capa.
+  notaCapa1      Decimal? @db.Decimal(5, 2)
+  notaCapa2      Decimal? @db.Decimal(5, 2)
+  notaCapa3      Decimal? @db.Decimal(5, 2)
+  /// MAESTRO §10.5 · nota_final = capa1*peso1 + capa2*peso2 + capa3*peso3.
+  notaFinal      Decimal? @db.Decimal(5, 2)
+  ajustadaManual Boolean  @default(false)
+
+  /// Outputs cualitativos de la IA.
+  fortalezas         String?
+  areasMejora        String?
+  dudasDetectadas    String?
+  transcripcionCapa3 String?
+
+  estado EstadoEntregaProyecto @default(ENVIADA)
+
+  enviadaAt  DateTime  @default(now())
+  evaluadaAt DateTime?
+
+  // Detalle por capa (alertas, scoring intermedio).
+  detalleCapas DetalleCapaEvaluacion[]
+  alertasIA    AlertaIA[]
+
+  @@unique([inscripcionId, miniProyectoId, intento])
+  @@unique([inscripcionId, transversalId, intento])
+  @@index([estado])
+  @@index([miniProyectoId])
+  @@index([transversalId])
+}
+
+/// MAESTRO §10.5 · detalle por capa para la entrega del proyecto.
+/// Permite guardar metadata estructurada (ej. resultado por test individual de Capa 1).
+model DetalleCapaEvaluacion {
+  id                String          @id @default(uuid()) @db.Uuid
+  entregaProyectoId String          @db.Uuid
+  entrega           EntregaProyecto @relation(fields: [entregaProyectoId], references: [id], onDelete: Cascade)
+  capa              CapaEvaluacion
+  /// JSONB con shape específico por capa. Ver ENTIDADES.md.
+  /// - CAPA_1: { tests: [...], linter: {...}, commits: {...} }
+  /// - CAPA_2: { codigoAnalisis: {...}, arquitectura: {...} }
+  /// - CAPA_3: { preguntas: [...], respuestas: [...] }
+  detalle           Json
+  generadaAt        DateTime        @default(now())
+
+  @@unique([entregaProyectoId, capa])
+  @@index([entregaProyectoId])
+}
+
+/// MAESTRO §12.1 · alertas generadas por la IA durante revisión (plagio, similitud, anomalías).
+model AlertaIA {
+  id                String           @id @default(uuid()) @db.Uuid
+  entregaProyectoId String?          @db.Uuid
+  entrega           EntregaProyecto? @relation(fields: [entregaProyectoId], references: [id], onDelete: SetNull)
+  /// Tipo de alerta (plagio, anomalía, similitud) — texto en MVP, enum cuando se cierre A27.
+  tipo              String
+  /// Severidad reportada por la IA.
+  severidad         String
+  descripcion       String
+
+  detectadaAt   DateTime  @default(now())
+  /// Resolución del admin (descartada, ajuste de nota, reporte).
+  resueltaAt    DateTime?
+  resueltaPorId String?   @db.Uuid
+  resueltaPor   Usuario?  @relation("alertaIAResolutor", fields: [resueltaPorId], references: [id], onDelete: SetNull)
+
+  @@index([resueltaAt])
+  @@index([entregaProyectoId])
+  @@index([resueltaPorId, resueltaAt])
+}
+
+// ============================================================================
+// ENTREVISTA IA · sesiones individuales por participante
+// ============================================================================
+
+/// MAESTRO §11 · ejecución de la entrevista IA por una inscripción.
+/// T05 · política "último intento aprobado" (con override admin §11.6).
+model EntrevistaIASesion {
+  id            String             @id @default(uuid()) @db.Uuid
+  inscripcionId String             @db.Uuid
+  inscripcion   Inscripcion        @relation(fields: [inscripcionId], references: [id], onDelete: Cascade)
+  configId      String             @db.Uuid
+  config        EntrevistaIAConfig @relation(fields: [configId], references: [id], onDelete: Restrict)
+
+  intento Int
+  estado  EstadoEntrevistaIA @default(PENDIENTE)
+
+  /// MAESTRO §11.5 · score general 0-100, ponderado por rúbrica.
+  scoreGeneral Decimal?               @db.Decimal(5, 2)
+  /// MAESTRO §11.5 · ALTA/MEDIA/BAJA.
+  confianza    ConfianzaEntrevistaIA?
+
+  /// JSONB con desglose por área de la rúbrica (0-100 por área).
+  /// Shape: { [areaId]: { puntaje: number, peso: number, comentarios: string } }
+  desglosePorArea Json?
+
+  fortalezas  String?
+  areasMejora String?
+
+  ajustadaManual Boolean @default(false)
+
+  iniciadaAt   DateTime?
+  finalizadaAt DateTime?
+
+  @@unique([inscripcionId, configId, intento])
+  @@index([estado])
+  @@index([inscripcionId])
+}
+
+// ============================================================================
+// EXPEDIENTE DEL PARTICIPANTE
+// ============================================================================
+
+/// MAESTRO §4.2, §8.7, §17.7 · expediente del participante.
+/// Cada entry = un curso completado, snapshot inmutable salvo ajuste manual con motivo (A23).
+/// T03 · I4 · NO se recalcula automáticamente cuando cambia el curso de origen.
+model ExpedienteEntry {
+  id             String  @id @default(uuid()) @db.Uuid
+  participanteId String  @db.Uuid
+  participante   Usuario @relation(fields: [participanteId], references: [id], onDelete: Restrict)
+
+  /// FK al curso para trazabilidad y deep-links. Si el curso se elimina (BORRADOR sin candidatos)
+  /// la entry no debería existir (no hay sellado posible). Para CERRADO, persiste.
+  cursoId String @db.Uuid
+
+  /// Snapshot. Persiste aunque el curso original cambie de título o de empresa.
+  tituloCurso    String
+  empresaCliente String
+
+  /// MAESTRO §4.2, §8.7 · timestamp del sellado (= inscripcion.completadaAt).
+  fechaCompletitud DateTime
+
+  /// MAESTRO §9.7 · nota global del curso = notaCurso (0-100).
+  notaGlobal Decimal       @db.Decimal(5, 2)
+  /// MAESTRO §9.8 · etiqueta de logro al sellar.
+  etiqueta   EtiquetaLogro
+
+  /// Si fue ajustado manualmente alguna vez (A23): true. Cada ajuste queda en log_actividad.
+  ajustadoManual Boolean @default(false)
+
+  selladoAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  notasPorArea ExpedienteEntryArea[]
+
+  @@unique([participanteId, cursoId])
+  @@index([participanteId])
+  @@index([fechaCompletitud])
+}
+
+/// MAESTRO §4.2 · nota por área del expediente (snapshot).
+model ExpedienteEntryArea {
+  id      String          @id @default(uuid()) @db.Uuid
+  entryId String          @db.Uuid
+  entry   ExpedienteEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  areaId  String          @db.Uuid
+  area    Area            @relation(fields: [areaId], references: [id], onDelete: Restrict)
+
+  /// Nombre del área en el momento del sellado (snapshot). Si el área se renombra después, la entry conserva el original.
+  /// Resuelve la pregunta abierta A01 sobre nombre del área en snapshot: snapshot del nombre vigente al sellar.
+  nombreAreaSnapshot String
+  puntaje            Decimal @db.Decimal(5, 2)
+
+  /// Cumple = puntaje ≥ puntajeObjetivo del área en el curso (snapshot del momento).
+  cumpleUmbral Boolean
+
+  @@unique([entryId, areaId])
+  @@index([entryId])
+}
+
+// ============================================================================
+// LOG DE ACTIVIDAD (T02)
+// ============================================================================
+
+/// T02 · única fuente de verdad de auditoría. Inmutable (T02 · I1).
+/// Atomicidad con la acción (T02 · I3) — escritura en la misma transacción.
+/// Idempotencia (T02 · I2) — repetir misma acción no genera duplicado.
+model LogActividad {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// T02 · null si tipoActor = SISTEMA.
+  actorId   String?   @db.Uuid
+  actor     Usuario?  @relation("logActor", fields: [actorId], references: [id], onDelete: SetNull)
+  tipoActor TipoActor @default(USUARIO)
+
+  tipoAccion  TipoAccionLog
+  /// Tipo y id de la entidad sobre la que se actuó (genérico para soportar todos los recursos).
+  entidadTipo String
+  entidadId   String        @db.Uuid
+
+  /// JSONB · snapshot del estado antes de la acción (cuando aplica).
+  valorAntes   Json?
+  /// JSONB · snapshot del estado después.
+  valorDespues Json?
+  /// T02 · obligatorio para acciones críticas (§17.2). Validación en app: 10–500 caracteres trim.
+  motivo       String?
+
+  /// T02 · permite encadenar recálculos en cascada (T03) al evento que los originó.
+  causaId String?        @db.Uuid
+  causa   LogActividad?  @relation("logCausa", fields: [causaId], references: [id], onDelete: SetNull)
+  efectos LogActividad[] @relation("logCausa")
+
+  timestamp DateTime @default(now())
+
+  @@index([entidadTipo, entidadId, timestamp])
+  @@index([actorId, timestamp])
+  @@index([tipoAccion, timestamp])
+  @@index([causaId])
+  @@index([timestamp])
+}
+
+// ============================================================================
+// NOTIFICACIONES (T06)
+// ============================================================================
+
+/// T06 · notificación in-app. Email queda post-MVP (§19 ítems 4 y 13).
+model Notificacion {
+  id   String           @id @default(uuid()) @db.Uuid
+  tipo TipoNotificacion
+
+  /// T06 · destinatario (puede ser ADMIN o PARTICIPANTE según el tipo).
+  destinatarioId String  @db.Uuid
+  destinatario   Usuario @relation("notificacionDestinatario", fields: [destinatarioId], references: [id], onDelete: Cascade)
+
+  /// JSONB · datos para renderizar el mensaje y construir deep-link.
+  /// Shape mínimo: { titulo: string, mensaje: string, deepLink: string, contexto?: {...} }.
+  payload Json
+
+  leida   Boolean   @default(false)
+  leidaAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([destinatarioId, leida, createdAt])
+  @@index([tipo])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// ============================================================================
+//                      APÉNDICE OPERATIVO (no v2 funcional)
+// ============================================================================
+// ============================================================================
+//
+// Lo que sigue NO está en el schema v2 funcional. Son tablas/enums operativos
+// para seguridad y rate-limiting de autenticación. Si en algún momento se
+// integran al log funcional (T02), se pueden migrar entonces.
+// ============================================================================
+
+/// Operativo · tipos de evento de autenticación para auditoría de seguridad.
+/// Distinto de TipoAccionLog (T02) — este enum cubre el ciclo login/MFA, no
+/// las acciones de negocio.
 enum AuthEventoTipo {
   LOGIN_OK
   LOGIN_FALLIDO
@@ -160,471 +1087,21 @@ enum AuthEventoTipo {
   LOGOUT
 }
 
+/// Operativo · log de eventos de autenticación.
+/// Independiente de LogActividad (T02): aquí se registran intentos fallidos
+/// con email aún sin usuario asociado, lo que T02 no permite (requiere actor).
 model AuthEvento {
-  id        String         @id @default(cuid())
-  usuarioId String?        @map("usuario_id")
+  id        String         @id @default(uuid()) @db.Uuid
+  usuarioId String?        @db.Uuid
   email     String?
   tipo      AuthEventoTipo
   ip        String?
-  userAgent String?        @map("user_agent")
+  userAgent String?
   metadata  Json?
-  creadoEn  DateTime       @default(now()) @map("creado_en")
+  createdAt DateTime       @default(now())
 
-  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+  usuario Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
 
-  @@index([usuarioId, creadoEn])
-  @@index([tipo, creadoEn])
-  @@map("auth_eventos")
-}
-
-// ═══════════════════════════════════════════════════════════════
-// ÁREAS DE COMPETENCIA
-// ═══════════════════════════════════════════════════════════════
-
-model AreaCompetencia {
-  id          String  @id @default(cuid())
-  nombre      String  @unique
-  descripcion String?
-  color       String?
-  orden       Int?
-
-  creadoEn DateTime @default(now()) @map("creado_en")
-
-  // Relaciones
-  modulos Modulo[]
-
-  @@map("areas_competencia")
-}
-
-// ═══════════════════════════════════════════════════════════════
-// CURSOS
-// ═══════════════════════════════════════════════════════════════
-
-model Curso {
-  id          String      @id @default(cuid())
-  titulo      String
-  slug        String      @unique
-  descripcion String?
-  imagenUrl   String?     @map("imagen_url")
-  nivel       NivelCurso  @default(BASICO)
-  estado      EstadoCurso @default(BORRADOR)
-
-  // Umbrales de logro (escala 0-100, configurables por curso)
-  umbralExcelencia   Float @default(90) @map("umbral_excelencia")
-  umbralAprobado     Float @default(70) @map("umbral_aprobado")
-  umbralEnDesarrollo Float @default(50) @map("umbral_en_desarrollo")
-
-  // Umbrales de diagnóstico (% de brecha, configurables por curso)
-  umbralDiagnosticoObligatorio Float @default(20) @map("umbral_diagnostico_obligatorio")
-  umbralDiagnosticoRecomendado Float @default(5)  @map("umbral_diagnostico_recomendado")
-
-  creadoEn      DateTime @default(now()) @map("creado_en")
-  actualizadoEn DateTime @updatedAt       @map("actualizado_en")
-
-  // Relaciones
-  modulos        Modulo[]
-  convocatorias  Convocatoria[]
-  inscripciones  Inscripcion[]
-  progresosCurso ProgresoCurso[]
-  tipoPesos      CursoTipoPeso[]
-  diagnosticos   Diagnostico[]
-
-  @@map("cursos")
-}
-
-// ═══════════════════════════════════════════════════════════════
-// PESOS POR TIPO DE ACTIVIDAD
-// ═══════════════════════════════════════════════════════════════
-
-model CursoTipoPeso {
-  cursoId String @map("curso_id")
-  // Tipos nivel módulo: quiz | ejercicio | codigo | mini_proyecto
-  // Tipos nivel curso:  proyecto | entrevista
-  tipo    String
-  peso    Float
-  // 'modulo' para pesos intra-módulo, 'curso' para pesos a nivel curso
-  nivel   String @default("modulo")
-
-  curso Curso @relation(fields: [cursoId], references: [id], onDelete: Cascade)
-
-  @@id([cursoId, tipo])
-  @@map("curso_tipo_pesos")
-}
-
-// ═══════════════════════════════════════════════════════════════
-// MÓDULOS
-// ═══════════════════════════════════════════════════════════════
-
-model Modulo {
-  id                String       @id @default(cuid())
-  cursoId           String       @map("curso_id")
-  titulo            String
-  slug              String
-  descripcion       String?
-  orden             Int
-  duracionEstimada  Int?         @map("duracion_estimada")
-  estado            EstadoModulo @default(BORRADOR)
-  puntajeObjetivo   Float?       @map("puntaje_objetivo")
-  // Peso en la nota del curso. null = peso igual entre módulos
-  peso              Float?
-  areaId            String?      @map("area_id")
-
-  creadoEn      DateTime @default(now()) @map("creado_en")
-  actualizadoEn DateTime @updatedAt       @map("actualizado_en")
-
-  // Relaciones
-  curso             Curso            @relation(fields: [cursoId], references: [id], onDelete: Cascade)
-  area              AreaCompetencia? @relation(fields: [areaId], references: [id])
-  secciones         Seccion[]
-  progresosModulo   ProgresoModulo[]
-  asignaciones      AsignacionModulo[]
-  resultadosDiag    ResultadoDiagnostico[]
-  moduloOrigen      ModuloOrigen?    @relation("ModuloClonado")
-  origenDe          ModuloOrigen[]   @relation("ModuloFuente")
-
-  @@unique([cursoId, slug])
-  @@unique([cursoId, orden])
-  @@index([cursoId, orden])
-  @@index([areaId])
-  @@map("modulos")
-}
-
-// ═══════════════════════════════════════════════════════════════
-// TRAZABILIDAD DE CLONADO
-// ═══════════════════════════════════════════════════════════════
-
-model ModuloOrigen {
-  moduloId       String  @id @map("modulo_id")
-  moduloOrigenId String? @map("modulo_origen_id")
-  cursoOrigenId  String? @map("curso_origen_id")
-  clonadoPor     String? @map("clonado_por")
-
-  clonadoEn DateTime @default(now()) @map("clonado_en")
-
-  modulo       Modulo  @relation("ModuloClonado", fields: [moduloId], references: [id], onDelete: Cascade)
-  moduloOrigen Modulo? @relation("ModuloFuente", fields: [moduloOrigenId], references: [id], onDelete: SetNull)
-
-  @@map("modulos_origen")
-}
-
-// ═══════════════════════════════════════════════════════════════
-// SECCIONES
-// ═══════════════════════════════════════════════════════════════
-
-model Seccion {
-  id       String @id @default(cuid())
-  moduloId String @map("modulo_id")
-  titulo   String
-  orden    Int
-
-  creadoEn      DateTime @default(now()) @map("creado_en")
-  actualizadoEn DateTime @updatedAt       @map("actualizado_en")
-
-  // Relaciones
-  modulo     Modulo      @relation(fields: [moduloId], references: [id], onDelete: Cascade)
-  contenidos Contenido[]
-
-  @@unique([moduloId, orden])
-  @@map("secciones")
-}
-
-// ═══════════════════════════════════════════════════════════════
-// CONTENIDOS DINÁMICOS
-// ═══════════════════════════════════════════════════════════════
-
-model Contenido {
-  id        String        @id @default(cuid())
-  seccionId String        @map("seccion_id")
-  tipo      TipoContenido
-  titulo    String
-  orden     Int
-  // Estructura variable según tipo (LECTURA: {bloques}, VIDEO: {url}, EJERCICIO: {archivos}, etc.)
-  contenido Json
-  metadata  Json?
-  // soft delete: true = no visible para participante, entregas conservadas
-  archivado Boolean @default(false)
-
-  creadoEn      DateTime @default(now()) @map("creado_en")
-  actualizadoEn DateTime @updatedAt       @map("actualizado_en")
-
-  // Relaciones
-  seccion           Seccion             @relation(fields: [seccionId], references: [id], onDelete: Cascade)
-  progresosContenido ProgresoContenido[]
-  entregas          Entrega[]
-  entregaDrafts     EntregaDraft[]
-
-  @@unique([seccionId, orden])
-  @@index([seccionId, orden])
-  @@map("contenidos_dinamicos")
-}
-
-// ═══════════════════════════════════════════════════════════════
-// CONVOCATORIAS
-// ═══════════════════════════════════════════════════════════════
-
-model Convocatoria {
-  id             String             @id @default(cuid())
-  cursoId        String             @map("curso_id")
-  titulo         String
-  empresaCliente String?            @map("empresa_cliente")
-  descripcion    String?
-  estado         EstadoConvocatoria @default(ABIERTA)
-  fechaInicio    DateTime?          @map("fecha_inicio")
-  fechaLimite    DateTime?          @map("fecha_limite")
-  creadoPorId    String?            @map("creado_por_id")
-
-  creadoEn      DateTime @default(now()) @map("creado_en")
-  actualizadoEn DateTime @updatedAt       @map("actualizado_en")
-
-  // Relaciones
-  curso         Curso         @relation(fields: [cursoId], references: [id])
-  creadoPor     Usuario?      @relation("ConvocatoriaCreador", fields: [creadoPorId], references: [id])
-  inscripciones Inscripcion[]
-
-  @@index([cursoId, estado])
-  @@map("convocatorias")
-}
-
-// ═══════════════════════════════════════════════════════════════
-// INSCRIPCIONES
-// ═══════════════════════════════════════════════════════════════
-
-model Inscripcion {
-  id             String            @id @default(cuid())
-  usuarioId      String            @map("usuario_id")
-  cursoId        String            @map("curso_id")
-  convocatoriaId String?           @map("convocatoria_id")
-  tipo           TipoInscripcion
-  estado         EstadoInscripcion @default(ACTIVA)
-  // null = auto-inscripción voluntaria
-  inscritoPorId  String?           @map("inscrito_por_id")
-  fechaInscripcion DateTime        @default(now()) @map("fecha_inscripcion")
-  fechaCompletado  DateTime?       @map("fecha_completado")
-  fechaLimite      DateTime?       @map("fecha_limite")
-
-  // Relaciones
-  usuario       Usuario            @relation("InscripcionUsuario", fields: [usuarioId], references: [id])
-  curso         Curso              @relation(fields: [cursoId], references: [id])
-  convocatoria  Convocatoria?      @relation(fields: [convocatoriaId], references: [id])
-  inscritoPor   Usuario?           @relation("InscripcionGestor", fields: [inscritoPorId], references: [id])
-  asignaciones  AsignacionModulo[]
-  progresoCurso ProgresoCurso?
-  progresosModulo    ProgresoModulo[]
-  progresosContenido ProgresoContenido[]
-  entregas      Entrega[]
-
-  @@unique([usuarioId, cursoId, convocatoriaId])
-  @@index([usuarioId])
-  @@index([cursoId])
-  @@index([convocatoriaId])
-  @@index([fechaLimite])
-  @@map("inscripciones")
-}
-
-// ═══════════════════════════════════════════════════════════════
-// ASIGNACIONES DE MÓDULO
-// ═══════════════════════════════════════════════════════════════
-
-model AsignacionModulo {
-  id            String           @id @default(cuid())
-  inscripcionId String           @map("inscripcion_id")
-  moduloId      String           @map("modulo_id")
-  prioridad     PrioridadModulo  @default(OPCIONAL)
-  origen        OrigenAsignacion @default(VOLUNTARIA)
-  diagnosticoId String?          @map("diagnostico_id")
-  fechaLimite   DateTime?        @map("fecha_limite")
-
-  // Relaciones
-  inscripcion  Inscripcion  @relation(fields: [inscripcionId], references: [id], onDelete: Cascade)
-  modulo       Modulo       @relation(fields: [moduloId], references: [id])
-  diagnostico  Diagnostico? @relation(fields: [diagnosticoId], references: [id])
-
-  @@unique([inscripcionId, moduloId])
-  @@index([fechaLimite])
-  @@map("asignaciones_modulo")
-}
-
-// ═══════════════════════════════════════════════════════════════
-// DIAGNÓSTICOS
-// ═══════════════════════════════════════════════════════════════
-
-model Diagnostico {
-  id        String   @id @default(cuid())
-  usuarioId String   @map("usuario_id")
-  cursoId   String   @map("curso_id")
-  titulo    String?
-  fecha     DateTime @default(now())
-  notas     String?
-
-  actualizadoEn DateTime @updatedAt @map("actualizado_en")
-
-  // Relaciones
-  usuario     Usuario                @relation(fields: [usuarioId], references: [id])
-  curso       Curso                  @relation(fields: [cursoId], references: [id])
-  resultados  ResultadoDiagnostico[]
-  asignaciones AsignacionModulo[]
-
-  @@map("diagnosticos")
-}
-
-model ResultadoDiagnostico {
-  id            String @id @default(cuid())
-  diagnosticoId String @map("diagnostico_id")
-  moduloId      String @map("modulo_id")
-  puntaje       Float
-  brecha        Float
-  // CUMPLE | CERCA | NO_CUMPLE
-  estado        String
-  observaciones String?
-
-  actualizadoEn DateTime @updatedAt @map("actualizado_en")
-
-  // Relaciones
-  diagnostico Diagnostico @relation(fields: [diagnosticoId], references: [id], onDelete: Cascade)
-  modulo      Modulo      @relation(fields: [moduloId], references: [id])
-
-  @@unique([diagnosticoId, moduloId])
-  @@map("resultados_diagnostico")
-}
-
-// ═══════════════════════════════════════════════════════════════
-// PROGRESO
-// ═══════════════════════════════════════════════════════════════
-
-model ProgresoCurso {
-  id                String         @id @default(cuid())
-  inscripcionId     String         @unique @map("inscripcion_id")
-  usuarioId         String         @map("usuario_id")
-  cursoId           String         @map("curso_id")
-  estado            EstadoProgreso @default(NO_INICIADO)
-  porcentaje        Float          @default(0)
-  notaFinal         Float?         @map("nota_final")
-  etiquetaLogro     EtiquetaLogro? @map("etiqueta_logro")
-  modulosCompletados Int           @default(0) @map("modulos_completados")
-  modulosTotales    Int            @default(0) @map("modulos_totales")
-  // Tiempo en minutos
-  tiempoTotal       Int            @default(0) @map("tiempo_total")
-  iniciadoEn        DateTime?      @map("iniciado_en")
-  completadoEn      DateTime?      @map("completado_en")
-
-  actualizadoEn DateTime @updatedAt @map("actualizado_en")
-
-  // Relaciones
-  inscripcion Inscripcion @relation(fields: [inscripcionId], references: [id], onDelete: Cascade)
-  usuario     Usuario     @relation(fields: [usuarioId], references: [id])
-  curso       Curso       @relation(fields: [cursoId], references: [id])
-
-  @@index([usuarioId])
-  @@index([cursoId])
-  @@map("progresos_curso")
-}
-
-model ProgresoModulo {
-  id            String         @id @default(cuid())
-  inscripcionId String         @map("inscripcion_id")
-  usuarioId     String         @map("usuario_id")
-  moduloId      String         @map("modulo_id")
-  estado        EstadoProgreso @default(NO_INICIADO)
-  porcentaje    Float          @default(0)
-  // null si no hay evaluables o no hay entregas todavía
-  puntaje       Float?
-  tiempoTotal   Int            @default(0) @map("tiempo_total")
-  iniciadoEn    DateTime?      @map("iniciado_en")
-  completadoEn  DateTime?      @map("completado_en")
-
-  actualizadoEn DateTime @updatedAt @map("actualizado_en")
-
-  // Relaciones
-  inscripcion Inscripcion @relation(fields: [inscripcionId], references: [id])
-  usuario     Usuario     @relation(fields: [usuarioId], references: [id])
-  modulo      Modulo      @relation(fields: [moduloId], references: [id])
-
-  @@unique([inscripcionId, moduloId])
-  @@index([usuarioId])
-  @@index([inscripcionId])
-  @@map("progresos_modulo")
-}
-
-model ProgresoContenido {
-  id            String   @id @default(cuid())
-  inscripcionId String   @map("inscripcion_id")
-  usuarioId     String   @map("usuario_id")
-  contenidoId   String   @map("contenido_id")
-  vistoEn       DateTime @default(now()) @map("visto_en")
-
-  // Relaciones
-  inscripcion Inscripcion @relation(fields: [inscripcionId], references: [id])
-  usuario     Usuario     @relation(fields: [usuarioId], references: [id])
-  contenido   Contenido   @relation(fields: [contenidoId], references: [id])
-
-  @@unique([inscripcionId, contenidoId])
-  @@index([inscripcionId])
-  @@map("progresos_contenido")
-}
-
-// ═══════════════════════════════════════════════════════════════
-// ENTREGAS
-// ═══════════════════════════════════════════════════════════════
-
-model Entrega {
-  id            String        @id @default(cuid())
-  usuarioId     String        @map("usuario_id")
-  contenidoId   String        @map("contenido_id")
-  inscripcionId String        @map("inscripcion_id")
-  // Estructura variable según tipo (respuestas de test, código, URL, etc.)
-  contenido     Json
-  estado        EstadoEntrega @default(PENDIENTE)
-  puntaje       Float?
-  retroalimentacion String?
-  // Datos de revisión IA
-  scoreIa       Float?        @map("score_ia")
-  flagsIa       Json?         @map("flags_ia")
-  // Datos de ejecución (ejercicios de código)
-  stdout        String?
-  stderr        String?
-  testsPasados  Int?          @map("tests_pasados")
-  testsTotal    Int?          @map("tests_total")
-  intentos      Int           @default(1)
-  creadoEn      DateTime      @default(now()) @map("creado_en")
-  evaluadoEn    DateTime?     @map("evaluado_en")
-
-  // Relaciones
-  usuario     Usuario     @relation(fields: [usuarioId], references: [id])
-  contenido_  Contenido   @relation(fields: [contenidoId], references: [id])
-  inscripcion Inscripcion @relation(fields: [inscripcionId], references: [id])
-  archivos    ArchivoEntrega[]
-
-  @@index([usuarioId])
-  @@index([contenidoId])
-  @@index([estado])
-  @@index([inscripcionId])
-  @@map("entregas")
-}
-
-model EntregaDraft {
-  usuarioId   String @map("usuario_id")
-  contenidoId String @map("contenido_id")
-  archivos    Json
-
-  actualizadoEn DateTime @updatedAt @map("actualizado_en")
-
-  // Relaciones
-  usuario   Usuario   @relation(fields: [usuarioId], references: [id])
-  contenido Contenido @relation(fields: [contenidoId], references: [id])
-
-  @@id([usuarioId, contenidoId])
-  @@map("entrega_drafts")
-}
-
-model ArchivoEntrega {
-  id        String  @id @default(cuid())
-  entregaId String  @map("entrega_id")
-  path      String
-  content   String
-  readOnly  Boolean @default(false) @map("read_only")
-
-  // Relaciones
-  entrega Entrega @relation(fields: [entregaId], references: [id], onDelete: Cascade)
-
-  @@map("archivos_entrega")
+  @@index([usuarioId, createdAt])
+  @@index([tipo, createdAt])
 }
