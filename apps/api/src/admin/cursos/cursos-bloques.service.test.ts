@@ -446,6 +446,20 @@ describe("crear", () => {
     })
     expect(result.success).toBe(false)
   })
+
+  // C1 · solucionReferencia acepta null en CREAR (alineado con PATCH)
+  it("acepta solucionReferencia: null en schema CODIGO al crear", () => {
+    const result = crearBloqueAdminInputSchema.safeParse({
+      tipo: "CODIGO",
+      payload: { archivos: [{ nombre: "main.py", contenido: "print(1)" }] },
+      codigoUbicacion: "INLINE",
+      codigoInteractivo: "EDITABLE",
+      codigoEvaluable: "NINGUNO",
+      codigoLenguaje: "PYTHON",
+      solucionReferencia: null,
+    })
+    expect(result.success).toBe(true)
+  })
 })
 
 // ─────────────────────────────────────────────────────────────────
@@ -509,6 +523,23 @@ describe("actualizar", () => {
 
     const input: ActualizarBloqueAdminInput = {
       codigoLenguaje: "PYTHON",
+    }
+    await expect(
+      service.actualizar(CURSO_ID, MODULO_ID, SECCION_ID, BLOQUE_ID, input, ACTOR_ID),
+    ).rejects.toThrow(BadRequestException)
+  })
+
+  // C2 · solucionReferencia también debe rechazarse en bloque no-CODIGO
+  it("rechaza solucionReferencia en bloque no-CODIGO", async () => {
+    const { service, prisma } = buildService()
+    const previo = buildBloqueRow({ tipo: "PARRAFO" })
+    prisma.bloque.findUnique.mockResolvedValue(previo)
+    prisma.modulo.findUnique.mockResolvedValue(buildModulo())
+    prisma.seccion.findUnique.mockResolvedValue(buildSeccion())
+    prisma.curso.findUnique.mockResolvedValue(buildCurso())
+
+    const input: ActualizarBloqueAdminInput = {
+      solucionReferencia: "def solucion(): pass",
     }
     await expect(
       service.actualizar(CURSO_ID, MODULO_ID, SECCION_ID, BLOQUE_ID, input, ACTOR_ID),

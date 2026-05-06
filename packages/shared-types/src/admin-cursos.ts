@@ -788,7 +788,7 @@ const crearBloqueCodigoSchema = z
     codigoInteractivo: codigoInteractivoSchema,
     codigoEvaluable: codigoEvaluableSchema,
     codigoLenguaje: lenguajeCodigoSchema,
-    solucionReferencia: z.string().optional(),
+    solucionReferencia: z.string().nullable().optional(),
   })
   .strict()
 
@@ -880,3 +880,89 @@ export const bloqueDeleteAdminResponseSchema = z.object({
   id: z.string(),
 })
 export type BloqueDeleteAdminResponse = z.infer<typeof bloqueDeleteAdminResponseSchema>
+
+// =============================================================================
+// MINI PROYECTO (§3.6, §10.1, §10.5)
+// Relación: Modulo 1-1 MiniProyecto (moduloId unique).
+// umbralAprobacion no existe en este modelo — lo hereda del área (CursoArea.puntajeObjetivo)
+// o del override del módulo (Modulo.umbralMiniOverride).
+// =============================================================================
+
+// ─────────────────────────────────────────────────────────────────
+// PUT (upsert) · crea si no existe, actualiza si existe
+// ─────────────────────────────────────────────────────────────────
+
+export const upsertMiniProyectoAdminInputSchema = z
+  .object({
+    titulo: z.string().min(1, "El titulo es obligatorio").max(200),
+    enunciado: z.string().min(1, "El enunciado es obligatorio"),
+  })
+  .strict()
+export type UpsertMiniProyectoAdminInput = z.infer<typeof upsertMiniProyectoAdminInputSchema>
+
+// ─────────────────────────────────────────────────────────────────
+// PATCH · actualización parcial
+// ─────────────────────────────────────────────────────────────────
+
+export const actualizarMiniProyectoAdminInputSchema = z
+  .object({
+    titulo: z.string().min(1).max(200),
+    enunciado: z.string().min(1),
+  })
+  .partial()
+  .strict()
+  .refine((v) => Object.keys(v).length > 0, { message: "Al menos un campo es requerido" })
+export type ActualizarMiniProyectoAdminInput = z.infer<
+  typeof actualizarMiniProyectoAdminInputSchema
+>
+
+// ─────────────────────────────────────────────────────────────────
+// POST /pesos · ajusta las 3 capas (deben sumar 100 ±0.01)
+// ─────────────────────────────────────────────────────────────────
+
+export const ajustarPesosMiniProyectoInputSchema = z
+  .object({
+    pesoCapa1: z.number().min(0).max(100),
+    pesoCapa2: z.number().min(0).max(100),
+    pesoCapa3: z.number().min(0).max(100),
+  })
+  .strict()
+  .refine((v) => Math.abs(v.pesoCapa1 + v.pesoCapa2 + v.pesoCapa3 - 100) <= 0.01, {
+    message: "Los pesos de las 3 capas deben sumar 100 (±0.01)",
+  })
+export type AjustarPesosMiniProyectoInput = z.infer<typeof ajustarPesosMiniProyectoInputSchema>
+
+// ─────────────────────────────────────────────────────────────────
+// POST /umbral · ajusta el override de umbral del módulo
+// ─────────────────────────────────────────────────────────────────
+
+export const ajustarUmbralMiniProyectoInputSchema = z
+  .object({
+    umbralMiniOverride: z.number().int().min(0).max(100).nullable(),
+  })
+  .strict()
+export type AjustarUmbralMiniProyectoInput = z.infer<typeof ajustarUmbralMiniProyectoInputSchema>
+
+// ─────────────────────────────────────────────────────────────────
+// LECTURA · detalle
+// ─────────────────────────────────────────────────────────────────
+
+export const miniProyectoDetalleAdminSchema = z.object({
+  id: z.string(),
+  moduloId: z.string(),
+  titulo: z.string(),
+  enunciado: z.string(),
+  pesoCapa1: z.number(),
+  pesoCapa2: z.number(),
+  pesoCapa3: z.number(),
+  umbralMiniOverride: z.number().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+export type MiniProyectoDetalleAdmin = z.infer<typeof miniProyectoDetalleAdminSchema>
+
+export const miniProyectoDeleteAdminResponseSchema = z.object({
+  tipo: z.literal("ELIMINADO"),
+  id: z.string(),
+})
+export type MiniProyectoDeleteAdminResponse = z.infer<typeof miniProyectoDeleteAdminResponseSchema>

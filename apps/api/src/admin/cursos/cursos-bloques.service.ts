@@ -45,7 +45,11 @@ const ERROR_REORDENAR_PERMUTACION_INVALIDA =
 
 type CodigoFields = Pick<
   ActualizarBloqueAdminInput,
-  "codigoUbicacion" | "codigoInteractivo" | "codigoEvaluable" | "codigoLenguaje"
+  | "codigoUbicacion"
+  | "codigoInteractivo"
+  | "codigoEvaluable"
+  | "codigoLenguaje"
+  | "solucionReferencia"
 >
 
 @Injectable()
@@ -504,7 +508,8 @@ function tieneCodigoFields(input: CodigoFields): boolean {
     input.codigoUbicacion !== undefined ||
     input.codigoInteractivo !== undefined ||
     input.codigoEvaluable !== undefined ||
-    input.codigoLenguaje !== undefined
+    input.codigoLenguaje !== undefined ||
+    input.solucionReferencia !== undefined
   )
 }
 

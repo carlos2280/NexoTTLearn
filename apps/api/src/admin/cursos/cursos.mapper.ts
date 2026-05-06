@@ -4,6 +4,7 @@ import type {
   CursoAreaIndividualDetalle,
   CursoDetalle,
   CursoListItem,
+  MiniProyectoDetalleAdmin,
   ModuloResumen,
 } from "@nexott-learn/shared-types"
 import type { Prisma } from "@prisma/client"
@@ -559,5 +560,56 @@ export function snapshotBloque(row: BloqueDetalleRow): Prisma.InputJsonValue {
     payload: (row.payload ?? {}) as Prisma.InputJsonValue,
     solucionReferencia: row.solucionReferencia,
     archivadoAt: row.archivadoAt ? row.archivadoAt.toISOString() : null,
+  }
+}
+
+// =============================================================================
+// MINI PROYECTO DETALLE SELECT + MAPPER
+// =============================================================================
+
+export const MINIPROYECTO_DETALLE_SELECT = {
+  id: true,
+  moduloId: true,
+  titulo: true,
+  enunciado: true,
+  pesoCapa1: true,
+  pesoCapa2: true,
+  pesoCapa3: true,
+  createdAt: true,
+  updatedAt: true,
+  modulo: {
+    select: { umbralMiniOverride: true },
+  },
+} satisfies Prisma.MiniProyectoSelect
+
+export type MiniProyectoDetalleRow = Prisma.MiniProyectoGetPayload<{
+  select: typeof MINIPROYECTO_DETALLE_SELECT
+}>
+
+export function mapMiniProyectoDetalle(row: MiniProyectoDetalleRow): MiniProyectoDetalleAdmin {
+  return {
+    id: row.id,
+    moduloId: row.moduloId,
+    titulo: row.titulo,
+    enunciado: row.enunciado,
+    pesoCapa1: Number(row.pesoCapa1),
+    pesoCapa2: Number(row.pesoCapa2),
+    pesoCapa3: Number(row.pesoCapa3),
+    umbralMiniOverride: row.modulo.umbralMiniOverride,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  }
+}
+
+export function snapshotMiniProyecto(row: MiniProyectoDetalleRow): Prisma.InputJsonValue {
+  return {
+    id: row.id,
+    moduloId: row.moduloId,
+    titulo: row.titulo,
+    enunciado: row.enunciado,
+    pesoCapa1: Number(row.pesoCapa1),
+    pesoCapa2: Number(row.pesoCapa2),
+    pesoCapa3: Number(row.pesoCapa3),
+    umbralMiniOverride: row.modulo.umbralMiniOverride,
   }
 }

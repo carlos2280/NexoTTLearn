@@ -168,6 +168,18 @@ export {
   type BloqueListAdminResponse,
   bloqueDeleteAdminResponseSchema,
   type BloqueDeleteAdminResponse,
+  upsertMiniProyectoAdminInputSchema,
+  type UpsertMiniProyectoAdminInput,
+  actualizarMiniProyectoAdminInputSchema,
+  type ActualizarMiniProyectoAdminInput,
+  ajustarPesosMiniProyectoInputSchema,
+  type AjustarPesosMiniProyectoInput,
+  ajustarUmbralMiniProyectoInputSchema,
+  type AjustarUmbralMiniProyectoInput,
+  miniProyectoDetalleAdminSchema,
+  type MiniProyectoDetalleAdmin,
+  miniProyectoDeleteAdminResponseSchema,
+  type MiniProyectoDeleteAdminResponse,
 } from "./admin-cursos"
 
 export {
