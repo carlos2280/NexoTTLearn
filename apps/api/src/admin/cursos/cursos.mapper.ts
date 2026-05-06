@@ -4,8 +4,10 @@ import type {
   CursoAreaIndividualDetalle,
   CursoDetalle,
   CursoListItem,
+  EntrevistaIADetalleAdmin,
   MiniProyectoDetalleAdmin,
   ModuloResumen,
+  ProyectoTransversalDetalleAdmin,
 } from "@nexott-learn/shared-types"
 import type { Prisma } from "@prisma/client"
 
@@ -611,5 +613,111 @@ export function snapshotMiniProyecto(row: MiniProyectoDetalleRow): Prisma.InputJ
     pesoCapa2: Number(row.pesoCapa2),
     pesoCapa3: Number(row.pesoCapa3),
     umbralMiniOverride: row.modulo.umbralMiniOverride,
+  }
+}
+
+// =============================================================================
+// PROYECTO TRANSVERSAL DETALLE SELECT + MAPPER
+// MAESTRO §3.6, §10.2, §10.5 · 1-1 opcional con Curso. umbralAprobacion vive
+// en el propio modelo (default 70), a diferencia del Mini que hereda del área.
+// =============================================================================
+
+export const PROYECTO_TRANSVERSAL_DETALLE_SELECT = {
+  id: true,
+  cursoId: true,
+  titulo: true,
+  enunciado: true,
+  umbralAprobacion: true,
+  pesoCapa1: true,
+  pesoCapa2: true,
+  pesoCapa3: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.ProyectoTransversalSelect
+
+export type ProyectoTransversalDetalleRow = Prisma.ProyectoTransversalGetPayload<{
+  select: typeof PROYECTO_TRANSVERSAL_DETALLE_SELECT
+}>
+
+export function mapProyectoTransversalDetalle(
+  row: ProyectoTransversalDetalleRow,
+): ProyectoTransversalDetalleAdmin {
+  return {
+    id: row.id,
+    cursoId: row.cursoId,
+    titulo: row.titulo,
+    enunciado: row.enunciado,
+    umbralAprobacion: row.umbralAprobacion,
+    pesoCapa1: Number(row.pesoCapa1),
+    pesoCapa2: Number(row.pesoCapa2),
+    pesoCapa3: Number(row.pesoCapa3),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  }
+}
+
+export function snapshotProyectoTransversal(
+  row: ProyectoTransversalDetalleRow,
+): Prisma.InputJsonValue {
+  return {
+    id: row.id,
+    cursoId: row.cursoId,
+    titulo: row.titulo,
+    enunciado: row.enunciado,
+    umbralAprobacion: row.umbralAprobacion,
+    pesoCapa1: Number(row.pesoCapa1),
+    pesoCapa2: Number(row.pesoCapa2),
+    pesoCapa3: Number(row.pesoCapa3),
+  }
+}
+
+// =============================================================================
+// ENTREVISTA IA CONFIG DETALLE SELECT + MAPPER
+// MAESTRO §11.1, §11.2 · 1-1 opcional con Curso. La rúbrica (subset áreas +
+// pesos) es sub-recurso aparte y NO se cubre en este iter.
+// =============================================================================
+
+export const ENTREVISTA_IA_DETALLE_SELECT = {
+  id: true,
+  cursoId: true,
+  perfilCliente: true,
+  contextoNegocio: true,
+  umbralAprobacion: true,
+  numeroPreguntas: true,
+  modo: true,
+  maxIntentos: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.EntrevistaIAConfigSelect
+
+export type EntrevistaIADetalleRow = Prisma.EntrevistaIAConfigGetPayload<{
+  select: typeof ENTREVISTA_IA_DETALLE_SELECT
+}>
+
+export function mapEntrevistaIADetalle(row: EntrevistaIADetalleRow): EntrevistaIADetalleAdmin {
+  return {
+    id: row.id,
+    cursoId: row.cursoId,
+    perfilCliente: row.perfilCliente,
+    contextoNegocio: row.contextoNegocio,
+    umbralAprobacion: row.umbralAprobacion,
+    numeroPreguntas: row.numeroPreguntas,
+    modo: row.modo,
+    maxIntentos: row.maxIntentos,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  }
+}
+
+export function snapshotEntrevistaIA(row: EntrevistaIADetalleRow): Prisma.InputJsonValue {
+  return {
+    id: row.id,
+    cursoId: row.cursoId,
+    perfilCliente: row.perfilCliente,
+    contextoNegocio: row.contextoNegocio,
+    umbralAprobacion: row.umbralAprobacion,
+    numeroPreguntas: row.numeroPreguntas,
+    modo: row.modo,
+    maxIntentos: row.maxIntentos,
   }
 }

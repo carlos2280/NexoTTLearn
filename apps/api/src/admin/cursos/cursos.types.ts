@@ -29,3 +29,24 @@ export const ERROR_AREA_DUPLICADA_EN_CURSO = "El area ya esta asignada a este cu
 export const ERROR_AREA_TIENE_MODULOS =
   "El area tiene modulos no archivados en este curso; reasigna o archiva primero"
 export const ERROR_AREA_NUEVA_YA_EN_CURSO = "El nuevo area ya esta asignada a este curso"
+
+// Errores de Proyecto Transversal (Iter 7)
+// biome-ignore lint/nursery/noSecrets: nombre de entidad de dominio, no es un secreto
+export const ENTIDAD_TIPO_PROYECTO_TRANSVERSAL = "ProyectoTransversal"
+// biome-ignore lint/nursery/noSecrets: mensaje de error de dominio, no es un secreto
+export const ERROR_PROYECTO_TRANSVERSAL_NO_ENCONTRADO = "ProyectoTransversal no encontrado"
+export const ERROR_PT_CURSO_CERRADO =
+  "No se puede modificar el proyecto transversal en un curso CERRADO"
+export const ERROR_PT_DELETE_NO_BORRADOR =
+  "Solo se puede eliminar el proyecto transversal en cursos en estado BORRADOR"
+export const ERROR_PT_DELETE_CON_ENTREGAS =
+  "No se puede eliminar el proyecto transversal porque tiene entregas registradas"
+
+// Errores de Entrevista IA Config (Iter 7)
+export const ENTIDAD_TIPO_ENTREVISTA_IA = "EntrevistaIA"
+export const ERROR_ENTREVISTA_IA_NO_ENCONTRADA = "EntrevistaIA no encontrada"
+export const ERROR_EI_CURSO_CERRADO = "No se puede modificar la entrevista IA en un curso CERRADO"
+export const ERROR_EI_DELETE_NO_BORRADOR =
+  "Solo se puede eliminar la entrevista IA en cursos en estado BORRADOR"
+export const ERROR_EI_DELETE_CON_SESIONES =
+  "No se puede eliminar la entrevista IA porque tiene sesiones registradas"

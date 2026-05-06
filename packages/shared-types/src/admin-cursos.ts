@@ -966,3 +966,168 @@ export const miniProyectoDeleteAdminResponseSchema = z.object({
   id: z.string(),
 })
 export type MiniProyectoDeleteAdminResponse = z.infer<typeof miniProyectoDeleteAdminResponseSchema>
+
+// =============================================================================
+// PROYECTO TRANSVERSAL (§3.6, §10.2, §10.5)
+// Relación: Curso 1-1 ProyectoTransversal (cursoId unique).
+// A diferencia del Mini, este SÍ tiene umbralAprobacion propio (default 70).
+// La presencia del registro es el "flag" — no hay columna activo en Curso.
+// =============================================================================
+
+// ─────────────────────────────────────────────────────────────────
+// PUT (upsert) · crea si no existe, actualiza si existe
+// ─────────────────────────────────────────────────────────────────
+
+export const upsertProyectoTransversalAdminInputSchema = z
+  .object({
+    titulo: z.string().min(1, "El titulo es obligatorio").max(200),
+    enunciado: z.string().min(1, "El enunciado es obligatorio"),
+  })
+  .strict()
+export type UpsertProyectoTransversalAdminInput = z.infer<
+  typeof upsertProyectoTransversalAdminInputSchema
+>
+
+// ─────────────────────────────────────────────────────────────────
+// PATCH · actualización parcial
+// ─────────────────────────────────────────────────────────────────
+
+export const actualizarProyectoTransversalAdminInputSchema = z
+  .object({
+    titulo: z.string().min(1).max(200),
+    enunciado: z.string().min(1),
+  })
+  .partial()
+  .strict()
+  .refine((v) => Object.keys(v).length > 0, { message: "Al menos un campo es requerido" })
+export type ActualizarProyectoTransversalAdminInput = z.infer<
+  typeof actualizarProyectoTransversalAdminInputSchema
+>
+
+// ─────────────────────────────────────────────────────────────────
+// POST /pesos · ajusta las 3 capas (deben sumar 100 ±0.01)
+// ─────────────────────────────────────────────────────────────────
+
+export const ajustarPesosProyectoTransversalInputSchema = z
+  .object({
+    pesoCapa1: z.number().min(0).max(100),
+    pesoCapa2: z.number().min(0).max(100),
+    pesoCapa3: z.number().min(0).max(100),
+  })
+  .strict()
+  .refine((v) => Math.abs(v.pesoCapa1 + v.pesoCapa2 + v.pesoCapa3 - 100) <= 0.01, {
+    message: "Los pesos de las 3 capas deben sumar 100 (±0.01)",
+  })
+export type AjustarPesosProyectoTransversalInput = z.infer<
+  typeof ajustarPesosProyectoTransversalInputSchema
+>
+
+// ─────────────────────────────────────────────────────────────────
+// POST /umbral · ajusta umbralAprobacion del proyecto (0-100)
+// ─────────────────────────────────────────────────────────────────
+
+export const ajustarUmbralProyectoTransversalInputSchema = z
+  .object({
+    umbralAprobacion: z.number().int().min(0).max(100),
+  })
+  .strict()
+export type AjustarUmbralProyectoTransversalInput = z.infer<
+  typeof ajustarUmbralProyectoTransversalInputSchema
+>
+
+// ─────────────────────────────────────────────────────────────────
+// LECTURA · detalle
+// ─────────────────────────────────────────────────────────────────
+
+export const proyectoTransversalDetalleAdminSchema = z.object({
+  id: z.string(),
+  cursoId: z.string(),
+  titulo: z.string(),
+  enunciado: z.string(),
+  umbralAprobacion: z.number(),
+  pesoCapa1: z.number(),
+  pesoCapa2: z.number(),
+  pesoCapa3: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+export type ProyectoTransversalDetalleAdmin = z.infer<typeof proyectoTransversalDetalleAdminSchema>
+
+export const proyectoTransversalDeleteAdminResponseSchema = z.object({
+  tipo: z.literal("ELIMINADO"),
+  id: z.string(),
+})
+export type ProyectoTransversalDeleteAdminResponse = z.infer<
+  typeof proyectoTransversalDeleteAdminResponseSchema
+>
+
+// =============================================================================
+// ENTREVISTA IA · CONFIG (§11.1, §11.2, §11.6)
+// Relación: Curso 1-1 EntrevistaIAConfig (cursoId unique).
+// Sub-recurso `RubricaEntrevistaItem` (pesos por área) NO está en este iter:
+// requiere su propio módulo por la validación de subset de áreas del curso
+// y la suma 100 ±0.01 (T04 caso borde 4). Se aborda en una iter dedicada.
+// =============================================================================
+
+export const modoEntrevistaSchema = z.enum(["TEXTO", "VOZ"])
+export type ModoEntrevistaApi = z.infer<typeof modoEntrevistaSchema>
+
+// ─────────────────────────────────────────────────────────────────
+// PUT (upsert) · crea/actualiza la config completa
+// ─────────────────────────────────────────────────────────────────
+
+export const upsertEntrevistaIAAdminInputSchema = z
+  .object({
+    perfilCliente: z.string().min(1, "El perfil del cliente es obligatorio"),
+    contextoNegocio: z.string().min(1, "El contexto de negocio es obligatorio"),
+    umbralAprobacion: z.number().int().min(0).max(100),
+    numeroPreguntas: z.number().int().min(1).max(50),
+    modo: modoEntrevistaSchema,
+    maxIntentos: z.number().int().min(1).max(20),
+  })
+  .strict()
+export type UpsertEntrevistaIAAdminInput = z.infer<typeof upsertEntrevistaIAAdminInputSchema>
+
+// ─────────────────────────────────────────────────────────────────
+// PATCH · actualización parcial
+// ─────────────────────────────────────────────────────────────────
+
+export const actualizarEntrevistaIAAdminInputSchema = z
+  .object({
+    perfilCliente: z.string().min(1),
+    contextoNegocio: z.string().min(1),
+    umbralAprobacion: z.number().int().min(0).max(100),
+    numeroPreguntas: z.number().int().min(1).max(50),
+    modo: modoEntrevistaSchema,
+    maxIntentos: z.number().int().min(1).max(20),
+  })
+  .partial()
+  .strict()
+  .refine((v) => Object.keys(v).length > 0, { message: "Al menos un campo es requerido" })
+export type ActualizarEntrevistaIAAdminInput = z.infer<
+  typeof actualizarEntrevistaIAAdminInputSchema
+>
+
+// ─────────────────────────────────────────────────────────────────
+// LECTURA · detalle
+// ─────────────────────────────────────────────────────────────────
+
+export const entrevistaIADetalleAdminSchema = z.object({
+  id: z.string(),
+  cursoId: z.string(),
+  perfilCliente: z.string(),
+  contextoNegocio: z.string(),
+  umbralAprobacion: z.number(),
+  numeroPreguntas: z.number(),
+  modo: modoEntrevistaSchema,
+  maxIntentos: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+export type EntrevistaIADetalleAdmin = z.infer<typeof entrevistaIADetalleAdminSchema>
+
+export const entrevistaIADeleteAdminResponseSchema = z.object({
+  tipo: z.literal("ELIMINADO"),
+  id: z.string(),
+})
+export type EntrevistaIADeleteAdminResponse = z.infer<typeof entrevistaIADeleteAdminResponseSchema>
