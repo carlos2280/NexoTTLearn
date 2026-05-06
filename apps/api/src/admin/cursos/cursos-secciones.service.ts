@@ -60,7 +60,7 @@ export class CursosSeccionesService {
     moduloId: string,
     seccionId: string,
   ): Promise<SeccionDetalleAdmin> {
-    await this.requireCurso(cursoId)
+    await this.requireModulo(cursoId, moduloId)
     const row = await this.prisma.seccion.findUnique({
       where: { id: seccionId },
       select: SECCION_DETALLE_SELECT,
@@ -133,6 +133,7 @@ export class CursosSeccionesService {
     if (curso.estado === "CERRADO") {
       throw new ConflictException(ERROR_CURSO_CERRADO)
     }
+    await this.requireModulo(cursoId, moduloId)
 
     await this.prisma.$transaction(async (tx) => {
       const data: Prisma.SeccionUpdateInput = {}
@@ -179,6 +180,7 @@ export class CursosSeccionesService {
     if (curso.estado === "CERRADO") {
       throw new ConflictException(ERROR_CURSO_CERRADO)
     }
+    await this.requireModulo(cursoId, moduloId)
 
     if (previo.archivadoAt !== null) {
       return this.hidratarSeccion(previo)
@@ -217,6 +219,7 @@ export class CursosSeccionesService {
     if (curso.estado === "CERRADO") {
       throw new ConflictException(ERROR_CURSO_CERRADO)
     }
+    await this.requireModulo(cursoId, moduloId)
 
     if (previo.archivadoAt === null) {
       return this.hidratarSeccion(previo)
@@ -259,6 +262,7 @@ export class CursosSeccionesService {
     if (curso.estado !== "BORRADOR") {
       throw new ConflictException(ERROR_DELETE_NO_BORRADOR)
     }
+    await this.requireModulo(cursoId, moduloId)
 
     const tieneEntregas = await this.prisma.entregaBloque.count({
       where: { bloque: { seccionId } },

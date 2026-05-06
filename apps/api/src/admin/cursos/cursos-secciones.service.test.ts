@@ -152,7 +152,7 @@ describe("listar", () => {
 describe("obtenerPorId", () => {
   it("devuelve la seccion si existe y pertenece al modulo", async () => {
     const { service, prisma } = buildService()
-    prisma.curso.findUnique.mockResolvedValue(buildCurso())
+    prisma.modulo.findUnique.mockResolvedValue(buildModulo())
     prisma.seccion.findUnique.mockResolvedValue(buildSeccionRow())
     prisma.entregaBloque.count.mockResolvedValue(0)
 
@@ -162,7 +162,7 @@ describe("obtenerPorId", () => {
 
   it("lanza 404 si la seccion no existe", async () => {
     const { service, prisma } = buildService()
-    prisma.curso.findUnique.mockResolvedValue(buildCurso())
+    prisma.modulo.findUnique.mockResolvedValue(buildModulo())
     prisma.seccion.findUnique.mockResolvedValue(null)
 
     await expect(service.obtenerPorId(CURSO_ID, MODULO_ID, SECCION_ID)).rejects.toThrow(
@@ -172,8 +172,17 @@ describe("obtenerPorId", () => {
 
   it("lanza 404 si la seccion pertenece a otro modulo", async () => {
     const { service, prisma } = buildService()
-    prisma.curso.findUnique.mockResolvedValue(buildCurso())
+    prisma.modulo.findUnique.mockResolvedValue(buildModulo())
     prisma.seccion.findUnique.mockResolvedValue(buildSeccionRow({ moduloId: "otro-modulo" }))
+
+    await expect(service.obtenerPorId(CURSO_ID, MODULO_ID, SECCION_ID)).rejects.toThrow(
+      NotFoundException,
+    )
+  })
+
+  it("lanza 404 si el modulo esta archivado", async () => {
+    const { service, prisma } = buildService()
+    prisma.modulo.findUnique.mockResolvedValue(buildModulo(new Date()))
 
     await expect(service.obtenerPorId(CURSO_ID, MODULO_ID, SECCION_ID)).rejects.toThrow(
       NotFoundException,
@@ -251,6 +260,7 @@ describe("actualizar", () => {
     const previo = buildSeccionRow()
     prisma.seccion.findUnique.mockResolvedValueOnce(previo)
     prisma.curso.findUnique.mockResolvedValue(buildCurso())
+    prisma.modulo.findUnique.mockResolvedValue(buildModulo())
     const actualizada = buildSeccionRow({ titulo: "Titulo actualizado" })
     prisma.seccion.update.mockResolvedValue(actualizada)
     prisma.logActividad.create.mockResolvedValue({})
@@ -280,6 +290,17 @@ describe("actualizar", () => {
       service.actualizar(CURSO_ID, MODULO_ID, SECCION_ID, { titulo: "X" }, ACTOR_ID),
     ).rejects.toThrow(NotFoundException)
   })
+
+  it("lanza 404 si el modulo esta archivado", async () => {
+    const { service, prisma } = buildService()
+    prisma.seccion.findUnique.mockResolvedValue(buildSeccionRow())
+    prisma.curso.findUnique.mockResolvedValue(buildCurso())
+    prisma.modulo.findUnique.mockResolvedValue(buildModulo(new Date()))
+
+    await expect(
+      service.actualizar(CURSO_ID, MODULO_ID, SECCION_ID, { titulo: "X" }, ACTOR_ID),
+    ).rejects.toThrow(NotFoundException)
+  })
 })
 
 // ─────────────────────────────────────────────────────────────────
@@ -292,6 +313,7 @@ describe("archivar", () => {
     const previo = buildSeccionRow()
     prisma.seccion.findUnique.mockResolvedValueOnce(previo)
     prisma.curso.findUnique.mockResolvedValue(buildCurso())
+    prisma.modulo.findUnique.mockResolvedValue(buildModulo())
     const archivada = buildSeccionRow({ archivadoAt: new Date() })
     prisma.seccion.update.mockResolvedValue(archivada)
     prisma.logActividad.create.mockResolvedValue({})
@@ -307,6 +329,7 @@ describe("archivar", () => {
     const archivada = buildSeccionRow({ archivadoAt: new Date(), archivadoEstado: "ARCHIVADO" })
     prisma.seccion.findUnique.mockResolvedValue(archivada)
     prisma.curso.findUnique.mockResolvedValue(buildCurso())
+    prisma.modulo.findUnique.mockResolvedValue(buildModulo())
     prisma.entregaBloque.count.mockResolvedValue(0)
 
     const result = await service.archivar(CURSO_ID, MODULO_ID, SECCION_ID, ACTOR_ID)
@@ -323,6 +346,17 @@ describe("archivar", () => {
       ConflictException,
     )
   })
+
+  it("lanza 404 si el modulo esta archivado", async () => {
+    const { service, prisma } = buildService()
+    prisma.seccion.findUnique.mockResolvedValue(buildSeccionRow())
+    prisma.curso.findUnique.mockResolvedValue(buildCurso())
+    prisma.modulo.findUnique.mockResolvedValue(buildModulo(new Date()))
+
+    await expect(service.archivar(CURSO_ID, MODULO_ID, SECCION_ID, ACTOR_ID)).rejects.toThrow(
+      NotFoundException,
+    )
+  })
 })
 
 describe("desarchivar", () => {
@@ -331,6 +365,7 @@ describe("desarchivar", () => {
     const archivada = buildSeccionRow({ archivadoAt: new Date(), archivadoEstado: "ARCHIVADO" })
     prisma.seccion.findUnique.mockResolvedValueOnce(archivada)
     prisma.curso.findUnique.mockResolvedValue(buildCurso())
+    prisma.modulo.findUnique.mockResolvedValue(buildModulo())
     const activa = buildSeccionRow()
     prisma.seccion.update.mockResolvedValue(activa)
     prisma.logActividad.create.mockResolvedValue({})
@@ -346,6 +381,7 @@ describe("desarchivar", () => {
     const activa = buildSeccionRow()
     prisma.seccion.findUnique.mockResolvedValue(activa)
     prisma.curso.findUnique.mockResolvedValue(buildCurso())
+    prisma.modulo.findUnique.mockResolvedValue(buildModulo())
     prisma.entregaBloque.count.mockResolvedValue(0)
 
     const result = await service.desarchivar(CURSO_ID, MODULO_ID, SECCION_ID, ACTOR_ID)
@@ -363,6 +399,18 @@ describe("desarchivar", () => {
       ConflictException,
     )
   })
+
+  it("lanza 404 si el modulo esta archivado", async () => {
+    const { service, prisma } = buildService()
+    const archivada = buildSeccionRow({ archivadoAt: new Date(), archivadoEstado: "ARCHIVADO" })
+    prisma.seccion.findUnique.mockResolvedValue(archivada)
+    prisma.curso.findUnique.mockResolvedValue(buildCurso())
+    prisma.modulo.findUnique.mockResolvedValue(buildModulo(new Date()))
+
+    await expect(service.desarchivar(CURSO_ID, MODULO_ID, SECCION_ID, ACTOR_ID)).rejects.toThrow(
+      NotFoundException,
+    )
+  })
 })
 
 // ─────────────────────────────────────────────────────────────────
@@ -374,6 +422,7 @@ describe("eliminar", () => {
     const { service, prisma } = buildService()
     prisma.seccion.findUnique.mockResolvedValue(buildSeccionRow())
     prisma.curso.findUnique.mockResolvedValue(buildCurso("BORRADOR"))
+    prisma.modulo.findUnique.mockResolvedValue(buildModulo())
     prisma.entregaBloque.count.mockResolvedValue(0)
     prisma.logActividad.create.mockResolvedValue({})
     prisma.seccion.delete.mockResolvedValue({})
@@ -397,6 +446,7 @@ describe("eliminar", () => {
     const { service, prisma } = buildService()
     prisma.seccion.findUnique.mockResolvedValue(buildSeccionRow())
     prisma.curso.findUnique.mockResolvedValue(buildCurso("BORRADOR"))
+    prisma.modulo.findUnique.mockResolvedValue(buildModulo())
     prisma.entregaBloque.count.mockResolvedValue(1)
 
     await expect(service.eliminar(CURSO_ID, MODULO_ID, SECCION_ID, ACTOR_ID)).rejects.toThrow(
@@ -407,6 +457,17 @@ describe("eliminar", () => {
   it("lanza 404 si la seccion no existe", async () => {
     const { service, prisma } = buildService()
     prisma.seccion.findUnique.mockResolvedValue(null)
+
+    await expect(service.eliminar(CURSO_ID, MODULO_ID, SECCION_ID, ACTOR_ID)).rejects.toThrow(
+      NotFoundException,
+    )
+  })
+
+  it("lanza 404 si el modulo esta archivado", async () => {
+    const { service, prisma } = buildService()
+    prisma.seccion.findUnique.mockResolvedValue(buildSeccionRow())
+    prisma.curso.findUnique.mockResolvedValue(buildCurso("BORRADOR"))
+    prisma.modulo.findUnique.mockResolvedValue(buildModulo(new Date()))
 
     await expect(service.eliminar(CURSO_ID, MODULO_ID, SECCION_ID, ACTOR_ID)).rejects.toThrow(
       NotFoundException,

@@ -178,6 +178,10 @@ enum TipoActor {
 /// Lista derivada de las acciones que MAESTRO §17.2 declara registrables.
 enum TipoAccionLog {
   // Cursos
+  CURSO_CREADO
+  CURSO_ACTUALIZADO
+  CURSO_DUPLICADO
+  CURSO_AREAS_ACTUALIZADAS
   CURSO_PUBLICADO
   CURSO_DESPUBLICADO
   CURSO_CERRADO
@@ -185,6 +189,7 @@ enum TipoAccionLog {
 
   // Pesos
   PESOS_CAMBIADOS_RETROACTIVO
+  CURSO_PESOS_RECALCULO_PENDIENTE
 
   // Bloques / secciones / módulos
   BLOQUE_ARCHIVADO
