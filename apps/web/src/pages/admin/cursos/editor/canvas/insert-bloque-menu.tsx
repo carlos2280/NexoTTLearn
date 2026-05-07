@@ -7,14 +7,14 @@ interface InsertBloqueMenuProps {
   readonly onCancel: () => void
 }
 
-interface MenuItem {
+export interface InsertBloqueItem {
   readonly label: string
   readonly hint: string
   readonly icon: ReactNode
   readonly build: () => CrearBloqueAdminInput
 }
 
-const ITEMS: readonly MenuItem[] = [
+export const INSERT_BLOQUE_ITEMS: readonly InsertBloqueItem[] = [
   {
     label: "Párrafo",
     hint: "Texto enriquecido",
@@ -84,7 +84,7 @@ export function InsertBloqueMenu({ onPick, onCancel }: InsertBloqueMenuProps) {
         </button>
       </div>
       <div className="grid grid-cols-1 gap-1">
-        {ITEMS.map((item) => (
+        {INSERT_BLOQUE_ITEMS.map((item) => (
           <button
             key={item.label}
             type="button"

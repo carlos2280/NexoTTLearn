@@ -27,7 +27,7 @@ export const ADMIN_NAV_GROUPS: readonly SidebarNavGroup[] = [
     label: "Gestion",
     items: [
       { label: "Cursos", icon: BookOpen, href: RUTAS.admin.cursos, matchPrefix: true },
-      { label: "Diagnosticos", icon: Compass, href: "#", disabled: true },
+      { label: "Diagnostico", icon: Compass, href: RUTAS.admin.diagnosticos, matchPrefix: true },
       { label: "Seguimiento", icon: TrendingUp, href: "#", disabled: true },
       { label: "Revisiones", icon: CheckCircle2, href: "#", disabled: true },
       { label: "Mantenedores", icon: Users, href: "#", disabled: true },

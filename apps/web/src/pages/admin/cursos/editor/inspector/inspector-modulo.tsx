@@ -3,6 +3,7 @@ import {
   useArchivarModulo,
   useEliminarModulo,
 } from "@/features/admin-cursos/hooks/use-editor-curso"
+import { ConfirmDialog } from "@/shared/ui/patterns/confirm-dialog"
 import {
   InspectorPanel,
   InspectorRow,
@@ -54,11 +55,15 @@ export function InspectorModulo({ curso, cursoId, modulo }: InspectorModuloProps
   const handleArchivar = () => {
     archivar.mutate({ moduloId: modulo.id, archivar: !archivado })
   }
-  const handleEliminar = () => {
-    if (!window.confirm("¿Eliminar este módulo? Esta acción no se puede deshacer.")) {
-      return
-    }
-    eliminar.mutate(modulo.id, { onSuccess: () => setSelected({ tipo: "curso" }) })
+  const [confirmEliminarOpen, setConfirmEliminarOpen] = useState(false)
+  const handleEliminar = () => setConfirmEliminarOpen(true)
+  const handleConfirmEliminar = () => {
+    eliminar.mutate(modulo.id, {
+      onSuccess: () => {
+        setConfirmEliminarOpen(false)
+        setSelected({ tipo: "curso" })
+      },
+    })
   }
 
   return (
@@ -145,6 +150,21 @@ export function InspectorModulo({ curso, cursoId, modulo }: InspectorModuloProps
           </Button>
         )}
       </InspectorSection>
+      <ConfirmDialog
+        open={confirmEliminarOpen}
+        onOpenChange={setConfirmEliminarOpen}
+        tone="danger"
+        title="Eliminar módulo"
+        description={
+          <>
+            Vas a eliminar el módulo <strong>{modulo.titulo}</strong> y todas sus secciones y
+            bloques. Esta acción no se puede deshacer.
+          </>
+        }
+        confirmLabel="Eliminar módulo"
+        loading={eliminar.isPending}
+        onConfirm={handleConfirmEliminar}
+      />
     </InspectorPanel>
   )
 }

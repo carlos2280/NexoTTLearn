@@ -62,11 +62,14 @@ export function AddAreaDialog({ cursoId, curso, open, onOpenChange, onAdded }: A
             <select
               value={areaId}
               onChange={(e) => setAreaId(e.target.value)}
+              style={{ colorScheme: "dark" }}
               className="w-full rounded-[var(--radius-sm)] border border-glass-border bg-glass-1 px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-violet"
             >
-              <option value="">— Selecciona —</option>
+              <option value="" className="bg-surface-2 text-text-primary">
+                — Selecciona —
+              </option>
               {disponibles.map((a) => (
-                <option key={a.id} value={a.id}>
+                <option key={a.id} value={a.id} className="bg-surface-2 text-text-primary">
                   {a.nombre}
                 </option>
               ))}

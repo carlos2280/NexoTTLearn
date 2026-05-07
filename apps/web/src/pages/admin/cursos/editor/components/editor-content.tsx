@@ -10,6 +10,7 @@ import { buildCursoTree, parseTreeId } from "../lib/build-tree"
 import { computeSelectedTreeId } from "../lib/compute-selected-tree-id"
 import { useEditorStore } from "../use-editor-store"
 import { ChecklistOverlay } from "./checklist-overlay"
+import { CommandPalette } from "./command-palette"
 import { EditorBanner } from "./editor-banner"
 import { EditorCanvasArea } from "./editor-canvas-area"
 import { EditorRightColumn } from "./editor-right-column"
@@ -97,6 +98,7 @@ export function EditorContent({ curso, cursoId, modulosLoading }: EditorContentP
         modulos={modulos}
         seccionesPorModulo={seccionesPorModulo}
       />
+      <CommandPalette curso={curso} cursoId={cursoId} seccionesPorModulo={seccionesPorModulo} />
     </>
   )
 }

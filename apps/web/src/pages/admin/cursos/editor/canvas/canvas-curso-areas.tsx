@@ -1,7 +1,7 @@
 import { cn } from "@/shared/lib/cn"
 import { Button } from "@/shared/ui/primitives/button"
 import type { CursoDetalle } from "@nexott-learn/shared-types"
-import { Plus, Sparkles } from "lucide-react"
+import { CheckCircle2, Plus, Sparkles } from "lucide-react"
 import { useState } from "react"
 import { AddAreaDialog } from "../components/add-area-dialog"
 
@@ -13,7 +13,8 @@ interface CanvasCursoAreasProps {
 
 export function CanvasCursoAreas({ cursoId, curso, onSelectArea }: CanvasCursoAreasProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
-  const sumaCompleta = curso.cursoAreas.reduce((acc, a) => acc + a.peso, 0) >= 99.99
+  const sumaPesos = curso.cursoAreas.reduce((acc, a) => acc + a.peso, 0)
+  const sumaCompleta = sumaPesos >= 99.99
 
   return (
     <section>
@@ -70,14 +71,32 @@ export function CanvasCursoAreas({ cursoId, curso, onSelectArea }: CanvasCursoAr
               </button>
             ))}
           </div>
-          {sumaCompleta ? null : (
+          {sumaCompleta ? (
+            <div className="mt-3 flex items-start gap-3 rounded-[var(--radius-lg)] border border-success/30 bg-success/5 px-4 py-3">
+              <CheckCircle2
+                className="mt-0.5 size-4 shrink-0 text-success"
+                strokeWidth={1.75}
+                aria-hidden="true"
+              />
+              <div className="flex-1">
+                <p className="font-medium text-sm text-text-primary">
+                  Distribución de pesos completa (100%)
+                </p>
+                <p className="mt-0.5 text-text-muted text-xs">
+                  Para incorporar otra área, primero reduce el peso de alguna existente y libera el
+                  porcentaje que quieras asignarle.
+                </p>
+              </div>
+            </div>
+          ) : (
             <Button
               variant="outline"
               full={true}
               onClick={() => setDialogOpen(true)}
               className="mt-3 border-dashed"
             >
-              <Plus className="size-4" /> Agregar área del catálogo
+              <Plus className="size-4" /> Agregar área del catálogo ·{" "}
+              <span className="text-text-muted">{(100 - sumaPesos).toFixed(2)}% disponible</span>
             </Button>
           )}
         </>

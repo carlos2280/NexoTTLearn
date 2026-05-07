@@ -17,11 +17,13 @@ export const RUTAS = {
     cursos: "/admin/cursos",
     cursoDetalle: (id: string): string => `/admin/cursos/${id}`,
     cursoEditor: (id: string): string => `/admin/cursos/${id}/editor`,
+    cursoCandidatos: (id: string): string => `/admin/cursos/${id}/candidatos`,
+
+    diagnosticos: "/admin/diagnostico",
 
     // Pendientes — items deshabilitados en el sidebar.
     centroRevision: "/admin/centro-revision",
     seguimiento: "/admin/seguimiento",
-    diagnosticos: "/admin/diagnosticos",
     configuracion: "/admin/configuracion",
   },
 } as const

@@ -7,12 +7,24 @@ import type { BreadcrumbCrumb } from "@/shared/ui/patterns/app-topbar"
 const MAPA: Record<string, readonly BreadcrumbCrumb[]> = {
   [RUTAS.admin.bandeja]: [{ label: "Bandeja" }],
   [RUTAS.admin.cursos]: [{ label: "Cursos" }],
+  [RUTAS.admin.diagnosticos]: [{ label: "Diagnóstico" }],
 }
+
+const RUTA_CANDIDATOS = /^\/admin\/cursos\/[^/]+\/candidatos$/
 
 export function resolveBreadcrumbs(pathname: string): readonly BreadcrumbCrumb[] {
   const exact = MAPA[pathname]
   if (exact) {
     return exact
+  }
+
+  // Detalles dinamicos: /admin/cursos/:id/candidatos
+  if (RUTA_CANDIDATOS.test(pathname)) {
+    return [
+      { label: "Cursos", href: RUTAS.admin.cursos },
+      { label: "Detalle" },
+      { label: "Diagnóstico" },
+    ]
   }
 
   // Detalles dinamicos: /admin/cursos/:id

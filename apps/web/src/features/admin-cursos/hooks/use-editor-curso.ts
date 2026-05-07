@@ -9,10 +9,19 @@ import type {
   ModuloDetalleAdmin,
   ModuloListAdminResponse,
   PublicarResponse,
+  ReordenarBloquesAdminInput,
+  ReordenarModulosAdminInput,
+  ReordenarSeccionesAdminInput,
   SeccionListAdminResponse,
 } from "@nexott-learn/shared-types"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { actualizarBloque, crearBloque, eliminarBloque, listarBloques } from "../api/bloques.api"
+import {
+  actualizarBloque,
+  crearBloque,
+  eliminarBloque,
+  listarBloques,
+  reordenarBloques,
+} from "../api/bloques.api"
 import {
   actualizarModulo,
   archivarModulo,
@@ -20,9 +29,10 @@ import {
   desarchivarModulo,
   eliminarModulo,
   listarModulos,
+  reordenarModulos,
 } from "../api/modulos.api"
 import { publicarCurso } from "../api/publicar-curso.api"
-import { crearSeccion, listarSecciones } from "../api/secciones.api"
+import { crearSeccion, listarSecciones, reordenarSecciones } from "../api/secciones.api"
 import { ADMIN_CURSOS_KEY } from "./use-cursos"
 
 // ─── Keys ────────────────────────────────────────────────────────────
@@ -191,6 +201,38 @@ export function useEliminarBloque(cursoId: string, moduloId: string, seccionId: 
     mutationFn: (bloqueId: string) => eliminarBloque({ cursoId, moduloId, seccionId }, bloqueId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: editorKeys.bloques(cursoId, moduloId, seccionId) })
+    },
+  })
+}
+
+export function useReordenarBloques(cursoId: string, moduloId: string, seccionId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: ReordenarBloquesAdminInput) =>
+      reordenarBloques({ cursoId, moduloId, seccionId }, input),
+    onSuccess: (data: BloqueListAdminResponse) => {
+      qc.setQueryData(editorKeys.bloques(cursoId, moduloId, seccionId), data)
+    },
+  })
+}
+
+export function useReordenarSecciones(cursoId: string, moduloId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: ReordenarSeccionesAdminInput) =>
+      reordenarSecciones({ cursoId, moduloId }, input),
+    onSuccess: (data: SeccionListAdminResponse) => {
+      qc.setQueryData(editorKeys.secciones(cursoId, moduloId), data)
+    },
+  })
+}
+
+export function useReordenarModulos(cursoId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: ReordenarModulosAdminInput) => reordenarModulos(cursoId, input),
+    onSuccess: (data: ModuloListAdminResponse) => {
+      qc.setQueryData(editorKeys.modulos(cursoId), data)
     },
   })
 }

@@ -2,6 +2,7 @@ import {
   useActualizarCursoArea,
   useEliminarCursoArea,
 } from "@/features/admin-cursos/hooks/use-curso-areas"
+import { ConfirmDialog } from "@/shared/ui/patterns/confirm-dialog"
 import {
   InspectorPanel,
   InspectorRow,
@@ -40,6 +41,8 @@ function InspectorAreaCargada({ curso, cursoArea }: CargadaProps) {
 
   const [peso, setPeso] = useState(String(cursoArea.peso))
   const [umbral, setUmbral] = useState(String(cursoArea.puntajeObjetivo))
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [bloqueoOpen, setBloqueoOpen] = useState(false)
 
   useDebouncedSave(peso, (v) => {
     const n = Number.parseFloat(v)
@@ -61,15 +64,18 @@ function InspectorAreaCargada({ curso, cursoArea }: CargadaProps) {
 
   const handleEliminar = () => {
     if (cursoArea.modulosCount > 0) {
-      window.alert(
-        "Esta área tiene módulos asignados. Reasigna o elimina los módulos antes de quitarla.",
-      )
+      setBloqueoOpen(true)
       return
     }
-    if (!window.confirm(`¿Quitar el área "${cursoArea.area.nombre}" de este curso?`)) {
-      return
-    }
-    eliminar.mutate(cursoArea.id, { onSuccess: () => setSelected({ tipo: "curso" }) })
+    setConfirmOpen(true)
+  }
+  const handleConfirmarEliminar = () => {
+    eliminar.mutate(cursoArea.id, {
+      onSuccess: () => {
+        setConfirmOpen(false)
+        setSelected({ tipo: "curso" })
+      },
+    })
   }
 
   return (
@@ -131,6 +137,37 @@ function InspectorAreaCargada({ curso, cursoArea }: CargadaProps) {
           <span className="text-danger">Quitar área del curso</span>
         </Button>
       </InspectorSection>
+      <ConfirmDialog
+        open={bloqueoOpen}
+        onOpenChange={setBloqueoOpen}
+        tone="info"
+        title="No se puede quitar el área"
+        description={
+          <>
+            El área <strong>{cursoArea.area.nombre}</strong> tiene {cursoArea.modulosCount}{" "}
+            {cursoArea.modulosCount === 1 ? "módulo asignado" : "módulos asignados"}. Reasigna o
+            elimina los módulos antes de quitarla del curso.
+          </>
+        }
+        confirmLabel="Entendido"
+        cancelLabel="Cerrar"
+        onConfirm={() => setBloqueoOpen(false)}
+      />
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        tone="danger"
+        title="Quitar área del curso"
+        description={
+          <>
+            ¿Confirmas que deseas quitar el área <strong>{cursoArea.area.nombre}</strong> de este
+            curso? El catálogo global no se ve afectado.
+          </>
+        }
+        confirmLabel="Quitar área"
+        loading={eliminar.isPending}
+        onConfirm={handleConfirmarEliminar}
+      />
     </InspectorPanel>
   )
 }

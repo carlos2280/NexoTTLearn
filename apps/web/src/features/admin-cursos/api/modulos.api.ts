@@ -4,6 +4,7 @@ import {
   type CrearModuloAdminInput,
   type ModuloDetalleAdmin,
   type ModuloListAdminResponse,
+  type ReordenarModulosAdminInput,
   moduloDetalleAdminSchema,
   moduloListAdminResponseSchema,
 } from "@nexott-learn/shared-types"
@@ -57,4 +58,15 @@ export async function desarchivarModulo(
 
 export async function eliminarModulo(cursoId: string, moduloId: string): Promise<void> {
   await httpClient.delete(`/admin/cursos/${cursoId}/modulos/${moduloId}`)
+}
+
+export async function reordenarModulos(
+  cursoId: string,
+  input: ReordenarModulosAdminInput,
+): Promise<ModuloListAdminResponse> {
+  const data = await httpClient.put<ModuloListAdminResponse>(
+    `/admin/cursos/${cursoId}/modulos/reordenar`,
+    input,
+  )
+  return moduloListAdminResponseSchema.parse(data)
 }

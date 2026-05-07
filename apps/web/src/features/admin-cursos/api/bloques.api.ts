@@ -4,6 +4,7 @@ import {
   type BloqueDetalleAdmin,
   type BloqueListAdminResponse,
   type CrearBloqueAdminInput,
+  type ReordenarBloquesAdminInput,
   bloqueDetalleAdminSchema,
   bloqueListAdminResponseSchema,
 } from "@nexott-learn/shared-types"
@@ -42,4 +43,12 @@ export async function actualizarBloque(
 
 export async function eliminarBloque(scope: ScopeBloque, bloqueId: string): Promise<void> {
   await httpClient.delete(`${path(scope)}/${bloqueId}`)
+}
+
+export async function reordenarBloques(
+  scope: ScopeBloque,
+  input: ReordenarBloquesAdminInput,
+): Promise<BloqueListAdminResponse> {
+  const data = await httpClient.put<BloqueListAdminResponse>(`${path(scope)}/reordenar`, input)
+  return bloqueListAdminResponseSchema.parse(data)
 }

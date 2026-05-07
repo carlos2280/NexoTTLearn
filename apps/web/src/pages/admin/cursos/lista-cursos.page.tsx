@@ -63,7 +63,7 @@ export function ListaCursosPage() {
     [navigate],
   )
   const goToCandidatos = useCallback(
-    (curso: CursoListItem) => navigate(`${RUTAS.admin.diagnosticos}?curso=${curso.id}`),
+    (curso: CursoListItem) => navigate(RUTAS.admin.cursoCandidatos(curso.id)),
     [navigate],
   )
 

@@ -6,8 +6,10 @@ import type {
 } from "@nexott-learn/shared-types"
 import { CanvasArea } from "../canvas/canvas-area"
 import { CanvasCurso } from "../canvas/canvas-curso"
+import { CanvasEntrevista } from "../canvas/canvas-entrevista"
 import { CanvasModulo } from "../canvas/canvas-modulo"
 import { CanvasSeccion } from "../canvas/canvas-seccion"
+import { CanvasTransversal } from "../canvas/canvas-transversal"
 import type { SelectedNode } from "../use-editor-store"
 import { useEditorStore } from "../use-editor-store"
 
@@ -38,12 +40,14 @@ export function EditorCanvasArea({ curso, cursoId, seccionesPorModulo }: EditorC
     case "seccion":
     case "bloque":
       return renderSeccion(cursoId, seccionesPorModulo, selected, setSelected)
-    default:
-      return (
-        <CanvasFallback
-          message={`Modo "${selected.tipo}" — vista pendiente. Selecciona la raíz.`}
-        />
-      )
+    case "transversal":
+      return <CanvasTransversal curso={curso} cursoId={cursoId} />
+    case "entrevista":
+      return <CanvasEntrevista curso={curso} cursoId={cursoId} />
+    default: {
+      const _exhaustive: never = selected
+      return _exhaustive
+    }
   }
 }
 

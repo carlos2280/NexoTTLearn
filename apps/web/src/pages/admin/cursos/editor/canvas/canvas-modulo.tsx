@@ -1,14 +1,35 @@
-import { useCrearSeccion } from "@/features/admin-cursos/hooks/use-editor-curso"
+import {
+  useCrearSeccion,
+  useReordenarSecciones,
+} from "@/features/admin-cursos/hooks/use-editor-curso"
 import { cn } from "@/shared/lib/cn"
 import { BlockCanvas } from "@/shared/ui/patterns/immersive/block-canvas"
+import { PromptDialog } from "@/shared/ui/patterns/prompt-dialog"
 import { Button } from "@/shared/ui/primitives/button"
+import {
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import type {
   CursoDetalle,
   ModuloDetalleAdmin,
   SeccionListAdminResponse,
 } from "@nexott-learn/shared-types"
 import { ChevronRight, GripVertical, Layers, Plus, Sparkles, Star } from "lucide-react"
-import { useCallback } from "react"
+import { useCallback, useState } from "react"
 import { useKeyShortcut } from "../hooks/use-key-shortcut"
 
 interface CanvasModuloProps {
@@ -27,18 +48,46 @@ export function CanvasModulo({
   onSelectSeccion,
 }: CanvasModuloProps) {
   const crearSeccion = useCrearSeccion(cursoId, modulo.id)
+  const reordenar = useReordenarSecciones(cursoId, modulo.id)
   const area = curso.cursoAreas.find((a) => a.areaId === modulo.areaId)
   const visibles = secciones.filter((s) => s.archivadoAt === null)
 
-  const handleCrearSeccion = useCallback(() => {
-    const titulo = window.prompt("Nombre de la nueva sección")?.trim()
-    if (!titulo || titulo.length < 3) {
-      return
-    }
-    crearSeccion.mutate({ titulo }, { onSuccess: (creada) => onSelectSeccion(creada.id) })
-  }, [crearSeccion, onSelectSeccion])
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
+  const [crearOpen, setCrearOpen] = useState(false)
+  const handleCrearSeccion = useCallback(() => setCrearOpen(true), [])
+  const handleConfirmCrearSeccion = (titulo: string) => {
+    crearSeccion.mutate(
+      { titulo },
+      {
+        onSuccess: (creada) => {
+          setCrearOpen(false)
+          onSelectSeccion(creada.id)
+        },
+      },
+    )
+  }
 
   useKeyShortcut({ key: "n", onTrigger: handleCrearSeccion })
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) {
+      return
+    }
+    const oldIndex = visibles.findIndex((s) => s.id === active.id)
+    const newIndex = visibles.findIndex((s) => s.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) {
+      return
+    }
+    const reordenado = arrayMove(visibles, oldIndex, newIndex)
+    reordenar.mutate({
+      items: reordenado.map((s, i) => ({ id: s.id, orden: i })),
+    })
+  }
 
   return (
     <BlockCanvas
@@ -68,32 +117,30 @@ export function CanvasModulo({
         {visibles.length === 0 ? (
           <EmptyEstado onCrear={handleCrearSeccion} disabled={crearSeccion.isPending} />
         ) : (
-          <ul className="flex flex-col gap-2">
-            {visibles.map((seccion, idx) => (
-              <li key={seccion.id}>
-                <button
-                  type="button"
-                  onClick={() => onSelectSeccion(seccion.id)}
-                  className={cn(
-                    "group flex w-full items-center gap-3 rounded-[var(--radius-md)] border border-glass-border bg-glass-1 px-4 py-3 text-left",
-                    "hover:border-glass-border-strong hover:bg-glass-2",
-                  )}
-                >
-                  <GripVertical className="size-4 text-text-faint" strokeWidth={1.5} />
-                  <span className="font-mono text-text-muted text-xs">{idx + 1}.</span>
-                  <span className="flex-1">
-                    <span className="block font-medium text-sm text-text-primary">
-                      {seccion.titulo}
-                    </span>
-                    <span className="block text-[11px] text-text-muted">
-                      {seccion.bloquesCount} bloques · {seccion.evaluablesCount} evaluables
-                    </span>
-                  </span>
-                  <ChevronRight className="size-4 text-text-faint group-hover:text-text-secondary" />
-                </button>
-              </li>
-            ))}
-          </ul>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={visibles.map((s) => s.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <ul className="flex flex-col gap-2">
+                {visibles.map((seccion, idx) => (
+                  <SortableSeccion
+                    key={seccion.id}
+                    id={seccion.id}
+                    titulo={seccion.titulo}
+                    bloquesCount={seccion.bloquesCount}
+                    evaluablesCount={seccion.evaluablesCount}
+                    idx={idx}
+                    onSelect={onSelectSeccion}
+                  />
+                ))}
+              </ul>
+            </SortableContext>
+          </DndContext>
         )}
         {visibles.length > 0 ? (
           <Button
@@ -124,7 +171,77 @@ export function CanvasModulo({
           </div>
         </section>
       ) : null}
+      <PromptDialog
+        open={crearOpen}
+        onOpenChange={setCrearOpen}
+        eyebrow={modulo.titulo}
+        title="Nueva sección"
+        description="Las secciones agrupan los bloques de contenido y evaluaciones del módulo."
+        label="Nombre de la sección"
+        placeholder="Ej: Introducción a las APIs REST"
+        confirmLabel="Crear sección"
+        loading={crearSeccion.isPending}
+        onConfirm={handleConfirmCrearSeccion}
+      />
     </BlockCanvas>
+  )
+}
+
+interface SortableSeccionProps {
+  readonly id: string
+  readonly titulo: string
+  readonly bloquesCount: number
+  readonly evaluablesCount: number
+  readonly idx: number
+  readonly onSelect: (id: string) => void
+}
+
+function SortableSeccion({
+  id,
+  titulo,
+  bloquesCount,
+  evaluablesCount,
+  idx,
+  onSelect,
+}: SortableSeccionProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  })
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={isDragging ? "opacity-50" : undefined}
+    >
+      <button
+        type="button"
+        onClick={() => onSelect(id)}
+        className={cn(
+          "group flex w-full items-center gap-3 rounded-[var(--radius-md)] border border-glass-border bg-glass-1 px-4 py-3 text-left",
+          "hover:border-glass-border-strong hover:bg-glass-2",
+        )}
+      >
+        <span
+          {...attributes}
+          {...listeners}
+          aria-label="Arrastrar sección"
+          className="cursor-grab touch-none text-text-faint hover:text-text-muted active:cursor-grabbing"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="size-4" strokeWidth={1.5} />
+        </span>
+        <span className="font-mono text-text-muted text-xs">{idx + 1}.</span>
+        <span className="flex-1">
+          <span className="block font-medium text-sm text-text-primary">{titulo}</span>
+          <span className="block text-[11px] text-text-muted">
+            {bloquesCount} bloques · {evaluablesCount} evaluables
+          </span>
+        </span>
+        <ChevronRight className="size-4 text-text-faint group-hover:text-text-secondary" />
+      </button>
+    </li>
   )
 }
 

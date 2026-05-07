@@ -1,8 +1,10 @@
 import { useModulos } from "@/features/admin-cursos/hooks/use-editor-curso"
 import type { CursoDetalle, SeccionListAdminResponse } from "@nexott-learn/shared-types"
 import { InspectorCurso } from "../inspector/inspector-curso"
+import { InspectorEntrevista } from "../inspector/inspector-entrevista"
 import { InspectorModulo } from "../inspector/inspector-modulo"
 import { InspectorStub } from "../inspector/inspector-stub"
+import { InspectorTransversal } from "../inspector/inspector-transversal"
 import { useEditorStore } from "../use-editor-store"
 import { InspectorArea } from "./inspector-area"
 import { InspectorSeccionBloque } from "./inspector-seccion-bloque"
@@ -51,29 +53,9 @@ export function EditorRightColumn({
         />
       )
     case "transversal":
-      return (
-        <InspectorStub
-          eyebrow="Hito"
-          title="Proyecto Transversal"
-          description={
-            curso.proyectoTransversal.activo
-              ? "El proyecto transversal está activo. Edición de enunciado y rúbrica pendiente."
-              : "Inactivo. Activa para configurar enunciado, entrega y rúbrica."
-          }
-        />
-      )
+      return <InspectorTransversal curso={curso} cursoId={cursoId} />
     case "entrevista":
-      return (
-        <InspectorStub
-          eyebrow="Hito"
-          title="Entrevista IA"
-          description={
-            curso.entrevistaIAConfig.activa
-              ? "Entrevista activa. Edición de perfil y rúbrica pendiente."
-              : "Inactiva. Activa para configurar perfil cliente, rúbrica y modo (texto/voz)."
-          }
-        />
-      )
+      return <InspectorEntrevista curso={curso} cursoId={cursoId} />
     default: {
       const _exhaustive: never = selected
       return _exhaustive

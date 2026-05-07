@@ -1,9 +1,28 @@
-import { useCrearModulo } from "@/features/admin-cursos/hooks/use-editor-curso"
+import { useCrearModulo, useReordenarModulos } from "@/features/admin-cursos/hooks/use-editor-curso"
 import { cn } from "@/shared/lib/cn"
 import { BlockCanvas } from "@/shared/ui/patterns/immersive/block-canvas"
+import { PromptDialog } from "@/shared/ui/patterns/prompt-dialog"
 import { Button } from "@/shared/ui/primitives/button"
+import {
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import type { CursoAreaDetalle, ModuloListAdminResponse } from "@nexott-learn/shared-types"
-import { ChevronRight, Layers, Package, Plus, Sparkles, Star } from "lucide-react"
+import { ChevronRight, GripVertical, Layers, Plus, Sparkles, Star } from "lucide-react"
+import { useState } from "react"
 
 interface CanvasAreaProps {
   readonly cursoId: string
@@ -14,17 +33,43 @@ interface CanvasAreaProps {
 
 export function CanvasArea({ cursoId, cursoArea, modulos, onSelectModulo }: CanvasAreaProps) {
   const crearModulo = useCrearModulo(cursoId)
+  const reordenar = useReordenarModulos(cursoId)
   const modulosArea = modulos.filter((m) => m.areaId === cursoArea.areaId && m.archivadoAt === null)
+  const [crearOpen, setCrearOpen] = useState(false)
 
-  const handleCrear = () => {
-    const titulo = window.prompt("Nombre del nuevo módulo")?.trim()
-    if (!titulo || titulo.length < 3) {
-      return
-    }
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
+  const handleCrear = () => setCrearOpen(true)
+
+  const handleConfirmCrear = (titulo: string) => {
     crearModulo.mutate(
       { titulo, areaId: cursoArea.areaId },
-      { onSuccess: (creado) => onSelectModulo(creado.id) },
+      {
+        onSuccess: (creado) => {
+          setCrearOpen(false)
+          onSelectModulo(creado.id)
+        },
+      },
     )
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) {
+      return
+    }
+    const oldIndex = modulosArea.findIndex((m) => m.id === active.id)
+    const newIndex = modulosArea.findIndex((m) => m.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) {
+      return
+    }
+    const reordenado = arrayMove(modulosArea, oldIndex, newIndex)
+    reordenar.mutate({
+      items: reordenado.map((m, i) => ({ id: m.id, orden: i })),
+    })
   }
 
   return (
@@ -62,31 +107,29 @@ export function CanvasArea({ cursoId, cursoArea, modulos, onSelectModulo }: Canv
         {modulosArea.length === 0 ? (
           <EmptyEstado onCrear={handleCrear} disabled={crearModulo.isPending} />
         ) : (
-          <ul className="flex flex-col gap-2">
-            {modulosArea.map((modulo) => (
-              <li key={modulo.id}>
-                <button
-                  type="button"
-                  onClick={() => onSelectModulo(modulo.id)}
-                  className={cn(
-                    "group flex w-full items-center gap-3 rounded-[var(--radius-md)] border border-glass-border bg-glass-1 px-4 py-3 text-left",
-                    "hover:border-glass-border-strong hover:bg-glass-2",
-                  )}
-                >
-                  <Package className="size-4 text-text-muted" strokeWidth={1.5} />
-                  <span className="flex-1">
-                    <span className="block font-medium text-sm text-text-primary">
-                      {modulo.titulo}
-                    </span>
-                    <span className="block text-[11px] text-text-muted">
-                      {modulo.seccionesCount} secciones · {modulo.evaluablesCount} evaluables
-                    </span>
-                  </span>
-                  <ChevronRight className="size-4 text-text-faint group-hover:text-text-secondary" />
-                </button>
-              </li>
-            ))}
-          </ul>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={modulosArea.map((m) => m.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <ul className="flex flex-col gap-2">
+                {modulosArea.map((modulo) => (
+                  <SortableModulo
+                    key={modulo.id}
+                    id={modulo.id}
+                    titulo={modulo.titulo}
+                    seccionesCount={modulo.seccionesCount}
+                    evaluablesCount={modulo.evaluablesCount}
+                    onSelect={onSelectModulo}
+                  />
+                ))}
+              </ul>
+            </SortableContext>
+          </DndContext>
         )}
         {modulosArea.length > 0 ? (
           <Button
@@ -100,7 +143,74 @@ export function CanvasArea({ cursoId, cursoArea, modulos, onSelectModulo }: Canv
           </Button>
         ) : null}
       </section>
+      <PromptDialog
+        open={crearOpen}
+        onOpenChange={setCrearOpen}
+        eyebrow={cursoArea.area.nombre}
+        title="Nuevo módulo"
+        description="Asigna un nombre claro. Podrás editarlo más tarde y configurar sus secciones desde el editor."
+        label="Nombre del módulo"
+        placeholder="Ej: Fundamentos de Node.js"
+        confirmLabel="Crear módulo"
+        loading={crearModulo.isPending}
+        onConfirm={handleConfirmCrear}
+      />
     </BlockCanvas>
+  )
+}
+
+interface SortableModuloProps {
+  readonly id: string
+  readonly titulo: string
+  readonly seccionesCount: number
+  readonly evaluablesCount: number
+  readonly onSelect: (id: string) => void
+}
+
+function SortableModulo({
+  id,
+  titulo,
+  seccionesCount,
+  evaluablesCount,
+  onSelect,
+}: SortableModuloProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  })
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={isDragging ? "opacity-50" : undefined}
+    >
+      <button
+        type="button"
+        onClick={() => onSelect(id)}
+        className={cn(
+          "group flex w-full items-center gap-3 rounded-[var(--radius-md)] border border-glass-border bg-glass-1 px-4 py-3 text-left",
+          "hover:border-glass-border-strong hover:bg-glass-2",
+        )}
+      >
+        <span
+          {...attributes}
+          {...listeners}
+          aria-label="Arrastrar módulo"
+          className="cursor-grab touch-none text-text-faint hover:text-text-muted active:cursor-grabbing"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="size-4" strokeWidth={1.5} />
+        </span>
+        <span className="flex-1">
+          <span className="block font-medium text-sm text-text-primary">{titulo}</span>
+          <span className="block text-[11px] text-text-muted">
+            {seccionesCount} secciones · {evaluablesCount} evaluables
+          </span>
+        </span>
+        <ChevronRight className="size-4 text-text-faint group-hover:text-text-secondary" />
+      </button>
+    </li>
   )
 }
 

@@ -19,6 +19,7 @@ export function CursoEditorPage() {
   const isPublishOpen = useEditorStore((s) => s.isPublishOpen)
   const openPublish = useEditorStore((s) => s.openPublish)
   const closePublish = useEditorStore((s) => s.closePublish)
+  const openPalette = useEditorStore((s) => s.openPalette)
 
   const handleEscape = useCallback(() => navigate(RUTAS.admin.cursos), [navigate])
 
@@ -26,6 +27,7 @@ export function CursoEditorPage() {
     isPublishOpen,
     onEscape: handleEscape,
     onPublishShortcut: openPublish,
+    onPaletteShortcut: openPalette,
   })
 
   if (cursoQuery.isLoading || !cursoQuery.data) {

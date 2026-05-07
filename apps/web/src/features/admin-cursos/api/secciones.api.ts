@@ -1,6 +1,7 @@
 import { httpClient } from "@/shared/api/http-client"
 import {
   type CrearSeccionAdminInput,
+  type ReordenarSeccionesAdminInput,
   type SeccionDetalleAdmin,
   type SeccionListAdminResponse,
   seccionDetalleAdminSchema,
@@ -40,4 +41,12 @@ export async function actualizarSeccion(
 
 export async function eliminarSeccion(scope: ScopeSeccion, seccionId: string): Promise<void> {
   await httpClient.delete(`${path(scope)}/${seccionId}`)
+}
+
+export async function reordenarSecciones(
+  scope: ScopeSeccion,
+  input: ReordenarSeccionesAdminInput,
+): Promise<SeccionListAdminResponse> {
+  const data = await httpClient.put<SeccionListAdminResponse>(`${path(scope)}/reordenar`, input)
+  return seccionListAdminResponseSchema.parse(data)
 }

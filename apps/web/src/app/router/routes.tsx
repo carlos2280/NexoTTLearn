@@ -2,6 +2,8 @@ import { BandejaAdminPage } from "@/pages/admin/bandeja/bandeja-admin.page"
 import { CursoDetallePage } from "@/pages/admin/cursos/detalle/curso-detalle.page"
 import { CursoEditorPage } from "@/pages/admin/cursos/editor/curso-editor.page"
 import { ListaCursosPage } from "@/pages/admin/cursos/lista-cursos.page"
+import { CursoCandidatosPage } from "@/pages/admin/diagnostico/candidatos.page"
+import { HubDiagnosticoPage } from "@/pages/admin/diagnostico/hub.page"
 import { CambiarPasswordPage } from "@/pages/cambiar-password/cambiar-password.page"
 import { LoginPage } from "@/pages/login/login.page"
 import { MfaPage } from "@/pages/login/mfa.page"
@@ -36,6 +38,8 @@ export function AppRoutes() {
               <Route path={RUTAS.admin.bandeja} element={<BandejaAdminPage />} />
               <Route path={RUTAS.admin.cursos} element={<ListaCursosPage />} />
               <Route path="/admin/cursos/:id" element={<CursoDetallePage />} />
+              <Route path="/admin/cursos/:id/candidatos" element={<CursoCandidatosPage />} />
+              <Route path={RUTAS.admin.diagnosticos} element={<HubDiagnosticoPage />} />
             </Route>
           </Route>
         </Route>
