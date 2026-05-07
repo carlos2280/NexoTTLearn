@@ -15,5 +15,5 @@
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/features/_legacy/**", "src/pages/admin/_legacy/**"]
+  "exclude": ["node_modules", "dist"]
 }

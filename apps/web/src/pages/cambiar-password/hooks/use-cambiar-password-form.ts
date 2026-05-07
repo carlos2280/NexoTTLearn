@@ -19,7 +19,7 @@ export function useCambiarPasswordForm(options?: UseCambiarPasswordFormOptions) 
   // actual (todavia con debeCambiarPassword=true).
   const cambiarPasswordMutation = useCambiarPassword({
     onSuccess: () => {
-      const destino = usuario?.rol === "ADMIN" ? RUTAS.admin.bandeja : RUTAS.bandeja
+      const destino = usuario?.rol === "ADMIN" ? RUTAS.admin.bandeja : RUTAS.login
       options?.onSuccess?.(destino)
     },
   })

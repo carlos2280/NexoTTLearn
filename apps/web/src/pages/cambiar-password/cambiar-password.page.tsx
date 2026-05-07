@@ -40,7 +40,7 @@ export function CambiarPasswordPage() {
   // Si el usuario ya no requiere cambiar password, no debe poder volver aqui.
   if (!usuario.debeCambiarPassword) {
     return (
-      <Navigate to={usuario.rol === "ADMIN" ? RUTAS.admin.bandeja : RUTAS.bandeja} replace={true} />
+      <Navigate to={usuario.rol === "ADMIN" ? RUTAS.admin.bandeja : RUTAS.login} replace={true} />
     )
   }
 

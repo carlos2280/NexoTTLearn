@@ -1,48 +1,37 @@
 import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
-import { AdminSidebar } from "@/shared/components/admin-sidebar"
-import { PersonalizationDrawer } from "@/shared/components/personalization-drawer"
-import { UserMenu } from "@/shared/components/user-menu"
-import {
-  NxtLayout,
-  NxtSidebarToggle,
-  NxtToastProvider,
-  NxtTopbar,
-} from "@carlos2280/nexott-ui/react"
-import { Stack } from "@carlos2280/nexott-ui/react-primitives"
-import { useState } from "react"
-import { Outlet } from "react-router-dom"
+import { AppShell } from "@/shared/ui/patterns/app-shell"
+import { NxtToastProvider } from "@carlos2280/nexott-ui/react"
+import { Outlet, useLocation } from "react-router-dom"
+import { resolveBreadcrumbs } from "./admin-breadcrumbs"
+import { ADMIN_NAV_FOOTER, ADMIN_NAV_GROUPS } from "./admin-nav-config"
 
 export function LayoutAdmin() {
   const { data: usuario } = useUsuarioActual()
-  const [personalizarAbierto, setPersonalizarAbierto] = useState(false)
+  const location = useLocation()
 
   if (!usuario) {
     return null
   }
 
+  const breadcrumbs = resolveBreadcrumbs(location.pathname)
+
   return (
-    <NxtLayout theme="nexott-learn" sidebarPosition="full">
-      <NxtTopbar slot="topbar">
-        <NxtSidebarToggle slot="logo" size="sm" />
+    <>
+      <AppShell
+        usuario={usuario}
+        groups={ADMIN_NAV_GROUPS}
+        footer={ADMIN_NAV_FOOTER}
+        breadcrumbs={breadcrumbs}
+        appMark="Nx"
+        appName="NexoTT"
+        appSub="Learn"
+      >
+        <Outlet />
+      </AppShell>
 
-        <Stack slot="actions" direction="row" align="center" gap="md">
-          <UserMenu usuario={usuario} onPersonalizarClick={() => setPersonalizarAbierto(true)} />
-        </Stack>
-      </NxtTopbar>
-
-      <AdminSidebar />
-
-      <Outlet />
-
-      <PersonalizationDrawer
-        open={personalizarAbierto}
-        onClose={() => setPersonalizarAbierto(false)}
-      />
-
-      {/* Provider global de toasts del DS. La API `toast.success(...)` busca
-          este provider montado en el DOM. Lo dejamos en el layout admin
-          porque por ahora solo hay flows admin que usan toast. */}
+      {/* Toast provider del DS legacy: las paginas admin actuales lo usan.
+          Migrar a `sonner` cuando esas paginas se reescriban. */}
       <NxtToastProvider position="top-right" max={4} />
-    </NxtLayout>
+    </>
   )
 }

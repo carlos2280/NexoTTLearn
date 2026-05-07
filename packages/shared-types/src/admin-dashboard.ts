@@ -85,7 +85,11 @@ export type DashboardActividad = z.infer<typeof dashboardActividadSchema>
 
 export const adminDashboardResponseSchema = z.object({
   kpis: z.array(dashboardKpiSchema),
-  colaRevision: dashboardColaRevisionSchema,
+  // colaRevision es opcional: el rediseño v2 de la bandeja inyecta la cola
+  // accionable en KPIs con `urgentCount` (Pilar 6 — datos cuentan historias)
+  // y elimina el banner separado. Se mantiene en el contrato por si una
+  // futura iteración necesita exponer el detalle de la cola por separado.
+  colaRevision: dashboardColaRevisionSchema.optional(),
   alertas: z.array(dashboardAlertaSchema),
   actividad: z.array(dashboardActividadSchema),
 })

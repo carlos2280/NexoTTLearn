@@ -10,5 +10,6 @@ export function calcularRutaPostLogin(usuario: UsuarioPublico): string {
   if (usuario.rol === "ADMIN") {
     return RUTAS.admin.bandeja
   }
-  return RUTAS.bandeja
+  // Sin pantalla para participantes en este momento — vuelven a login.
+  return RUTAS.login
 }

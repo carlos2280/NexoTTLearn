@@ -1,6 +1,8 @@
 import { RUTAS } from "@/shared/constants/rutas"
-import { NxtAlert, NxtButton, NxtInputField, NxtTextLink } from "@carlos2280/nexott-ui/react"
-import { Stack } from "@carlos2280/nexott-ui/react-primitives"
+import { Alert } from "@/shared/ui/primitives/alert"
+import { Button } from "@/shared/ui/primitives/button"
+import { Input } from "@/shared/ui/primitives/input"
+import { ArrowRight, Lock, Mail } from "lucide-react"
 import { Link } from "react-router-dom"
 import { useLoginForm } from "../hooks/use-login-form"
 import { LoginLocked } from "./login-locked"
@@ -9,60 +11,57 @@ export function LoginForm() {
   const { register, handleSubmit, errors, isSubmitting, locked, resetLocked } = useLoginForm()
 
   if (locked) {
-    return (
-      <div className="animate-materialize">
-        <LoginLocked retryAfterSeconds={locked.retryAfter} onUnlocked={resetLocked} />
-      </div>
-    )
+    return <LoginLocked retryAfterSeconds={locked.retryAfter} onUnlocked={resetLocked} />
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate={true} className="animate-materialize">
-      <Stack gap="lg">
-        <NxtInputField
-          variant="filled"
+    <form onSubmit={handleSubmit} noValidate={true} className="flex flex-col gap-6">
+      <header className="flex flex-col gap-1.5">
+        <h2 className="font-bold text-2xl text-text-primary tracking-tight">
+          Bienvenido de vuelta
+        </h2>
+        <p className="text-sm text-text-secondary">Ingresa con tu cuenta corporativa.</p>
+      </header>
+
+      <div className="flex flex-col gap-4">
+        <Input
           label="Email corporativo"
           type="email"
-          icon="mail"
+          icon={Mail}
           placeholder="tu@nttdata.com"
-          autocomplete="email"
+          autoComplete="email"
+          autoFocus={true}
           {...register("email")}
-          state={errors.email ? "error" : ""}
-          helper={errors.email?.message ?? ""}
+          error={errors.email?.message}
         />
 
-        <NxtInputField
-          variant="filled"
+        <Input
           label="Contrasena"
           type="password"
-          icon="lock"
-          autocomplete="current-password"
-          toggle-password={true}
+          icon={Lock}
+          placeholder="••••••••"
+          autoComplete="current-password"
+          togglePassword={true}
           {...register("password")}
-          state={errors.password ? "error" : ""}
-          helper={errors.password?.message ?? ""}
+          error={errors.password?.message}
         />
+      </div>
 
-        {errors.root && <NxtAlert variant="error" message={errors.root.message ?? ""} />}
+      {errors.root ? <Alert variant="error">{errors.root.message}</Alert> : null}
 
-        <NxtButton
-          variant="primary"
-          full={true}
-          disabled={isSubmitting}
-          loading={isSubmitting}
-          onNxtButtonClick={async () => {
-            await handleSubmit()
-          }}
+      <Button type="submit" full={true} loading={isSubmitting} disabled={isSubmitting}>
+        {isSubmitting ? "Ingresando…" : "Ingresar"}
+        {!isSubmitting && <ArrowRight aria-hidden="true" />}
+      </Button>
+
+      <div className="flex items-center justify-center pt-1">
+        <Link
+          to={RUTAS.recuperarPassword}
+          className="font-medium text-text-muted text-xs transition-colors hover:text-brand-violet-soft focus-visible:text-brand-violet-soft focus-visible:outline-none"
         >
-          {isSubmitting ? "Ingresando…" : "Ingresar"}
-        </NxtButton>
-
-        <Stack gap="xs" align="center">
-          <Link to={RUTAS.recuperarPassword}>
-            <NxtTextLink tone="dim">Olvidaste tu contrasena?</NxtTextLink>
-          </Link>
-        </Stack>
-      </Stack>
+          Olvidaste tu contrasena?
+        </Link>
+      </div>
     </form>
   )
 }

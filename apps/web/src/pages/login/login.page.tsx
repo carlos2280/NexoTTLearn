@@ -1,7 +1,7 @@
 import { AuthHydrationLoader } from "@/features/auth/components/auth-hydration-loader"
 import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
 import { calcularRutaPostLogin } from "@/features/auth/lib/calcular-ruta-post-login"
-import { NxtLayoutAuth } from "@carlos2280/nexott-ui/react"
+import { AuthShell } from "@/shared/ui/patterns/auth-shell"
 import { Navigate } from "react-router-dom"
 import { LoginForm } from "./components/login-form"
 
@@ -12,23 +12,21 @@ export function LoginPage() {
     return <AuthHydrationLoader />
   }
 
-  // Si ya hay sesion activa, redirigir segun rol/cambio de password
   if (usuario) {
     return <Navigate to={calcularRutaPostLogin(usuario)} replace={true} />
   }
 
   return (
-    <NxtLayoutAuth
-      theme="nexott-learn"
+    <AuthShell
       appMark="Nx"
       appName="NexoTT"
       appSub="Learn"
+      heroEyebrow="Plataforma de capacitacion"
       heroTitle={"Aprende. Demuestra.\nLlega listo."}
-      heroSubtitle="Plataforma de capacitacion interna - NTT DATA."
-      manifesto="Tu proximo nivel empieza aqui."
+      manifesto="El conocimiento que aplicas es el unico que cuenta."
       version="v0.1"
     >
       <LoginForm />
-    </NxtLayoutAuth>
+    </AuthShell>
   )
 }
