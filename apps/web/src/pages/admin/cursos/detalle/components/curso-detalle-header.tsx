@@ -1,30 +1,30 @@
+import { Badge, type BadgeProps } from "@/shared/ui/patterns/badge"
+import { PageHeader } from "@/shared/ui/patterns/page-header"
+import { Button } from "@/shared/ui/primitives/button"
 import {
-  NxtBadge,
-  NxtButton,
-  NxtEyebrow,
-  NxtHeading,
-  NxtMenu,
-  NxtMenuItem,
-  NxtMenuSep,
-  NxtText,
-} from "@carlos2280/nexott-ui/react"
-import { Box, Stack } from "@carlos2280/nexott-ui/react-primitives"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/shared/ui/primitives/dropdown-menu"
 import type { CursoDetalle, EstadoCurso } from "@nexott-learn/shared-types"
+import { Copy, Lock, MoreHorizontal, Pencil, Trash2, XCircle } from "lucide-react"
 import { formatFechaCorta, formatRelativo } from "../lib/format"
 
 interface BadgeEstado {
-  readonly variant: "info" | "success" | "neutral"
+  readonly tone: BadgeProps["tone"]
   readonly label: string
 }
 
 function badgeParaEstado(estado: EstadoCurso): BadgeEstado {
   if (estado === "BORRADOR") {
-    return { variant: "info", label: "Borrador" }
+    return { tone: "info", label: "Borrador" }
   }
   if (estado === "ACTIVO") {
-    return { variant: "success", label: "Activo" }
+    return { tone: "success", label: "Activo" }
   }
-  return { variant: "neutral", label: "Cerrado" }
+  return { tone: "neutral", label: "Cerrado" }
 }
 
 interface CursoDetalleHeaderProps {
@@ -49,64 +49,68 @@ export function CursoDetalleHeader({
   const puedeCerrar = curso.estado === "ACTIVO"
   const puedeEliminar = curso.estado === "BORRADOR" && curso.contadores.inscripcionesActivas === 0
 
-  return (
-    <Stack direction="column" gap="md">
-      <Stack direction="row" gap="md" align="start" justify="between" wrap={true}>
-        <Stack direction="column" gap="xs">
-          <NxtEyebrow>{curso.empresaCliente}</NxtEyebrow>
-          <Stack direction="row" gap="sm" align="center" wrap={true}>
-            <NxtHeading level={1}>{curso.titulo}</NxtHeading>
-            <NxtBadge variant={badgeEstado.variant} label={badgeEstado.label} />
-            {curso.permiteInscripcionLibre ? (
-              <NxtBadge variant="info" label="Catálogo libre" />
-            ) : null}
-          </Stack>
-          {curso.descripcion ? (
-            <Box style={{ maxWidth: "70ch" }}>
-              <NxtText size="md">{curso.descripcion}</NxtText>
-            </Box>
+  const meta = (
+    <>
+      <Badge tone={badgeEstado.tone} size="md">
+        {badgeEstado.label}
+      </Badge>
+      {curso.permiteInscripcionLibre ? (
+        <Badge tone="info" size="md">
+          Catálogo libre
+        </Badge>
+      ) : null}
+    </>
+  )
+
+  const actions = (
+    <>
+      <Button onClick={onEditar}>
+        <Pencil aria-hidden="true" />
+        Editar
+      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild={true}>
+          <Button variant="ghost" size="icon" aria-label="Más acciones">
+            <MoreHorizontal aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem icon={Copy} onSelect={onDuplicar}>
+            Duplicar
+          </DropdownMenuItem>
+          {puedeDespublicar ? (
+            <DropdownMenuItem icon={Lock} onSelect={onDespublicar}>
+              Despublicar
+            </DropdownMenuItem>
           ) : null}
-        </Stack>
+          {puedeCerrar ? (
+            <DropdownMenuItem icon={XCircle} onSelect={onCerrar}>
+              Cerrar curso
+            </DropdownMenuItem>
+          ) : null}
+          {puedeEliminar ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem icon={Trash2} tone="danger" onSelect={onEliminar}>
+                Eliminar
+              </DropdownMenuItem>
+            </>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  )
 
-        <Stack direction="row" gap="sm" align="center">
-          <NxtButton variant="brand" icon="edit" onNxtButtonClick={onEditar}>
-            Editar
-          </NxtButton>
-          <NxtMenu placement="bottom-end" trigger="click">
-            <NxtButton slot="trigger" variant="ghost" icon="more-horizontal">
-              Más
-            </NxtButton>
-            <NxtMenuItem label="Duplicar" icon="copy" onNxtMenuItemClick={() => onDuplicar()} />
-            {puedeDespublicar ? (
-              <NxtMenuItem
-                label="Despublicar"
-                icon="lock"
-                onNxtMenuItemClick={() => onDespublicar()}
-              />
-            ) : null}
-            {puedeCerrar ? (
-              <NxtMenuItem
-                label="Cerrar curso"
-                icon="x-circle"
-                onNxtMenuItemClick={() => onCerrar()}
-              />
-            ) : null}
-            {puedeEliminar ? (
-              <>
-                <NxtMenuSep label="" />
-                <NxtMenuItem
-                  label="Eliminar"
-                  icon="trash"
-                  danger={true}
-                  onNxtMenuItemClick={() => onEliminar()}
-                />
-              </>
-            ) : null}
-          </NxtMenu>
-        </Stack>
-      </Stack>
-
-      <Stack direction="row" gap="lg" wrap={true}>
+  return (
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        eyebrow={curso.empresaCliente}
+        title={curso.titulo}
+        subtitle={curso.descripcion ?? undefined}
+        meta={meta}
+        actions={actions}
+      />
+      <dl className="flex flex-wrap items-start gap-x-8 gap-y-3 border-glass-border border-t pt-4">
         <MetadataItem label="Inicio" value={formatFechaCorta(curso.fechaInicio)} />
         <MetadataItem label="Deadline" value={formatFechaCorta(curso.deadline)} />
         <MetadataItem label="Duración" value={curso.duracionEstimada ?? "—"} />
@@ -119,20 +123,16 @@ export function CursoDetalleHeader({
           value={String(curso.contadores.inscripcionesActivas)}
         />
         <MetadataItem label="Última edición" value={formatRelativo(curso.updatedAt)} />
-      </Stack>
-    </Stack>
+      </dl>
+    </div>
   )
 }
 
 function MetadataItem({ label, value }: { readonly label: string; readonly value: string }) {
   return (
-    <Stack direction="column" gap="xs">
-      <NxtText size="xs" tone="muted">
-        {label}
-      </NxtText>
-      <NxtText size="md" weight="medium">
-        {value}
-      </NxtText>
-    </Stack>
+    <div className="flex flex-col gap-0.5">
+      <dt className="font-medium text-[11px] text-text-muted uppercase tracking-wider">{label}</dt>
+      <dd className="font-medium text-sm text-text-primary">{value}</dd>
+    </div>
   )
 }

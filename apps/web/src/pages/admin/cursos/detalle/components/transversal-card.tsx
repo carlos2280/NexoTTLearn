@@ -1,13 +1,10 @@
-import {
-  NxtAlert,
-  NxtCard,
-  NxtDivider,
-  NxtEmpty,
-  NxtProgress,
-  NxtText,
-} from "@carlos2280/nexott-ui/react"
-import { Box, Stack } from "@carlos2280/nexott-ui/react-primitives"
+import { EmptyState } from "@/shared/ui/patterns/empty-state"
+import { SectionCard } from "@/shared/ui/patterns/section-card"
+import { Alert } from "@/shared/ui/primitives/alert"
+import { Divider } from "@/shared/ui/primitives/divider"
+import { Progress } from "@/shared/ui/primitives/progress"
 import type { ProyectoTransversalDetalleAdmin } from "@nexott-learn/shared-types"
+import { TrendingUp } from "lucide-react"
 import { formatPeso } from "../lib/format"
 
 interface TransversalCardProps {
@@ -17,60 +14,52 @@ interface TransversalCardProps {
   readonly error: Error | null
 }
 
-// MAESTRO §10.2 · Proyecto Transversal del curso.
-// La presencia del registro es el flag "activo". Si el curso lo declara
-// activo pero no devolvemos data, mostramos placeholder.
 export function TransversalCard({ activo, transversal, loading, error }: TransversalCardProps) {
   if (!activo) {
     return (
-      <NxtCard
-        variant="surface"
-        padding="lg"
+      <SectionCard
+        icon={TrendingUp}
+        iconTone="amber"
         title="Proyecto Transversal"
         description="No configurado para este curso."
-        icon="trending-up"
-        iconColor="amber"
       >
-        <NxtEmpty
-          icon="trending-up"
+        <EmptyState
+          variant="inline"
+          icon={TrendingUp}
           title="Sin proyecto transversal"
           description="Activa esta sección si el curso necesita un entregable integrador."
         />
-      </NxtCard>
+      </SectionCard>
     )
   }
 
   if (loading) {
     return (
-      <NxtCard variant="surface" padding="lg" title="Proyecto Transversal" loading={true}>
-        <NxtText size="sm" tone="muted">
-          Cargando configuración…
-        </NxtText>
-      </NxtCard>
+      <SectionCard icon={TrendingUp} iconTone="amber" title="Proyecto Transversal" loading={true} />
     )
   }
 
   if (error) {
     return (
-      <NxtCard variant="surface" padding="lg" title="Proyecto Transversal">
-        <NxtAlert
-          variant="error"
-          heading="No pudimos cargar el proyecto transversal"
-          message={error.message}
-        />
-      </NxtCard>
+      <SectionCard icon={TrendingUp} iconTone="amber" title="Proyecto Transversal">
+        <Alert variant="error">
+          <p className="font-semibold text-sm">No pudimos cargar el proyecto transversal</p>
+          <p className="mt-1 text-sm text-text-secondary">{error.message}</p>
+        </Alert>
+      </SectionCard>
     )
   }
 
   if (!transversal) {
     return (
-      <NxtCard variant="surface" padding="lg" title="Proyecto Transversal">
-        <NxtAlert
-          variant="warning"
-          heading="Configuración pendiente"
-          message="El proyecto transversal está marcado como activo pero aún no tiene contenido."
-        />
-      </NxtCard>
+      <SectionCard icon={TrendingUp} iconTone="amber" title="Proyecto Transversal">
+        <Alert variant="warning">
+          <p className="font-semibold text-sm">Configuración pendiente</p>
+          <p className="mt-1 text-sm text-text-secondary">
+            El proyecto transversal está marcado como activo pero aún no tiene contenido.
+          </p>
+        </Alert>
+      </SectionCard>
     )
   }
 
@@ -81,70 +70,53 @@ export function TransversalCard({ activo, transversal, loading, error }: Transve
   ]
 
   return (
-    <NxtCard
-      variant="surface"
-      padding="lg"
+    <SectionCard
+      icon={TrendingUp}
+      iconTone="amber"
       title={transversal.titulo}
       description="Proyecto Transversal del curso"
-      icon="trending-up"
-      iconColor="amber"
     >
-      <Stack direction="column" gap="lg">
-        {/* Enunciado */}
-        <Box style={{ maxWidth: "70ch" }}>
-          <NxtText size="md">{transversal.enunciado}</NxtText>
-        </Box>
+      <p className="max-w-[70ch] text-sm text-text-secondary leading-relaxed">
+        {transversal.enunciado}
+      </p>
 
-        <NxtDivider />
+      <Divider />
 
-        {/* Decisión: umbral de aprobación destacado */}
-        <Stack direction="row" gap="md" align="center" justify="between">
-          <Stack direction="column" gap="xs">
-            <NxtText size="xs" weight="semibold" tone="muted">
-              UMBRAL DE APROBACIÓN
-            </NxtText>
-            <NxtText size="sm" tone="muted">
-              Nota mínima para aprobar el proyecto
-            </NxtText>
-          </Stack>
-          <NxtText size="lg" weight="bold">
-            ≥ {transversal.umbralAprobacion}
-          </NxtText>
-        </Stack>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-0.5">
+          <span className="font-semibold text-[11px] text-text-muted uppercase tracking-wider">
+            Umbral de aprobación
+          </span>
+          <span className="text-sm text-text-secondary">Nota mínima para aprobar el proyecto</span>
+        </div>
+        <span className="font-bold text-text-primary text-xl tabular-nums">
+          ≥ {transversal.umbralAprobacion}
+        </span>
+      </div>
 
-        <NxtDivider />
+      <Divider />
 
-        {/* Ponderaciones: las 3 capas */}
-        <Stack direction="column" gap="sm">
-          <NxtText size="xs" weight="semibold" tone="muted">
-            PONDERACIÓN POR CAPA (suma 100%)
-          </NxtText>
-          <Stack direction="column" gap="sm">
-            {capas.map((capa) => (
-              <Stack key={capa.n} direction="row" gap="md" align="center">
-                <Box style={{ width: "28px", flexShrink: 0 }}>
-                  <NxtText size="sm" weight="semibold" tone="muted">
-                    C{capa.n}
-                  </NxtText>
-                </Box>
-                <Box style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <NxtText size="sm" weight="medium">
-                    {capa.label}
-                  </NxtText>
-                </Box>
-                <Box style={{ width: "120px", flexShrink: 0 }}>
-                  <NxtProgress variant="bar" value={capa.valor} max={100} size="sm" color="brand" />
-                </Box>
-                <Box style={{ width: "44px", textAlign: "right", flexShrink: 0 }}>
-                  <NxtText size="sm" weight="semibold">
-                    {formatPeso(capa.valor)}
-                  </NxtText>
-                </Box>
-              </Stack>
-            ))}
-          </Stack>
-        </Stack>
-      </Stack>
-    </NxtCard>
+      <div className="flex flex-col gap-3">
+        <p className="font-semibold text-[11px] text-text-muted uppercase tracking-wider">
+          Ponderación por capa (suma 100%)
+        </p>
+        <div className="flex flex-col gap-2.5">
+          {capas.map((capa) => (
+            <div key={capa.n} className="flex items-center gap-3">
+              <span className="w-7 shrink-0 font-semibold text-text-muted text-xs">C{capa.n}</span>
+              <span className="min-w-0 flex-1 truncate font-medium text-sm text-text-primary">
+                {capa.label}
+              </span>
+              <div className="w-28 shrink-0">
+                <Progress value={capa.valor} max={100} size="sm" tone="brand" />
+              </div>
+              <span className="w-11 shrink-0 text-right font-semibold text-sm text-text-primary tabular-nums">
+                {formatPeso(capa.valor)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </SectionCard>
   )
 }

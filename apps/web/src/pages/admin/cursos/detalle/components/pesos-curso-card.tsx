@@ -1,6 +1,8 @@
-import { NxtCard, NxtProgress, NxtTag, NxtText } from "@carlos2280/nexott-ui/react"
-import { Box, Stack } from "@carlos2280/nexott-ui/react-primitives"
+import { Badge } from "@/shared/ui/patterns/badge"
+import { SectionCard } from "@/shared/ui/patterns/section-card"
+import { Progress } from "@/shared/ui/primitives/progress"
 import type { CursoDetalle } from "@nexott-learn/shared-types"
+import { BarChart3, Layers } from "lucide-react"
 import { formatPeso } from "../lib/format"
 
 interface PesoFila {
@@ -9,45 +11,53 @@ interface PesoFila {
   readonly activa: boolean
 }
 
-interface PesoRowProps {
-  readonly fila: PesoFila
-}
-
-// Fila reutilizable: label fijo · barra crece · % alineado a la derecha.
-function PesoRow({ fila }: PesoRowProps) {
+function PesoRow({ fila }: { readonly fila: PesoFila }) {
   return (
-    <Stack direction="row" gap="md" align="center">
-      <Box style={{ width: "168px", flexShrink: 0 }}>
-        <Stack direction="row" gap="sm" align="center">
-          <NxtText size="md" weight="medium" tone={fila.activa ? "default" : "muted"}>
-            {fila.label}
-          </NxtText>
-          {fila.activa ? null : (
-            <NxtTag variant="neutral" size="sm">
-              Inactivo
-            </NxtTag>
-          )}
-        </Stack>
-      </Box>
-      <Box style={{ flex: "1 1 auto", minWidth: 0 }}>
-        <NxtProgress variant="bar" value={fila.valor} max={100} size="sm" color="brand" />
-      </Box>
-      <Box style={{ width: "48px", textAlign: "right", flexShrink: 0 }}>
-        <NxtText size="md" weight="semibold">
-          {formatPeso(fila.valor)}
-        </NxtText>
-      </Box>
-    </Stack>
+    <div className="flex items-center gap-3">
+      <div className="flex w-44 shrink-0 items-center gap-2">
+        <span
+          className={
+            fila.activa
+              ? "font-medium text-sm text-text-primary"
+              : "font-medium text-sm text-text-muted"
+          }
+        >
+          {fila.label}
+        </span>
+        {fila.activa ? null : (
+          <Badge tone="neutral" size="sm">
+            Inactivo
+          </Badge>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <Progress
+          value={fila.valor}
+          max={100}
+          size="sm"
+          tone={fila.activa ? "brand" : "muted"}
+          label={fila.label}
+        />
+      </div>
+      <span className="w-12 shrink-0 text-right font-semibold text-sm text-text-primary tabular-nums">
+        {formatPeso(fila.valor)}
+      </span>
+    </div>
   )
 }
 
-interface PesosCursoCardProps {
-  readonly curso: CursoDetalle
+function SumaTotal({ valor, ok }: { readonly valor: number; readonly ok: boolean }) {
+  return (
+    <div className="flex items-center justify-end gap-2 pt-1">
+      <span className="text-sm text-text-secondary">Suma total</span>
+      <Badge tone={ok ? "success" : "warning"} size="sm">
+        {formatPeso(valor)}
+      </Badge>
+    </div>
+  )
 }
 
-// MAESTRO §9.7 · Pesos a nivel curso (Áreas + Transversal + Entrevista IA).
-// Suma debe dar 100% (T04 §17.5). Read-only en Capa 2.
-export function PesosCursoCard({ curso }: PesosCursoCardProps) {
+export function PesosCursoCard({ curso }: { readonly curso: CursoDetalle }) {
   const filas: readonly PesoFila[] = [
     { label: "Áreas", valor: curso.pesoAreas, activa: true },
     {
@@ -62,69 +72,46 @@ export function PesosCursoCard({ curso }: PesosCursoCardProps) {
     },
   ]
   const suma = filas.reduce((acc, f) => acc + f.valor, 0)
-  const pesosOk = Math.abs(suma - 100) < 0.01
+  const ok = Math.abs(suma - 100) < 0.01
 
   return (
-    <NxtCard
-      variant="surface"
-      padding="lg"
+    <SectionCard
+      icon={BarChart3}
+      iconTone="violet"
       title="Pesos a nivel curso"
       description="Cómo combinan áreas, proyecto y entrevista en la nota final."
-      icon="bar-chart"
-      iconColor="violet"
     >
-      <Stack direction="column" gap="md">
+      <div className="flex flex-col gap-3">
         {filas.map((fila) => (
           <PesoRow key={fila.label} fila={fila} />
         ))}
-        <Stack direction="row" gap="sm" align="center" justify="end">
-          <NxtText size="sm" tone="muted">
-            Suma total
-          </NxtText>
-          <NxtTag variant={pesosOk ? "success" : "warning"} size="sm">
-            {formatPeso(suma)}
-          </NxtTag>
-        </Stack>
-      </Stack>
-    </NxtCard>
+        <SumaTotal valor={suma} ok={ok} />
+      </div>
+    </SectionCard>
   )
 }
 
-interface PesosIntraModuloCardProps {
-  readonly curso: CursoDetalle
-}
-
-// MAESTRO §9.5 · Pesos intra-módulo (mismos para todos los módulos del curso).
-export function PesosIntraModuloCard({ curso }: PesosIntraModuloCardProps) {
+export function PesosIntraModuloCard({ curso }: { readonly curso: CursoDetalle }) {
   const filas: readonly PesoFila[] = [
     { label: "Actividades (bloques)", valor: curso.pesoActividades, activa: true },
     { label: "Mini proyecto", valor: curso.pesoMiniProyecto, activa: true },
   ]
   const suma = curso.pesoActividades + curso.pesoMiniProyecto
-  const pesosOk = Math.abs(suma - 100) < 0.01
+  const ok = Math.abs(suma - 100) < 0.01
 
   return (
-    <NxtCard
-      variant="surface"
-      padding="lg"
+    <SectionCard
+      icon={Layers}
+      iconTone="emerald"
       title="Pesos intra-módulo"
       description="Cómo se combina dentro de cada módulo (actividades + mini proyecto)."
-      icon="layers"
-      iconColor="emerald"
     >
-      <Stack direction="column" gap="md">
+      <div className="flex flex-col gap-3">
         {filas.map((fila) => (
           <PesoRow key={fila.label} fila={fila} />
         ))}
-        <Stack direction="row" gap="sm" align="center" justify="end">
-          <NxtText size="sm" tone="muted">
-            Suma total
-          </NxtText>
-          <NxtTag variant={pesosOk ? "success" : "warning"} size="sm">
-            {formatPeso(suma)}
-          </NxtTag>
-        </Stack>
-      </Stack>
-    </NxtCard>
+        <SumaTotal valor={suma} ok={ok} />
+      </div>
+    </SectionCard>
   )
 }

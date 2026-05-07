@@ -1,6 +1,9 @@
-import { NxtAlert, NxtCard, NxtDivider, NxtEmpty, NxtText } from "@carlos2280/nexott-ui/react"
-import { Box, Stack } from "@carlos2280/nexott-ui/react-primitives"
+import { EmptyState } from "@/shared/ui/patterns/empty-state"
+import { SectionCard } from "@/shared/ui/patterns/section-card"
+import { Alert } from "@/shared/ui/primitives/alert"
+import { Divider } from "@/shared/ui/primitives/divider"
 import type { EntrevistaIADetalleAdmin } from "@nexott-learn/shared-types"
+import { MessageCircle } from "lucide-react"
 
 interface EntrevistaIACardProps {
   readonly activa: boolean
@@ -9,127 +12,108 @@ interface EntrevistaIACardProps {
   readonly error: Error | null
 }
 
-// MAESTRO §11 · Entrevista Final IA.
 export function EntrevistaIACard({ activa, entrevista, loading, error }: EntrevistaIACardProps) {
   if (!activa) {
     return (
-      <NxtCard
-        variant="surface"
-        padding="lg"
+      <SectionCard
+        icon={MessageCircle}
+        iconTone="violet"
         title="Entrevista Final IA"
         description="No configurada para este curso."
-        icon="message"
-        iconColor="violet"
       >
-        <NxtEmpty
-          icon="message"
+        <EmptyState
+          variant="inline"
+          icon={MessageCircle}
           title="Sin entrevista IA"
           description="Activa esta sección si el cliente requiere validación final con IA."
         />
-      </NxtCard>
+      </SectionCard>
     )
   }
 
   if (loading) {
     return (
-      <NxtCard variant="surface" padding="lg" title="Entrevista Final IA" loading={true}>
-        <NxtText size="sm" tone="muted">
-          Cargando configuración…
-        </NxtText>
-      </NxtCard>
+      <SectionCard
+        icon={MessageCircle}
+        iconTone="violet"
+        title="Entrevista Final IA"
+        loading={true}
+      />
     )
   }
 
   if (error) {
     return (
-      <NxtCard variant="surface" padding="lg" title="Entrevista Final IA">
-        <NxtAlert
-          variant="error"
-          heading="No pudimos cargar la entrevista IA"
-          message={error.message}
-        />
-      </NxtCard>
+      <SectionCard icon={MessageCircle} iconTone="violet" title="Entrevista Final IA">
+        <Alert variant="error">
+          <p className="font-semibold text-sm">No pudimos cargar la entrevista IA</p>
+          <p className="mt-1 text-sm text-text-secondary">{error.message}</p>
+        </Alert>
+      </SectionCard>
     )
   }
 
   if (!entrevista) {
     return (
-      <NxtCard variant="surface" padding="lg" title="Entrevista Final IA">
-        <NxtAlert
-          variant="warning"
-          heading="Configuración pendiente"
-          message="La entrevista IA está marcada como activa pero aún no tiene contenido."
-        />
-      </NxtCard>
+      <SectionCard icon={MessageCircle} iconTone="violet" title="Entrevista Final IA">
+        <Alert variant="warning">
+          <p className="font-semibold text-sm">Configuración pendiente</p>
+          <p className="mt-1 text-sm text-text-secondary">
+            La entrevista IA está marcada como activa pero aún no tiene contenido.
+          </p>
+        </Alert>
+      </SectionCard>
     )
   }
 
   return (
-    <NxtCard
-      variant="surface"
-      padding="lg"
+    <SectionCard
+      icon={MessageCircle}
+      iconTone="violet"
       title="Entrevista Final IA"
       description="Validación final con cliente simulado por IA"
-      icon="message"
-      iconColor="violet"
     >
-      <Stack direction="column" gap="lg">
-        {/* Bloque escenario: perfil + contexto */}
-        <Stack direction="column" gap="md">
-          <Stack direction="column" gap="xs">
-            <NxtText size="xs" weight="semibold" tone="muted">
-              PERFIL DEL CLIENTE
-            </NxtText>
-            <Box style={{ maxWidth: "70ch" }}>
-              <NxtText size="md">{entrevista.perfilCliente}</NxtText>
-            </Box>
-          </Stack>
+      <CampoTexto label="Perfil del cliente" value={entrevista.perfilCliente} />
+      <CampoTexto label="Contexto de negocio" value={entrevista.contextoNegocio} />
 
-          <Stack direction="column" gap="xs">
-            <NxtText size="xs" weight="semibold" tone="muted">
-              CONTEXTO DE NEGOCIO
-            </NxtText>
-            <Box style={{ maxWidth: "70ch" }}>
-              <NxtText size="md">{entrevista.contextoNegocio}</NxtText>
-            </Box>
-          </Stack>
-        </Stack>
+      <Divider />
 
-        <NxtDivider />
+      <div className="flex flex-col gap-3">
+        <p className="font-semibold text-[11px] text-text-muted uppercase tracking-wider">
+          Parámetros de ejecución
+        </p>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+          <ParamItem label="Modo" value={entrevista.modo === "TEXTO" ? "Texto" : "Voz"} />
+          <ParamItem label="Preguntas" value={String(entrevista.numeroPreguntas)} />
+          <ParamItem label="Máx. intentos" value={String(entrevista.maxIntentos)} />
+          <ParamItem label="Umbral aprobación" value={`≥ ${entrevista.umbralAprobacion}`} />
+        </div>
+      </div>
 
-        {/* Bloque parámetros: 4 métricas con jerarquía fuerte */}
-        <Stack direction="column" gap="sm">
-          <NxtText size="xs" weight="semibold" tone="muted">
-            PARÁMETROS DE EJECUCIÓN
-          </NxtText>
-          <Stack direction="row" gap="lg" wrap={true}>
-            <ParamItem label="Modo" value={entrevista.modo === "TEXTO" ? "Texto" : "Voz"} />
-            <ParamItem label="Preguntas" value={String(entrevista.numeroPreguntas)} />
-            <ParamItem label="Máx. intentos" value={String(entrevista.maxIntentos)} />
-            <ParamItem label="Umbral aprobación" value={`≥ ${entrevista.umbralAprobacion}`} />
-          </Stack>
-        </Stack>
+      <Alert variant="info">
+        <p className="font-semibold text-sm">Rúbrica por área del curso</p>
+        <p className="mt-1 text-sm text-text-secondary">
+          La configuración de pesos por área se habilitará en la siguiente iteración.
+        </p>
+      </Alert>
+    </SectionCard>
+  )
+}
 
-        {/* Aviso de deuda — separado de la config real */}
-        <NxtAlert
-          variant="info"
-          heading="Rúbrica por área del curso"
-          message="La configuración de pesos por área se habilitará en la siguiente iteración."
-        />
-      </Stack>
-    </NxtCard>
+function CampoTexto({ label, value }: { readonly label: string; readonly value: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="font-semibold text-[11px] text-text-muted uppercase tracking-wider">{label}</p>
+      <p className="max-w-[70ch] text-sm text-text-secondary leading-relaxed">{value}</p>
+    </div>
   )
 }
 
 function ParamItem({ label, value }: { readonly label: string; readonly value: string }) {
   return (
-    <Stack direction="column" gap="xs">
-      <NxtText size="xs" tone="muted">
-        {label}
-      </NxtText>
-      <NxtText size="lg" weight="bold">
-        {value}
-      </NxtText>
-    </Stack>
+    <div className="flex flex-col gap-0.5">
+      <span className="text-text-muted text-xs">{label}</span>
+      <span className="font-bold text-base text-text-primary tabular-nums">{value}</span>
+    </div>
   )
 }
