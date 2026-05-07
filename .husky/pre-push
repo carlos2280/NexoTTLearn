@@ -1,20 +1,2 @@
-# Verifica que pnpm-lock.yaml en HEAD este limpio (sin overrides locales).
-# Aunque el pre-commit ya bloquea commits sucios, este chequeo defiende contra
-# pushes de ramas legacy o commits hechos sin pasar por el hook.
-if git show "HEAD:pnpm-lock.yaml" 2>/dev/null | grep -qE "file:/(home|Users|root)|^pnpmfileChecksum:"; then
-  echo "❌ pnpm-lock.yaml en HEAD contiene overrides locales (file:/... o pnpmfileChecksum)."
-  echo "   Regeneralo con: pnpm lockfile:clean"
-  echo "   Luego: git add pnpm-lock.yaml && git commit --amend --no-edit"
-  exit 1
-fi
-
-# Avisar (sin bloquear) si el lockfile en disco esta sucio: util saberlo antes
-# de que CI falle con --frozen-lockfile, pero no impide pushear el commit limpio.
-if grep -qE "file:/(home|Users|root)|^pnpmfileChecksum:" pnpm-lock.yaml 2>/dev/null; then
-  echo "⚠ pnpm-lock.yaml en disco esta sucio (override local activo)."
-  echo "  El push procede porque HEAD esta limpio, pero recuerda: NO hagas 'git add pnpm-lock.yaml'"
-  echo "  hasta ejecutar 'pnpm lockfile:clean'."
-fi
-
 echo "→ Ejecutando make validate antes del push (typecheck + lint + test)…"
 make validate

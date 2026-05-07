@@ -18,7 +18,6 @@ C_RED   := \033[31m
 
 # Rutas
 ROOT := $(shell pwd)
-LIB  := $(ROOT)/../nexott-ui
 
 # ─────────────────────────────────────────────────────────
 # Help
@@ -46,35 +45,6 @@ clean: kill ## Limpia node_modules, dist y .turbo
 	rm -rf apps/*/dist packages/*/dist
 	rm -rf .turbo apps/*/.turbo packages/*/.turbo
 	@printf "$(C_GREEN)✓ Limpio$(C_RESET)\n"
-
-# ─────────────────────────────────────────────────────────
-# Librería local (nexott-ui)
-# ─────────────────────────────────────────────────────────
-
-.PHONY: lib-build
-lib-build: ## Compila la librería nexott-ui (../nexott-ui)
-	@printf "$(C_BLUE)→ Building nexott-ui…$(C_RESET)\n"
-	cd $(LIB) && pnpm build
-
-.PHONY: lib-rebuild
-lib-rebuild: lib-build install ## Compila la librería y reinstala (refresca enlace)
-	@printf "$(C_GREEN)✓ Librería recompilada y enlazada$(C_RESET)\n"
-
-.PHONY: lib-refresh
-lib-refresh: lib-build ## Recompila lib + invalida cache pnpm + reinstala + limpia Vite
-	@printf "$(C_BLUE)→ Invalidando cache pnpm de nexott-ui…$(C_RESET)\n"
-	@# pnpm cachea el contenido del paquete file: la primera vez. Si solo
-	@# cambia el dist (sin tocar package.json), no detecta diff y sirve la
-	@# version vieja. Borrar el store interno + el link en apps fuerza re-copia.
-	@rm -rf node_modules/.pnpm/@carlos2280+nexott-ui@file* apps/web/node_modules/@carlos2280
-	@printf "$(C_BLUE)→ Reinstalando link pnpm…$(C_RESET)\n"
-	@pnpm install --no-frozen-lockfile --silent
-	@$(MAKE) vite-cache-clear
-	@printf "$(C_GREEN)✓ Librería recompilada y enlazada. Reinicia 'make dev' si está corriendo.$(C_RESET)\n"
-
-.PHONY: lib-storybook
-lib-storybook: ## Levanta Storybook de la librería (localhost:6006)
-	cd $(LIB) && pnpm storybook
 
 # ─────────────────────────────────────────────────────────
 # Base de datos
@@ -119,13 +89,8 @@ dev: kill ## Levanta web + api en paralelo (foreground)
 	pnpm dev
 
 .PHONY: dev-fresh
-dev-fresh: kill vite-cache-clear ## Levanta dev con cache de Vite limpio (tras lib-build)
+dev-fresh: kill vite-cache-clear ## Levanta dev con cache de Vite limpio
 	@printf "$(C_BLUE)→ Levantando web + api con cache limpio…$(C_RESET)\n"
-	pnpm dev
-
-.PHONY: dev-ui-fresh
-dev-ui-fresh: kill lib-refresh ## Recompila nexott-ui + refresh cache + levanta dev (ciclo completo de iteracion en el DS)
-	@printf "$(C_BLUE)→ Levantando web + api con DS recien compilado…$(C_RESET)\n"
 	pnpm dev
 
 .PHONY: dev-web
