@@ -2,7 +2,7 @@ import { AuthHydrationLoader } from "@/features/auth/components/auth-hydration-l
 import { AuthSuccessScreen } from "@/features/auth/components/auth-success-screen"
 import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
 import { RUTAS } from "@/shared/constants/rutas"
-import { NxtLayoutAuth } from "@carlos2280/nexott-ui/react"
+import { AuthShell } from "@/shared/ui/patterns/auth-shell"
 import { useState } from "react"
 import { Navigate, useNavigate } from "react-router-dom"
 import { CambiarPasswordForm } from "./components/cambiar-password-form"
@@ -45,17 +45,17 @@ export function CambiarPasswordPage() {
   }
 
   return (
-    <NxtLayoutAuth
-      theme="nexott-learn"
+    <AuthShell
       appMark="Nx"
       appName="NexoTT"
       appSub="Learn"
-      heroTitle="Cambia tu contrasena"
+      heroEyebrow="Primer acceso"
+      heroTitle={"Cambia tu\ncontrasena."}
       heroSubtitle="Por seguridad debes definir una contrasena nueva en tu primer acceso."
       manifesto="Listo para empezar."
       version="v0.1"
     >
       <CambiarPasswordForm onSuccess={setDestinoExito} />
-    </NxtLayoutAuth>
+    </AuthShell>
   )
 }

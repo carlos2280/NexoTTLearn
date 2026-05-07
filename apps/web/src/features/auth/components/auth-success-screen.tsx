@@ -1,4 +1,6 @@
-import { NxtLayoutAuth, NxtSuccessMark } from "@carlos2280/nexott-ui/react"
+import { AuthShell } from "@/shared/ui/patterns/auth-shell"
+import { motion } from "framer-motion"
+import { Check } from "lucide-react"
 import { useEffect } from "react"
 import { AUTH_TIMINGS } from "../constants/timings"
 
@@ -19,15 +21,6 @@ interface AuthSuccessScreenProps {
   readonly durationMs?: number
 }
 
-/**
- * Pantalla intersticial de exito para flujos de auth.
- *
- * Mantiene el envoltorio NxtLayoutAuth (mismo ambiente cromatico)
- * y reemplaza el formulario por un NxtSuccessMark grande con tone="brand"
- * (espectro completo: el "exito" en NexoTT es entrar al producto).
- *
- * Tras durationMs, ejecuta onComplete (tipicamente un navigate).
- */
 export function AuthSuccessScreen({
   heroTitle,
   heroSubtitle,
@@ -39,32 +32,62 @@ export function AuthSuccessScreen({
 }: AuthSuccessScreenProps) {
   useEffect(() => {
     const timer = window.setTimeout(onComplete, durationMs)
-    return () => {
-      window.clearTimeout(timer)
-    }
+    return () => window.clearTimeout(timer)
   }, [onComplete, durationMs])
 
   return (
-    <NxtLayoutAuth
-      theme="nexott-learn"
+    <AuthShell
       appMark="Nx"
       appName="NexoTT"
       appSub="Learn"
+      heroEyebrow="Acceso confirmado"
       heroTitle={heroTitle}
-      heroSubtitle={heroSubtitle ?? ""}
+      heroSubtitle={heroSubtitle}
       manifesto={manifesto}
       version="v0.1"
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: "320px",
-        }}
+      <SuccessMark label={label} sublabel={sublabel} />
+    </AuthShell>
+  )
+}
+
+interface SuccessMarkProps {
+  readonly label: string
+  readonly sublabel?: string
+}
+
+function SuccessMark({ label, sublabel }: SuccessMarkProps) {
+  return (
+    <div className="flex min-h-[320px] flex-col items-center justify-center gap-6 text-center">
+      <motion.div
+        initial={{ scale: 0.6, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
+        className="relative grid size-24 place-items-center rounded-full bg-[linear-gradient(135deg,var(--brand-violet)_0%,var(--brand-cyan)_100%)] shadow-[0_12px_40px_-8px_rgb(124_58_237/0.6)]"
       >
-        <NxtSuccessMark tone="brand" size="lg" label={label} sublabel={sublabel ?? ""} />
-      </div>
-    </NxtLayoutAuth>
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 animate-[breathing_4s_ease-in-out_infinite] rounded-full bg-[linear-gradient(135deg,var(--brand-violet)_0%,var(--brand-cyan)_100%)] opacity-50 blur-xl"
+        />
+        <motion.span
+          initial={{ pathLength: 0, opacity: 0 }}
+          animate={{ pathLength: 1, opacity: 1 }}
+          transition={{ duration: 0.45, delay: 0.25, ease: "easeOut" }}
+          className="relative"
+        >
+          <Check className="size-12 text-white" strokeWidth={3} aria-hidden="true" />
+        </motion.span>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.4 }}
+        className="flex flex-col items-center gap-1.5"
+      >
+        <h2 className="font-bold text-2xl text-text-primary tracking-tight">{label}</h2>
+        {sublabel ? <p className="text-sm text-text-secondary">{sublabel}</p> : null}
+      </motion.div>
+    </div>
   )
 }

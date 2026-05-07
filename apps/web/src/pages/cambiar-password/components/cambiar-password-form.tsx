@@ -1,5 +1,7 @@
-import { NxtButton, NxtInputField } from "@carlos2280/nexott-ui/react"
-import { Box, Stack } from "@carlos2280/nexott-ui/react-primitives"
+import { Alert } from "@/shared/ui/primitives/alert"
+import { Button } from "@/shared/ui/primitives/button"
+import { Input } from "@/shared/ui/primitives/input"
+import { ArrowRight, Lock } from "lucide-react"
 import { useCambiarPasswordForm } from "../hooks/use-cambiar-password-form"
 
 interface CambiarPasswordFormProps {
@@ -7,72 +9,61 @@ interface CambiarPasswordFormProps {
 }
 
 export function CambiarPasswordForm({ onSuccess }: CambiarPasswordFormProps) {
-  const { register, handleSubmit, errors, isSubmitting } = useCambiarPasswordForm({
-    onSuccess,
-  })
+  const { register, handleSubmit, errors, isSubmitting } = useCambiarPasswordForm({ onSuccess })
 
   return (
-    <form onSubmit={handleSubmit} noValidate={true}>
-      <Stack gap="lg">
-        <NxtInputField
-          variant="filled"
+    <form onSubmit={handleSubmit} noValidate={true} className="flex flex-col gap-6">
+      <header className="flex flex-col gap-1.5">
+        <h2 className="font-bold text-2xl text-text-primary tracking-tight">
+          Define tu nueva contrasena
+        </h2>
+        <p className="text-sm text-text-secondary">
+          Solo te tomara un momento. Tu sesion sigue activa.
+        </p>
+      </header>
+
+      <div className="flex flex-col gap-4">
+        <Input
           label="Contrasena actual"
           type="password"
-          icon="lock"
-          autocomplete="current-password"
-          toggle-password={true}
+          icon={Lock}
+          placeholder="••••••••"
+          autoComplete="current-password"
+          togglePassword={true}
           {...register("passwordActual")}
-          state={errors.passwordActual ? "error" : ""}
-          helper={errors.passwordActual?.message ?? ""}
+          error={errors.passwordActual?.message}
         />
 
-        <NxtInputField
-          variant="filled"
+        <Input
           label="Contrasena nueva"
           type="password"
-          icon="lock"
-          autocomplete="new-password"
-          toggle-password={true}
+          icon={Lock}
+          placeholder="••••••••"
+          autoComplete="new-password"
+          togglePassword={true}
           {...register("passwordNuevo")}
-          state={errors.passwordNuevo ? "error" : ""}
-          helper={
-            errors.passwordNuevo?.message ??
-            "Minimo 8 caracteres, 1 mayuscula, 1 minuscula, 1 numero"
-          }
+          error={errors.passwordNuevo?.message}
+          helper="Minimo 8 caracteres, 1 mayuscula, 1 minuscula, 1 numero"
         />
 
-        <NxtInputField
-          variant="filled"
+        <Input
           label="Confirmar contrasena nueva"
           type="password"
-          icon="lock"
-          autocomplete="new-password"
-          toggle-password={true}
+          icon={Lock}
+          placeholder="••••••••"
+          autoComplete="new-password"
+          togglePassword={true}
           {...register("confirmacion")}
-          state={errors.confirmacion ? "error" : ""}
-          helper={errors.confirmacion?.message ?? ""}
+          error={errors.confirmacion?.message}
         />
+      </div>
 
-        {errors.root && (
-          <Box role="alert" surface="card" padding="md" radius="md">
-            <span style={{ color: "var(--nx-rose-400)", fontSize: "var(--nx-text-sm)" }}>
-              {errors.root.message}
-            </span>
-          </Box>
-        )}
+      {errors.root ? <Alert variant="error">{errors.root.message}</Alert> : null}
 
-        <NxtButton
-          variant="primary"
-          full={true}
-          disabled={isSubmitting}
-          loading={isSubmitting}
-          onNxtButtonClick={async () => {
-            await handleSubmit()
-          }}
-        >
-          {isSubmitting ? "Guardando…" : "Cambiar contrasena"}
-        </NxtButton>
-      </Stack>
+      <Button type="submit" full={true} loading={isSubmitting} disabled={isSubmitting}>
+        {isSubmitting ? "Guardando…" : "Cambiar contrasena"}
+        {!isSubmitting && <ArrowRight aria-hidden="true" />}
+      </Button>
     </form>
   )
 }

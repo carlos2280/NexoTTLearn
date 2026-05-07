@@ -1,18 +1,10 @@
 import type { PendingMfaSetup } from "@/features/auth/lib/pending-mfa-store"
 import { useQrCode } from "@/shared/hooks/use-qr-code"
-import {
-  NxtButton,
-  NxtCopyField,
-  NxtEyebrow,
-  NxtHeading,
-  NxtIcon,
-  NxtText,
-  NxtTextLink,
-  NxtTotp,
-} from "@carlos2280/nexott-ui/react"
-import { Box, Stack } from "@carlos2280/nexott-ui/react-primitives"
-import type { ComponentRef, ReactElement } from "react"
-import { useCallback, useRef, useState } from "react"
+import { CopyField } from "@/shared/ui/patterns/copy-field"
+import { Button } from "@/shared/ui/primitives/button"
+import { Totp, type TotpHandle } from "@/shared/ui/primitives/totp"
+import { ArrowRight, ShieldCheck } from "lucide-react"
+import { type FormEvent, type ReactElement, useCallback, useRef, useState } from "react"
 import { type MfaSuccess, useMfaForm } from "../hooks/use-mfa-form"
 
 interface MfaSetupFormProps {
@@ -25,12 +17,10 @@ export function MfaSetupForm({ initialPending, onSuccess }: MfaSetupFormProps): 
     onSuccess,
   })
   const [code, setCode] = useState("")
-  const totpRef = useRef<ComponentRef<typeof NxtTotp>>(null)
+  const totpRef = useRef<TotpHandle>(null)
 
-  // El pending puede cambiar a null si el flujo expira. En setup tomamos el initial
-  // como fuente confiable mientras siga existiendo.
   const setupData = pending?.mode === "setup" ? pending : initialPending
-  const { svg } = useQrCode(setupData.otpauthUri, 200)
+  const { svg } = useQrCode(setupData.otpauthUri, 184)
 
   const onComplete = useCallback(
     async (value: string): Promise<void> => {
@@ -41,86 +31,88 @@ export function MfaSetupForm({ initialPending, onSuccess }: MfaSetupFormProps): 
     [verificar],
   )
 
-  const onSubmit = async (): Promise<void> => {
+  const onSubmit = async (e: FormEvent): Promise<void> => {
+    e.preventDefault()
     if (code.length === 6) {
       await verificar(code)
     }
   }
 
+  const isReady = code.length === 6 && !isVerifying
+
   return (
-    <div className="animate-materialize">
-      <Stack gap="lg">
-        <Stack gap="sm" align="center">
-          <NxtIcon name="shield" size="lg" spectrum={true} label="Configurar MFA" />
-          <Stack gap="xs" align="center">
-            <NxtHeading level={2} align="center">
-              Configura tu MFA
-            </NxtHeading>
-            <NxtText size="sm" tone="dim" align="center" max-width="36ch">
-              Escanea el QR con Google Authenticator, Authy o tu app preferida.
-            </NxtText>
-          </Stack>
-        </Stack>
-
-        {svg && (
-          <Box
-            surface="card"
-            padding="md"
-            radius="lg"
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              background: "#ffffff",
-              width: "fit-content",
-              margin: "0 auto",
-            }}
-          >
-            <div
-              aria-label="Codigo QR para configurar MFA"
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: SVG generado por la libreria qrcode en cliente, sin entrada de usuario
-              dangerouslySetInnerHTML={{ __html: svg }}
-            />
-          </Box>
-        )}
-
-        <Stack gap="xs" align="center">
-          <NxtEyebrow accent="bar">O ingresa el codigo manualmente</NxtEyebrow>
-          <NxtCopyField value={setupData.secret} label="Copiar codigo MFA" wrap={true} />
-        </Stack>
-
-        <Stack gap="xs" align="center">
-          <NxtEyebrow accent="bar">Confirma con el codigo de tu app</NxtEyebrow>
-          <NxtTotp
-            ref={totpRef}
-            state={error ? "error" : ""}
-            helper={error ?? ""}
-            disabled={isVerifying}
-            onNxtTotpChange={(e: CustomEvent<{ value: string; complete: boolean }>) =>
-              setCode(e.detail.value)
-            }
-            onNxtTotpComplete={async (e: CustomEvent<{ value: string }>) => {
-              await onComplete(e.detail.value)
-            }}
+    <form onSubmit={onSubmit} noValidate={true} className="flex flex-col gap-6">
+      <header className="flex flex-col items-center gap-4">
+        <span className="relative grid size-14 place-items-center rounded-[var(--radius-xl)] border border-glass-border bg-[linear-gradient(135deg,rgb(124_58_237/0.18),rgb(34_211_238/0.14))]">
+          <span
+            aria-hidden="true"
+            className="absolute inset-0 animate-[breathing_4s_ease-in-out_infinite] rounded-[var(--radius-xl)] bg-[linear-gradient(135deg,rgb(124_58_237/0.25),rgb(34_211_238/0.2))] opacity-60 blur-md"
           />
-        </Stack>
+          <ShieldCheck className="relative size-7 text-brand-cyan" aria-hidden="true" />
+        </span>
+        <div className="flex flex-col items-center gap-1.5 text-center">
+          <h2 className="font-bold text-2xl text-text-primary tracking-tight">Configura tu MFA</h2>
+          <p className="max-w-[36ch] text-sm text-text-secondary leading-relaxed">
+            Escanea el QR con Google Authenticator, Authy o tu app preferida.
+          </p>
+        </div>
+      </header>
 
-        <NxtButton
-          variant="primary"
-          full={true}
-          disabled={isVerifying || code.length !== 6}
-          loading={isVerifying}
-          onNxtButtonClick={onSubmit}
+      {svg ? (
+        <div className="mx-auto rounded-[var(--radius-lg)] border border-glass-border bg-white p-3">
+          <div
+            aria-label="Codigo QR para configurar MFA"
+            className="grid place-items-center"
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: SVG generado por la libreria qrcode en cliente, sin entrada de usuario
+            dangerouslySetInnerHTML={{ __html: svg }}
+          />
+        </div>
+      ) : null}
+
+      <div className="flex flex-col gap-2">
+        <SectionLabel>O ingresa el codigo manualmente</SectionLabel>
+        <CopyField value={setupData.secret} label="Copiar codigo MFA" wrap={true} />
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <SectionLabel>Confirma con el codigo de tu app</SectionLabel>
+        <Totp
+          ref={totpRef}
+          value={code}
+          onChange={setCode}
+          onComplete={onComplete}
+          disabled={isVerifying}
+          state={error ? "error" : "default"}
+          helper={error ?? undefined}
+        />
+      </div>
+
+      <Button type="submit" full={true} loading={isVerifying} disabled={!isReady}>
+        {isVerifying ? "Activando…" : "Activar MFA"}
+        {isReady ? <ArrowRight aria-hidden="true" /> : null}
+      </Button>
+
+      <div className="flex items-center justify-center pt-1">
+        <button
+          type="button"
+          onClick={cancelar}
+          className="font-medium text-text-muted text-xs transition-colors hover:text-brand-violet-soft focus-visible:text-brand-violet-soft focus-visible:outline-none"
         >
-          {isVerifying ? "Activando…" : "Activar MFA"}
-        </NxtButton>
+          Cancelar y volver al login
+        </button>
+      </div>
+    </form>
+  )
+}
 
-        <Stack gap="xs" align="center">
-          <NxtTextLink tone="dim" onNxtTextLinkClick={cancelar}>
-            Cancelar y volver al login
-          </NxtTextLink>
-        </Stack>
-      </Stack>
-    </div>
+function SectionLabel({ children }: { readonly children: string }) {
+  return (
+    <span className="flex items-center gap-2 font-medium text-text-muted text-xs uppercase tracking-widest">
+      <span
+        aria-hidden="true"
+        className="h-px w-4 bg-gradient-to-r from-brand-violet to-brand-cyan"
+      />
+      {children}
+    </span>
   )
 }
