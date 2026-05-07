@@ -4,6 +4,7 @@ import { useInscripcionesCurso } from "@/features/admin-diagnostico/hooks/use-in
 import { calcularProgreso } from "@/features/admin-diagnostico/lib/progreso"
 import { getDiagnosticoMock } from "@/features/admin-diagnostico/mocks/mock-candidatos"
 import { RUTAS } from "@/shared/constants/rutas"
+import { useBreadcrumbOverride } from "@/shared/hooks/use-breadcrumb-override"
 import { ConfirmDialog } from "@/shared/ui/patterns/confirm-dialog"
 import { PageHeader } from "@/shared/ui/patterns/page-header"
 import { Button } from "@/shared/ui/primitives/button"
@@ -39,6 +40,11 @@ export function CursoCandidatosPage() {
   const { tabActiva, setTabActiva } = useTabActiva(progreso.tabSugerido)
   const quitar = useQuitarDialog()
   const captura = useCapturaCelda()
+
+  useBreadcrumbOverride([
+    { label: "Diagnóstico", href: RUTAS.admin.diagnosticos },
+    { label: mock.curso.titulo },
+  ])
 
   const badges = {
     invitados: inscripciones.length,

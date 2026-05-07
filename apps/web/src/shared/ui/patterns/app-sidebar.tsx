@@ -11,6 +11,12 @@ export interface SidebarNavItem {
   readonly badge?: string | number
   /** Marca activa custom — por default compara con location.pathname (incluyendo prefijo). */
   readonly matchPrefix?: boolean
+  /** Prefijos adicionales que también marcan este item como activo. */
+  readonly alsoMatchPrefixes?: readonly string[]
+  /** Sufijos adicionales que también marcan este item como activo. */
+  readonly alsoMatchSuffixes?: readonly string[]
+  /** Sufijos que, si la URL los tiene, cancelan el match (útil para excluir sub-rutas cedidas a otro item). */
+  readonly excludeSuffixes?: readonly string[]
   /** Si true, se renderiza como span no clickable con estilo apagado. */
   readonly disabled?: boolean
 }
@@ -122,7 +128,7 @@ function NavGroup({
       ) : null}
       <ul className="flex flex-col gap-0.5">
         {group.items.map((item) => (
-          <li key={item.href}>
+          <li key={`${item.href}::${item.label}`}>
             <NavItemRow item={item} collapsed={collapsed} />
           </li>
         ))}
@@ -139,9 +145,14 @@ interface NavItemRowProps {
 
 function NavItemRow({ item, collapsed }: NavItemRowProps) {
   const location = useLocation()
-  const isActive = item.matchPrefix
-    ? location.pathname.startsWith(item.href)
-    : location.pathname === item.href
+  const excluded = item.excludeSuffixes?.some((s) => location.pathname.endsWith(s)) ?? false
+  const isActive =
+    !excluded &&
+    ((item.matchPrefix
+      ? location.pathname.startsWith(item.href)
+      : location.pathname === item.href) ||
+      (item.alsoMatchPrefixes?.some((p) => location.pathname.startsWith(p)) ?? false) ||
+      (item.alsoMatchSuffixes?.some((s) => location.pathname.endsWith(s)) ?? false))
   const isDisabled = item.disabled === true
 
   const className = navItemClasses({ isActive, isDisabled, collapsed })

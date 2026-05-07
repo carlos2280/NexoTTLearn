@@ -1,3 +1,5 @@
+// P1 · controller admin del dashboard. Read-only, RolGuard ADMIN.
+
 import { Controller, Get, UseGuards } from "@nestjs/common"
 import type { AdminDashboardResponse } from "@nexott-learn/shared-types"
 import { Roles } from "../../common/decorators/roles.decorator"
@@ -9,10 +11,10 @@ import { DashboardService } from "./dashboard.service"
 @UseGuards(SesionGuard, RolGuard)
 @Roles("ADMIN")
 export class DashboardController {
-  constructor(private readonly dashboardService: DashboardService) {}
+  constructor(private readonly dashboard: DashboardService) {}
 
   @Get()
   obtenerDashboard(): Promise<AdminDashboardResponse> {
-    return this.dashboardService.obtenerDashboard()
+    return this.dashboard.obtenerDashboard()
   }
 }

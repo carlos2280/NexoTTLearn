@@ -21,9 +21,9 @@ export const RUTAS = {
 
     diagnosticos: "/admin/diagnostico",
 
-    // Pendientes — items deshabilitados en el sidebar.
     centroRevision: "/admin/centro-revision",
     seguimiento: "/admin/seguimiento",
+    seguimientoParticipante: (id: string): string => `/admin/seguimiento/p/${id}`,
     configuracion: "/admin/configuracion",
   },
 } as const

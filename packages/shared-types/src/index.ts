@@ -399,6 +399,18 @@ export {
 } from "./admin-contenidos"
 
 export {
+  NOTA_MIN,
+  NOTA_MAX,
+  NOTA_DECIMALES,
+  TEXTO_LIBRE_MAX,
+  MOTIVO_MIN,
+  MOTIVO_MAX,
+  notaSchema,
+  textoLibreCualitativoSchema,
+  motivoAjusteSchema,
+} from "./admin-centro-revision-shared"
+
+export {
   estadoEntregaBloqueSchema,
   type EstadoEntregaBloque,
   filtroEstadoEntregaBloqueSchema,

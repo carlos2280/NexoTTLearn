@@ -5,6 +5,7 @@ import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler"
 import { AreasModule } from "./admin/areas/areas.module"
 import { CentroRevisionModule } from "./admin/centro-revision/centro-revision.module"
 import { CursosModule } from "./admin/cursos/cursos.module"
+import { DashboardModule } from "./admin/dashboard/dashboard.module"
 import { DiagnosticoModule } from "./admin/diagnostico/diagnostico.module"
 import { InscripcionesModule } from "./admin/inscripciones/inscripciones.module"
 import { ParticipantesModule } from "./admin/participantes/participantes.module"
@@ -44,6 +45,7 @@ import { HealthModule } from "./health/health.module"
     CentroRevisionModule,
     SeguimientoModule,
     ParticipantesModule,
+    DashboardModule,
   ],
   providers: [
     {

@@ -18,6 +18,7 @@ import { seedCursoCerrado } from "./04-curso-cerrado.js"
 import { seedInscripciones } from "./05-inscripciones.js"
 import { seedEntrevistasYAlertas } from "./06-entrevistas-alertas.js"
 import { seedLogsYNotificaciones } from "./07-logs-notificaciones.js"
+import { seedCursoBb } from "./08-curso-bb.js"
 import { prisma } from "./_lib.js"
 
 export type SeedOptions = {
@@ -33,10 +34,10 @@ export async function runSeed(opts: SeedOptions): Promise<void> {
     await truncarDominio()
   }
 
-  console.info(`\n[1/${opts.mode === "minimal" ? 2 : 8}] Usuarios`)
+  console.info(`\n[1/${opts.mode === "minimal" ? 2 : 9}] Usuarios`)
   const usuarios = await seedUsuarios()
 
-  console.info(`[2/${opts.mode === "minimal" ? 2 : 8}] Áreas`)
+  console.info(`[2/${opts.mode === "minimal" ? 2 : 9}] Áreas`)
   const areas = await seedAreas()
 
   if (opts.mode === "minimal") {
@@ -44,23 +45,26 @@ export async function runSeed(opts: SeedOptions): Promise<void> {
     return
   }
 
-  console.info("[3/8] Curso XYZ ACTIVO")
+  console.info("[3/9] Curso XYZ ACTIVO")
   const cursoXyz = await seedCursoXyz(areas)
 
-  console.info("[4/8] Cursos auxiliares (libre / borrador / duplicado)")
+  console.info("[4/9] Cursos auxiliares (libre / borrador / duplicado)")
   const cursosAux = await seedCursosAuxiliares(areas, cursoXyz.cursoId)
 
-  console.info("[5/8] Curso CERRADO + expediente")
+  console.info("[5/9] Curso CERRADO + expediente")
   const cursoCerrado = await seedCursoCerrado(areas, usuarios)
 
-  console.info("[6/8] Inscripciones, evaluaciones iniciales y entregas")
+  console.info("[6/9] Inscripciones, evaluaciones iniciales y entregas")
   await seedInscripciones(usuarios, areas, cursoXyz, cursosAux)
 
-  console.info("[7/8] Entrevistas IA y alertas")
+  console.info("[7/9] Entrevistas IA y alertas")
   await seedEntrevistasYAlertas(usuarios, cursoXyz)
 
-  console.info("[8/8] Logs encadenados y notificaciones")
+  console.info("[8/9] Logs encadenados y notificaciones")
   await seedLogsYNotificaciones(usuarios, cursoXyz, cursoCerrado)
+
+  console.info("[9/9] Curso BB ACTIVO (hub diagnóstico multi-curso)")
+  await seedCursoBb(areas)
 
   await finalizar(t0)
 }
