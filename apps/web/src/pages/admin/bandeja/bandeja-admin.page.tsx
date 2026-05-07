@@ -1,6 +1,6 @@
 import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
-import { NxtEmpty } from "@carlos2280/nexott-ui/react"
-import { Box } from "@carlos2280/nexott-ui/react-primitives"
+import { EmptyState } from "@/shared/ui/patterns/empty-state"
+import { LayoutDashboard } from "lucide-react"
 
 export function BandejaAdminPage() {
   const { data: usuario } = useUsuarioActual()
@@ -10,12 +10,12 @@ export function BandejaAdminPage() {
   }
 
   return (
-    <Box slot="content" padding={{ base: "lg", md: "xl" }}>
-      <NxtEmpty
-        icon="dashboard"
+    <div className="px-6 py-8 md:px-10 md:py-12">
+      <EmptyState
+        icon={LayoutDashboard}
         title="Bandeja en construcción"
         description="Estamos rediseñando la bandeja del administrador. Vuelve pronto."
       />
-    </Box>
+    </div>
   )
 }
