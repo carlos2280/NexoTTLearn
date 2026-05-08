@@ -46,6 +46,52 @@
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 
+  /* Escala tipografica (utilidades text-display, text-h1, ..., text-eyebrow) */
+  --text-display: var(--fs-display);
+  --text-display--line-height: var(--lh-tight);
+  --text-display--letter-spacing: var(--ls-tight);
+
+  --text-h1: var(--fs-h1);
+  --text-h1--line-height: var(--lh-tight);
+  --text-h1--letter-spacing: var(--ls-tight);
+
+  --text-h2: var(--fs-h2);
+  --text-h2--line-height: var(--lh-snug);
+  --text-h2--letter-spacing: var(--ls-tight);
+
+  --text-h3: var(--fs-h3);
+  --text-h3--line-height: var(--lh-snug);
+
+  --text-body: var(--fs-body);
+  --text-body--line-height: var(--lh-normal);
+
+  --text-sm: var(--fs-sm);
+  --text-sm--line-height: var(--lh-normal);
+
+  --text-xs: var(--fs-xs);
+  --text-xs--line-height: var(--lh-normal);
+
+  --text-caption: var(--fs-caption);
+  --text-caption--line-height: var(--lh-normal);
+
+  --text-eyebrow: var(--fs-eyebrow);
+  --text-eyebrow--line-height: var(--lh-normal);
+  --text-eyebrow--letter-spacing: var(--ls-eyebrow);
+
+  /* Layout inmersivo (utilidades w-sidebar-inmersivo, h-header-inmersivo, etc.) */
+  --spacing-header-inmersivo: var(--inmersivo-header-h);
+  --spacing-dock-inmersivo: var(--inmersivo-dock-h);
+  --spacing-sidebar-inmersivo: var(--inmersivo-sidebar-w);
+  --spacing-canvas-bottom: var(--inmersivo-canvas-bottom-pad);
+
+  /* Ancho de lectura (max-w-reading) */
+  --container-reading: var(--reading-measure);
+  --container-reading-wide: var(--reading-measure-wide);
+
+  /* Glass del dock/header sticky inmersivo (consume token semantico tematizado) */
+  --color-dock-glass: var(--dock-glass);
+  --color-dock-border: var(--dock-border);
+
   /* Radius — rounded-md, rounded-lg, etc. */
   --radius-xs: var(--radius-xs);
   --radius-sm: var(--radius-sm);
@@ -189,9 +235,16 @@ body {
   background: var(--surface-0);
   color: var(--text-primary);
   font-family: var(--font-sans);
+  font-feature-settings: var(--font-features-ui);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+/* Numeros tabulares (progreso, contadores, tiempos) */
+.tabular-nums {
+  font-feature-settings: var(--font-features-tabular);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Selection */
@@ -255,10 +308,30 @@ body {
   -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 80%);
 }
 
-/* Focus ring consistente */
+/* Focus ring consistente (utility opt-in, escenarios custom) */
 .focus-ring-brand:focus-visible {
   outline: none;
   box-shadow: var(--shadow-ring-brand);
+}
+
+/* Focus visible global para elementos interactivos. Reemplaza el outline
+   blanco del browser por el ring brand tokenizado. Solo aplica con teclado
+   (focus-visible), nunca con click (mejora UX). */
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-brand);
+  border-radius: var(--radius-sm);
+}
+/* Los inputs/textareas pintan el ring sin redondear extra (tienen su propio radius). */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-brand);
 }
 
 /* Reduced motion */
