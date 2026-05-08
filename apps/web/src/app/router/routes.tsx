@@ -12,6 +12,9 @@ import { CambiarPasswordPage } from "@/pages/cambiar-password/cambiar-password.p
 import { LoginPage } from "@/pages/login/login.page"
 import { MfaPage } from "@/pages/login/mfa.page"
 import { BandejaParticipantePage } from "@/pages/participante/bandeja/bandeja-participante.page"
+import { FichaCursoLibrePage } from "@/pages/participante/catalogo/ficha-curso-libre.page"
+import { VitrinaCatalogoPage } from "@/pages/participante/catalogo/vitrina.page"
+import { EstudioPage } from "@/pages/participante/estudio/estudio.page"
 import { MisCursosPage } from "@/pages/participante/mis-cursos/mis-cursos.page"
 import { VistaCursoPage } from "@/pages/participante/vista-curso/vista-curso.page"
 import { RecuperarPasswordPage } from "@/pages/recuperar-password/recuperar-password.page"
@@ -56,10 +59,15 @@ export function AppRoutes() {
           </Route>
 
           <Route element={<GuardRol rol="PARTICIPANTE" />}>
+            {/* Modo estudio inmersivo · full-screen sin LayoutParticipante. */}
+            <Route path="/cursos/:slug/modulo/:moduloId" element={<EstudioPage />} />
+
             <Route element={<LayoutParticipante />}>
               <Route path={RUTAS.participante.bandeja} element={<BandejaParticipantePage />} />
               <Route path={RUTAS.participante.misCursos} element={<MisCursosPage />} />
               <Route path="/cursos/:slug" element={<VistaCursoPage />} />
+              <Route path={RUTAS.participante.catalogo} element={<VitrinaCatalogoPage />} />
+              <Route path="/catalogo/:slug" element={<FichaCursoLibrePage />} />
             </Route>
           </Route>
         </Route>

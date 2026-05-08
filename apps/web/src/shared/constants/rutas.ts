@@ -33,7 +33,9 @@ export const RUTAS = {
     bandeja: "/",
     misCursos: "/cursos",
     cursoDetalle: (id: string): string => `/cursos/${id}`,
+    cursoModulo: (slug: string, moduloId: string): string => `/cursos/${slug}/modulo/${moduloId}`,
     catalogo: "/catalogo",
+    catalogoCurso: (slug: string): string => `/catalogo/${slug}`,
     expediente: "/expediente",
   },
 } as const

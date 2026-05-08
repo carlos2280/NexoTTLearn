@@ -34,9 +34,8 @@ const DESTINOS: readonly DockDestino[] = [
     id: "catalogo",
     label: "Catalogo",
     icono: Compass,
-    href: null,
+    href: RUTAS.participante.catalogo,
     isActive: (p) => p.startsWith("/catalogo"),
-    tooltipDisabled: "Catalogo · proximamente",
   },
 ]
 
