@@ -3,12 +3,15 @@ import { RUTAS } from "@/shared/constants/rutas"
 import { ImmersiveShell } from "@/shared/ui/patterns/immersive/immersive-shell"
 import { StructureTree } from "@/shared/ui/patterns/immersive/structure-tree"
 import type { CursoDetalle } from "@nexott-learn/shared-types"
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useSeccionesPorModulo } from "../hooks/use-secciones-por-modulo"
 import { buildCursoTree, parseTreeId } from "../lib/build-tree"
 import { computeSelectedTreeId } from "../lib/compute-selected-tree-id"
 import { useEditorStore } from "../use-editor-store"
+import { AddAreaDialog } from "./add-area-dialog"
+import { AddModuloDialog } from "./add-modulo-dialog"
+import { AddSeccionDialog } from "./add-seccion-dialog"
 import { ChecklistOverlay } from "./checklist-overlay"
 import { CommandPalette } from "./command-palette"
 import { EditorBanner } from "./editor-banner"
@@ -22,6 +25,9 @@ interface EditorContentProps {
   readonly modulosLoading: boolean
 }
 
+type ModuloTarget = { areaId: string; areaNombre: string }
+type SeccionTarget = { moduloId: string; moduloTitulo: string }
+
 export function EditorContent({ curso, cursoId, modulosLoading }: EditorContentProps) {
   const navigate = useNavigate()
   const selected = useEditorStore((s) => s.selected)
@@ -33,8 +39,21 @@ export function EditorContent({ curso, cursoId, modulosLoading }: EditorContentP
 
   const seccionesPorModulo = useSeccionesPorModulo({ cursoId, modulos })
 
+  // ── Estado de dialogs de creación ────────────────────────────────
+  const [areaDialogOpen, setAreaDialogOpen] = useState(false)
+  const [moduloTarget, setModuloTarget] = useState<ModuloTarget | null>(null)
+  const [seccionTarget, setSeccionTarget] = useState<SeccionTarget | null>(null)
+
   const treeNodes = useMemo(
-    () => buildCursoTree({ curso, modulos, seccionesPorModulo }),
+    () =>
+      buildCursoTree({
+        curso,
+        modulos,
+        seccionesPorModulo,
+        onAddArea: () => setAreaDialogOpen(true),
+        onAddModulo: (areaId, areaNombre) => setModuloTarget({ areaId, areaNombre }),
+        onAddSeccion: (moduloId, moduloTitulo) => setSeccionTarget({ moduloId, moduloTitulo }),
+      }),
     [curso, modulos, seccionesPorModulo],
   )
 
@@ -93,12 +112,42 @@ export function EditorContent({ curso, cursoId, modulosLoading }: EditorContentP
           />
         }
       />
+
       <ChecklistOverlay
         cursoId={cursoId}
         modulos={modulos}
         seccionesPorModulo={seccionesPorModulo}
       />
       <CommandPalette curso={curso} cursoId={cursoId} seccionesPorModulo={seccionesPorModulo} />
+
+      {/* ── Dialogs de creación contextual ────────────────────────── */}
+      <AddAreaDialog
+        cursoId={cursoId}
+        curso={curso}
+        open={areaDialogOpen}
+        onOpenChange={setAreaDialogOpen}
+        onAdded={(cursoAreaId) => setSelected({ tipo: "area", cursoAreaId })}
+      />
+
+      {moduloTarget ? (
+        <AddModuloDialog
+          cursoId={cursoId}
+          areaId={moduloTarget.areaId}
+          areaNombre={moduloTarget.areaNombre}
+          open={Boolean(moduloTarget)}
+          onOpenChange={(open) => !open && setModuloTarget(null)}
+        />
+      ) : null}
+
+      {seccionTarget ? (
+        <AddSeccionDialog
+          cursoId={cursoId}
+          moduloId={seccionTarget.moduloId}
+          moduloTitulo={seccionTarget.moduloTitulo}
+          open={Boolean(seccionTarget)}
+          onOpenChange={(open) => !open && setSeccionTarget(null)}
+        />
+      ) : null}
     </>
   )
 }
