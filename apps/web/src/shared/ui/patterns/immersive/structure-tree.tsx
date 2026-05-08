@@ -79,6 +79,7 @@ function TreeRow({ node, depth, selectedId, expanded, onSelect, onToggle, mode }
 
   return (
     <div className="flex flex-col">
+      {node.divider ? <hr className="my-1.5 border-glass-border" /> : null}
       <TreeRowHeader
         node={node}
         depth={depth}

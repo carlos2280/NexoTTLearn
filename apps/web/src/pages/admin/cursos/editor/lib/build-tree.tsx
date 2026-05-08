@@ -127,6 +127,7 @@ export function buildCursoTree({
     {
       id: TREE_IDS.transversal,
       label: "Proyecto Transversal",
+      divider: true,
       icon: <FolderTree className={treeIconClass} strokeWidth={1.6} />,
       meta: (
         <span className={curso.proyectoTransversal.activo ? "text-success" : ""}>

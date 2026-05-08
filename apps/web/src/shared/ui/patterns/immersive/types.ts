@@ -27,4 +27,6 @@ export interface TreeNode {
    * renderiza solo en modo edit.
    */
   readonly action?: ReactNode
+  /** Si true, renderiza un divisor horizontal antes de este nodo. */
+  readonly divider?: boolean
 }
