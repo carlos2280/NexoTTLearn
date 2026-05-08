@@ -34,7 +34,6 @@ export function InspectorCurso({ curso, onPublish }: InspectorCursoProps) {
       <DescripcionSection curso={curso} save={save} />
       <FechasSection curso={curso} save={save} />
       <InscripcionSection curso={curso} save={save} />
-      <PesosIntraModuloSection curso={curso} save={save} />
       <UmbralesSection curso={curso} save={save} />
       <AvanzadoSection curso={curso} />
 
@@ -237,85 +236,6 @@ function RadioOption({ checked, onSelect, label, description }: RadioOptionProps
       </span>
       <span className="pl-5 text-text-muted text-xs leading-relaxed">{description}</span>
     </button>
-  )
-}
-
-// ─── Pesos intra-módulo ────────────────────────────────────────────
-
-function PesosIntraModuloSection({ curso, save }: SectionProps) {
-  const algunMini = curso.algunModuloConMiniActivo
-
-  const [pesoActividades, setPesoActividades] = useState(String(curso.pesoActividades))
-  const [pesoMiniProyecto, setPesoMiniProyecto] = useState(String(curso.pesoMiniProyecto))
-
-  const numActividades = Number.parseFloat(pesoActividades) || 0
-  const numMini = Number.parseFloat(pesoMiniProyecto) || 0
-
-  // Suma cruda: lo que se persiste. Constraint SQL `curso_pesos_intra_modulo_suman_100`
-  // exige actividades + mini = 100 SIEMPRE. Mandamos PATCH único con ambos
-  // valores cuando suman 100, igual que en PesosSection.
-  const sumaCruda = numActividades + numMini
-  const sumaCrudaOk = Math.abs(sumaCruda - 100) < 0.01
-  const algoCambio = numActividades !== curso.pesoActividades || numMini !== curso.pesoMiniProyecto
-
-  useDebouncedSave(`${pesoActividades}|${pesoMiniProyecto}`, () => {
-    if (!(algoCambio && sumaCrudaOk)) {
-      return
-    }
-    if (numActividades < 0 || numActividades > 100) {
-      return
-    }
-    if (numMini < 0 || numMini > 100) {
-      return
-    }
-    save({ pesoActividades: numActividades, pesoMiniProyecto: numMini })
-  })
-
-  // MAESTRO §9.5: si hay algún módulo con Mini activo, su peso debe ser > 0.
-  const miniActivoConPesoCero = algunMini && numMini <= 0
-
-  return (
-    <InspectorSection title="Pesos intra-módulo" defaultOpen={false}>
-      <p className="text-[11px] text-text-muted">
-        Aplica al interior de cada módulo del curso. Los 2 pesos deben sumar 100; mientras no lo
-        hagan, los cambios no se guardan. Si ningún módulo activa Mini Proyecto, las actividades
-        cubren el 100%.
-      </p>
-      <InspectorRow label="Actividades (%)">
-        <NumberInput
-          value={pesoActividades}
-          onChange={setPesoActividades}
-          min={0}
-          max={100}
-          step={0.01}
-        />
-      </InspectorRow>
-      <InspectorRow
-        label="Mini Proyecto (%)"
-        hint={
-          algunMini
-            ? undefined
-            : "Ningún módulo tiene Mini Proyecto activo; este peso solo aplicará si activas el Mini en algún módulo."
-        }
-      >
-        <NumberInput
-          value={pesoMiniProyecto}
-          onChange={setPesoMiniProyecto}
-          min={0}
-          max={100}
-          step={0.01}
-        />
-      </InspectorRow>
-      {miniActivoConPesoCero ? (
-        <p className="text-[11px] text-warning">
-          Hay módulos con Mini Proyecto activo. Asigna un peso &gt; 0%. Si no quieres que cuente,
-          desactívalo en el módulo.
-        </p>
-      ) : null}
-      <p className={`text-[11px] ${sumaCrudaOk ? "text-success" : "text-warning"}`}>
-        Suma: {sumaCruda.toFixed(2)}% {sumaCrudaOk ? "✓" : "(debe ser 100 para guardar)"}
-      </p>
-    </InspectorSection>
   )
 }
 

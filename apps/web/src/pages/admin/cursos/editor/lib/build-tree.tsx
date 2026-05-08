@@ -1,5 +1,6 @@
 import { NodeTypeBadge } from "@/pages/admin/cursos/editor/components/node-type-badge"
 import {
+  MiniToggleModulo,
   PesoAreaInline,
   PesoEntrevistaInline,
   PesoTransversalInline,
@@ -54,6 +55,7 @@ function AddButton({ label, onClick }: AddButtonProps) {
 
 interface BuildTreeArgs {
   readonly curso: CursoDetalle
+  readonly cursoId: string
   readonly modulos: ModuloListAdminResponse | undefined
   readonly seccionesPorModulo: ReadonlyMap<string, SeccionListAdminResponse>
   readonly onAddArea: () => void
@@ -70,6 +72,7 @@ interface BuildTreeArgs {
  */
 export function buildCursoTree({
   curso,
+  cursoId,
   modulos,
   seccionesPorModulo,
   onAddArea,
@@ -105,7 +108,16 @@ export function buildCursoTree({
           id: TREE_IDS.modulo(modulo.id),
           label: modulo.titulo,
           icon: <NodeTypeBadge type="modulo" />,
-          meta: <span>{`${secciones.length}s`}</span>,
+          meta: (
+            <span className="flex items-center gap-1.5">
+              <MiniToggleModulo
+                cursoId={cursoId}
+                moduloId={modulo.id}
+                activo={modulo.miniProyectoActivo}
+              />
+              <span className="text-text-muted">{`${secciones.length}s`}</span>
+            </span>
+          ),
           action: (
             <AddButton
               label="Agregar sección"

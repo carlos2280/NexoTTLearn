@@ -52,6 +52,7 @@ export function EditorContent({ curso, cursoId, modulosLoading }: EditorContentP
     () =>
       buildCursoTree({
         curso,
+        cursoId,
         modulos,
         seccionesPorModulo,
         onAddArea: () => setAreaDialogOpen(true),
@@ -59,7 +60,7 @@ export function EditorContent({ curso, cursoId, modulosLoading }: EditorContentP
         onAddSeccion: (moduloId, moduloTitulo) => setSeccionTarget({ moduloId, moduloTitulo }),
         pesosState,
       }),
-    [curso, modulos, seccionesPorModulo, pesosState],
+    [curso, cursoId, modulos, seccionesPorModulo, pesosState],
   )
 
   const selectedTreeId = computeSelectedTreeId(selected)
