@@ -1,14 +1,6 @@
 import { RUTAS } from "@/shared/constants/rutas"
 import type { SidebarNavGroup, SidebarNavItem } from "@/shared/ui/patterns/app-sidebar"
-import {
-  BookOpen,
-  CheckCircle2,
-  Compass,
-  LayoutDashboard,
-  Settings,
-  TrendingUp,
-  Users,
-} from "lucide-react"
+import { BookOpen, CheckCircle2, LayoutDashboard, Settings, TrendingUp, Users } from "lucide-react"
 
 /* Configuracion del menu admin. Mantenida fuera del layout para que sea
    facil de evolucionar (badges dinamicos, items por permiso, etc.). */
@@ -31,20 +23,13 @@ export const ADMIN_NAV_GROUPS: readonly SidebarNavGroup[] = [
         icon: BookOpen,
         href: RUTAS.admin.cursos,
         matchPrefix: true,
-        excludeSuffixes: ["/candidatos"],
-      },
-      {
-        label: "Diagnostico",
-        icon: Compass,
-        href: RUTAS.admin.diagnosticos,
-        matchPrefix: true,
-        alsoMatchSuffixes: ["/candidatos"],
       },
       {
         label: "Seguimiento",
         icon: TrendingUp,
         href: RUTAS.admin.seguimiento,
         matchPrefix: true,
+        alsoMatchSuffixes: ["/candidatos"],
       },
       {
         label: "Revisiones",
@@ -52,7 +37,12 @@ export const ADMIN_NAV_GROUPS: readonly SidebarNavGroup[] = [
         href: RUTAS.admin.centroRevision,
         matchPrefix: true,
       },
-      { label: "Mantenedores", icon: Users, href: "#", disabled: true },
+      {
+        label: "Mantenedores",
+        icon: Users,
+        href: RUTAS.admin.mantenedores,
+        matchPrefix: true,
+      },
     ],
   },
 ]

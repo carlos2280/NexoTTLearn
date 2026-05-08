@@ -10,6 +10,7 @@ const MAPA: Record<string, readonly BreadcrumbCrumb[]> = {
   [RUTAS.admin.diagnosticos]: [{ label: "Diagnóstico" }],
   [RUTAS.admin.centroRevision]: [{ label: "Centro de revisión" }],
   [RUTAS.admin.seguimiento]: [{ label: "Seguimiento" }],
+  [RUTAS.admin.mantenedores]: [{ label: "Mantenedores" }],
 }
 
 const RUTA_CANDIDATOS = /^\/admin\/cursos\/[^/]+\/candidatos$/

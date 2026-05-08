@@ -24,6 +24,7 @@ export const RUTAS = {
     centroRevision: "/admin/centro-revision",
     seguimiento: "/admin/seguimiento",
     seguimientoParticipante: (id: string): string => `/admin/seguimiento/p/${id}`,
+    mantenedores: "/admin/mantenedores",
     configuracion: "/admin/configuracion",
   },
 } as const

@@ -5,6 +5,7 @@ import { CursoEditorPage } from "@/pages/admin/cursos/editor/curso-editor.page"
 import { ListaCursosPage } from "@/pages/admin/cursos/lista-cursos.page"
 import { CursoCandidatosPage } from "@/pages/admin/diagnostico/candidatos.page"
 import { HubDiagnosticoPage } from "@/pages/admin/diagnostico/hub.page"
+import { MantenedoresPage } from "@/pages/admin/mantenedores/mantenedores.page"
 import { FichaParticipantePage } from "@/pages/admin/seguimiento/ficha-participante.page"
 import { HubSeguimientoPage } from "@/pages/admin/seguimiento/hub.page"
 import { CambiarPasswordPage } from "@/pages/cambiar-password/cambiar-password.page"
@@ -46,6 +47,7 @@ export function AppRoutes() {
               <Route path={RUTAS.admin.centroRevision} element={<CentroRevisionPage />} />
               <Route path={RUTAS.admin.seguimiento} element={<HubSeguimientoPage />} />
               <Route path="/admin/seguimiento/p/:id" element={<FichaParticipantePage />} />
+              <Route path={RUTAS.admin.mantenedores} element={<MantenedoresPage />} />
             </Route>
           </Route>
         </Route>
