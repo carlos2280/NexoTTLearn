@@ -1,5 +1,12 @@
-import { useModulos } from "@/features/admin-cursos/hooks/use-editor-curso"
+import {
+  useArchivarModulo,
+  useArchivarSeccionGlobal,
+  useEliminarModulo,
+  useEliminarSeccionGlobal,
+  useModulos,
+} from "@/features/admin-cursos/hooks/use-editor-curso"
 import { RUTAS } from "@/shared/constants/rutas"
+import { ConfirmDialog } from "@/shared/ui/patterns/confirm-dialog"
 import { ImmersiveShell } from "@/shared/ui/patterns/immersive/immersive-shell"
 import { StructureTree } from "@/shared/ui/patterns/immersive/structure-tree"
 import type { CursoDetalle } from "@nexott-learn/shared-types"
@@ -28,6 +35,8 @@ interface EditorContentProps {
 
 type ModuloTarget = { areaId: string; areaNombre: string }
 type SeccionTarget = { moduloId: string; moduloTitulo: string }
+type DeleteModuloTarget = { moduloId: string; moduloTitulo: string }
+type DeleteSeccionTarget = { moduloId: string; seccionId: string; seccionTitulo: string }
 
 export function EditorContent({ curso, cursoId, modulosLoading }: EditorContentProps) {
   const navigate = useNavigate()
@@ -45,6 +54,14 @@ export function EditorContent({ curso, cursoId, modulosLoading }: EditorContentP
   const [moduloTarget, setModuloTarget] = useState<ModuloTarget | null>(null)
   const [seccionTarget, setSeccionTarget] = useState<SeccionTarget | null>(null)
 
+  // ── Acciones de archivar / eliminar (menú contextual del árbol) ──
+  const archivarModulo = useArchivarModulo(cursoId)
+  const eliminarModulo = useEliminarModulo(cursoId)
+  const archivarSeccion = useArchivarSeccionGlobal(cursoId)
+  const eliminarSeccion = useEliminarSeccionGlobal(cursoId)
+  const [deleteModulo, setDeleteModulo] = useState<DeleteModuloTarget | null>(null)
+  const [deleteSeccion, setDeleteSeccion] = useState<DeleteSeccionTarget | null>(null)
+
   // ── Edición inline de pesos en el árbol (áreas + nivel curso) ────
   const pesosState = usePesos({ cursoId, curso })
 
@@ -58,9 +75,21 @@ export function EditorContent({ curso, cursoId, modulosLoading }: EditorContentP
         onAddArea: () => setAreaDialogOpen(true),
         onAddModulo: (areaId, areaNombre) => setModuloTarget({ areaId, areaNombre }),
         onAddSeccion: (moduloId, moduloTitulo) => setSeccionTarget({ moduloId, moduloTitulo }),
+        onToggleArchivarModulo: (moduloId, archivado) => {
+          archivarModulo.mutate({ moduloId, archivar: !archivado })
+        },
+        onSolicitarEliminarModulo: (moduloId, moduloTitulo) => {
+          setDeleteModulo({ moduloId, moduloTitulo })
+        },
+        onToggleArchivarSeccion: (moduloId, seccionId, archivado) => {
+          archivarSeccion.mutate({ moduloId, seccionId, archivar: !archivado })
+        },
+        onSolicitarEliminarSeccion: (moduloId, seccionId, seccionTitulo) => {
+          setDeleteSeccion({ moduloId, seccionId, seccionTitulo })
+        },
         pesosState,
       }),
-    [curso, cursoId, modulos, seccionesPorModulo, pesosState],
+    [curso, cursoId, modulos, seccionesPorModulo, pesosState, archivarModulo, archivarSeccion],
   )
 
   const selectedTreeId = computeSelectedTreeId(selected)
@@ -157,6 +186,66 @@ export function EditorContent({ curso, cursoId, modulosLoading }: EditorContentP
           onOpenChange={(open) => !open && setSeccionTarget(null)}
         />
       ) : null}
+
+      {/* ── Confirmaciones del menú contextual del árbol ─────────── */}
+      <ConfirmDialog
+        open={deleteModulo !== null}
+        onOpenChange={(open) => !open && setDeleteModulo(null)}
+        tone="danger"
+        title="Eliminar módulo"
+        description={
+          deleteModulo ? (
+            <>
+              Vas a eliminar el módulo <strong>{deleteModulo.moduloTitulo}</strong> y todas sus
+              secciones y bloques. Esta acción no se puede deshacer.
+            </>
+          ) : null
+        }
+        confirmLabel="Eliminar módulo"
+        loading={eliminarModulo.isPending}
+        onConfirm={() => {
+          if (!deleteModulo) {
+            return
+          }
+          eliminarModulo.mutate(deleteModulo.moduloId, {
+            onSuccess: () => {
+              setDeleteModulo(null)
+              setSelected({ tipo: "curso" })
+            },
+          })
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleteSeccion !== null}
+        onOpenChange={(open) => !open && setDeleteSeccion(null)}
+        tone="danger"
+        title="Eliminar sección"
+        description={
+          deleteSeccion ? (
+            <>
+              Vas a eliminar la sección <strong>{deleteSeccion.seccionTitulo}</strong> y todos sus
+              bloques. Esta acción no se puede deshacer.
+            </>
+          ) : null
+        }
+        confirmLabel="Eliminar sección"
+        loading={eliminarSeccion.isPending}
+        onConfirm={() => {
+          if (!deleteSeccion) {
+            return
+          }
+          eliminarSeccion.mutate(
+            { moduloId: deleteSeccion.moduloId, seccionId: deleteSeccion.seccionId },
+            {
+              onSuccess: () => {
+                setDeleteSeccion(null)
+                setSelected({ tipo: "modulo", moduloId: deleteSeccion.moduloId })
+              },
+            },
+          )
+        }}
+      />
     </>
   )
 }

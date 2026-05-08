@@ -204,6 +204,37 @@ export function useEliminarSeccion(cursoId: string, moduloId: string) {
   })
 }
 
+/**
+ * Variantes "globales" de archivar/eliminar sección que aceptan moduloId
+ * en el payload. Útil cuando una sola UI dispara la mutación para
+ * cualquier sección del curso (ej: menú contextual del árbol del editor).
+ */
+export function useArchivarSeccionGlobal(cursoId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { moduloId: string; seccionId: string; archivar: boolean }) =>
+      vars.archivar
+        ? archivarSeccion({ cursoId, moduloId: vars.moduloId }, vars.seccionId)
+        : desarchivarSeccion({ cursoId, moduloId: vars.moduloId }, vars.seccionId),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: editorKeys.secciones(cursoId, vars.moduloId) })
+      qc.invalidateQueries({ queryKey: editorKeys.modulos(cursoId) })
+    },
+  })
+}
+
+export function useEliminarSeccionGlobal(cursoId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { moduloId: string; seccionId: string }) =>
+      eliminarSeccion({ cursoId, moduloId: vars.moduloId }, vars.seccionId),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: editorKeys.secciones(cursoId, vars.moduloId) })
+      qc.invalidateQueries({ queryKey: editorKeys.modulos(cursoId) })
+    },
+  })
+}
+
 export function useCrearSeccion(cursoId: string, moduloId: string) {
   const qc = useQueryClient()
   return useMutation({

@@ -1,3 +1,7 @@
+import {
+  buildModuloMenu,
+  buildSeccionMenu,
+} from "@/pages/admin/cursos/editor/components/node-context-menu"
 import { NodeTypeBadge } from "@/pages/admin/cursos/editor/components/node-type-badge"
 import {
   MiniToggleModulo,
@@ -61,6 +65,18 @@ interface BuildTreeArgs {
   readonly onAddArea: () => void
   readonly onAddModulo: (areaId: string, areaNombre: string) => void
   readonly onAddSeccion: (moduloId: string, moduloTitulo: string) => void
+  readonly onToggleArchivarModulo: (moduloId: string, archivado: boolean) => void
+  readonly onSolicitarEliminarModulo: (moduloId: string, moduloTitulo: string) => void
+  readonly onToggleArchivarSeccion: (
+    moduloId: string,
+    seccionId: string,
+    archivado: boolean,
+  ) => void
+  readonly onSolicitarEliminarSeccion: (
+    moduloId: string,
+    seccionId: string,
+    seccionTitulo: string,
+  ) => void
   readonly pesosState: PesosState
 }
 
@@ -78,6 +94,10 @@ export function buildCursoTree({
   onAddArea,
   onAddModulo,
   onAddSeccion,
+  onToggleArchivarModulo,
+  onSolicitarEliminarModulo,
+  onToggleArchivarSeccion,
+  onSolicitarEliminarSeccion,
   pesosState,
 }: BuildTreeArgs): readonly TreeNode[] {
   const modulosByArea = new Map<string, ModuloListAdminResponse>()
@@ -104,10 +124,12 @@ export function buildCursoTree({
       ),
       children: modulosArea.map((modulo) => {
         const secciones = seccionesPorModulo.get(modulo.id) ?? []
+        const moduloArchivado = modulo.archivadoAt !== null
         return {
           id: TREE_IDS.modulo(modulo.id),
           label: modulo.titulo,
           icon: <NodeTypeBadge type="modulo" />,
+          muted: moduloArchivado,
           meta: (
             <span className="flex items-center gap-1.5">
               <MiniToggleModulo
@@ -124,12 +146,30 @@ export function buildCursoTree({
               onClick={() => onAddSeccion(modulo.id, modulo.titulo)}
             />
           ),
-          children: secciones.map((seccion) => ({
-            id: TREE_IDS.seccion(modulo.id, seccion.id),
-            label: seccion.titulo,
-            icon: <NodeTypeBadge type="seccion" />,
-            meta: <span>{`${seccion.bloquesCount}`}</span>,
-          })),
+          menu: buildModuloMenu({
+            archivado: moduloArchivado,
+            puedeEliminar: !modulo.tieneEntregas,
+            onToggleArchivar: () => onToggleArchivarModulo(modulo.id, moduloArchivado),
+            onSolicitarEliminar: () => onSolicitarEliminarModulo(modulo.id, modulo.titulo),
+          }),
+          children: secciones.map((seccion) => {
+            const seccionArchivada = seccion.archivadoAt !== null
+            return {
+              id: TREE_IDS.seccion(modulo.id, seccion.id),
+              label: seccion.titulo,
+              icon: <NodeTypeBadge type="seccion" />,
+              muted: seccionArchivada,
+              meta: <span>{`${seccion.bloquesCount}`}</span>,
+              menu: buildSeccionMenu({
+                archivado: seccionArchivada,
+                puedeEliminar: !seccion.tieneEntregas,
+                onToggleArchivar: () =>
+                  onToggleArchivarSeccion(modulo.id, seccion.id, seccionArchivada),
+                onSolicitarEliminar: () =>
+                  onSolicitarEliminarSeccion(modulo.id, seccion.id, seccion.titulo),
+              }),
+            }
+          }),
         }
       }),
     }
