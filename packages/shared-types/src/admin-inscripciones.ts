@@ -1,12 +1,13 @@
 import { z } from "zod"
 
 // MAESTRO §6.3, §7.1 · DTOs y tipos para listado de inscripciones de un curso
-// desde el panel admin (modulo Diagnostico Tab 1 "Invitados"). El alta masiva
-// de candidatos (invitar) queda fuera de este iter y dependera del CRUD de
-// Usuarios (P2 del MAPA-FRONT-BACK). Aqui solo lectura, baja y reenvio.
+// desde el panel admin (modulo Diagnostico Tab 1 "Invitados"). Alta de
+// candidatos por seleccion de Usuarios existentes (rol PARTICIPANTE) ya
+// registrados; el alta de usuarios nuevos sigue dependiendo del CRUD de
+// Usuarios (P2 del MAPA-FRONT-BACK).
 //
 // Reglas:
-// - Mutaciones .strict() (no aplica aqui, no hay body de mutacion).
+// - Mutaciones .strict() — claves desconocidas se rechazan.
 // - Filtros opcionales para tab 1: por estado de invitacion (sin login / con
 //   login) y por completitud de evaluacion inicial.
 

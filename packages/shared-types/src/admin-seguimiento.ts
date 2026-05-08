@@ -74,9 +74,18 @@ export type MatrizParticipante = z.infer<typeof matrizParticipanteSchema>
 export const matrizCeldaSchema = z.object({
   areaId: z.string().uuid(),
   nota: z.number().nullable(),
+  // Nota inicial (EvaluacionInicial.puntaje). En tab "inicial" coincide con
+  // `nota`. En tab "actual" puede ser null si no hay diagnóstico capturado.
+  notaInicial: z.number().int().min(0).max(100).nullable(),
   semaforo: semaforoCeldaSchema,
 })
 export type MatrizCelda = z.infer<typeof matrizCeldaSchema>
+
+export const trayectoriaResumenFilaSchema = z.object({
+  // Promedio(actual) - Promedio(inicial) sobre áreas con ambos valores.
+  deltaPromedio: z.number(),
+})
+export type TrayectoriaResumenFila = z.infer<typeof trayectoriaResumenFilaSchema>
 
 export const matrizFilaSchema = z.object({
   inscripcionId: z.string().uuid(),
@@ -84,6 +93,8 @@ export const matrizFilaSchema = z.object({
   estadoSeguimiento: estadoSeguimientoSchema,
   celdas: z.array(matrizCeldaSchema),
   cobertura: z.number(),
+  // Solo presente en tab "actual" cuando hay al menos un par (inicial, actual).
+  trayectoriaResumen: trayectoriaResumenFilaSchema.optional(),
 })
 export type MatrizFila = z.infer<typeof matrizFilaSchema>
 
@@ -172,3 +183,80 @@ export const celdaDetalleResponseSchema = z.discriminatedUnion("tab", [
   celdaActualDetalleSchema,
 ])
 export type CeldaDetalleResponse = z.infer<typeof celdaDetalleResponseSchema>
+
+// ─────────────────────────────────────────────────────────────────
+// Cohorte · charts agregados (línea de tiempo, barras por área, donut)
+// ─────────────────────────────────────────────────────────────────
+//
+// Sin snapshots históricos en MVP: la serie devuelve siempre 2 puntos
+// (Inicial · usando notaInicial; Hoy · usando nota actual). Cuando aterrice
+// el job de snapshots se enriquece con puntos intermedios.
+
+export const cohorteSeriePuntoSchema = z.object({
+  etiqueta: z.string(),
+  valor: z.number(),
+})
+export type CohorteSeriePunto = z.infer<typeof cohorteSeriePuntoSchema>
+
+export const cohorteSerieResponseSchema = z.object({
+  puntos: z.array(cohorteSeriePuntoSchema),
+})
+export type CohorteSerieResponse = z.infer<typeof cohorteSerieResponseSchema>
+
+export const cohorteAreaPromedioSchema = z.object({
+  areaId: z.string().uuid(),
+  nombre: z.string(),
+  promedio: z.number(),
+  objetivo: z.number(),
+})
+export type CohorteAreaPromedio = z.infer<typeof cohorteAreaPromedioSchema>
+
+export const cohorteAreasResponseSchema = z.object({
+  areas: z.array(cohorteAreaPromedioSchema),
+})
+export type CohorteAreasResponse = z.infer<typeof cohorteAreasResponseSchema>
+
+export const cohorteDistribucionItemSchema = z.object({
+  estado: estadoSeguimientoSchema,
+  cantidad: z.number().int().min(0),
+})
+export type CohorteDistribucionItem = z.infer<typeof cohorteDistribucionItemSchema>
+
+export const cohorteDistribucionResponseSchema = z.object({
+  distribucion: z.array(cohorteDistribucionItemSchema),
+})
+export type CohorteDistribucionResponse = z.infer<typeof cohorteDistribucionResponseSchema>
+
+// ─────────────────────────────────────────────────────────────────
+// Evolución persona × área (drawer)
+// ─────────────────────────────────────────────────────────────────
+//
+// Serie temporal: punto 0 = EvaluacionInicial (si existe) con
+// hito="Diagnóstico inicial". Los siguientes puntos son entregas de
+// bloque del área (EntregaBloque), ordenadas por enviadaAt asc, con
+// hito = título del bloque.
+//
+// Proyección: regresión lineal simple sobre los últimos N=5 puntos.
+// Si pendiente <= 0 o hay menos de 2 puntos válidos →
+// { diasAlObjetivo: null, valorEstimado: null }.
+// valorEstimado: nota proyectada a 30 días (capeada a [0, 100]).
+// diasAlObjetivo: días hasta cruzar el umbralArea (0 si ya está sobre).
+
+export const celdaEvolucionPuntoSchema = z.object({
+  fecha: z.string().datetime(),
+  valor: z.number(),
+  hito: z.string().nullable(),
+})
+export type CeldaEvolucionPunto = z.infer<typeof celdaEvolucionPuntoSchema>
+
+export const celdaEvolucionProyeccionSchema = z.object({
+  diasAlObjetivo: z.number().int().min(0).nullable(),
+  valorEstimado: z.number().nullable(),
+})
+export type CeldaEvolucionProyeccion = z.infer<typeof celdaEvolucionProyeccionSchema>
+
+export const celdaEvolucionResponseSchema = z.object({
+  puntos: z.array(celdaEvolucionPuntoSchema),
+  proyeccion: celdaEvolucionProyeccionSchema,
+})
+export type CeldaEvolucionResponse = z.infer<typeof celdaEvolucionResponseSchema>

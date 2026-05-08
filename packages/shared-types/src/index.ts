@@ -52,6 +52,37 @@ export {
 } from "./admin-areas"
 
 export {
+  rolMantenedorSchema,
+  type RolMantenedor,
+  estadoUsuarioSchema,
+  type EstadoUsuario,
+  usuarioAdminSchema,
+  type UsuarioAdmin,
+  usuarioListResponseSchema,
+  type UsuarioListResponse,
+  listarUsuariosQuerySchema,
+  type ListarUsuariosQuery,
+  crearUsuarioSchema,
+  type CrearUsuarioInput,
+  actualizarUsuarioSchema,
+  type ActualizarUsuarioInput,
+  bloquearUsuarioSchema,
+  type BloquearUsuarioInput,
+  desbloquearUsuarioSchema,
+  type DesbloquearUsuarioInput,
+  resetPasswordUsuarioSchema,
+  type ResetPasswordUsuarioInput,
+  activarMfaUsuarioSchema,
+  type ActivarMfaUsuarioInput,
+  resetMfaUsuarioSchema,
+  type ResetMfaUsuarioInput,
+  usuarioConCredencialesSchema,
+  type UsuarioConCredenciales,
+  resetPasswordResponseSchema,
+  type ResetPasswordResponse,
+} from "./admin-usuarios"
+
+export {
   adminDashboardResponseSchema,
   type AdminDashboardResponse,
   dashboardKpiSchema,
@@ -227,6 +258,21 @@ export {
   reenviarCredencialesResponseSchema,
   type ReenviarCredencialesResponse,
 } from "./admin-inscripciones"
+
+export {
+  invitarCandidatosBodySchema,
+  type InvitarCandidatosBody,
+  invitarCandidatosErrorCodigoSchema,
+  type InvitarCandidatosErrorCodigo,
+  invitarCandidatosResponseSchema,
+  type InvitarCandidatosResponse,
+  candidatosDisponiblesQuerySchema,
+  type CandidatosDisponiblesQuery,
+  candidatoDisponibleSchema,
+  type CandidatoDisponible,
+  candidatosDisponiblesResponseSchema,
+  type CandidatosDisponiblesResponse,
+} from "./admin-inscripciones-invitar"
 
 export {
   semaforoCeldaDiagnosticoSchema,
@@ -493,7 +539,44 @@ export {
   type CeldaActualDetalle,
   celdaDetalleResponseSchema,
   type CeldaDetalleResponse,
+  trayectoriaResumenFilaSchema,
+  type TrayectoriaResumenFila,
+  cohorteSeriePuntoSchema,
+  type CohorteSeriePunto,
+  cohorteSerieResponseSchema,
+  type CohorteSerieResponse,
+  cohorteAreaPromedioSchema,
+  type CohorteAreaPromedio,
+  cohorteAreasResponseSchema,
+  type CohorteAreasResponse,
+  cohorteDistribucionItemSchema,
+  type CohorteDistribucionItem,
+  cohorteDistribucionResponseSchema,
+  type CohorteDistribucionResponse,
+  celdaEvolucionPuntoSchema,
+  type CeldaEvolucionPunto,
+  celdaEvolucionProyeccionSchema,
+  type CeldaEvolucionProyeccion,
+  celdaEvolucionResponseSchema,
+  type CeldaEvolucionResponse,
 } from "./admin-seguimiento"
+
+export {
+  excelPreviewNotaSchema,
+  type ExcelPreviewNota,
+  excelPreviewEstadoSchema,
+  type ExcelPreviewEstado,
+  excelPreviewFilaSchema,
+  type ExcelPreviewFila,
+  excelPreviewResumenSchema,
+  type ExcelPreviewResumen,
+  excelPreviewResponseSchema,
+  type ExcelPreviewResponse,
+  excelConfirmarBodySchema,
+  type ExcelConfirmarBody,
+  excelConfirmarResponseSchema,
+  type ExcelConfirmarResponse,
+} from "./admin-diagnostico-excel"
 
 export {
   fichaCtaSchema,

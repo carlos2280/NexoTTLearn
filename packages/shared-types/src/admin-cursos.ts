@@ -161,6 +161,11 @@ export const cursoDetalleSchema = cursoListItemSchema.extend({
   // Activacion de proyecto transversal y entrevista (sin payload completo).
   proyectoTransversal: z.object({ activo: z.boolean() }),
   entrevistaIAConfig: z.object({ activa: z.boolean() }),
+  // Derivado: hay al menos un modulo (no archivado) con miniProyectoActivo=true.
+  // El front lo usa para habilitar el input pesoMiniProyecto y para mostrar
+  // helper text cuando ningun modulo lo activo. El back ya respeta esta
+  // misma logica en cursos.checklist.ts (regla pesos_intra_modulo).
+  algunModuloConMiniActivo: z.boolean(),
 })
 export type CursoDetalle = z.infer<typeof cursoDetalleSchema>
 
@@ -322,6 +327,7 @@ export const checklistItemIdSchema = z.enum([
   "area_tiene_modulo",
   "modulo_tiene_contenido",
   "pesos_intra_modulo",
+  "mini_activo_con_peso",
   "pesos_curso_100",
   "umbrales_logro",
 ])
