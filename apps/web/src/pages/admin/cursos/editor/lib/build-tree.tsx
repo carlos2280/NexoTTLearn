@@ -1,8 +1,10 @@
 import { NodeTypeBadge } from "@/pages/admin/cursos/editor/components/node-type-badge"
 import {
-  PesoInlineInput,
-  PesosAreasFooter,
-} from "@/pages/admin/cursos/editor/components/pesos-areas-inline"
+  PesoAreaInline,
+  PesoEntrevistaInline,
+  PesoTransversalInline,
+  type PesosState,
+} from "@/pages/admin/cursos/editor/components/pesos-inline"
 import type { TreeNode } from "@/shared/ui/patterns/immersive/types"
 import type {
   CursoDetalle,
@@ -11,10 +13,6 @@ import type {
 } from "@nexott-learn/shared-types"
 import { FolderTree, Mic, Plus, Users } from "lucide-react"
 import type { MouseEvent } from "react"
-
-// El state lo provee el hook usePesosAreas; sólo re-importamos su tipo para
-// la firma sin acoplarlo al módulo de UI.
-type PesosAreasState = Parameters<typeof PesosAreasFooter>[0]["state"]
 
 const treeIconClass = "size-4"
 
@@ -61,7 +59,7 @@ interface BuildTreeArgs {
   readonly onAddArea: () => void
   readonly onAddModulo: (areaId: string, areaNombre: string) => void
   readonly onAddSeccion: (moduloId: string, moduloTitulo: string) => void
-  readonly pesosAreas: PesosAreasState
+  readonly pesosState: PesosState
 }
 
 /**
@@ -77,7 +75,7 @@ export function buildCursoTree({
   onAddArea,
   onAddModulo,
   onAddSeccion,
-  pesosAreas,
+  pesosState,
 }: BuildTreeArgs): readonly TreeNode[] {
   const modulosByArea = new Map<string, ModuloListAdminResponse>()
   if (modulos) {
@@ -93,15 +91,7 @@ export function buildCursoTree({
       id: TREE_IDS.area(area.id),
       label: area.area.nombre,
       icon: <NodeTypeBadge type="area" />,
-      meta: (
-        <PesoInlineInput
-          cursoAreaId={area.id}
-          persistido={area.peso}
-          drafts={pesosAreas.drafts}
-          onChange={pesosAreas.setPeso}
-          onReset={pesosAreas.resetPeso}
-        />
-      ),
+      meta: <PesoAreaInline cursoAreaId={area.id} persistido={area.peso} state={pesosState} />,
       accent: area.area.color,
       action: (
         <AddButton
@@ -141,7 +131,6 @@ export function buildCursoTree({
       meta: <span>{`${curso.cursoAreas.length}á`}</span>,
       action: <AddButton label="Agregar área" onClick={onAddArea} />,
       children: areaNodes,
-      footer: <PesosAreasFooter state={pesosAreas} />,
     },
     {
       id: TREE_IDS.transversal,
@@ -149,8 +138,11 @@ export function buildCursoTree({
       divider: true,
       icon: <FolderTree className={treeIconClass} strokeWidth={1.6} />,
       meta: (
-        <span className={curso.proyectoTransversal.activo ? "text-success" : ""}>
-          {curso.proyectoTransversal.activo ? "◉" : "─"}
+        <span className="flex items-center gap-1.5">
+          <span className={curso.proyectoTransversal.activo ? "text-success" : "text-text-faint"}>
+            {curso.proyectoTransversal.activo ? "◉" : "─"}
+          </span>
+          <PesoTransversalInline state={pesosState} persistido={curso.pesoProyectoTransversal} />
         </span>
       ),
     },
@@ -159,8 +151,11 @@ export function buildCursoTree({
       label: "Entrevista IA",
       icon: <Mic className={treeIconClass} strokeWidth={1.6} />,
       meta: (
-        <span className={curso.entrevistaIAConfig.activa ? "text-success" : ""}>
-          {curso.entrevistaIAConfig.activa ? "◉" : "─"}
+        <span className="flex items-center gap-1.5">
+          <span className={curso.entrevistaIAConfig.activa ? "text-success" : "text-text-faint"}>
+            {curso.entrevistaIAConfig.activa ? "◉" : "─"}
+          </span>
+          <PesoEntrevistaInline state={pesosState} persistido={curso.pesoEntrevistaIA} />
         </span>
       ),
     },

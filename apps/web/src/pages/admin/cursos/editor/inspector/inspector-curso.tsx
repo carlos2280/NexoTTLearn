@@ -34,7 +34,6 @@ export function InspectorCurso({ curso, onPublish }: InspectorCursoProps) {
       <DescripcionSection curso={curso} save={save} />
       <FechasSection curso={curso} save={save} />
       <InscripcionSection curso={curso} save={save} />
-      <PesosSection curso={curso} save={save} />
       <PesosIntraModuloSection curso={curso} save={save} />
       <UmbralesSection curso={curso} save={save} />
       <AvanzadoSection curso={curso} />
@@ -238,130 +237,6 @@ function RadioOption({ checked, onSelect, label, description }: RadioOptionProps
       </span>
       <span className="pl-5 text-text-muted text-xs leading-relaxed">{description}</span>
     </button>
-  )
-}
-
-// ─── Pesos del curso ───────────────────────────────────────────────
-
-function pesoEnRango(n: number) {
-  return n >= 0 && n <= 100
-}
-
-function calcSumaEfectiva(
-  numAreas: number,
-  numTransversal: number,
-  numEntrevista: number,
-  transversalActivo: boolean,
-  entrevistaActiva: boolean,
-) {
-  return (
-    numAreas + (transversalActivo ? numTransversal : 0) + (entrevistaActiva ? numEntrevista : 0)
-  )
-}
-
-function PesosSection({ curso, save }: SectionProps) {
-  const transversalActivo = curso.proyectoTransversal.activo
-  const entrevistaActiva = curso.entrevistaIAConfig.activa
-
-  const [pesoAreas, setPesoAreas] = useState(String(curso.pesoAreas))
-  const [pesoTransversal, setPesoTransversal] = useState(String(curso.pesoProyectoTransversal))
-  const [pesoEntrevista, setPesoEntrevista] = useState(String(curso.pesoEntrevistaIA))
-
-  const numAreas = Number.parseFloat(pesoAreas) || 0
-  const numTransversal = Number.parseFloat(pesoTransversal) || 0
-  const numEntrevista = Number.parseFloat(pesoEntrevista) || 0
-
-  // Suma cruda: lo que se persiste. Constraint SQL `curso_pesos_nivel_curso_suman_100`
-  // exige que esto sume 100. Sólo mandamos PATCH cuando los 3 valores nuevos
-  // suman 100 entre sí; un PATCH con un solo campo cambiando rompería la
-  // constraint contra los persistidos.
-  const sumaCruda = numAreas + numTransversal + numEntrevista
-  const sumaCrudaOk = Math.abs(sumaCruda - 100) < 0.01
-  const algoCambio =
-    numAreas !== curso.pesoAreas ||
-    numTransversal !== curso.pesoProyectoTransversal ||
-    numEntrevista !== curso.pesoEntrevistaIA
-
-  // Disparador único para los 3 inputs: useDebouncedSave reacciona al string
-  // serializado. Cuando el usuario edita cualquiera, esperamos al debounce y
-  // si la suma da 100 mandamos un solo PATCH con los 3.
-  useDebouncedSave(`${pesoAreas}|${pesoTransversal}|${pesoEntrevista}`, () => {
-    if (!(algoCambio && sumaCrudaOk)) {
-      return
-    }
-    if (!(pesoEnRango(numAreas) && pesoEnRango(numTransversal) && pesoEnRango(numEntrevista))) {
-      return
-    }
-    save({
-      pesoAreas: numAreas,
-      pesoProyectoTransversal: numTransversal,
-      pesoEntrevistaIA: numEntrevista,
-    })
-  })
-
-  // Suma efectiva: la fórmula real del cálculo (descarta inactivos). Es lo que
-  // valida el checklist (MAESTRO §9.7). Sólo la mostramos si difiere de la
-  // cruda, para no cargar la UI cuando todos están activos.
-  const sumaEfectiva = calcSumaEfectiva(
-    numAreas,
-    numTransversal,
-    numEntrevista,
-    transversalActivo,
-    entrevistaActiva,
-  )
-  const sumaEfectivaOk = Math.abs(sumaEfectiva - 100) < 0.01
-  const mostrarEfectiva = !(transversalActivo && entrevistaActiva)
-
-  return (
-    <InspectorSection title="Pesos del curso" defaultOpen={false}>
-      <p className="text-[11px] text-text-muted">
-        Los 3 pesos deben sumar 100. Mientras la suma no dé 100, los cambios no se guardan.
-      </p>
-      <InspectorRow label="Áreas (%)">
-        <NumberInput value={pesoAreas} onChange={setPesoAreas} min={0} max={100} step={0.01} />
-      </InspectorRow>
-      <InspectorRow
-        label="Proyecto Transversal (%)"
-        hint={
-          transversalActivo
-            ? undefined
-            : "Componente no activo en el árbol; este peso solo aplicará si lo activas."
-        }
-      >
-        <NumberInput
-          value={pesoTransversal}
-          onChange={setPesoTransversal}
-          min={0}
-          max={100}
-          step={0.01}
-        />
-      </InspectorRow>
-      <InspectorRow
-        label="Entrevista IA (%)"
-        hint={
-          entrevistaActiva
-            ? undefined
-            : "Componente no activo en el árbol; este peso solo aplicará si la activas."
-        }
-      >
-        <NumberInput
-          value={pesoEntrevista}
-          onChange={setPesoEntrevista}
-          min={0}
-          max={100}
-          step={0.01}
-        />
-      </InspectorRow>
-      <p className={`text-[11px] ${sumaCrudaOk ? "text-success" : "text-warning"}`}>
-        Suma: {sumaCruda.toFixed(2)}% {sumaCrudaOk ? "✓" : "(debe ser 100 para guardar)"}
-      </p>
-      {mostrarEfectiva ? (
-        <p className={`text-[11px] ${sumaEfectivaOk ? "text-success" : "text-warning"}`}>
-          Suma efectiva (sólo activos): {sumaEfectiva.toFixed(2)}%{" "}
-          {sumaEfectivaOk ? "✓" : "(debe ser 100 al publicar)"}
-        </p>
-      ) : null}
-    </InspectorSection>
   )
 }
 

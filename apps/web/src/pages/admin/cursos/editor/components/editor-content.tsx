@@ -18,7 +18,7 @@ import { EditorBanner } from "./editor-banner"
 import { EditorCanvasArea } from "./editor-canvas-area"
 import { EditorRightColumn } from "./editor-right-column"
 import { EditorTopbar } from "./editor-topbar"
-import { usePesosAreas } from "./pesos-areas-inline"
+import { PesosFooter, usePesos } from "./pesos-inline"
 
 interface EditorContentProps {
   readonly curso: CursoDetalle
@@ -45,8 +45,8 @@ export function EditorContent({ curso, cursoId, modulosLoading }: EditorContentP
   const [moduloTarget, setModuloTarget] = useState<ModuloTarget | null>(null)
   const [seccionTarget, setSeccionTarget] = useState<SeccionTarget | null>(null)
 
-  // ── Edición inline de pesos de áreas en el árbol ─────────────────
-  const pesosAreas = usePesosAreas({ cursoId, curso })
+  // ── Edición inline de pesos en el árbol (áreas + nivel curso) ────
+  const pesosState = usePesos({ cursoId, curso })
 
   const treeNodes = useMemo(
     () =>
@@ -57,9 +57,9 @@ export function EditorContent({ curso, cursoId, modulosLoading }: EditorContentP
         onAddArea: () => setAreaDialogOpen(true),
         onAddModulo: (areaId, areaNombre) => setModuloTarget({ areaId, areaNombre }),
         onAddSeccion: (moduloId, moduloTitulo) => setSeccionTarget({ moduloId, moduloTitulo }),
-        pesosAreas,
+        pesosState,
       }),
-    [curso, modulos, seccionesPorModulo, pesosAreas],
+    [curso, modulos, seccionesPorModulo, pesosState],
   )
 
   const selectedTreeId = computeSelectedTreeId(selected)
@@ -98,6 +98,9 @@ export function EditorContent({ curso, cursoId, modulosLoading }: EditorContentP
                   }}
                 />
               )}
+            </div>
+            <div className="shrink-0 border-glass-border border-t px-3">
+              <PesosFooter state={pesosState} />
             </div>
           </div>
         }

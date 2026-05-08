@@ -39,18 +39,10 @@ function InspectorAreaCargada({ curso, cursoArea }: CargadaProps) {
   const eliminar = useEliminarCursoArea(curso.id)
   const setSelected = useEditorStore((s) => s.setSelected)
 
-  const [peso, setPeso] = useState(String(cursoArea.peso))
   const [umbral, setUmbral] = useState(String(cursoArea.puntajeObjetivo))
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [bloqueoOpen, setBloqueoOpen] = useState(false)
 
-  useDebouncedSave(peso, (v) => {
-    const n = Number.parseFloat(v)
-    if (!Number.isFinite(n) || n < 0 || n > 100 || n === cursoArea.peso) {
-      return
-    }
-    actualizar.mutate({ cursoAreaId: cursoArea.id, input: { peso: n } })
-  })
   useDebouncedSave(umbral, (v) => {
     const n = Number.parseInt(v, 10)
     if (!Number.isFinite(n) || n < 0 || n > 100 || n === cursoArea.puntajeObjetivo) {
@@ -58,9 +50,6 @@ function InspectorAreaCargada({ curso, cursoArea }: CargadaProps) {
     }
     actualizar.mutate({ cursoAreaId: cursoArea.id, input: { puntajeObjetivo: n } })
   })
-
-  const sumaPesos = curso.cursoAreas.reduce((acc, a) => acc + a.peso, 0)
-  const sumaOk = Math.abs(sumaPesos - 100) < 0.01
 
   const handleEliminar = () => {
     if (cursoArea.modulosCount > 0) {
@@ -86,20 +75,9 @@ function InspectorAreaCargada({ curso, cursoArea }: CargadaProps) {
     >
       <InspectorSection title="Configuración en este curso">
         <InspectorRow
-          label="Peso (% del curso)"
-          hint={sumaOk ? "Suma actual: 100% ✓" : `Suma actual: ${sumaPesos.toFixed(2)}%`}
+          label="Puntaje objetivo (0–100)"
+          hint="El peso del área se edita inline en el árbol."
         >
-          <input
-            type="number"
-            min={0}
-            max={100}
-            step={0.01}
-            value={peso}
-            onChange={(e) => setPeso(e.target.value)}
-            className="rounded-[var(--radius-sm)] border border-glass-border bg-glass-1 px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-violet"
-          />
-        </InspectorRow>
-        <InspectorRow label="Puntaje objetivo (0–100)">
           <input
             type="number"
             min={0}
