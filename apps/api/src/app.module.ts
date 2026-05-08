@@ -10,6 +10,7 @@ import { DiagnosticoModule } from "./admin/diagnostico/diagnostico.module"
 import { InscripcionesModule } from "./admin/inscripciones/inscripciones.module"
 import { ParticipantesModule } from "./admin/participantes/participantes.module"
 import { SeguimientoModule } from "./admin/seguimiento/seguimiento.module"
+import { UsuariosModule } from "./admin/usuarios/usuarios.module"
 import { AuthModule } from "./auth/auth.module"
 import { PrismaModule } from "./common/prisma/prisma.module"
 import { HealthModule } from "./health/health.module"
@@ -39,6 +40,7 @@ import { HealthModule } from "./health/health.module"
     AuthModule,
     HealthModule,
     AreasModule,
+    UsuariosModule,
     CursosModule,
     InscripcionesModule,
     DiagnosticoModule,
