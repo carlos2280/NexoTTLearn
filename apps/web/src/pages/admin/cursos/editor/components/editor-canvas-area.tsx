@@ -1,9 +1,12 @@
 import { useModulos } from "@/features/admin-cursos/hooks/use-editor-curso"
+import { type BreadcrumbItem, ImmersiveBreadcrumb } from "@/shared/ui/patterns/immersive/breadcrumb"
 import type {
   CursoDetalle,
   ModuloListAdminResponse,
   SeccionListAdminResponse,
 } from "@nexott-learn/shared-types"
+import { FolderTree, Mic } from "lucide-react"
+import type { ReactNode } from "react"
 import { CanvasArea } from "../canvas/canvas-area"
 import { CanvasCurso } from "../canvas/canvas-curso"
 import { CanvasEntrevista } from "../canvas/canvas-entrevista"
@@ -12,6 +15,7 @@ import { CanvasSeccion } from "../canvas/canvas-seccion"
 import { CanvasTransversal } from "../canvas/canvas-transversal"
 import type { SelectedNode } from "../use-editor-store"
 import { useEditorStore } from "../use-editor-store"
+import { NodeTypeBadge } from "./node-type-badge"
 
 interface EditorCanvasAreaProps {
   readonly curso: CursoDetalle
@@ -24,6 +28,42 @@ export function EditorCanvasArea({ curso, cursoId, seccionesPorModulo }: EditorC
   const setSelected = useEditorStore((s) => s.setSelected)
   const modulos = useModulos(cursoId).data ?? []
 
+  const breadcrumbItems = buildBreadcrumb({
+    curso,
+    modulos,
+    seccionesPorModulo,
+    selected,
+    setSelected,
+  })
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <ImmersiveBreadcrumb items={breadcrumbItems} />
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {renderCanvasBody({
+          curso,
+          cursoId,
+          modulos,
+          seccionesPorModulo,
+          selected,
+          setSelected,
+        })}
+      </div>
+    </div>
+  )
+}
+
+interface RenderArgs {
+  readonly curso: CursoDetalle
+  readonly cursoId: string
+  readonly modulos: ModuloListAdminResponse
+  readonly seccionesPorModulo: ReadonlyMap<string, SeccionListAdminResponse>
+  readonly selected: SelectedNode
+  readonly setSelected: (node: SelectedNode) => void
+}
+
+function renderCanvasBody(args: RenderArgs): ReactNode {
+  const { curso, cursoId, modulos, seccionesPorModulo, selected, setSelected } = args
   switch (selected.tipo) {
     case "curso":
       return (
@@ -117,6 +157,123 @@ function renderSeccion(
       onSelectBloque={(bloqueId) => setSelected({ tipo: "bloque", moduloId, seccionId, bloqueId })}
     />
   )
+}
+
+interface BuildBreadcrumbArgs {
+  readonly curso: CursoDetalle
+  readonly modulos: ModuloListAdminResponse
+  readonly seccionesPorModulo: ReadonlyMap<string, SeccionListAdminResponse>
+  readonly selected: SelectedNode
+  readonly setSelected: (node: SelectedNode) => void
+}
+
+const BADGE_CLS = "size-[14px] text-[8px]"
+
+function makeCursoItem(args: BuildBreadcrumbArgs): BreadcrumbItem {
+  return {
+    id: "curso",
+    label: args.curso.titulo,
+    icon: <NodeTypeBadge type="curso" className={BADGE_CLS} />,
+    onClick: () => args.setSelected({ tipo: "curso" }),
+  }
+}
+
+function resolveLinaje(args: BuildBreadcrumbArgs): {
+  readonly cursoArea: CursoDetalle["cursoAreas"][number] | null
+  readonly modulo: ModuloListAdminResponse[number] | null
+} {
+  const { curso, modulos, selected } = args
+  const moduloId =
+    selected.tipo === "modulo" || selected.tipo === "seccion" || selected.tipo === "bloque"
+      ? selected.moduloId
+      : null
+  const modulo = moduloId ? (modulos.find((m) => m.id === moduloId) ?? null) : null
+
+  const cursoAreaId =
+    selected.tipo === "area"
+      ? selected.cursoAreaId
+      : modulo
+        ? (curso.cursoAreas.find((a) => a.areaId === modulo.areaId)?.id ?? null)
+        : null
+  const cursoArea = cursoAreaId
+    ? (curso.cursoAreas.find((a) => a.id === cursoAreaId) ?? null)
+    : null
+  return { cursoArea, modulo }
+}
+
+function buildBreadcrumb(args: BuildBreadcrumbArgs): readonly BreadcrumbItem[] {
+  const { selected } = args
+  const cursoItem = makeCursoItem(args)
+
+  if (selected.tipo === "curso") {
+    return [cursoItem]
+  }
+  if (selected.tipo === "transversal") {
+    return [
+      cursoItem,
+      {
+        id: "transversal",
+        label: "Proyecto Transversal",
+        icon: <FolderTree className="size-3.5" strokeWidth={1.8} aria-hidden="true" />,
+      },
+    ]
+  }
+  if (selected.tipo === "entrevista") {
+    return [
+      cursoItem,
+      {
+        id: "entrevista",
+        label: "Entrevista IA",
+        icon: <Mic className="size-3.5" strokeWidth={1.8} aria-hidden="true" />,
+      },
+    ]
+  }
+  return buildEstructuralBreadcrumb(args, cursoItem)
+}
+
+function buildEstructuralBreadcrumb(
+  args: BuildBreadcrumbArgs,
+  cursoItem: BreadcrumbItem,
+): readonly BreadcrumbItem[] {
+  const { seccionesPorModulo, selected, setSelected } = args
+  const { cursoArea, modulo } = resolveLinaje(args)
+  const items: BreadcrumbItem[] = [cursoItem]
+
+  if (cursoArea) {
+    items.push({
+      id: `area:${cursoArea.id}`,
+      label: cursoArea.area.nombre,
+      icon: <NodeTypeBadge type="area" className={BADGE_CLS} />,
+      onClick:
+        selected.tipo === "area"
+          ? undefined
+          : () => setSelected({ tipo: "area", cursoAreaId: cursoArea.id }),
+    })
+  }
+  if (modulo) {
+    items.push({
+      id: `modulo:${modulo.id}`,
+      label: modulo.titulo,
+      icon: <NodeTypeBadge type="modulo" className={BADGE_CLS} />,
+      onClick:
+        selected.tipo === "modulo"
+          ? undefined
+          : () => setSelected({ tipo: "modulo", moduloId: modulo.id }),
+    })
+  }
+  if (selected.tipo === "seccion" || selected.tipo === "bloque") {
+    const seccion = (seccionesPorModulo.get(selected.moduloId) ?? []).find(
+      (s) => s.id === selected.seccionId,
+    )
+    if (seccion) {
+      items.push({
+        id: `seccion:${seccion.id}`,
+        label: seccion.titulo,
+        icon: <NodeTypeBadge type="seccion" className={BADGE_CLS} />,
+      })
+    }
+  }
+  return items
 }
 
 interface CanvasFallbackProps {
