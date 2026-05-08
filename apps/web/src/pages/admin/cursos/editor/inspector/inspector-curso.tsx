@@ -243,42 +243,91 @@ function RadioOption({ checked, onSelect, label, description }: RadioOptionProps
 
 // ─── Pesos del curso ───────────────────────────────────────────────
 
+function pesoEnRango(n: number) {
+  return n >= 0 && n <= 100
+}
+
+function calcSumaEfectiva(
+  numAreas: number,
+  numTransversal: number,
+  numEntrevista: number,
+  transversalActivo: boolean,
+  entrevistaActiva: boolean,
+) {
+  return (
+    numAreas + (transversalActivo ? numTransversal : 0) + (entrevistaActiva ? numEntrevista : 0)
+  )
+}
+
 function PesosSection({ curso, save }: SectionProps) {
+  const transversalActivo = curso.proyectoTransversal.activo
+  const entrevistaActiva = curso.entrevistaIAConfig.activa
+
   const [pesoAreas, setPesoAreas] = useState(String(curso.pesoAreas))
   const [pesoTransversal, setPesoTransversal] = useState(String(curso.pesoProyectoTransversal))
   const [pesoEntrevista, setPesoEntrevista] = useState(String(curso.pesoEntrevistaIA))
 
-  useDebouncedSave(pesoAreas, (v) => {
-    const n = Number.parseFloat(v)
-    if (Number.isFinite(n) && n >= 0 && n <= 100 && n !== curso.pesoAreas) {
-      save({ pesoAreas: n })
+  const numAreas = Number.parseFloat(pesoAreas) || 0
+  const numTransversal = Number.parseFloat(pesoTransversal) || 0
+  const numEntrevista = Number.parseFloat(pesoEntrevista) || 0
+
+  // Suma cruda: lo que se persiste. Constraint SQL `curso_pesos_nivel_curso_suman_100`
+  // exige que esto sume 100. Sólo mandamos PATCH cuando los 3 valores nuevos
+  // suman 100 entre sí; un PATCH con un solo campo cambiando rompería la
+  // constraint contra los persistidos.
+  const sumaCruda = numAreas + numTransversal + numEntrevista
+  const sumaCrudaOk = Math.abs(sumaCruda - 100) < 0.01
+  const algoCambio =
+    numAreas !== curso.pesoAreas ||
+    numTransversal !== curso.pesoProyectoTransversal ||
+    numEntrevista !== curso.pesoEntrevistaIA
+
+  // Disparador único para los 3 inputs: useDebouncedSave reacciona al string
+  // serializado. Cuando el usuario edita cualquiera, esperamos al debounce y
+  // si la suma da 100 mandamos un solo PATCH con los 3.
+  useDebouncedSave(`${pesoAreas}|${pesoTransversal}|${pesoEntrevista}`, () => {
+    if (!(algoCambio && sumaCrudaOk)) {
+      return
     }
-  })
-  useDebouncedSave(pesoTransversal, (v) => {
-    const n = Number.parseFloat(v)
-    if (Number.isFinite(n) && n >= 0 && n <= 100 && n !== curso.pesoProyectoTransversal) {
-      save({ pesoProyectoTransversal: n })
+    if (!(pesoEnRango(numAreas) && pesoEnRango(numTransversal) && pesoEnRango(numEntrevista))) {
+      return
     }
-  })
-  useDebouncedSave(pesoEntrevista, (v) => {
-    const n = Number.parseFloat(v)
-    if (Number.isFinite(n) && n >= 0 && n <= 100 && n !== curso.pesoEntrevistaIA) {
-      save({ pesoEntrevistaIA: n })
-    }
+    save({
+      pesoAreas: numAreas,
+      pesoProyectoTransversal: numTransversal,
+      pesoEntrevistaIA: numEntrevista,
+    })
   })
 
-  const suma =
-    (Number.parseFloat(pesoAreas) || 0) +
-    (Number.parseFloat(pesoTransversal) || 0) +
-    (Number.parseFloat(pesoEntrevista) || 0)
-  const sumaOk = Math.abs(suma - 100) < 0.01
+  // Suma efectiva: la fórmula real del cálculo (descarta inactivos). Es lo que
+  // valida el checklist (MAESTRO §9.7). Sólo la mostramos si difiere de la
+  // cruda, para no cargar la UI cuando todos están activos.
+  const sumaEfectiva = calcSumaEfectiva(
+    numAreas,
+    numTransversal,
+    numEntrevista,
+    transversalActivo,
+    entrevistaActiva,
+  )
+  const sumaEfectivaOk = Math.abs(sumaEfectiva - 100) < 0.01
+  const mostrarEfectiva = !(transversalActivo && entrevistaActiva)
 
   return (
     <InspectorSection title="Pesos del curso" defaultOpen={false}>
+      <p className="text-[11px] text-text-muted">
+        Los 3 pesos deben sumar 100. Mientras la suma no dé 100, los cambios no se guardan.
+      </p>
       <InspectorRow label="Áreas (%)">
         <NumberInput value={pesoAreas} onChange={setPesoAreas} min={0} max={100} step={0.01} />
       </InspectorRow>
-      <InspectorRow label="Proyecto Transversal (%)">
+      <InspectorRow
+        label="Proyecto Transversal (%)"
+        hint={
+          transversalActivo
+            ? undefined
+            : "Componente no activo en el árbol; este peso solo aplicará si lo activas."
+        }
+      >
         <NumberInput
           value={pesoTransversal}
           onChange={setPesoTransversal}
@@ -287,7 +336,14 @@ function PesosSection({ curso, save }: SectionProps) {
           step={0.01}
         />
       </InspectorRow>
-      <InspectorRow label="Entrevista IA (%)">
+      <InspectorRow
+        label="Entrevista IA (%)"
+        hint={
+          entrevistaActiva
+            ? undefined
+            : "Componente no activo en el árbol; este peso solo aplicará si la activas."
+        }
+      >
         <NumberInput
           value={pesoEntrevista}
           onChange={setPesoEntrevista}
@@ -296,9 +352,15 @@ function PesosSection({ curso, save }: SectionProps) {
           step={0.01}
         />
       </InspectorRow>
-      <p className={`text-[11px] ${sumaOk ? "text-success" : "text-warning"}`}>
-        Suma: {suma.toFixed(2)}% {sumaOk ? "✓" : "(debe ser 100)"}
+      <p className={`text-[11px] ${sumaCrudaOk ? "text-success" : "text-warning"}`}>
+        Suma: {sumaCruda.toFixed(2)}% {sumaCrudaOk ? "✓" : "(debe ser 100 para guardar)"}
       </p>
+      {mostrarEfectiva ? (
+        <p className={`text-[11px] ${sumaEfectivaOk ? "text-success" : "text-warning"}`}>
+          Suma efectiva (sólo activos): {sumaEfectiva.toFixed(2)}%{" "}
+          {sumaEfectivaOk ? "✓" : "(debe ser 100 al publicar)"}
+        </p>
+      ) : null}
     </InspectorSection>
   )
 }
@@ -306,31 +368,43 @@ function PesosSection({ curso, save }: SectionProps) {
 // ─── Pesos intra-módulo ────────────────────────────────────────────
 
 function PesosIntraModuloSection({ curso, save }: SectionProps) {
+  const algunMini = curso.algunModuloConMiniActivo
+
   const [pesoActividades, setPesoActividades] = useState(String(curso.pesoActividades))
   const [pesoMiniProyecto, setPesoMiniProyecto] = useState(String(curso.pesoMiniProyecto))
 
-  useDebouncedSave(pesoActividades, (v) => {
-    const n = Number.parseFloat(v)
-    if (Number.isFinite(n) && n >= 0 && n <= 100 && n !== curso.pesoActividades) {
-      save({ pesoActividades: n })
+  const numActividades = Number.parseFloat(pesoActividades) || 0
+  const numMini = Number.parseFloat(pesoMiniProyecto) || 0
+
+  // Suma cruda: lo que se persiste. Constraint SQL `curso_pesos_intra_modulo_suman_100`
+  // exige actividades + mini = 100 SIEMPRE. Mandamos PATCH único con ambos
+  // valores cuando suman 100, igual que en PesosSection.
+  const sumaCruda = numActividades + numMini
+  const sumaCrudaOk = Math.abs(sumaCruda - 100) < 0.01
+  const algoCambio = numActividades !== curso.pesoActividades || numMini !== curso.pesoMiniProyecto
+
+  useDebouncedSave(`${pesoActividades}|${pesoMiniProyecto}`, () => {
+    if (!(algoCambio && sumaCrudaOk)) {
+      return
     }
-  })
-  useDebouncedSave(pesoMiniProyecto, (v) => {
-    const n = Number.parseFloat(v)
-    if (Number.isFinite(n) && n >= 0 && n <= 100 && n !== curso.pesoMiniProyecto) {
-      save({ pesoMiniProyecto: n })
+    if (numActividades < 0 || numActividades > 100) {
+      return
     }
+    if (numMini < 0 || numMini > 100) {
+      return
+    }
+    save({ pesoActividades: numActividades, pesoMiniProyecto: numMini })
   })
 
-  const suma =
-    (Number.parseFloat(pesoActividades) || 0) + (Number.parseFloat(pesoMiniProyecto) || 0)
-  const sumaOk = Math.abs(suma - 100) < 0.01
+  // MAESTRO §9.5: si hay algún módulo con Mini activo, su peso debe ser > 0.
+  const miniActivoConPesoCero = algunMini && numMini <= 0
 
   return (
     <InspectorSection title="Pesos intra-módulo" defaultOpen={false}>
       <p className="text-[11px] text-text-muted">
-        Aplica al interior de cada módulo del curso. Si un módulo no activa Mini Proyecto, sus
-        actividades cubren el 100%.
+        Aplica al interior de cada módulo del curso. Los 2 pesos deben sumar 100; mientras no lo
+        hagan, los cambios no se guardan. Si ningún módulo activa Mini Proyecto, las actividades
+        cubren el 100%.
       </p>
       <InspectorRow label="Actividades (%)">
         <NumberInput
@@ -341,7 +415,14 @@ function PesosIntraModuloSection({ curso, save }: SectionProps) {
           step={0.01}
         />
       </InspectorRow>
-      <InspectorRow label="Mini Proyecto (%)">
+      <InspectorRow
+        label="Mini Proyecto (%)"
+        hint={
+          algunMini
+            ? undefined
+            : "Ningún módulo tiene Mini Proyecto activo; este peso solo aplicará si activas el Mini en algún módulo."
+        }
+      >
         <NumberInput
           value={pesoMiniProyecto}
           onChange={setPesoMiniProyecto}
@@ -350,8 +431,14 @@ function PesosIntraModuloSection({ curso, save }: SectionProps) {
           step={0.01}
         />
       </InspectorRow>
-      <p className={`text-[11px] ${sumaOk ? "text-success" : "text-warning"}`}>
-        Suma: {suma.toFixed(2)}% {sumaOk ? "✓" : "(debe ser 100)"}
+      {miniActivoConPesoCero ? (
+        <p className="text-[11px] text-warning">
+          Hay módulos con Mini Proyecto activo. Asigna un peso &gt; 0%. Si no quieres que cuente,
+          desactívalo en el módulo.
+        </p>
+      ) : null}
+      <p className={`text-[11px] ${sumaCrudaOk ? "text-success" : "text-warning"}`}>
+        Suma: {sumaCruda.toFixed(2)}% {sumaCrudaOk ? "✓" : "(debe ser 100 para guardar)"}
       </p>
     </InspectorSection>
   )
@@ -463,9 +550,10 @@ interface NumberInputProps {
   readonly min: number
   readonly max: number
   readonly step: number
+  readonly disabled?: boolean
 }
 
-function NumberInput({ value, onChange, min, max, step }: NumberInputProps) {
+function NumberInput({ value, onChange, min, max, step, disabled }: NumberInputProps) {
   return (
     <input
       type="number"
@@ -473,8 +561,9 @@ function NumberInput({ value, onChange, min, max, step }: NumberInputProps) {
       max={max}
       step={step}
       value={value}
+      disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-[var(--radius-sm)] border border-glass-border bg-glass-1 px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-violet"
+      className="w-full rounded-[var(--radius-sm)] border border-glass-border bg-glass-1 px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-violet disabled:cursor-not-allowed disabled:bg-glass-2 disabled:text-text-muted"
     />
   )
 }

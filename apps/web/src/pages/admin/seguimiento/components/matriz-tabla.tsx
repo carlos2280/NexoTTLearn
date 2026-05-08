@@ -31,7 +31,7 @@ export function MatrizTabla({
                 <th
                   key={area.id}
                   scope="col"
-                  className="min-w-[5rem] px-1.5 py-2.5 text-center font-medium text-text-secondary text-xs uppercase tracking-wider"
+                  className="min-w-[7rem] px-1.5 py-2.5 text-center font-medium text-text-secondary text-xs uppercase tracking-wider"
                 >
                   <button
                     type="button"

@@ -1,10 +1,16 @@
 import { httpClient } from "@/shared/api/http-client"
 import {
+  type CandidatosDisponiblesQuery,
+  type CandidatosDisponiblesResponse,
   type InscripcionDeleteAdminResponse,
   type InscripcionDiagnosticoListResponse,
+  type InvitarCandidatosBody,
+  type InvitarCandidatosResponse,
   type ListarInscripcionesCursoQuery,
+  candidatosDisponiblesResponseSchema,
   inscripcionDeleteAdminResponseSchema,
   inscripcionDiagnosticoListResponseSchema,
+  invitarCandidatosResponseSchema,
 } from "@nexott-learn/shared-types"
 
 export async function listarInscripcionesCurso(
@@ -42,4 +48,33 @@ export async function quitarInscripcionDelCurso(
     `/admin/cursos/${cursoId}/inscripciones/${inscripcionId}`,
   )
   return inscripcionDeleteAdminResponseSchema.parse(data)
+}
+
+export async function buscarCandidatosDisponibles(
+  cursoId: string,
+  query: Partial<CandidatosDisponiblesQuery> = {},
+): Promise<CandidatosDisponiblesResponse> {
+  const search = new URLSearchParams()
+  if (query.q) {
+    search.set("q", query.q)
+  }
+  if (query.limit !== undefined) {
+    search.set("limit", String(query.limit))
+  }
+  const qs = search.toString()
+  const base = `/admin/cursos/${cursoId}/inscripciones/candidatos-disponibles`
+  const path = qs ? `${base}?${qs}` : base
+  const data = await httpClient.get<CandidatosDisponiblesResponse>(path)
+  return candidatosDisponiblesResponseSchema.parse(data)
+}
+
+export async function invitarCandidatos(
+  cursoId: string,
+  body: InvitarCandidatosBody,
+): Promise<InvitarCandidatosResponse> {
+  const data = await httpClient.post<InvitarCandidatosResponse>(
+    `/admin/cursos/${cursoId}/inscripciones`,
+    body,
+  )
+  return invitarCandidatosResponseSchema.parse(data)
 }

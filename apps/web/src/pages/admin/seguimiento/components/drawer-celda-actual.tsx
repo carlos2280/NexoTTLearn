@@ -2,16 +2,34 @@ import { Badge } from "@/shared/ui/patterns/badge"
 import type { CeldaActualDetalle, CeldaActualModulo } from "@nexott-learn/shared-types"
 import { AlertTriangle, BookOpen } from "lucide-react"
 import type { ReactNode } from "react"
+import { EvolucionCelda } from "./charts/evolucion-celda"
 import { type EntregaAjustable, FilaEntregaReciente } from "./fila-entrega-reciente"
 
 interface DrawerCeldaActualProps {
   readonly detalle: CeldaActualDetalle
+  readonly cursoId: string
+  readonly inscripcionId: string
+  readonly areaId: string
+  readonly umbralArea: number
   readonly onAjustarEntrega: (e: EntregaAjustable) => void
 }
 
-export function DrawerCeldaActual({ detalle, onAjustarEntrega }: DrawerCeldaActualProps) {
+export function DrawerCeldaActual({
+  detalle,
+  cursoId,
+  inscripcionId,
+  areaId,
+  umbralArea,
+  onAjustarEntrega,
+}: DrawerCeldaActualProps) {
   return (
     <div className="flex flex-col gap-5">
+      <EvolucionCelda
+        cursoId={cursoId}
+        inscripcionId={inscripcionId}
+        areaId={areaId}
+        umbralArea={umbralArea}
+      />
       <Bloque titulo="Nota actual del área">
         <div className="flex items-baseline gap-2">
           <span className="font-semibold text-3xl text-text-primary tabular-nums">

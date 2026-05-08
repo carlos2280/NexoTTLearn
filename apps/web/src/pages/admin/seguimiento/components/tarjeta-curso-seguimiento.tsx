@@ -1,10 +1,13 @@
+import { useCohorteSerie } from "@/features/admin-seguimiento/hooks/use-cohorte-serie"
 import { Badge } from "@/shared/ui/patterns/badge"
 import { Skeleton } from "@/shared/ui/patterns/skeleton"
 import { Button } from "@/shared/ui/primitives/button"
 import { Card } from "@/shared/ui/primitives/card"
 import type { CursoListItem, KpisCursoActual } from "@nexott-learn/shared-types"
-import { AlertTriangle, ArrowRight, Clock, Users } from "lucide-react"
+import { AlertTriangle, ArrowRight, Clock, TrendingUp, Users } from "lucide-react"
+import { Area, AreaChart, ResponsiveContainer } from "recharts"
 import { diasHastaDeadline } from "../lib/ordenar-cursos-hub"
+import { CHART_COLORS } from "./charts/chart-tokens"
 
 interface TarjetaCursoSeguimientoProps {
   readonly curso: CursoListItem
@@ -41,12 +44,11 @@ export function TarjetaCursoSeguimiento({
           </strong>
           {curso.contadores.inscripcionesActivas === 1 ? "candidato" : "candidatos"}
         </span>
-        {kpis ? (
-          <span className="text-text-muted text-xs">
-            Cumplimiento: {Math.round(kpis.cumplimientoPct)}%
-          </span>
-        ) : null}
       </div>
+
+      {kpis ? (
+        <SparklineCumplimiento cursoId={curso.id} cumplimiento={kpis.cumplimientoPct} />
+      ) : null}
 
       <div className="mt-auto flex items-center justify-end gap-3">
         <Button size="sm" variant="ghost" onClick={() => onAbrir(curso.id)}>
@@ -55,6 +57,48 @@ export function TarjetaCursoSeguimiento({
         </Button>
       </div>
     </Card>
+  )
+}
+
+interface SparklineCumplimientoProps {
+  readonly cursoId: string
+  readonly cumplimiento: number
+}
+
+function SparklineCumplimiento({ cursoId, cumplimiento }: SparklineCumplimientoProps) {
+  const { data: serie } = useCohorteSerie(cursoId)
+  const data = (serie?.puntos ?? []).map((p) => ({ v: p.valor }))
+  return (
+    <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-glass-border bg-glass-1 px-3 py-2">
+      <div className="flex flex-col">
+        <span className="text-[10px] text-text-muted uppercase tracking-wider">Cumplimiento</span>
+        <span className="font-bold text-base text-text-primary tabular-nums leading-tight">
+          {Math.round(cumplimiento)}%
+        </span>
+      </div>
+      <div className="relative h-10 flex-1">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+            <defs>
+              <linearGradient id={`spark-${cursoId}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={CHART_COLORS.brandViolet} stopOpacity={0.5} />
+                <stop offset="100%" stopColor={CHART_COLORS.brandViolet} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <Area
+              type="monotone"
+              dataKey="v"
+              stroke={CHART_COLORS.brandViolet}
+              strokeWidth={2}
+              fill={`url(#spark-${cursoId})`}
+              dot={false}
+              isAnimationActive={false}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      <TrendingUp className="size-3.5 text-success" strokeWidth={2.5} aria-hidden="true" />
+    </div>
   )
 }
 

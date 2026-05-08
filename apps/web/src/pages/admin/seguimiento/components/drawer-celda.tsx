@@ -76,9 +76,16 @@ export function DrawerCelda({
         <DrawerBody>
           {isLoading || !data ? (
             <Skeleton className="h-64 w-full rounded-[var(--radius-lg)]" />
-          ) : data.tab === "actual" ? (
-            <DrawerCeldaActual detalle={data} onAjustarEntrega={onAjustarEntrega} />
-          ) : (
+          ) : data.tab === "actual" && fila && area ? (
+            <DrawerCeldaActual
+              detalle={data}
+              cursoId={cursoId}
+              inscripcionId={fila.inscripcionId}
+              areaId={area.id}
+              umbralArea={area.umbral}
+              onAjustarEntrega={onAjustarEntrega}
+            />
+          ) : data.tab === "actual" ? null : (
             <DrawerCeldaInicial detalle={data} />
           )}
         </DrawerBody>

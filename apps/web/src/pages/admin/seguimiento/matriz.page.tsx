@@ -1,22 +1,27 @@
+import { useDescargarPlantilla } from "@/features/admin-seguimiento/hooks/use-descargar-plantilla"
 import { useKpisSeguimiento } from "@/features/admin-seguimiento/hooks/use-kpis-seguimiento"
 import { useMatrizSeguimiento } from "@/features/admin-seguimiento/hooks/use-matriz-seguimiento"
 import { RUTAS } from "@/shared/constants/rutas"
 import { PageHeader } from "@/shared/ui/patterns/page-header"
 import { Button } from "@/shared/ui/primitives/button"
 import type { FiltroEstadoSeguimiento } from "@nexott-learn/shared-types"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Download, Upload } from "lucide-react"
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
+import { GraficoBarrasAreas } from "./components/charts/grafico-barras-areas"
+import { GraficoDonutEstados } from "./components/charts/grafico-donut-estados"
+import { GraficoLineaCohorte } from "./components/charts/grafico-linea-cohorte"
 import { DrawerAreaCross } from "./components/drawer-area-cross"
 import { DrawerCelda } from "./components/drawer-celda"
+import { DrawerCargarExcel } from "./components/excel/drawer-cargar-excel"
 import { MatrizCuerpo, filtrarBusqueda } from "./components/matriz-cuerpo"
 import { MatrizKpis } from "./components/matriz-kpis"
-import { MatrizTabs } from "./components/matriz-tabs"
 import { MatrizToolbar } from "./components/matriz-toolbar"
 import { ModalAjustarEntrega } from "./components/modal-ajustar-entrega"
+import { SelectorCurso } from "./components/selector-curso"
 import { useAjusteEntrega } from "./lib/use-ajuste-entrega"
 import { useCeldaAbierta } from "./lib/use-celda-abierta"
-import { useTabMatriz } from "./lib/use-tab-matriz"
 
 type EstadoNoAll = Exclude<FiltroEstadoSeguimiento, "all">
 
@@ -26,15 +31,17 @@ interface MatrizSeguimientoPageProps {
 
 export function MatrizSeguimientoPage({ cursoId }: MatrizSeguimientoPageProps) {
   const navigate = useNavigate()
-  const { tab, setTab } = useTabMatriz()
+  const tab = "actual" as const
   const [search, setSearch] = useState("")
   const [estado, setEstado] = useState<EstadoNoAll | null>(null)
+  const [cargandoExcel, setCargandoExcel] = useState(false)
 
   const matrizQuery = useMatrizSeguimiento(cursoId, {
     tab,
     estado: estado ?? undefined,
   })
   const kpisQuery = useKpisSeguimiento(cursoId, tab)
+  const descargarPlantillaMut = useDescargarPlantilla()
 
   const filas = useMemo(() => filtrarBusqueda(matrizQuery.data, search), [matrizQuery.data, search])
   const drawer = useCeldaAbierta()
@@ -48,22 +55,49 @@ export function MatrizSeguimientoPage({ cursoId }: MatrizSeguimientoPageProps) {
     navigate(RUTAS.admin.seguimientoParticipante(participanteId))
   }
 
+  const handleDescargarPlantilla = () => {
+    descargarPlantillaMut.mutate(
+      { cursoId },
+      {
+        onSuccess: () => toast.success("Plantilla descargada"),
+        onError: (e) => toast.error(e.message),
+      },
+    )
+  }
+
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 md:py-10 lg:px-8">
       <div className="flex flex-col gap-6">
         <PageHeader
           eyebrow="Seguimiento"
-          title={matrizQuery.data ? `Curso · ${cursoId.slice(0, 8)}` : "Matriz del curso"}
-          subtitle="Lectura cohorte · candidatos × áreas."
+          title="Matriz de progreso"
+          subtitle="Evolución de la cohorte · candidatos × áreas"
           actions={
-            <Button variant="ghost" size="sm" onClick={() => navigate(RUTAS.admin.seguimiento)}>
-              <ArrowLeft className="size-4" strokeWidth={2} aria-hidden="true" />
-              Volver al hub
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <SelectorCurso cursoIdActual={cursoId} />
+              <Button variant="secondary" size="sm" onClick={handleDescargarPlantilla}>
+                <Download className="size-4" strokeWidth={2} aria-hidden="true" />
+                Plantilla
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => setCargandoExcel(true)}>
+                <Upload className="size-4" strokeWidth={2} aria-hidden="true" />
+                Cargar Excel
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate(RUTAS.admin.seguimiento)}>
+                <ArrowLeft className="size-4" strokeWidth={2} aria-hidden="true" />
+                Hub
+              </Button>
+            </div>
           }
         />
-        <MatrizTabs value={tab} onChange={setTab} />
         <MatrizKpis data={kpisQuery.data} isLoading={kpisQuery.isLoading} />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <GraficoLineaCohorte cursoId={cursoId} />
+          </div>
+          <GraficoDonutEstados cursoId={cursoId} />
+        </div>
+        <GraficoBarrasAreas cursoId={cursoId} />
         <MatrizToolbar
           search={search}
           onChangeSearch={setSearch}
@@ -83,20 +117,32 @@ export function MatrizSeguimientoPage({ cursoId }: MatrizSeguimientoPageProps) {
         tab={tab}
         fila={drawer.celda?.fila ?? null}
         area={drawer.celda?.area ?? null}
-        onClose={drawer.cerrar}
+        onClose={drawer.cerrarCelda}
         onAbrirFicha={(id) => {
           drawer.cerrar()
           navigate(RUTAS.admin.seguimientoParticipante(id))
         }}
         onAjustarEntrega={ajuste.abrir}
       />
-      <DrawerAreaCross area={drawer.areaCross} matriz={matrizQuery.data} onClose={drawer.cerrar} />
+      <DrawerAreaCross
+        area={drawer.areaCross}
+        matriz={matrizQuery.data}
+        onClose={drawer.cerrarAreaCross}
+      />
       <ModalAjustarEntrega
         entregaId={ajuste.entrega?.id ?? null}
         tipo={ajuste.entrega?.tipo ?? "bloque"}
         notaActual={ajuste.entrega?.nota ?? null}
         nombreParticipante={nombreParticipante}
         onClose={ajuste.cerrar}
+      />
+      <DrawerCargarExcel
+        open={cargandoExcel}
+        onClose={() => setCargandoExcel(false)}
+        cursoId={cursoId}
+        onConfirmado={() => {
+          toast.success("Evaluación inicial aplicada")
+        }}
       />
     </main>
   )

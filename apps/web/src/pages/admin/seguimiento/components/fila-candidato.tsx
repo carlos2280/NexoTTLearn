@@ -2,7 +2,7 @@ import { configEstadoSeguimiento } from "@/features/admin-seguimiento/lib/estado
 import { Badge } from "@/shared/ui/patterns/badge"
 import { Avatar } from "@/shared/ui/primitives/avatar"
 import type { MatrizAreaHeader, MatrizFila } from "@nexott-learn/shared-types"
-import { CeldaSemaforo } from "./celda-semaforo"
+import { CeldaTrayectoria } from "./celda-trayectoria"
 
 interface FilaCandidatoProps {
   readonly fila: MatrizFila
@@ -44,7 +44,12 @@ export function FilaCandidato({ fila, areas, onClickCelda, onClickFila }: FilaCa
         }
         return (
           <td key={area.id} className="px-1.5 py-2 text-center align-middle">
-            <CeldaSemaforo celda={celda} umbral={area.umbral} onClick={() => onClickCelda(area)} />
+            <CeldaTrayectoria
+              celda={celda}
+              umbral={area.umbral}
+              notaInicial={celda.notaInicial}
+              onClick={() => onClickCelda(area)}
+            />
           </td>
         )
       })}

@@ -8,10 +8,11 @@ import { FilaInvitado } from "./fila-invitado"
 interface TabInvitadosProps {
   readonly inscripciones: readonly InscripcionDiagnosticoItem[]
   readonly onQuitar?: (inscripcion: InscripcionDiagnosticoItem) => void
+  readonly onInvitar?: () => void
   readonly cargando?: boolean
 }
 
-export function TabInvitados({ inscripciones, onQuitar, cargando }: TabInvitadosProps) {
+export function TabInvitados({ inscripciones, onQuitar, onInvitar, cargando }: TabInvitadosProps) {
   if (cargando && inscripciones.length === 0) {
     return <EsqueletoLista />
   }
@@ -22,14 +23,10 @@ export function TabInvitados({ inscripciones, onQuitar, cargando }: TabInvitados
         title="Sin candidatos invitados"
         description="Empieza invitando a los participantes que tomarán este curso."
         action={
-          <Tooltip content="Disponible próximamente · pendiente endpoint de invitación">
-            <span>
-              <Button disabled={true}>
-                <Plus className="size-4" aria-hidden="true" />
-                Invitar candidatos
-              </Button>
-            </span>
-          </Tooltip>
+          <Button onClick={onInvitar} disabled={!onInvitar}>
+            <Plus className="size-4" aria-hidden="true" />
+            Invitar candidatos
+          </Button>
         }
       />
     )
@@ -37,7 +34,7 @@ export function TabInvitados({ inscripciones, onQuitar, cargando }: TabInvitados
 
   return (
     <div className="flex flex-col gap-4">
-      <CabeceraInvitados total={inscripciones.length} />
+      <CabeceraInvitados total={inscripciones.length} onInvitar={onInvitar} />
       <ul className="flex flex-col gap-2.5">
         {inscripciones.map((insc) => (
           <li key={insc.inscripcionId}>
@@ -49,7 +46,12 @@ export function TabInvitados({ inscripciones, onQuitar, cargando }: TabInvitados
   )
 }
 
-function CabeceraInvitados({ total }: { readonly total: number }) {
+interface CabeceraInvitadosProps {
+  readonly total: number
+  readonly onInvitar?: () => void
+}
+
+function CabeceraInvitados({ total, onInvitar }: CabeceraInvitadosProps) {
   return (
     <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-col gap-0.5">
@@ -67,14 +69,10 @@ function CabeceraInvitados({ total }: { readonly total: number }) {
             </Button>
           </span>
         </Tooltip>
-        <Tooltip content="Disponible próximamente · pendiente endpoint">
-          <span>
-            <Button size="sm" disabled={true}>
-              <Plus className="size-4" aria-hidden="true" />
-              Invitar más
-            </Button>
-          </span>
-        </Tooltip>
+        <Button size="sm" onClick={onInvitar} disabled={!onInvitar}>
+          <Plus className="size-4" aria-hidden="true" />
+          Invitar más
+        </Button>
       </div>
     </header>
   )

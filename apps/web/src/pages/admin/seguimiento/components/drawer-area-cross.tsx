@@ -11,7 +11,7 @@ interface DrawerAreaCrossProps {
 }
 
 export function DrawerAreaCross({ area, matriz, onClose }: DrawerAreaCrossProps) {
-  const open = Boolean(area && matriz)
+  const open = Boolean(area)
   const stats = matriz && area ? calcularStatsArea(matriz, area.id) : null
 
   return (
@@ -42,6 +42,11 @@ export function DrawerAreaCross({ area, matriz, onClose }: DrawerAreaCrossProps)
         }
       >
         <DrawerBody>
+          {!stats && area ? (
+            <div className="rounded-[var(--radius-lg)] border border-glass-border bg-glass-1 p-6 text-center text-sm text-text-muted">
+              Cargando datos del área…
+            </div>
+          ) : null}
           {stats && area ? (
             <>
               <div className="grid grid-cols-2 gap-3">

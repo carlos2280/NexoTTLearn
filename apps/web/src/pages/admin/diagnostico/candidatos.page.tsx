@@ -15,12 +15,14 @@ import { useNavigate, useParams } from "react-router-dom"
 import { BotonIrSeguimiento } from "./components/boton-ir-seguimiento"
 import { DiagnosticoTabs } from "./components/diagnostico-tabs"
 import { DrawerCapturaCelda } from "./components/drawer-captura-celda"
+import { DrawerInvitarCandidatos } from "./components/drawer-invitar/drawer-invitar-candidatos"
 import { ProgresoDiagnostico } from "./components/progreso-diagnostico"
 import { TabAsignacion } from "./components/tab-asignacion"
 import { TabEvaluacion } from "./components/tab-evaluacion"
 import { TabInvitados } from "./components/tab-invitados"
 import { mapMockInscripciones } from "./lib/adapters"
 import { useCapturaCelda } from "./lib/use-captura-celda"
+import { useDrawerInvitar } from "./lib/use-drawer-invitar"
 import { useQuitarDialog } from "./lib/use-quitar-dialog"
 import { useTabActiva } from "./lib/use-tab-activa"
 
@@ -40,6 +42,7 @@ export function CursoCandidatosPage() {
   const { tabActiva, setTabActiva } = useTabActiva(progreso.tabSugerido)
   const quitar = useQuitarDialog()
   const captura = useCapturaCelda()
+  const drawerInvitar = useDrawerInvitar(cursoId)
 
   useBreadcrumbOverride([
     { label: "Diagnóstico", href: RUTAS.admin.diagnosticos },
@@ -102,6 +105,7 @@ export function CursoCandidatosPage() {
             <TabInvitados
               inscripciones={inscripciones}
               onQuitar={quitar.pedirQuitar}
+              onInvitar={drawerInvitar.abrir}
               cargando={inscripcionesQuery.isLoading}
             />
           ) : tabActiva === 2 ? (
@@ -139,6 +143,8 @@ export function CursoCandidatosPage() {
         onCerrar={captura.cerrar}
         onGuardar={captura.guardar}
       />
+
+      <DrawerInvitarCandidatos cursoId={cursoId} controller={drawerInvitar} />
     </TooltipProvider>
   )
 }

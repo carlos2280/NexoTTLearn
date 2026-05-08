@@ -7,9 +7,53 @@ import {
   type HTMLAttributes,
   type ReactNode,
   forwardRef,
+  useEffect,
 } from "react"
 
-export const Drawer = Radix.Root
+/**
+ * Workaround de Radix Dialog: cuando un Dialog/Popover hijo se cierra mientras
+ * el Drawer sigue abierto, Radix deja `pointer-events: none` en <body> y los
+ * clicks en el propio Drawer (X, overlay, footer) dejan de funcionar.
+ * Vigilamos el body con un MutationObserver mientras hay un drawer abierto y
+ * limpiamos el estilo en cuanto aparece.
+ * Ref: https://github.com/radix-ui/primitives/issues/1241
+ */
+function useFixBodyPointerEvents(open: boolean) {
+  useEffect(() => {
+    if (!open) {
+      if (document.body.style.pointerEvents === "none") {
+        document.body.style.pointerEvents = ""
+      }
+      return undefined
+    }
+    const clear = () => {
+      if (document.body.style.pointerEvents === "none") {
+        document.body.style.pointerEvents = ""
+      }
+    }
+    clear()
+    const observer = new MutationObserver(clear)
+    observer.observe(document.body, { attributes: true, attributeFilter: ["style"] })
+    return () => {
+      observer.disconnect()
+      clear()
+    }
+  }, [open])
+}
+
+export function Drawer({
+  open,
+  onOpenChange,
+  children,
+  ...rest
+}: ComponentPropsWithoutRef<typeof Radix.Root>) {
+  useFixBodyPointerEvents(Boolean(open))
+  return (
+    <Radix.Root open={open} onOpenChange={onOpenChange} {...rest}>
+      {children}
+    </Radix.Root>
+  )
+}
 export const DrawerTrigger = Radix.Trigger
 export const DrawerClose = Radix.Close
 
@@ -47,9 +91,7 @@ export const DrawerContent = forwardRef<HTMLDivElement, DrawerContentProps>(func
         {...props}
       >
         <Radix.Title className="sr-only">{title}</Radix.Title>
-        {description ? (
-          <Radix.Description className="sr-only">{description}</Radix.Description>
-        ) : null}
+        <Radix.Description className="sr-only">{description ?? title}</Radix.Description>
 
         {header ? <div className="shrink-0 border-glass-border border-b">{header}</div> : null}
 

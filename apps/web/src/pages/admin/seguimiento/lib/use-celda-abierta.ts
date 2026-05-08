@@ -27,5 +27,13 @@ export function useCeldaAbierta() {
     setAreaCross(null)
   }, [])
 
-  return { celda, areaCross, abrirCelda, abrirAreaCross, cerrar }
+  const cerrarCelda = useCallback(() => {
+    setCelda(null)
+  }, [])
+
+  const cerrarAreaCross = useCallback(() => {
+    setAreaCross(null)
+  }, [])
+
+  return { celda, areaCross, abrirCelda, abrirAreaCross, cerrar, cerrarCelda, cerrarAreaCross }
 }
