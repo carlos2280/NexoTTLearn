@@ -34,4 +34,23 @@ export interface TreeNode {
    * expandido. Útil para barras de validación/guardado contextual al grupo.
    */
   readonly footer?: ReactNode
+  /**
+   * Items del menú contextual (click derecho + boton ⋯). El árbol los
+   * renderiza tanto en context menu como en dropdown del boton. Pasa los
+   * `<ContextMenuItem>` o `<DropdownMenuItem>` directamente — el árbol los
+   * envuelve. Si null/undefined, el row no expone menu.
+   */
+  readonly menu?: TreeMenu
+  /** Si true, atenúa visualmente el row (nodo archivado). */
+  readonly muted?: boolean
+}
+
+/**
+ * Render-prop pair para que el consumidor describa el menú de un row sin
+ * acoplar la primitiva a Radix-context vs Radix-dropdown. El árbol invoca
+ * uno u otro según el disparador (click derecho vs botón ⋯).
+ */
+export interface TreeMenu {
+  readonly contextItems: ReactNode
+  readonly dropdownItems: ReactNode
 }

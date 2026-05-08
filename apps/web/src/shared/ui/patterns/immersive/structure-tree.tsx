@@ -1,7 +1,17 @@
 import { cn } from "@/shared/lib/cn"
-import { ChevronRight } from "lucide-react"
-import { useState } from "react"
-import type { ImmersiveMode, TreeNode } from "./types"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuTrigger,
+} from "@/shared/ui/primitives/context-menu"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/shared/ui/primitives/dropdown-menu"
+import { ChevronRight, MoreHorizontal } from "lucide-react"
+import { type ReactNode, useState } from "react"
+import type { ImmersiveMode, TreeMenu, TreeNode } from "./types"
 
 interface StructureTreeProps {
   readonly nodes: readonly TreeNode[]
@@ -127,7 +137,17 @@ interface TreeRowHeaderProps {
   readonly mode: ImmersiveMode
 }
 
-function TreeRowHeader({
+function TreeRowHeader(props: TreeRowHeaderProps) {
+  const { node, mode } = props
+  const row = <TreeRowBody {...props} />
+
+  if (mode === "edit" && node.menu) {
+    return <RowContextWrapper menu={node.menu}>{row}</RowContextWrapper>
+  }
+  return row
+}
+
+function TreeRowBody({
   node,
   depth,
   isSelected,
@@ -145,6 +165,7 @@ function TreeRowHeader({
         isSelected
           ? "bg-[var(--gradient-brand-soft)] text-text-primary"
           : "text-text-secondary hover:bg-glass-2 hover:text-text-primary",
+        node.muted && !isSelected && "opacity-60",
       )}
       style={{ paddingLeft: `${depth * 12 + 6}px` }}
     >
@@ -168,31 +189,9 @@ function TreeRowHeader({
         <ChevronRight className="size-3.5" strokeWidth={2} />
       </button>
 
-      <button
-        type="button"
-        onClick={() => onSelect(node.id)}
-        className="flex min-w-0 flex-1 items-center gap-2 text-left"
-      >
-        {node.icon ? (
-          <span
-            className={cn("shrink-0", isSelected ? "text-brand-violet-soft" : "text-text-muted")}
-            style={node.accent ? { color: node.accent } : undefined}
-            aria-hidden="true"
-          >
-            {node.icon}
-          </span>
-        ) : null}
+      <RowLabelButton node={node} isSelected={isSelected} onSelect={onSelect} />
 
-        <span className={cn("truncate font-medium", isSelected && "text-text-primary")}>
-          {node.label}
-        </span>
-
-        {node.meta ? (
-          <span className="ml-auto shrink-0 text-[11px] text-text-muted">{node.meta}</span>
-        ) : null}
-
-        {node.badge}
-      </button>
+      {mode === "edit" && node.menu ? <RowMenuButton items={node.menu.dropdownItems} /> : null}
 
       {mode === "edit" && node.action ? (
         <span className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
@@ -200,5 +199,87 @@ function TreeRowHeader({
         </span>
       ) : null}
     </div>
+  )
+}
+
+function RowLabelButton({
+  node,
+  isSelected,
+  onSelect,
+}: {
+  readonly node: TreeNode
+  readonly isSelected: boolean
+  readonly onSelect: (id: string) => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(node.id)}
+      className="flex min-w-0 flex-1 items-center gap-2 text-left"
+    >
+      {node.icon ? (
+        <span
+          className={cn("shrink-0", isSelected ? "text-brand-violet-soft" : "text-text-muted")}
+          style={node.accent ? { color: node.accent } : undefined}
+          aria-hidden="true"
+        >
+          {node.icon}
+        </span>
+      ) : null}
+
+      <span className={cn("truncate font-medium", isSelected && "text-text-primary")}>
+        {node.label}
+      </span>
+
+      {node.meta ? (
+        <span className="ml-auto shrink-0 text-[11px] text-text-muted">{node.meta}</span>
+      ) : null}
+
+      {node.badge}
+    </button>
+  )
+}
+
+function RowContextWrapper({
+  menu,
+  children,
+}: {
+  readonly menu: TreeMenu
+  readonly children: ReactNode
+}) {
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild={true}>{children}</ContextMenuTrigger>
+      <ContextMenuContent>{menu.contextItems}</ContextMenuContent>
+    </ContextMenu>
+  )
+}
+
+function RowMenuButton({ items }: { readonly items: ReactNode }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild={true}>
+        <button
+          type="button"
+          aria-label="Abrir menú"
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            "flex size-5 shrink-0 items-center justify-center rounded",
+            "text-text-muted transition-all duration-150",
+            "opacity-0 group-hover:opacity-100",
+            "hover:bg-glass-2 hover:text-text-primary",
+            "data-[state=open]:bg-glass-2 data-[state=open]:text-text-primary",
+            "data-[state=open]:opacity-100",
+            "focus-visible:opacity-100 focus-visible:outline-none",
+            "focus-visible:ring-2 focus-visible:ring-brand-violet/40",
+          )}
+        >
+          <MoreHorizontal className="size-3.5" strokeWidth={2} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" sideOffset={4} className="min-w-[10rem]">
+        {items}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
