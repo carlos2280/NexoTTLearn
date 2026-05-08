@@ -130,12 +130,6 @@ function InspectorEntrevistaCargada({ curso, cursoId, ei }: CargadaProps) {
           />
         </InspectorRow>
       </InspectorSection>
-
-      <InspectorSection title="Información" defaultOpen={false}>
-        <InspectorRow label="Peso en curso">
-          <span className="text-sm text-text-secondary">{curso.pesoEntrevistaIA}%</span>
-        </InspectorRow>
-      </InspectorSection>
     </InspectorPanel>
   )
 }
