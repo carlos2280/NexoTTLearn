@@ -73,7 +73,17 @@
   /* ── Glow shadows (no cambian, son brand) ───────────── */
   --shadow-glow-violet: 0 0 32px rgb(124 58 237 / 0.35);
   --shadow-glow-cyan: 0 0 32px rgb(34 211 238 / 0.3);
+  --shadow-glow-spectral: 0 24px 80px -20px rgb(124 58 237 / 0.45),
+    0 8px 32px -8px rgb(34 211 238 / 0.35);
   --shadow-ring-brand: 0 0 0 1px var(--brand-violet), 0 0 0 4px rgb(124 58 237 / 0.25);
+
+  /* ── Gradiente espectral suave (glow inferior firma) ── */
+  --gradient-spectral-soft: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgb(124 58 237 / 0.18) 50%,
+    rgb(34 211 238 / 0.18) 100%
+  );
 
   /* ── Bordes y radios ────────────────────────────────── */
   --radius-xs: 4px;
@@ -144,6 +154,10 @@
   /* FX hero (scrim base) */
   --hero-scrim: radial-gradient(ellipse at top left, rgb(76 29 149 / 0.35), transparent 55%),
     radial-gradient(ellipse at bottom right, rgb(8 145 178 / 0.25), transparent 60%);
+
+  /* Dock flotante (glass mas marcado para que destaque sobre mesh) */
+  --dock-glass: rgb(255 255 255 / 0.06);
+  --dock-border: rgb(255 255 255 / 0.12);
 }
 
 /* ============================================================
@@ -191,4 +205,8 @@
   /* FX hero (scrim mas suave en light) */
   --hero-scrim: radial-gradient(ellipse at top left, rgb(124 58 237 / 0.18), transparent 55%),
     radial-gradient(ellipse at bottom right, rgb(34 211 238 / 0.18), transparent 60%);
+
+  /* Dock flotante (glass oscuro suave sobre claro) */
+  --dock-glass: rgb(15 12 30 / 0.05);
+  --dock-border: rgb(15 12 30 / 0.1);
 }

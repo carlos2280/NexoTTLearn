@@ -1,5 +1,5 @@
 import { cn } from "@/shared/lib/cn"
-import { Slot } from "@radix-ui/react-slot"
+import { Slot, Slottable } from "@radix-ui/react-slot"
 import { Loader2 } from "lucide-react"
 import { type ButtonHTMLAttributes, forwardRef } from "react"
 import { type VariantProps, tv } from "tailwind-variants"
@@ -73,7 +73,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       {...props}
     >
       {loading ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-      {children}
+      <Slottable>{children}</Slottable>
     </Comp>
   )
 })

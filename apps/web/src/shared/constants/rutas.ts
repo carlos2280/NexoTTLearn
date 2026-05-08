@@ -27,4 +27,13 @@ export const RUTAS = {
     mantenedores: "/admin/mantenedores",
     configuracion: "/admin/configuracion",
   },
+
+  // Participante
+  participante: {
+    bandeja: "/",
+    misCursos: "/cursos",
+    cursoDetalle: (id: string): string => `/cursos/${id}`,
+    catalogo: "/catalogo",
+    expediente: "/expediente",
+  },
 } as const
