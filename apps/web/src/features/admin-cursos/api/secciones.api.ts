@@ -1,5 +1,6 @@
 import { httpClient } from "@/shared/api/http-client"
 import {
+  type ActualizarSeccionAdminInput,
   type CrearSeccionAdminInput,
   type ReordenarSeccionesAdminInput,
   type SeccionDetalleAdmin,
@@ -33,7 +34,7 @@ export async function crearSeccion(
 export async function actualizarSeccion(
   scope: ScopeSeccion,
   seccionId: string,
-  input: { readonly titulo?: string },
+  input: ActualizarSeccionAdminInput,
 ): Promise<SeccionDetalleAdmin> {
   const data = await httpClient.patch<SeccionDetalleAdmin>(`${path(scope)}/${seccionId}`, input)
   return seccionDetalleAdminSchema.parse(data)

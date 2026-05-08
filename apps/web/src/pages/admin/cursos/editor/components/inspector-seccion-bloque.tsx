@@ -38,7 +38,7 @@ export function InspectorSeccionBloque({
   }
 
   if (selected.tipo === "seccion") {
-    return <InspectorSeccion seccion={seccion} onArchivar={noop} onEliminar={noop} />
+    return <InspectorSeccion cursoId={cursoId} moduloId={selected.moduloId} seccion={seccion} />
   }
 
   return (
@@ -50,6 +50,3 @@ export function InspectorSeccionBloque({
     />
   )
 }
-
-// biome-ignore lint/suspicious/noEmptyBlockStatements: placeholder hasta integrar archivar/eliminar sección
-function noop(): void {}

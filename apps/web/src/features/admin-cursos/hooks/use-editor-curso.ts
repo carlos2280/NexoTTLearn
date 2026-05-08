@@ -1,6 +1,7 @@
 import type {
   ActualizarBloqueAdminInput,
   ActualizarModuloAdminInput,
+  ActualizarSeccionAdminInput,
   BloqueDetalleAdmin,
   BloqueListAdminResponse,
   CrearBloqueAdminInput,
@@ -32,7 +33,12 @@ import {
   reordenarModulos,
 } from "../api/modulos.api"
 import { publicarCurso } from "../api/publicar-curso.api"
-import { crearSeccion, listarSecciones, reordenarSecciones } from "../api/secciones.api"
+import {
+  actualizarSeccion,
+  crearSeccion,
+  listarSecciones,
+  reordenarSecciones,
+} from "../api/secciones.api"
 import { ADMIN_CURSOS_KEY } from "./use-cursos"
 
 // ─── Keys ────────────────────────────────────────────────────────────
@@ -154,6 +160,18 @@ export function useEliminarModulo(cursoId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: editorKeys.modulos(cursoId) })
       qc.invalidateQueries({ queryKey: ADMIN_CURSOS_KEY })
+    },
+  })
+}
+
+export function useActualizarSeccion(cursoId: string, moduloId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { seccionId: string; input: ActualizarSeccionAdminInput }) =>
+      actualizarSeccion({ cursoId, moduloId }, vars.seccionId, vars.input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: editorKeys.secciones(cursoId, moduloId) })
+      qc.invalidateQueries({ queryKey: editorKeys.modulos(cursoId) })
     },
   })
 }
