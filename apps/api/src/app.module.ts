@@ -15,6 +15,7 @@ import { AuthModule } from "./auth/auth.module"
 import { PrismaModule } from "./common/prisma/prisma.module"
 import { HealthModule } from "./health/health.module"
 import { BandejaModule } from "./participante/bandeja/bandeja.module"
+import { CatalogoModule } from "./participante/catalogo/catalogo.module"
 import { MisCursosModule } from "./participante/mis-cursos/mis-cursos.module"
 
 // Migración v2 en curso. Los módulos admin (cursos, módulos, secciones,
@@ -52,6 +53,7 @@ import { MisCursosModule } from "./participante/mis-cursos/mis-cursos.module"
     DashboardModule,
     BandejaModule,
     MisCursosModule,
+    CatalogoModule,
   ],
   providers: [
     {
