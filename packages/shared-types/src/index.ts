@@ -400,9 +400,9 @@ export {
   type ReordenarSeccionesInput,
 } from "./admin-secciones"
 
+export { lecturaContenidoSchema, type LecturaContenido } from "./bloque-payloads"
+
 export {
-  lecturaContenidoSchema,
-  type LecturaContenido,
   videoContenidoSchema,
   type VideoContenido,
   type ProveedorVideo,
@@ -704,3 +704,58 @@ export {
   participanteVistaCursoResponseSchema,
   type ParticipanteVistaCursoResponse,
 } from "./participante-vista-curso"
+
+export {
+  bloqueRuntimeEstadoSchema,
+  type BloqueRuntimeEstado,
+  bloqueRuntimeParrafoSchema,
+  type BloqueRuntimeParrafo,
+  bloqueRuntimeSchema,
+  type BloqueRuntime,
+  type TipoBloqueRuntime,
+  type BloqueRuntimePresetKey,
+  presetKeyDeBloque,
+  seccionInmersivaEstadoSchema,
+  type SeccionInmersivaEstado,
+  seccionInmersivaSchema,
+  type SeccionInmersiva,
+  moduloInmersivoCursoSchema,
+  type ModuloInmersivoCurso,
+  moduloInmersivoSchema,
+  type ModuloInmersivo,
+  moduloInmersivoProgresoSchema,
+  type ModuloInmersivoProgreso,
+  moduloInmersivoNavegacionSchema,
+  type ModuloInmersivoNavegacion,
+  moduloInmersivoResponseSchema,
+  type ModuloInmersivoResponse,
+} from "./participante-modulo-inmersivo"
+
+export {
+  catalogoDuracionBandaSchema,
+  type CatalogoDuracionBanda,
+  catalogoVitrinaQuerySchema,
+  type CatalogoVitrinaQuery,
+  catalogoAreaResumenSchema,
+  type CatalogoAreaResumen,
+  catalogoVitrinaItemSchema,
+  type CatalogoVitrinaItem,
+  catalogoFiltroDuracionSchema,
+  type CatalogoFiltroDuracion,
+  catalogoFiltrosDisponiblesSchema,
+  type CatalogoFiltrosDisponibles,
+  catalogoVitrinaResponseSchema,
+  type CatalogoVitrinaResponse,
+  catalogoFichaHeroSchema,
+  type CatalogoFichaHero,
+  catalogoFichaModuloSchema,
+  type CatalogoFichaModulo,
+  catalogoFichaAreaSchema,
+  type CatalogoFichaArea,
+  catalogoFichaHitosSchema,
+  type CatalogoFichaHitos,
+  catalogoFichaResponseSchema,
+  type CatalogoFichaResponse,
+  catalogoInscribirmeResponseSchema,
+  type CatalogoInscribirmeResponse,
+} from "./participante-catalogo"
