@@ -14,6 +14,8 @@ import { UsuariosModule } from "./admin/usuarios/usuarios.module"
 import { AuthModule } from "./auth/auth.module"
 import { PrismaModule } from "./common/prisma/prisma.module"
 import { HealthModule } from "./health/health.module"
+import { BandejaModule } from "./participante/bandeja/bandeja.module"
+import { MisCursosModule } from "./participante/mis-cursos/mis-cursos.module"
 
 // Migración v2 en curso. Los módulos admin (cursos, módulos, secciones,
 // bloques, dashboard) se reescriben PR a PR contra el schema nuevo. Hasta
@@ -48,6 +50,8 @@ import { HealthModule } from "./health/health.module"
     SeguimientoModule,
     ParticipantesModule,
     DashboardModule,
+    BandejaModule,
+    MisCursosModule,
   ],
   providers: [
     {
