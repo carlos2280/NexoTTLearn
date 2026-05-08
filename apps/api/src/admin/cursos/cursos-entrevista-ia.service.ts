@@ -14,6 +14,7 @@ import {
   snapshotEntrevistaIA,
 } from "./cursos.mapper"
 import {
+  ENTIDAD_TIPO,
   ENTIDAD_TIPO_ENTREVISTA_IA,
   ERROR_CURSO_NO_ENCONTRADO,
   ERROR_EI_CURSO_CERRADO,
@@ -187,6 +188,35 @@ export class CursosEntrevistaIAService {
           valorDespues: Prisma.JsonNull,
         },
       })
+
+      // MAESTRO §9.7 + constraint SQL `curso_pesos_nivel_curso_suman_100`:
+      // pesoAreas + pesoProyectoTransversal + pesoEntrevistaIA debe sumar 100
+      // SIEMPRE (a nivel persistencia). Al desactivar entrevista, transferimos
+      // su peso a pesoAreas para conservar el invariante. Si ya era 0 no
+      // logueamos para no inflar el log con no-ops.
+      const cursoPesos = await tx.curso.findUniqueOrThrow({
+        where: { id: cursoId },
+        select: { pesoAreas: true, pesoEntrevistaIA: true },
+      })
+      const pesoEntrevistaPrevio = Number(cursoPesos.pesoEntrevistaIA.toString())
+      if (pesoEntrevistaPrevio !== 0) {
+        const pesoAreasPrevio = Number(cursoPesos.pesoAreas.toString())
+        const pesoAreasNuevo = Number((pesoAreasPrevio + pesoEntrevistaPrevio).toFixed(2))
+        await tx.curso.update({
+          where: { id: cursoId },
+          data: { pesoAreas: pesoAreasNuevo, pesoEntrevistaIA: 0 },
+        })
+        await tx.logActividad.create({
+          data: {
+            actorId,
+            tipoAccion: "CURSO_ACTUALIZADO",
+            entidadTipo: ENTIDAD_TIPO,
+            entidadId: cursoId,
+            valorAntes: { pesoAreas: pesoAreasPrevio, pesoEntrevistaIA: pesoEntrevistaPrevio },
+            valorDespues: { pesoAreas: pesoAreasNuevo, pesoEntrevistaIA: 0 },
+          },
+        })
+      }
     })
 
     return { tipo: "ELIMINADO", id: previo.id }

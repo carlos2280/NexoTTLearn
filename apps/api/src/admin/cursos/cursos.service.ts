@@ -120,7 +120,19 @@ export class CursosService {
       throw new NotFoundException(ERROR_CURSO_NO_ENCONTRADO)
     }
     const modulosPorArea = await this.contarModulosPorArea(id)
-    return mapCursoDetalle(curso, modulosPorArea)
+    const algunModuloConMiniActivo = await this.tieneAlgunModuloConMiniActivo(id)
+    return mapCursoDetalle(curso, modulosPorArea, algunModuloConMiniActivo)
+  }
+
+  // Indica si el curso tiene al menos un modulo (no archivado) con
+  // miniProyectoActivo=true. Lo usa el detalle para que el front pueda
+  // habilitar el input pesoMiniProyecto. Coincide con la logica del
+  // checklist (regla pesos_intra_modulo) en cursos.checklist.ts.
+  private async tieneAlgunModuloConMiniActivo(cursoId: string): Promise<boolean> {
+    const count = await this.prisma.modulo.count({
+      where: { cursoId, archivadoAt: null, miniProyectoActivo: true },
+    })
+    return count > 0
   }
 
   // ──────────────────────────────────────────────────────────────────

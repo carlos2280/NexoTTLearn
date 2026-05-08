@@ -7,7 +7,7 @@ import { CursosEntrevistaIAService } from "./cursos-entrevista-ia.service"
 type Stub = ReturnType<typeof vi.fn>
 
 interface PrismaMock {
-  curso: { findUnique: Stub }
+  curso: { findUnique: Stub; findUniqueOrThrow: Stub; update: Stub }
   entrevistaIAConfig: {
     findUnique: Stub
     findUniqueOrThrow: Stub
@@ -22,7 +22,14 @@ interface PrismaMock {
 
 function buildPrisma(): PrismaMock {
   const prisma: PrismaMock = {
-    curso: { findUnique: vi.fn() },
+    curso: {
+      findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn().mockResolvedValue({
+        pesoAreas: { toString: () => "100" },
+        pesoEntrevistaIA: { toString: () => "0" },
+      }),
+      update: vi.fn().mockResolvedValue({}),
+    },
     entrevistaIAConfig: {
       findUnique: vi.fn(),
       findUniqueOrThrow: vi.fn(),
@@ -256,5 +263,40 @@ describe("eliminar", () => {
     prisma.entrevistaIAConfig.findUnique.mockResolvedValue(null)
 
     await expect(service.eliminar(CURSO_ID, ACTOR_ID)).rejects.toThrow(NotFoundException)
+  })
+
+  it("MAESTRO §9.7 + constraint: transfiere pesoEntrevistaIA a pesoAreas al eliminar", async () => {
+    const { service, prisma } = buildService()
+    prisma.curso.findUnique.mockResolvedValue(buildCursoRow())
+    prisma.entrevistaIAConfig.findUnique.mockResolvedValue(buildEiRow())
+    prisma.entrevistaIASesion.count.mockResolvedValue(0)
+    prisma.entrevistaIAConfig.delete.mockResolvedValue({})
+    prisma.logActividad.create.mockResolvedValue({})
+    prisma.curso.findUniqueOrThrow.mockResolvedValue({
+      pesoAreas: { toString: () => "70" },
+      pesoEntrevistaIA: { toString: () => "10" },
+    })
+
+    await service.eliminar(CURSO_ID, ACTOR_ID)
+
+    expect(prisma.curso.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: CURSO_ID },
+        data: { pesoAreas: 80, pesoEntrevistaIA: 0 },
+      }),
+    )
+  })
+
+  it("no escribe curso.update si pesoEntrevistaIA ya era 0", async () => {
+    const { service, prisma } = buildService()
+    prisma.curso.findUnique.mockResolvedValue(buildCursoRow())
+    prisma.entrevistaIAConfig.findUnique.mockResolvedValue(buildEiRow())
+    prisma.entrevistaIASesion.count.mockResolvedValue(0)
+    prisma.entrevistaIAConfig.delete.mockResolvedValue({})
+    prisma.logActividad.create.mockResolvedValue({})
+
+    await service.eliminar(CURSO_ID, ACTOR_ID)
+
+    expect(prisma.curso.update).not.toHaveBeenCalled()
   })
 })

@@ -225,7 +225,11 @@ describe("SeguimientoService.obtenerMatriz", () => {
     expect(snapshotPorCurso).not.toHaveBeenCalled()
     const fila1 = resp.filas.find((f) => f.inscripcionId === INSCRIPCION_1)
     expect(fila1?.celdas[0]?.nota).toBe(80)
+    expect(fila1?.celdas[0]?.notaInicial).toBe(80)
     expect(fila1?.celdas[1]?.nota).toBeNull()
+    expect(fila1?.celdas[1]?.notaInicial).toBeNull()
+    // En tab "inicial" no hay trayectoria (nota === notaInicial).
+    expect(fila1?.trayectoriaResumen).toBeUndefined()
   })
 
   it("E1: filtro por estado=EnRiesgo deja solo esas filas", async () => {
@@ -332,6 +336,93 @@ describe("SeguimientoService.obtenerMatriz", () => {
     const fila1 = resp.filas.find((f) => f.inscripcionId === INSCRIPCION_1)
     // pesoA=60, pesoB=40. Cumple solo A → 60/100*100 = 60.
     expect(fila1?.cobertura).toBe(60)
+  })
+
+  it("E1 actual con evaluaciones iniciales: pobla notaInicial y trayectoriaResumen", async () => {
+    const { service, prisma, snapshotPorCurso } = buildService()
+    setupBase(prisma)
+    prisma.evaluacionInicial.findMany.mockResolvedValue([
+      { inscripcionId: INSCRIPCION_1, areaId: AREA_A, puntaje: 50 },
+      { inscripcionId: INSCRIPCION_1, areaId: AREA_B, puntaje: 60 },
+    ])
+    snapshotPorCurso.mockResolvedValue(
+      new Map([
+        [
+          INSCRIPCION_1,
+          {
+            notasModulo: new Map(),
+            notasArea: new Map([
+              [AREA_A, 80],
+              [AREA_B, 70],
+            ]),
+            notaCurso: 76,
+            etiqueta: "APROBADO",
+          },
+        ],
+      ]),
+    )
+    const resp = await service.obtenerMatriz(CURSO_ID, { tab: "actual", estado: "all" })
+    const fila1 = resp.filas.find((f) => f.inscripcionId === INSCRIPCION_1)
+    expect(fila1?.celdas[0]?.nota).toBe(80)
+    expect(fila1?.celdas[0]?.notaInicial).toBe(50)
+    expect(fila1?.celdas[1]?.nota).toBe(70)
+    expect(fila1?.celdas[1]?.notaInicial).toBe(60)
+    // Δ = avg(80,70) - avg(50,60) = 75 - 55 = 20.
+    expect(fila1?.trayectoriaResumen?.deltaPromedio).toBe(20)
+  })
+
+  it("E1 actual sin evaluaciones iniciales: notaInicial=null y trayectoriaResumen ausente", async () => {
+    const { service, prisma, snapshotPorCurso } = buildService()
+    setupBase(prisma)
+    snapshotPorCurso.mockResolvedValue(
+      new Map([
+        [
+          INSCRIPCION_1,
+          {
+            notasModulo: new Map(),
+            notasArea: new Map([[AREA_A, 80]]),
+            notaCurso: 48,
+            etiqueta: "EN_DESARROLLO",
+          },
+        ],
+      ]),
+    )
+    const resp = await service.obtenerMatriz(CURSO_ID, { tab: "actual", estado: "all" })
+    const fila1 = resp.filas.find((f) => f.inscripcionId === INSCRIPCION_1)
+    expect(fila1?.celdas[0]?.notaInicial).toBeNull()
+    expect(fila1?.celdas[1]?.notaInicial).toBeNull()
+    expect(fila1?.trayectoriaResumen).toBeUndefined()
+  })
+
+  it("E1 actual con iniciales parciales: delta solo sobre áreas con par válido", async () => {
+    const { service, prisma, snapshotPorCurso } = buildService()
+    setupBase(prisma)
+    // Solo AREA_A tiene EvaluacionInicial; AREA_B sin diagnóstico.
+    prisma.evaluacionInicial.findMany.mockResolvedValue([
+      { inscripcionId: INSCRIPCION_1, areaId: AREA_A, puntaje: 40 },
+    ])
+    snapshotPorCurso.mockResolvedValue(
+      new Map([
+        [
+          INSCRIPCION_1,
+          {
+            notasModulo: new Map(),
+            notasArea: new Map([
+              [AREA_A, 80],
+              [AREA_B, 50],
+            ]),
+            notaCurso: 68,
+            etiqueta: "EN_DESARROLLO",
+          },
+        ],
+      ]),
+    )
+    const resp = await service.obtenerMatriz(CURSO_ID, { tab: "actual", estado: "all" })
+    const fila1 = resp.filas.find((f) => f.inscripcionId === INSCRIPCION_1)
+    expect(fila1?.celdas[0]?.notaInicial).toBe(40)
+    expect(fila1?.celdas[1]?.notaInicial).toBeNull()
+    // Solo AREA_A entra al promedio: 80 - 40 = 40.
+    expect(fila1?.trayectoriaResumen?.deltaPromedio).toBe(40)
   })
 })
 
@@ -586,5 +677,205 @@ describe("SeguimientoService.obtenerCelda", () => {
       expect(resp.entregasRecientes).toHaveLength(1)
       expect(resp.alertas).toEqual([])
     }
+  })
+})
+
+// =========================================================================
+// Cohorte · charts agregados (B/C/D)
+// =========================================================================
+
+describe("SeguimientoService.obtenerCohorteSerie", () => {
+  it("happy path: 2 puntos (Inicial, Hoy) con cobertura promedio", async () => {
+    const { service, prisma, snapshotPorCurso } = buildService()
+    setupBase(prisma)
+    prisma.evaluacionInicial.findMany.mockResolvedValue([
+      { inscripcionId: INSCRIPCION_1, areaId: AREA_A, puntaje: 50 },
+      { inscripcionId: INSCRIPCION_1, areaId: AREA_B, puntaje: 50 },
+      { inscripcionId: INSCRIPCION_2, areaId: AREA_A, puntaje: 50 },
+      { inscripcionId: INSCRIPCION_2, areaId: AREA_B, puntaje: 50 },
+    ])
+    snapshotPorCurso.mockResolvedValue(
+      new Map([
+        [
+          INSCRIPCION_1,
+          {
+            notasModulo: new Map(),
+            notasArea: new Map([
+              [AREA_A, 80],
+              [AREA_B, 75],
+            ]),
+            notaCurso: 78,
+            etiqueta: "APROBADO",
+          },
+        ],
+        [
+          INSCRIPCION_2,
+          {
+            notasModulo: new Map(),
+            notasArea: new Map([
+              [AREA_A, 80],
+              [AREA_B, 75],
+            ]),
+            notaCurso: 78,
+            etiqueta: "APROBADO",
+          },
+        ],
+      ]),
+    )
+    const resp = await service.obtenerCohorteSerie(CURSO_ID)
+    expect(resp.puntos).toHaveLength(2)
+    expect(resp.puntos[0]?.etiqueta).toBe("Inicial")
+    expect(resp.puntos[1]?.etiqueta).toBe("Hoy")
+    // Iniciales 50/50 < umbral 70 en ambas → cobertura 0.
+    expect(resp.puntos[0]?.valor).toBe(0)
+    // Actuales: A=80 cumple (peso 60), B=75 cumple (peso 40) → cobertura 100.
+    expect(resp.puntos[1]?.valor).toBe(100)
+  })
+
+  it("curso sin inscripciones: ambos puntos en 0", async () => {
+    const { service, prisma, snapshotPorCurso } = buildService()
+    prisma.curso.findUnique.mockResolvedValue(cursoActivoMock())
+    prisma.inscripcion.findMany.mockResolvedValue([])
+    prisma.cursoArea.findMany.mockResolvedValue([])
+    snapshotPorCurso.mockResolvedValue(new Map())
+    const resp = await service.obtenerCohorteSerie(CURSO_ID)
+    expect(resp.puntos[0]?.valor).toBe(0)
+    expect(resp.puntos[1]?.valor).toBe(0)
+  })
+
+  it("sin evaluaciones iniciales: Inicial=0, Hoy refleja actual", async () => {
+    const { service, prisma, snapshotPorCurso } = buildService()
+    setupBase(prisma)
+    snapshotPorCurso.mockResolvedValue(
+      new Map([
+        [
+          INSCRIPCION_1,
+          {
+            notasModulo: new Map(),
+            notasArea: new Map([
+              [AREA_A, 80],
+              [AREA_B, 75],
+            ]),
+            notaCurso: 78,
+            etiqueta: "APROBADO",
+          },
+        ],
+      ]),
+    )
+    const resp = await service.obtenerCohorteSerie(CURSO_ID)
+    expect(resp.puntos[0]?.valor).toBe(0)
+    // INSCRIPCION_1 cobertura 100, INSCRIPCION_2 sin notas cobertura 0 → promedio 50.
+    expect(resp.puntos[1]?.valor).toBe(50)
+  })
+
+  it("404 si curso no existe", async () => {
+    const { service, prisma } = buildService()
+    prisma.curso.findUnique.mockResolvedValue(null)
+    await expect(service.obtenerCohorteSerie(CURSO_ID)).rejects.toBeInstanceOf(NotFoundException)
+  })
+})
+
+describe("SeguimientoService.obtenerCohorteAreas", () => {
+  it("happy path: promedio simple por área sobre inscripciones con nota", async () => {
+    const { service, prisma, snapshotPorCurso } = buildService()
+    setupBase(prisma)
+    snapshotPorCurso.mockResolvedValue(
+      new Map([
+        [
+          INSCRIPCION_1,
+          {
+            notasModulo: new Map(),
+            notasArea: new Map([
+              [AREA_A, 80],
+              [AREA_B, 60],
+            ]),
+            notaCurso: 72,
+            etiqueta: "EN_DESARROLLO",
+          },
+        ],
+        [
+          INSCRIPCION_2,
+          {
+            notasModulo: new Map(),
+            notasArea: new Map([[AREA_A, 60]]),
+            notaCurso: 36,
+            etiqueta: "INSUFICIENTE",
+          },
+        ],
+      ]),
+    )
+    const resp = await service.obtenerCohorteAreas(CURSO_ID)
+    expect(resp.areas).toHaveLength(2)
+    // AREA_A: (80 + 60) / 2 = 70.
+    const a = resp.areas.find((x) => x.areaId === AREA_A)
+    expect(a?.promedio).toBe(70)
+    expect(a?.objetivo).toBe(70)
+    // AREA_B: solo INSCRIPCION_1 → 60.
+    const b = resp.areas.find((x) => x.areaId === AREA_B)
+    expect(b?.promedio).toBe(60)
+  })
+
+  it("área sin notas: promedio=0", async () => {
+    const { service, prisma, snapshotPorCurso } = buildService()
+    setupBase(prisma)
+    snapshotPorCurso.mockResolvedValue(new Map())
+    const resp = await service.obtenerCohorteAreas(CURSO_ID)
+    expect(resp.areas.every((a) => a.promedio === 0)).toBe(true)
+  })
+})
+
+describe("SeguimientoService.obtenerCohorteDistribucion", () => {
+  it("happy path: cuenta los 4 estados, incluye Completado", async () => {
+    const { service, prisma, snapshotPorCurso } = buildService()
+    setupBase(prisma)
+    snapshotPorCurso.mockResolvedValue(
+      new Map([
+        [
+          INSCRIPCION_1,
+          {
+            notasModulo: new Map(),
+            notasArea: new Map([
+              [AREA_A, 80],
+              [AREA_B, 75],
+            ]),
+            notaCurso: 78,
+            etiqueta: "APROBADO",
+          },
+        ],
+        [
+          INSCRIPCION_2,
+          {
+            notasModulo: new Map(),
+            notasArea: new Map(),
+            notaCurso: 0,
+            etiqueta: "INSUFICIENTE",
+          },
+        ],
+      ]),
+    )
+    const resp = await service.obtenerCohorteDistribucion(CURSO_ID)
+    expect(resp.distribucion).toHaveLength(4)
+    expect(resp.distribucion.map((d) => d.estado)).toEqual([
+      "Apto",
+      "EnRuta",
+      "EnRiesgo",
+      "Completado",
+    ])
+    // Suma de cantidades = 2 inscripciones.
+    expect(resp.distribucion.reduce((acc, d) => acc + d.cantidad, 0)).toBe(2)
+    // INSCRIPCION_2 sin notas → EnRiesgo.
+    const enRiesgo = resp.distribucion.find((d) => d.estado === "EnRiesgo")
+    expect(enRiesgo?.cantidad).toBe(1)
+  })
+
+  it("curso vacío: los 4 estados con cantidad 0", async () => {
+    const { service, prisma, snapshotPorCurso } = buildService()
+    prisma.curso.findUnique.mockResolvedValue(cursoActivoMock())
+    prisma.inscripcion.findMany.mockResolvedValue([])
+    prisma.cursoArea.findMany.mockResolvedValue([])
+    snapshotPorCurso.mockResolvedValue(new Map())
+    const resp = await service.obtenerCohorteDistribucion(CURSO_ID)
+    expect(resp.distribucion).toHaveLength(4)
+    expect(resp.distribucion.every((d) => d.cantidad === 0)).toBe(true)
   })
 })

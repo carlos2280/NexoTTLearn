@@ -190,6 +190,12 @@ export class CursosModulosService {
           valorDespues: snapshotModulo(actualizado),
         },
       })
+
+      // Si la actualización pudo haber desactivado el mini de este módulo,
+      // verificamos el invariante MAESTRO §9.5 a nivel curso.
+      if (input.miniProyectoActivo === false && previo.miniProyectoActivo) {
+        await this.aplicarInvarianteMiniSiSinActivos(tx, cursoId, actorId)
+      }
     })
 
     return this.obtenerPorId(cursoId, moduloId)
@@ -228,6 +234,11 @@ export class CursosModulosService {
           valorDespues: snapshotModulo(actualizado),
         },
       })
+      // El módulo archivado deja de contar como activo. Si tenía mini activo,
+      // verificamos el invariante MAESTRO §9.5 a nivel curso.
+      if (previo.miniProyectoActivo) {
+        await this.aplicarInvarianteMiniSiSinActivos(tx, cursoId, actorId)
+      }
     })
 
     return this.obtenerPorId(cursoId, moduloId)
@@ -303,6 +314,11 @@ export class CursosModulosService {
         },
       })
       await tx.modulo.delete({ where: { id: moduloId } })
+      // El módulo borrado deja de contar como activo. Si tenía mini activo,
+      // verificamos el invariante MAESTRO §9.5 a nivel curso.
+      if (previo.miniProyectoActivo) {
+        await this.aplicarInvarianteMiniSiSinActivos(tx, cursoId, actorId)
+      }
     })
 
     return { tipo: "ELIMINADO", id: moduloId }
@@ -462,6 +478,51 @@ export class CursosModulosService {
       }
       await tx.miniProyecto.delete({ where: { moduloId } })
     }
+  }
+
+  // MAESTRO §9.5: si ningún módulo del curso tiene Mini Proyecto activo,
+  // entonces pesoActividades=100 y pesoMiniProyecto=0. Esta función mantiene
+  // ese invariante: la invocamos tras cualquier operación que pueda haber
+  // dejado al curso sin módulos con mini activo (desactivación, archivado,
+  // hard delete). Si el curso ya cumple el invariante (ej. los pesos ya
+  // estaban en 100/0) no logueamos nada para evitar ruido.
+  private async aplicarInvarianteMiniSiSinActivos(
+    tx: Prisma.TransactionClient,
+    cursoId: string,
+    actorId: string,
+  ): Promise<void> {
+    const cuentaActivos = await tx.modulo.count({
+      where: { cursoId, archivadoAt: null, miniProyectoActivo: true },
+    })
+    if (cuentaActivos > 0) {
+      return
+    }
+    const curso = await tx.curso.findUniqueOrThrow({
+      where: { id: cursoId },
+      select: { pesoActividades: true, pesoMiniProyecto: true },
+    })
+    const pesoActividadesPrevio = Number(curso.pesoActividades.toString())
+    const pesoMiniPrevio = Number(curso.pesoMiniProyecto.toString())
+    if (pesoActividadesPrevio === 100 && pesoMiniPrevio === 0) {
+      return
+    }
+    await tx.curso.update({
+      where: { id: cursoId },
+      data: { pesoActividades: 100, pesoMiniProyecto: 0 },
+    })
+    await tx.logActividad.create({
+      data: {
+        actorId,
+        tipoAccion: "CURSO_ACTUALIZADO",
+        entidadTipo: ENTIDAD_TIPO,
+        entidadId: cursoId,
+        valorAntes: {
+          pesoActividades: pesoActividadesPrevio,
+          pesoMiniProyecto: pesoMiniPrevio,
+        },
+        valorDespues: { pesoActividades: 100, pesoMiniProyecto: 0 },
+      },
+    })
   }
 }
 

@@ -12,6 +12,9 @@ import type {
   CeldaActualModulo,
   CeldaDetalleResponse,
   CeldaInicialDetalle,
+  CohorteAreasResponse,
+  CohorteDistribucionResponse,
+  CohorteSerieResponse,
   EstadoSeguimiento,
   KpisCursoActual,
   KpisCursoInicial,
@@ -61,15 +64,14 @@ export class SeguimientoService {
       throw new ConflictException(ERROR_CURSO_DEMASIADO_GRANDE)
     }
 
-    // Tab Inicial · usa EvaluacionInicial.puntaje. No depende de RecalculoService.
-    // Tab Actual · usa snapshotAgregadosPorCurso (notasArea derivadas).
-    const evaluacionesIniciales =
-      query.tab === "inicial"
-        ? await this.prisma.evaluacionInicial.findMany({
-            where: { inscripcionId: { in: inscripciones.map((i) => i.id) } },
-            select: { inscripcionId: true, areaId: true, puntaje: true },
-          })
-        : []
+    // EvaluacionInicial se carga SIEMPRE (no solo en tab="inicial"): en tab
+    // "actual" alimenta MatrizCelda.notaInicial y MatrizFila.trayectoriaResumen
+    // para que el frontend pueda mostrar la trayectoria "inicial → actual" sin
+    // ramificar por tab.
+    const evaluacionesIniciales = await this.prisma.evaluacionInicial.findMany({
+      where: { inscripcionId: { in: inscripciones.map((i) => i.id) } },
+      select: { inscripcionId: true, areaId: true, puntaje: true },
+    })
     const inicialPorInscripcion = new Map<string, Map<string, number>>()
     for (const ev of evaluacionesIniciales) {
       let perIns = inicialPorInscripcion.get(ev.inscripcionId)
@@ -253,6 +255,75 @@ export class SeguimientoService {
       enRiesgo,
       aptosEntrevista,
       completados,
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────────
+  // Cohorte · charts agregados (B/C/D)
+  // ────────────────────────────────────────────────────────────────
+  //
+  // Reusan obtenerMatriz(tab="actual", estado="all"). Para 200 inscripciones el
+  // costo es despreciable y el front carga los 3 charts juntos. Si en el futuro
+  // hace falta optimizar, cada endpoint puede consultar Prisma directo.
+
+  async obtenerCohorteSerie(cursoId: string): Promise<CohorteSerieResponse> {
+    const matriz = await this.obtenerMatriz(cursoId, { tab: "actual", estado: "all" })
+    if (matriz.filas.length === 0) {
+      return {
+        puntos: [
+          { etiqueta: "Inicial", valor: 0 },
+          { etiqueta: "Hoy", valor: 0 },
+        ],
+      }
+    }
+    const pesosAreas = matriz.areas.map((a) => ({ areaId: a.id, peso: a.peso, umbral: a.umbral }))
+    let sumaInicial = 0
+    let sumaActual = 0
+    for (const fila of matriz.filas) {
+      const notasInicial = new Map(fila.celdas.map((c) => [c.areaId, c.notaInicial]))
+      sumaInicial += calcularCobertura(pesosAreas, notasInicial)
+      sumaActual += fila.cobertura
+    }
+    const n = matriz.filas.length
+    return {
+      puntos: [
+        { etiqueta: "Inicial", valor: redondear2(sumaInicial / n) },
+        { etiqueta: "Hoy", valor: redondear2(sumaActual / n) },
+      ],
+    }
+  }
+
+  async obtenerCohorteAreas(cursoId: string): Promise<CohorteAreasResponse> {
+    const matriz = await this.obtenerMatriz(cursoId, { tab: "actual", estado: "all" })
+    const areas = matriz.areas.map((a) => {
+      let suma = 0
+      let n = 0
+      for (const fila of matriz.filas) {
+        const celda = fila.celdas.find((c) => c.areaId === a.id)
+        if (celda?.nota !== null && celda?.nota !== undefined) {
+          suma += celda.nota
+          n += 1
+        }
+      }
+      return {
+        areaId: a.id,
+        nombre: a.nombre,
+        promedio: n === 0 ? 0 : redondear2(suma / n),
+        objetivo: a.umbral,
+      }
+    })
+    return { areas }
+  }
+
+  async obtenerCohorteDistribucion(cursoId: string): Promise<CohorteDistribucionResponse> {
+    const matriz = await this.obtenerMatriz(cursoId, { tab: "actual", estado: "all" })
+    const orden: readonly EstadoSeguimiento[] = ["Apto", "EnRuta", "EnRiesgo", "Completado"]
+    const conteo = new Map<EstadoSeguimiento, number>(orden.map((e) => [e, 0]))
+    for (const fila of matriz.filas) {
+      conteo.set(fila.estadoSeguimiento, (conteo.get(fila.estadoSeguimiento) ?? 0) + 1)
+    }
+    return {
+      distribucion: orden.map((estado) => ({ estado, cantidad: conteo.get(estado) ?? 0 })),
     }
   }
 
@@ -601,11 +672,12 @@ function construirFilaMatriz(args: ConstruirFilaArgs): MatrizFila {
   const { ins, tab, areas, notasIniciales, agregados, asignaciones } = args
   const notasAreaActuales: Map<string, number> = agregados?.notasArea ?? new Map()
   const celdas = areas.map((a) => {
-    const nota =
-      tab === "inicial" ? (notasIniciales.get(a.id) ?? null) : (notasAreaActuales.get(a.id) ?? null)
+    const inicial = notasIniciales.get(a.id) ?? null
+    const nota = tab === "inicial" ? inicial : (notasAreaActuales.get(a.id) ?? null)
     return {
       areaId: a.id,
       nota,
+      notaInicial: inicial,
       semaforo: calcularSemaforo(nota, a.puntajeObjetivo),
     }
   })
@@ -613,6 +685,26 @@ function construirFilaMatriz(args: ConstruirFilaArgs): MatrizFila {
     areas.map((a) => ({ areaId: a.id, peso: Number(a.peso), umbral: a.puntajeObjetivo })),
     new Map(celdas.map((c) => [c.areaId, c.nota])),
   )
+  // Resumen de trayectoria solo en tab "actual" cuando hay al menos un par
+  // (inicial, actual) definido. En tab "inicial" no aplica (nota === inicial).
+  let trayectoriaResumen: { deltaPromedio: number } | undefined
+  if (tab === "actual") {
+    let sumaInicial = 0
+    let sumaActual = 0
+    let pares = 0
+    for (const c of celdas) {
+      if (c.notaInicial !== null && c.nota !== null) {
+        sumaInicial += c.notaInicial
+        sumaActual += c.nota
+        pares += 1
+      }
+    }
+    if (pares > 0) {
+      trayectoriaResumen = {
+        deltaPromedio: redondear2(sumaActual / pares - sumaInicial / pares),
+      }
+    }
+  }
   const modulosClasif: ModuloAreaParaClasificador[] = asignaciones.map((m) => ({
     areaId: m.areaId,
     tipoAsignacion: m.tipoAsignacion,
@@ -641,6 +733,7 @@ function construirFilaMatriz(args: ConstruirFilaArgs): MatrizFila {
     estadoSeguimiento,
     celdas,
     cobertura,
+    ...(trayectoriaResumen ? { trayectoriaResumen } : {}),
   }
 }
 

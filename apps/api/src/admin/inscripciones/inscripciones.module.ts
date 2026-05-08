@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common"
 import { PrismaModule } from "../../common/prisma/prisma.module"
+import { InscripcionesCursoInvitarService } from "./inscripciones-curso-invitar.service"
 import { InscripcionesCursoController } from "./inscripciones-curso.controller"
 import { InscripcionesCursoService } from "./inscripciones-curso.service"
 import { InscripcionesEvaluacionesInicialesController } from "./inscripciones-evaluaciones-iniciales.controller"
@@ -8,6 +9,10 @@ import { InscripcionesEvaluacionesInicialesService } from "./inscripciones-evalu
 @Module({
   imports: [PrismaModule],
   controllers: [InscripcionesEvaluacionesInicialesController, InscripcionesCursoController],
-  providers: [InscripcionesEvaluacionesInicialesService, InscripcionesCursoService],
+  providers: [
+    InscripcionesEvaluacionesInicialesService,
+    InscripcionesCursoService,
+    InscripcionesCursoInvitarService,
+  ],
 })
 export class InscripcionesModule {}

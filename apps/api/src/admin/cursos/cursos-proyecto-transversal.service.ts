@@ -179,6 +179,38 @@ export class CursosProyectoTransversalService {
           valorDespues: Prisma.JsonNull,
         },
       })
+
+      // MAESTRO §9.7 + constraint SQL `curso_pesos_nivel_curso_suman_100`:
+      // pesoAreas + pesoProyectoTransversal + pesoEntrevistaIA debe sumar 100
+      // SIEMPRE (a nivel persistencia). Al desactivar transversal, transferimos
+      // su peso a pesoAreas para conservar el invariante. Si ya era 0 no
+      // logueamos para no inflar el log con no-ops.
+      const cursoPesos = await tx.curso.findUniqueOrThrow({
+        where: { id: cursoId },
+        select: { pesoAreas: true, pesoProyectoTransversal: true },
+      })
+      const pesoTransversalPrevio = Number(cursoPesos.pesoProyectoTransversal.toString())
+      if (pesoTransversalPrevio !== 0) {
+        const pesoAreasPrevio = Number(cursoPesos.pesoAreas.toString())
+        const pesoAreasNuevo = Number((pesoAreasPrevio + pesoTransversalPrevio).toFixed(2))
+        await tx.curso.update({
+          where: { id: cursoId },
+          data: { pesoAreas: pesoAreasNuevo, pesoProyectoTransversal: 0 },
+        })
+        await tx.logActividad.create({
+          data: {
+            actorId,
+            tipoAccion: "CURSO_ACTUALIZADO",
+            entidadTipo: ENTIDAD_TIPO,
+            entidadId: cursoId,
+            valorAntes: {
+              pesoAreas: pesoAreasPrevio,
+              pesoProyectoTransversal: pesoTransversalPrevio,
+            },
+            valorDespues: { pesoAreas: pesoAreasNuevo, pesoProyectoTransversal: 0 },
+          },
+        })
+      }
     })
 
     return { tipo: "ELIMINADO", id: previo.id }

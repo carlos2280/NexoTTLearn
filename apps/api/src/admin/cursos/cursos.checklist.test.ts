@@ -8,7 +8,7 @@ import { type CursoParaChecklist, evaluarChecklistPublicacion } from "./cursos.c
 const FECHA_INICIO = new Date("2026-06-01T00:00:00Z")
 const FECHA_DEADLINE = new Date("2026-08-15T00:00:00Z")
 
-// Curso "perfecto": todas las 10 reglas cumplidas. Cada test parte de aqui y
+// Curso "perfecto": todas las reglas cumplidas. Cada test parte de aqui y
 // rompe UNA regla para verificar que el evaluador la detecta aislada.
 function cursoPerfecto(): CursoParaChecklist {
   return {
@@ -48,11 +48,11 @@ function cursoPerfecto(): CursoParaChecklist {
 }
 
 describe("evaluarChecklistPublicacion · curso perfecto", () => {
-  it("todoCumplido=true cuando las 10 reglas pasan", () => {
+  it("todoCumplido=true cuando todas las reglas pasan", () => {
     const r = evaluarChecklistPublicacion(cursoPerfecto())
     expect(r.todoCumplido).toBe(true)
     expect(r.faltantes).toHaveLength(0)
-    expect(r.cumplidos).toHaveLength(10)
+    expect(r.cumplidos).toHaveLength(11)
     expect(r.resumen).toMatchObject({
       areas: 2,
       modulos: 2,
@@ -198,6 +198,41 @@ describe("evaluarChecklistPublicacion · cada falta dispara su item", () => {
       ],
     })
     expect(r.faltantes.find((f) => f.id === "pesos_intra_modulo")).toBeUndefined()
+  })
+
+  it("mini_activo_con_peso: MAESTRO §9.5 falla si mini activo con peso 0", () => {
+    const r = evaluarChecklistPublicacion({
+      ...cursoPerfecto(),
+      // Activo en al menos un módulo (cursoPerfecto ya lo tiene), pero peso=0.
+      pesoActividades: 100,
+      pesoMiniProyecto: 0,
+    })
+    const item = r.faltantes.find((f) => f.id === "mini_activo_con_peso")
+    expect(item).toBeDefined()
+    expect(item?.ctaTarget).toBe("pesosIntraModulo")
+  })
+
+  it("mini_activo_con_peso: cumple si ningún módulo tiene mini activo (regla no aplica)", () => {
+    const r = evaluarChecklistPublicacion({
+      ...cursoPerfecto(),
+      pesoActividades: 100,
+      pesoMiniProyecto: 0,
+      modulos: [
+        {
+          id: "mod-1",
+          areaId: "area-frontend",
+          miniProyectoActivo: false,
+          secciones: [{ id: "s", bloques: [{ id: "b" }] }],
+        },
+        {
+          id: "mod-2",
+          areaId: "area-backend",
+          miniProyectoActivo: false,
+          secciones: [{ id: "s2", bloques: [{ id: "b2" }] }],
+        },
+      ],
+    })
+    expect(r.faltantes.find((f) => f.id === "mini_activo_con_peso")).toBeUndefined()
   })
 
   it("pesos_curso_100: con transversal y entrevista activos suma 99", () => {

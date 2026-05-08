@@ -202,6 +202,33 @@ function evalPesosIntraModulo(curso: CursoParaChecklist): ChecklistItemResult {
   }
 }
 
+// MAESTRO §9.5: si hay al menos un módulo con Mini Proyecto activo, su peso
+// debe estar en el rango [1, 100]. No se permite Mini activo con peso 0%
+// porque genera la contradicción funcional de un proyecto que existe pero
+// no aporta nota. La regla de la suma intra-módulo (`pesos_intra_modulo`)
+// no detecta este caso porque sólo cuenta el mini si está activo, así que
+// requiere un item independiente.
+function evalMiniActivoConPeso(curso: CursoParaChecklist): ChecklistItemResult {
+  const algunMini = curso.modulos.some((m) => m.miniProyectoActivo)
+  if (!algunMini) {
+    return {
+      id: "mini_activo_con_peso",
+      label: "Mini Proyecto activo tiene peso > 0%",
+      cumplido: true,
+    }
+  }
+  const cumplido = curso.pesoMiniProyecto >= 1 - TOLERANCIA_PESO
+  return {
+    id: "mini_activo_con_peso",
+    label: "Mini Proyecto activo tiene peso > 0%",
+    cumplido,
+    ctaTarget: cumplido ? undefined : "pesosIntraModulo",
+    detalle: cumplido
+      ? undefined
+      : "Si activas el Mini Proyecto, asígnale un peso > 0%. Si no quieres que cuente, desactívalo en el módulo.",
+  }
+}
+
 function evalPesosCurso100(curso: CursoParaChecklist): ChecklistItemResult {
   const suma =
     curso.pesoAreas +
@@ -246,6 +273,7 @@ const EVALUADORES: ReadonlyArray<{
   { id: "area_tiene_modulo", fn: evalAreaTieneModulo },
   { id: "modulo_tiene_contenido", fn: evalModuloTieneContenido },
   { id: "pesos_intra_modulo", fn: evalPesosIntraModulo },
+  { id: "mini_activo_con_peso", fn: evalMiniActivoConPeso },
   { id: "pesos_curso_100", fn: evalPesosCurso100 },
   { id: "umbrales_logro", fn: evalUmbralesLogro },
 ]

@@ -134,6 +134,7 @@ export function mapCursoListItem(row: CursoListRow): CursoListItem {
 export function mapCursoDetalle(
   row: CursoDetalleRow,
   modulosPorArea: ModulosPorAreaCount,
+  algunModuloConMiniActivo: boolean,
 ): CursoDetalle {
   const cursoAreas: CursoAreaDetalle[] = row.cursoAreas.map((ca) => ({
     id: ca.id,
@@ -179,6 +180,7 @@ export function mapCursoDetalle(
     cursoAreas,
     proyectoTransversal: { activo: row.proyectoTransversal !== null },
     entrevistaIAConfig: { activa: row.entrevistaIAConfig !== null },
+    algunModuloConMiniActivo,
   }
 }
 

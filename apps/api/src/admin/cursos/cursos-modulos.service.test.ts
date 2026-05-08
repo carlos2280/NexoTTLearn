@@ -11,7 +11,7 @@ import { CursosModulosService } from "./cursos-modulos.service"
 type Stub = ReturnType<typeof vi.fn>
 
 interface PrismaMock {
-  curso: { findUnique: Stub }
+  curso: { findUnique: Stub; findUniqueOrThrow: Stub; update: Stub }
   modulo: {
     findUnique: Stub
     findMany: Stub
@@ -30,14 +30,22 @@ interface PrismaMock {
 
 function buildPrisma(): PrismaMock {
   const prisma: PrismaMock = {
-    curso: { findUnique: vi.fn() },
+    curso: {
+      findUnique: vi.fn(),
+      // Default: pesos ya cumplen invariante 100/0 → reset no-op.
+      findUniqueOrThrow: vi.fn().mockResolvedValue({
+        pesoActividades: { toString: () => "100" },
+        pesoMiniProyecto: { toString: () => "0" },
+      }),
+      update: vi.fn().mockResolvedValue({}),
+    },
     modulo: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
-      count: vi.fn(),
+      count: vi.fn().mockResolvedValue(0),
     },
     cursoArea: { findFirst: vi.fn() },
     miniProyecto: { create: vi.fn(), delete: vi.fn() },
@@ -292,6 +300,45 @@ describe("actualizar", () => {
     await expect(
       service.actualizar(CURSO_ID, MODULO_ID, { miniProyectoActivo: false }, ACTOR_ID),
     ).rejects.toThrow(ConflictException)
+  })
+
+  it("MAESTRO §9.5: al desactivar el último mini activo del curso, resetea pesoActividades=100 y pesoMiniProyecto=0", async () => {
+    const { service, prisma } = buildService()
+    prisma.modulo.findUnique.mockResolvedValue(buildModuloRow({ miniProyectoActivo: true }))
+    prisma.curso.findUnique.mockResolvedValue(buildCurso())
+    prisma.entregaProyecto.count.mockResolvedValue(0)
+    prisma.miniProyecto.delete.mockResolvedValue({})
+    prisma.modulo.update.mockResolvedValue(buildModuloRow({ miniProyectoActivo: false }))
+    // Ningún módulo del curso queda con mini activo.
+    prisma.modulo.count.mockResolvedValue(0)
+    prisma.curso.findUniqueOrThrow.mockResolvedValue({
+      pesoActividades: { toString: () => "70" },
+      pesoMiniProyecto: { toString: () => "30" },
+    })
+
+    await service.actualizar(CURSO_ID, MODULO_ID, { miniProyectoActivo: false }, ACTOR_ID)
+
+    expect(prisma.curso.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: CURSO_ID },
+        data: { pesoActividades: 100, pesoMiniProyecto: 0 },
+      }),
+    )
+  })
+
+  it("MAESTRO §9.5: NO toca pesos si todavía quedan otros módulos con mini activo", async () => {
+    const { service, prisma } = buildService()
+    prisma.modulo.findUnique.mockResolvedValue(buildModuloRow({ miniProyectoActivo: true }))
+    prisma.curso.findUnique.mockResolvedValue(buildCurso())
+    prisma.entregaProyecto.count.mockResolvedValue(0)
+    prisma.miniProyecto.delete.mockResolvedValue({})
+    prisma.modulo.update.mockResolvedValue(buildModuloRow({ miniProyectoActivo: false }))
+    // Aún queda otro módulo con mini activo en el curso.
+    prisma.modulo.count.mockResolvedValue(1)
+
+    await service.actualizar(CURSO_ID, MODULO_ID, { miniProyectoActivo: false }, ACTOR_ID)
+
+    expect(prisma.curso.update).not.toHaveBeenCalled()
   })
 })
 

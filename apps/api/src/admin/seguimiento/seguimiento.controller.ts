@@ -3,6 +3,10 @@
 import { Controller, Get, Param, ParseUUIDPipe, Query, UseGuards } from "@nestjs/common"
 import {
   type CeldaDetalleResponse,
+  type CeldaEvolucionResponse,
+  type CohorteAreasResponse,
+  type CohorteDistribucionResponse,
+  type CohorteSerieResponse,
   type KpisCursoResponse,
   type MatrizCursoResponse,
   type SeguimientoMatrizQuery,
@@ -14,13 +18,17 @@ import { Roles } from "../../common/decorators/roles.decorator"
 import { RolGuard } from "../../common/guards/rol.guard"
 import { SesionGuard } from "../../common/guards/sesion.guard"
 import { ZodValidationPipe } from "../../common/zod-validation.pipe"
+import { CeldaEvolucionService } from "./celda-evolucion.service"
 import { SeguimientoService } from "./seguimiento.service"
 
 @Controller("admin/cursos/:cursoId/seguimiento")
 @UseGuards(SesionGuard, RolGuard)
 @Roles("ADMIN")
 export class SeguimientoController {
-  constructor(private readonly seguimiento: SeguimientoService) {}
+  constructor(
+    private readonly seguimiento: SeguimientoService,
+    private readonly celdaEvolucion: CeldaEvolucionService,
+  ) {}
 
   @Get("matriz")
   obtenerMatriz(
@@ -41,6 +49,15 @@ export class SeguimientoController {
     return this.seguimiento.obtenerKpis(cursoId, query.tab)
   }
 
+  @Get("celda/:inscripcionId/:areaId/evolucion")
+  obtenerEvolucion(
+    @Param("cursoId", new ParseUUIDPipe()) cursoId: string,
+    @Param("inscripcionId", new ParseUUIDPipe()) inscripcionId: string,
+    @Param("areaId", new ParseUUIDPipe()) areaId: string,
+  ): Promise<CeldaEvolucionResponse> {
+    return this.celdaEvolucion.obtener(cursoId, inscripcionId, areaId)
+  }
+
   @Get("celda/:inscripcionId/:areaId")
   obtenerCelda(
     @Param("cursoId", new ParseUUIDPipe()) cursoId: string,
@@ -49,5 +66,26 @@ export class SeguimientoController {
     @Query(new ZodValidationPipe(seguimientoTabQuerySchema)) query: SeguimientoTabQuery,
   ): Promise<CeldaDetalleResponse> {
     return this.seguimiento.obtenerCelda(cursoId, inscripcionId, areaId, query.tab)
+  }
+
+  @Get("cohorte/serie")
+  obtenerCohorteSerie(
+    @Param("cursoId", new ParseUUIDPipe()) cursoId: string,
+  ): Promise<CohorteSerieResponse> {
+    return this.seguimiento.obtenerCohorteSerie(cursoId)
+  }
+
+  @Get("cohorte/areas")
+  obtenerCohorteAreas(
+    @Param("cursoId", new ParseUUIDPipe()) cursoId: string,
+  ): Promise<CohorteAreasResponse> {
+    return this.seguimiento.obtenerCohorteAreas(cursoId)
+  }
+
+  @Get("cohorte/distribucion")
+  obtenerCohorteDistribucion(
+    @Param("cursoId", new ParseUUIDPipe()) cursoId: string,
+  ): Promise<CohorteDistribucionResponse> {
+    return this.seguimiento.obtenerCohorteDistribucion(cursoId)
   }
 }

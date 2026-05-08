@@ -12,7 +12,7 @@ import { CursosProyectoTransversalService } from "./cursos-proyecto-transversal.
 type Stub = ReturnType<typeof vi.fn>
 
 interface PrismaMock {
-  curso: { findUnique: Stub }
+  curso: { findUnique: Stub; findUniqueOrThrow: Stub; update: Stub }
   proyectoTransversal: {
     findUnique: Stub
     findUniqueOrThrow: Stub
@@ -27,7 +27,16 @@ interface PrismaMock {
 
 function buildPrisma(): PrismaMock {
   const prisma: PrismaMock = {
-    curso: { findUnique: vi.fn() },
+    curso: {
+      findUnique: vi.fn(),
+      // Por defecto pesoProyectoTransversal=0 → reset no-op. Los tests que
+      // verifican el reset lo override a un valor !=0.
+      findUniqueOrThrow: vi.fn().mockResolvedValue({
+        pesoAreas: { toString: () => "100" },
+        pesoProyectoTransversal: { toString: () => "0" },
+      }),
+      update: vi.fn().mockResolvedValue({}),
+    },
     proyectoTransversal: {
       findUnique: vi.fn(),
       findUniqueOrThrow: vi.fn(),
@@ -256,6 +265,42 @@ describe("eliminar", () => {
     prisma.proyectoTransversal.findUnique.mockResolvedValue(null)
 
     await expect(service.eliminar(CURSO_ID, ACTOR_ID)).rejects.toThrow(NotFoundException)
+  })
+
+  it("MAESTRO §9.7 + constraint: transfiere pesoProyectoTransversal a pesoAreas al eliminar", async () => {
+    const { service, prisma } = buildService()
+    prisma.curso.findUnique.mockResolvedValue(buildCursoRow())
+    prisma.proyectoTransversal.findUnique.mockResolvedValue(buildPtRow())
+    prisma.entregaProyecto.count.mockResolvedValue(0)
+    prisma.proyectoTransversal.delete.mockResolvedValue({})
+    prisma.logActividad.create.mockResolvedValue({})
+    prisma.curso.findUniqueOrThrow.mockResolvedValue({
+      pesoAreas: { toString: () => "70" },
+      pesoProyectoTransversal: { toString: () => "20" },
+    })
+
+    await service.eliminar(CURSO_ID, ACTOR_ID)
+
+    expect(prisma.curso.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: CURSO_ID },
+        data: { pesoAreas: 90, pesoProyectoTransversal: 0 },
+      }),
+    )
+  })
+
+  it("no escribe curso.update si pesoProyectoTransversal ya era 0", async () => {
+    const { service, prisma } = buildService()
+    prisma.curso.findUnique.mockResolvedValue(buildCursoRow())
+    prisma.proyectoTransversal.findUnique.mockResolvedValue(buildPtRow())
+    prisma.entregaProyecto.count.mockResolvedValue(0)
+    prisma.proyectoTransversal.delete.mockResolvedValue({})
+    prisma.logActividad.create.mockResolvedValue({})
+    // findUniqueOrThrow ya devuelve "0" por default
+
+    await service.eliminar(CURSO_ID, ACTOR_ID)
+
+    expect(prisma.curso.update).not.toHaveBeenCalled()
   })
 })
 
