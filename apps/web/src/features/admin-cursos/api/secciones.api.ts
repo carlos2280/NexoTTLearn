@@ -44,6 +44,28 @@ export async function eliminarSeccion(scope: ScopeSeccion, seccionId: string): P
   await httpClient.delete(`${path(scope)}/${seccionId}`)
 }
 
+export async function archivarSeccion(
+  scope: ScopeSeccion,
+  seccionId: string,
+): Promise<SeccionDetalleAdmin> {
+  const data = await httpClient.post<SeccionDetalleAdmin>(
+    `${path(scope)}/${seccionId}/archivar`,
+    {},
+  )
+  return seccionDetalleAdminSchema.parse(data)
+}
+
+export async function desarchivarSeccion(
+  scope: ScopeSeccion,
+  seccionId: string,
+): Promise<SeccionDetalleAdmin> {
+  const data = await httpClient.post<SeccionDetalleAdmin>(
+    `${path(scope)}/${seccionId}/desarchivar`,
+    {},
+  )
+  return seccionDetalleAdminSchema.parse(data)
+}
+
 export async function reordenarSecciones(
   scope: ScopeSeccion,
   input: ReordenarSeccionesAdminInput,

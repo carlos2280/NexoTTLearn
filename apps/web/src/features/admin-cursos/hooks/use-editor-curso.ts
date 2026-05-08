@@ -35,7 +35,10 @@ import {
 import { publicarCurso } from "../api/publicar-curso.api"
 import {
   actualizarSeccion,
+  archivarSeccion,
   crearSeccion,
+  desarchivarSeccion,
+  eliminarSeccion,
   listarSecciones,
   reordenarSecciones,
 } from "../api/secciones.api"
@@ -169,6 +172,31 @@ export function useActualizarSeccion(cursoId: string, moduloId: string) {
   return useMutation({
     mutationFn: (vars: { seccionId: string; input: ActualizarSeccionAdminInput }) =>
       actualizarSeccion({ cursoId, moduloId }, vars.seccionId, vars.input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: editorKeys.secciones(cursoId, moduloId) })
+      qc.invalidateQueries({ queryKey: editorKeys.modulos(cursoId) })
+    },
+  })
+}
+
+export function useArchivarSeccion(cursoId: string, moduloId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { seccionId: string; archivar: boolean }) =>
+      vars.archivar
+        ? archivarSeccion({ cursoId, moduloId }, vars.seccionId)
+        : desarchivarSeccion({ cursoId, moduloId }, vars.seccionId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: editorKeys.secciones(cursoId, moduloId) })
+      qc.invalidateQueries({ queryKey: editorKeys.modulos(cursoId) })
+    },
+  })
+}
+
+export function useEliminarSeccion(cursoId: string, moduloId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (seccionId: string) => eliminarSeccion({ cursoId, moduloId }, seccionId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: editorKeys.secciones(cursoId, moduloId) })
       qc.invalidateQueries({ queryKey: editorKeys.modulos(cursoId) })
