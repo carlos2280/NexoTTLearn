@@ -29,4 +29,9 @@ export interface TreeNode {
   readonly action?: ReactNode
   /** Si true, renderiza un divisor horizontal antes de este nodo. */
   readonly divider?: boolean
+  /**
+   * Slot opcional renderizado después de los hijos cuando el nodo está
+   * expandido. Útil para barras de validación/guardado contextual al grupo.
+   */
+  readonly footer?: ReactNode
 }

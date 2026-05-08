@@ -107,6 +107,11 @@ function TreeRow({ node, depth, selectedId, expanded, onSelect, onToggle, mode }
           ))}
         </div>
       ) : null}
+      {isExpanded && node.footer ? (
+        <div style={{ paddingLeft: `${(depth + 1) * 12 + 6}px` }} className="pr-1.5">
+          {node.footer}
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -18,6 +18,7 @@ import { EditorBanner } from "./editor-banner"
 import { EditorCanvasArea } from "./editor-canvas-area"
 import { EditorRightColumn } from "./editor-right-column"
 import { EditorTopbar } from "./editor-topbar"
+import { usePesosAreas } from "./pesos-areas-inline"
 
 interface EditorContentProps {
   readonly curso: CursoDetalle
@@ -44,6 +45,9 @@ export function EditorContent({ curso, cursoId, modulosLoading }: EditorContentP
   const [moduloTarget, setModuloTarget] = useState<ModuloTarget | null>(null)
   const [seccionTarget, setSeccionTarget] = useState<SeccionTarget | null>(null)
 
+  // ── Edición inline de pesos de áreas en el árbol ─────────────────
+  const pesosAreas = usePesosAreas({ cursoId, curso })
+
   const treeNodes = useMemo(
     () =>
       buildCursoTree({
@@ -53,8 +57,9 @@ export function EditorContent({ curso, cursoId, modulosLoading }: EditorContentP
         onAddArea: () => setAreaDialogOpen(true),
         onAddModulo: (areaId, areaNombre) => setModuloTarget({ areaId, areaNombre }),
         onAddSeccion: (moduloId, moduloTitulo) => setSeccionTarget({ moduloId, moduloTitulo }),
+        pesosAreas,
       }),
-    [curso, modulos, seccionesPorModulo],
+    [curso, modulos, seccionesPorModulo, pesosAreas],
   )
 
   const selectedTreeId = computeSelectedTreeId(selected)
