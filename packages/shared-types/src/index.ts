@@ -400,7 +400,12 @@ export {
   type ReordenarSeccionesInput,
 } from "./admin-secciones"
 
-export { lecturaContenidoSchema, type LecturaContenido } from "./bloque-payloads"
+export {
+  lecturaContenidoSchema,
+  type LecturaContenido,
+  tiptapDocSchema,
+  type TiptapJSONDoc,
+} from "./bloque-payloads"
 
 export {
   videoContenidoSchema,

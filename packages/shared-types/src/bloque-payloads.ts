@@ -14,13 +14,28 @@ const metadataBaseSchema = z
   })
   .passthrough()
 
-// Payload de un bloque PARRAFO (lectura). El `cuerpo` viene como HTML
-// pre-serializado de Tiptap (lo que guarda el admin). Si en el futuro se
-// migra a JSON Tiptap, este schema cambia y los renderers se ajustan.
+// Forma minima de un documento Tiptap serializado a JSON. Schema laxo a
+// proposito: cada nodo es un record con `type` requerido y el resto pasa
+// passthrough para no atarse a la lista exacta de extensiones (cambia entre
+// fases). La validacion estricta de nodos vive en el editor admin (Fase 2).
+const tiptapNodeSchema = z
+  .object({
+    type: z.string(),
+  })
+  .passthrough()
+
+export const tiptapDocSchema = z
+  .object({
+    type: z.literal("doc"),
+    content: z.array(tiptapNodeSchema).default([]),
+  })
+  .passthrough()
+export type TiptapJSONDoc = z.infer<typeof tiptapDocSchema>
+
 export const lecturaContenidoSchema = z.object({
   tipo: z.literal("LECTURA"),
   contenido: z.object({
-    cuerpo: z.string(),
+    doc: tiptapDocSchema,
   }),
   metadata: metadataBaseSchema
     .extend({
