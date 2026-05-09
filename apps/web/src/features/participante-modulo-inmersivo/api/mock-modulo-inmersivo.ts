@@ -38,7 +38,7 @@ export const mockModuloInmersivo: ModuloInmersivoResponse = {
           estado: "COMPLETADO",
           payload: {
             tipo: "LECTURA",
-            contenido: { cuerpo: CUERPO_INTRO },
+            contenido: { doc: CUERPO_INTRO },
             metadata: { duracionEstimada: 6, nivel: "basico" },
           },
         },
@@ -68,7 +68,7 @@ export const mockModuloInmersivo: ModuloInmersivoResponse = {
           estado: "COMPLETADO",
           payload: {
             tipo: "LECTURA",
-            contenido: { cuerpo: CUERPO_DETALLE },
+            contenido: { doc: CUERPO_DETALLE },
             metadata: { duracionEstimada: 9, nivel: "intermedio" },
           },
         },
@@ -81,7 +81,7 @@ export const mockModuloInmersivo: ModuloInmersivoResponse = {
           estado: "EN_PROGRESO",
           payload: {
             tipo: "LECTURA",
-            contenido: { cuerpo: CUERPO_CIERRE },
+            contenido: { doc: CUERPO_CIERRE },
             metadata: { duracionEstimada: 7, nivel: "intermedio" },
           },
         },

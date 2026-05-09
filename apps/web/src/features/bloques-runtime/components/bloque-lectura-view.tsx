@@ -1,18 +1,16 @@
-import { cn } from "@/shared/lib/cn"
 import type { BloqueRuntimeParrafo } from "@nexott-learn/shared-types"
+import { Suspense, lazy } from "react"
 import { BloqueHeader } from "./bloque-header"
 import { BloqueShell } from "./bloque-shell"
-import { proseInmersivo } from "./prose-inmersivo"
+
+const TiptapReader = lazy(() =>
+  import("./tiptap-reader").then((mod) => ({ default: mod.TiptapReader })),
+)
 
 interface BloqueLecturaViewProps {
   readonly bloque: BloqueRuntimeParrafo
   readonly esActual: boolean
 }
-
-// Renderer Capa 1 · PARRAFO (lectura). El payload trae HTML pre-serializado
-// de Tiptap (el admin lo guarda asi). Lo montamos con clases prose tokenizadas.
-// Si en el futuro el contrato cambia a JSON Tiptap, este es el unico archivo
-// a migrar a `<EditorContent editor={readOnly} />`.
 
 export function BloqueLecturaView({ bloque, esActual }: BloqueLecturaViewProps) {
   return (
@@ -23,11 +21,9 @@ export function BloqueLecturaView({ bloque, esActual }: BloqueLecturaViewProps) 
         estado={bloque.estado}
         duracionEstimadaMin={bloque.duracionEstimadaMin}
       />
-      <div
-        className={cn("text-text-primary", proseInmersivo)}
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML proviene del admin y es saneado en el back (Tiptap render seguro).
-        dangerouslySetInnerHTML={{ __html: bloque.payload.contenido.cuerpo }}
-      />
+      <Suspense fallback={<div className="h-24 animate-pulse rounded-xl bg-glass-1" />}>
+        <TiptapReader doc={bloque.payload.contenido.doc} />
+      </Suspense>
     </BloqueShell>
   )
 }

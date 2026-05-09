@@ -12,17 +12,14 @@ import { mockModuloInmersivo } from "./mock-modulo-inmersivo"
 const LATENCIA_SIMULADA_MS = 280
 
 export async function obtenerModuloInmersivo(
-  slug: string,
-  moduloId: string,
+  _slug: string,
+  _moduloId: string,
 ): Promise<ModuloInmersivoResponse> {
   await new Promise((resolve) => setTimeout(resolve, LATENCIA_SIMULADA_MS))
 
   // El mock es un solo modulo demo: ignoramos slug/moduloId y devolvemos la
   // misma data — pero validamos siempre con el schema real. Sirve de smoke
   // test del contrato cada vez que se actualiza el mock.
-  const _slug = slug
-  const _moduloId = moduloId
-
   const result = moduloInmersivoResponseSchema.safeParse(mockModuloInmersivo)
   if (!result.success) {
     console.error("[modulo-inmersivo] Mock no cumple el contrato Zod", {
