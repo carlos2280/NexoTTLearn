@@ -31,6 +31,14 @@ export const apiErrorCodes = {
   mfaChallengeExpirado: "MFA_CHALLENGE_EXPIRADO",
   setupMfaRequerido: "SETUP_MFA_REQUERIDO",
   modoAutomaticoNoDisponible: "MODO_AUTOMATICO_NO_DISPONIBLE",
+  // Catalogo P2 — un codigo por recurso para distinguir 404 de cualquier nivel
+  // del arbol catalogo (Area > Skill > Modulo > Seccion > Bloque + Cliente).
+  areaNoEncontrada: "AREA_NO_ENCONTRADA",
+  skillNoEncontrada: "SKILL_NO_ENCONTRADA",
+  moduloNoEncontrado: "MODULO_NO_ENCONTRADO",
+  seccionNoEncontrada: "SECCION_NO_ENCONTRADA",
+  bloqueNoEncontrado: "BLOQUE_NO_ENCONTRADO",
+  clienteNoEncontrado: "CLIENTE_NO_ENCONTRADO",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]

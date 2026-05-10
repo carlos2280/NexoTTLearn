@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config"
 import { APP_FILTER, APP_GUARD } from "@nestjs/core"
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler"
 import { AuthModule } from "./auth/auth.module"
+import { CatalogoModule } from "./catalogo/catalogo.module"
 import { ColaboradoresModule } from "./colaboradores/colaboradores.module"
 import { AuditLogModule } from "./common/audit/audit-log.module"
 import { PrismaExceptionFilter } from "./common/filters/prisma-exception.filter"
@@ -52,6 +53,7 @@ import { HealthModule } from "./health/health.module"
     AuditLogModule,
     HealthModule,
     AuthModule,
+    CatalogoModule,
     ColaboradoresModule,
   ],
   providers: [
