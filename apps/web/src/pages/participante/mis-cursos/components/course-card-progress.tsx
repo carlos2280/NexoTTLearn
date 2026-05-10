@@ -40,11 +40,12 @@ function fillClassName(estado: CursoEstado): string {
       return `${base} bg-text-faint`
     case "EN_PROGRESO":
       return `${base} bg-gradient-to-r from-brand-violet to-brand-cyan`
-    case "COMPLETADO":
+    case "COMPLETADO": {
       if (estado.excelencia) {
         return `${base} bg-gradient-to-r from-brand-violet via-brand-cyan to-brand-violet bg-[length:200%_100%] [animation:shimmer_2.4s_linear_infinite]`
       }
       return `${base} bg-success`
+    }
     case "ABANDONADO":
     case "CERRADO_SIN_COMPLETAR":
       return `${base} bg-text-faint/50`
