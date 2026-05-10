@@ -2,11 +2,7 @@
   "name": "@nexott-learn/api",
   "version": "0.1.0",
   "private": true,
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  },
   "scripts": {
-    "postinstall": "prisma generate",
     "dev": "nest start --watch",
     "build": "nest build && tsc-alias -p tsconfig.build.json",
     "start": "node dist/main.js",
