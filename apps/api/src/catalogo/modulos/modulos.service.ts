@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common"
 import { ListarModulosQuery, ModuloResponse, Paginated } from "@nexott-learn/shared-types"
 import { Prisma } from "@prisma/client"
 import { apiErrorCodes } from "../../common/errors/api-error.codes"
-import { buildPaginatedResponse } from "../../common/http/paginated"
+import { buildPaginatedResponse, resolvePaginacion } from "../../common/http/paginated"
 import { PrismaService } from "../../common/prisma/prisma.service"
 
 const SELECT_MODULO_FIELDS = {
@@ -32,7 +32,8 @@ export class ModulosService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listar(query: ListarModulosQuery): Promise<Paginated<ModuloResponse>> {
-    const { page, pageSize, estado, q } = query
+    const { estado, q } = query
+    const { skip, take, page, pageSize } = resolvePaginacion(query)
     // D-CAT-4: soft-delete excluido siempre del listado en P2.
     const where: Prisma.ModuloWhereInput = {
       deletedAt: null,
@@ -45,8 +46,8 @@ export class ModulosService {
         where,
         select: SELECT_MODULO_FIELDS,
         orderBy: { titulo: "asc" },
-        take: pageSize,
-        skip: (page - 1) * pageSize,
+        take,
+        skip,
       }),
       this.prisma.modulo.count({ where }),
     ])

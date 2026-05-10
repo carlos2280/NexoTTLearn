@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common"
 import { ListarSkillsQuery, Paginated, SkillResponse } from "@nexott-learn/shared-types"
 import { Prisma } from "@prisma/client"
 import { apiErrorCodes } from "../../common/errors/api-error.codes"
-import { buildPaginatedResponse } from "../../common/http/paginated"
+import { buildPaginatedResponse, resolvePaginacion } from "../../common/http/paginated"
 import { PrismaService } from "../../common/prisma/prisma.service"
 
 const SELECT_SKILL_FIELDS = {
@@ -32,7 +32,8 @@ export class SkillsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listar(query: ListarSkillsQuery): Promise<Paginated<SkillResponse>> {
-    const { page, pageSize, areaId, estado, q } = query
+    const { areaId, estado, q } = query
+    const { skip, take, page, pageSize } = resolvePaginacion(query)
     const where: Prisma.SkillWhereInput = {
       ...(areaId ? { areaId } : {}),
       ...(estado ? { estado } : {}),
@@ -44,8 +45,8 @@ export class SkillsService {
         where,
         select: SELECT_SKILL_FIELDS,
         orderBy: { etiquetaVisible: "asc" },
-        take: pageSize,
-        skip: (page - 1) * pageSize,
+        take,
+        skip,
       }),
       this.prisma.skill.count({ where }),
     ])

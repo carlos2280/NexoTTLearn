@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common"
 import { ListarSeccionesQuery, Paginated, SeccionResponse } from "@nexott-learn/shared-types"
 import { Prisma } from "@prisma/client"
 import { apiErrorCodes } from "../../common/errors/api-error.codes"
-import { buildPaginatedResponse } from "../../common/http/paginated"
+import { buildPaginatedResponse, resolvePaginacion } from "../../common/http/paginated"
 import { PrismaService } from "../../common/prisma/prisma.service"
 
 const SELECT_SECCION_FIELDS = {
@@ -32,7 +32,8 @@ export class SeccionesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listar(query: ListarSeccionesQuery): Promise<Paginated<SeccionResponse>> {
-    const { page, pageSize, moduloId } = query
+    const { moduloId } = query
+    const { skip, take, page, pageSize } = resolvePaginacion(query)
     const where: Prisma.SeccionWhereInput = moduloId ? { moduloId } : {}
 
     const [filas, total] = await this.prisma.$transaction([
@@ -40,8 +41,8 @@ export class SeccionesService {
         where,
         select: SELECT_SECCION_FIELDS,
         orderBy: [{ moduloId: "asc" }, { orden: "asc" }],
-        take: pageSize,
-        skip: (page - 1) * pageSize,
+        take,
+        skip,
       }),
       this.prisma.seccion.count({ where }),
     ])

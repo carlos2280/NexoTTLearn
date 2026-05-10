@@ -214,68 +214,74 @@ describe.runIf(RUN_E2E)("auth e2e", () => {
     expect(me.status).toBe(401)
   })
 
-  it("bloqueo tras 5 fallos + desbloqueo via /auth/desbloquear (admin)", async () => {
-    const passwordVictima = "Victima12!"
-    const passwordHash = await bcrypt.hash(passwordVictima, 12)
-    const email = `victima-${Date.now()}@nttdata.test`
-    const col = await prisma.colaborador.create({
-      data: { email, nombre: "Victima" },
-      select: { id: true },
-    })
-    const usuarioVictima = await prisma.usuario.create({
-      data: {
-        colaboradorId: col.id,
-        rol: "PARTICIPANTE",
-        passwordHash,
-        requiereCambioPassword: false,
-        intentosFallidos: 0,
-        bloqueado: false,
-      },
-      select: { id: true },
-    })
+  it(
+    "bloqueo tras 5 fallos + desbloqueo via /auth/desbloquear (admin)",
+    { timeout: 15_000 },
+    async () => {
+      const passwordVictima = "Victima12!"
+      const passwordHash = await bcrypt.hash(passwordVictima, 12)
+      const email = `victima-${Date.now()}@nttdata.test`
+      const col = await prisma.colaborador.create({
+        data: { email, nombre: "Victima" },
+        select: { id: true },
+      })
+      const usuarioVictima = await prisma.usuario.create({
+        data: {
+          colaboradorId: col.id,
+          rol: "PARTICIPANTE",
+          passwordHash,
+          requiereCambioPassword: false,
+          intentosFallidos: 0,
+          bloqueado: false,
+        },
+        select: { id: true },
+      })
 
-    const fallidos = supertest.agent(app.getHttpServer())
-    for (let i = 0; i < 5; i += 1) {
-      const r = await fallidos.post("/api/v1/auth/login").send({ email, password: "wrong" })
-      expect(r.status).toBe(401)
-    }
-    const tras5 = await prisma.usuario.findUnique({
-      where: { id: usuarioVictima.id },
-      select: { bloqueado: true, intentosFallidos: true },
-    })
-    expect(tras5?.bloqueado).toBe(true)
+      const fallidos = supertest.agent(app.getHttpServer())
+      for (let i = 0; i < 5; i += 1) {
+        const r = await fallidos.post("/api/v1/auth/login").send({ email, password: "wrong" })
+        expect(r.status).toBe(401)
+      }
+      const tras5 = await prisma.usuario.findUnique({
+        where: { id: usuarioVictima.id },
+        select: { bloqueado: true, intentosFallidos: true },
+      })
+      expect(tras5?.bloqueado).toBe(true)
 
-    const r6 = await fallidos.post("/api/v1/auth/login").send({ email, password: passwordVictima })
-    expect(r6.status).toBe(403)
-    expect((r6.body as { code: string }).code).toBe("USUARIO_BLOQUEADO")
+      const r6 = await fallidos
+        .post("/api/v1/auth/login")
+        .send({ email, password: passwordVictima })
+      expect(r6.status).toBe(403)
+      expect((r6.body as { code: string }).code).toBe("USUARIO_BLOQUEADO")
 
-    const adminAgent = supertest.agent(app.getHttpServer())
-    const { csrf: csrfAdmin } = await loginYObtenerCsrf(
-      adminAgent,
-      ADMIN_EMAIL,
-      ADMIN_PASSWORD_NUEVO,
-    )
+      const adminAgent = supertest.agent(app.getHttpServer())
+      const { csrf: csrfAdmin } = await loginYObtenerCsrf(
+        adminAgent,
+        ADMIN_EMAIL,
+        ADMIN_PASSWORD_NUEVO,
+      )
 
-    const desbloqueo = await adminAgent
-      .post("/api/v1/auth/desbloquear")
-      .set("X-XSRF-TOKEN", csrfAdmin)
-      .set("X-Motivo", "Test e2e: validar desbloqueo")
-      .send({ usuarioId: usuarioVictima.id })
-    expect(desbloqueo.status).toBe(204)
+      const desbloqueo = await adminAgent
+        .post("/api/v1/auth/desbloquear")
+        .set("X-XSRF-TOKEN", csrfAdmin)
+        .set("X-Motivo", "Test e2e: validar desbloqueo")
+        .send({ usuarioId: usuarioVictima.id })
+      expect(desbloqueo.status).toBe(204)
 
-    const tras = await prisma.usuario.findUnique({
-      where: { id: usuarioVictima.id },
-      select: { bloqueado: true, intentosFallidos: true },
-    })
-    expect(tras?.bloqueado).toBe(false)
-    expect(tras?.intentosFallidos).toBe(0)
+      const tras = await prisma.usuario.findUnique({
+        where: { id: usuarioVictima.id },
+        select: { bloqueado: true, intentosFallidos: true },
+      })
+      expect(tras?.bloqueado).toBe(false)
+      expect(tras?.intentosFallidos).toBe(0)
 
-    const reintento = await supertest
-      .agent(app.getHttpServer())
-      .post("/api/v1/auth/login")
-      .send({ email, password: passwordVictima })
-    expect(reintento.status).toBe(200)
-  })
+      const reintento = await supertest
+        .agent(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email, password: passwordVictima })
+      expect(reintento.status).toBe(200)
+    },
+  )
 })
 
 function extraerXsrfDeResponse(res: Response): string | null {

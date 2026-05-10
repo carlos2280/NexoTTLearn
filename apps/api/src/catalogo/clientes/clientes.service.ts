@@ -7,7 +7,7 @@ import {
 } from "@nexott-learn/shared-types"
 import { Prisma } from "@prisma/client"
 import { apiErrorCodes } from "../../common/errors/api-error.codes"
-import { buildPaginatedResponse } from "../../common/http/paginated"
+import { buildPaginatedResponse, resolvePaginacion } from "../../common/http/paginated"
 import { PrismaService } from "../../common/prisma/prisma.service"
 
 /**
@@ -56,7 +56,8 @@ export class ClientesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listar(query: ListarClientesQuery): Promise<Paginated<ClienteResponse>> {
-    const { page, pageSize, activo, q } = query
+    const { activo, q } = query
+    const { skip, take, page, pageSize } = resolvePaginacion(query)
     // D-CAT-4: soft-delete (`deletedAt`) excluido siempre.
     const where: Prisma.ClienteWhereInput = {
       deletedAt: null,
@@ -69,8 +70,8 @@ export class ClientesService {
         where,
         select: SELECT_CLIENTE_FIELDS,
         orderBy: { nombre: "asc" },
-        take: pageSize,
-        skip: (page - 1) * pageSize,
+        take,
+        skip,
       }),
       this.prisma.cliente.count({ where }),
     ])

@@ -2,6 +2,7 @@
 import { existsSync } from "node:fs"
 // biome-ignore lint/correctness/noNodejsModules: idem.
 import { join, resolve } from "node:path"
+import type { INestApplication, Type } from "@nestjs/common"
 import { PrismaClient } from "@prisma/client"
 import bcrypt from "bcrypt"
 import supertest, { type Agent } from "supertest"
@@ -29,14 +30,14 @@ const ADMIN_PASSWORD = "Catalogo1234!"
 
 interface ModuloApp {
   // biome-ignore lint/style/useNamingConvention: la clase Nest es PascalCase.
-  AppModule: unknown
+  AppModule: Type<unknown>
 }
 interface ModuloHttp {
   configurarHttp: (app: unknown) => void
 }
 
 describe.runIf(RUN_E2E)("catalogo e2e", () => {
-  let app: any
+  let app: INestApplication
   let agente: Agent
   let prisma: PrismaClient
 
@@ -94,7 +95,7 @@ describe.runIf(RUN_E2E)("catalogo e2e", () => {
     const throttlerSiempreOk = { canActivate: (): boolean => true }
 
     const moduleRef = await Test.createTestingModule({
-      imports: [moduleApp.AppModule as any],
+      imports: [moduleApp.AppModule],
     })
       .overrideGuard(ThrottlerGuard)
       .useValue(throttlerSiempreOk)
@@ -114,6 +115,31 @@ describe.runIf(RUN_E2E)("catalogo e2e", () => {
   }, 60_000)
 
   afterAll(async () => {
+    // Cleanup espejo al beforeAll: borrar sesiones + Usuario + Colaborador del
+    // admin de pruebas para que no quede basura en la BD entre runs ni se
+    // confunda con el admin del seed. Envuelto en try/catch para que el
+    // teardown no rompa si algun paso falla (el cierre de app/prisma debe
+    // ejecutarse siempre).
+    try {
+      const col = await prisma.colaborador.findUnique({
+        where: { email: ADMIN_EMAIL },
+        select: { id: true },
+      })
+      if (col) {
+        await prisma.$executeRaw`
+          DELETE FROM sesiones
+          WHERE (sess::jsonb->>'usuarioId') IN (
+            SELECT id::text FROM usuarios WHERE colaborador_id = ${col.id}::uuid
+          )
+        `
+        await prisma.usuario.deleteMany({ where: { colaboradorId: col.id } })
+        await prisma.colaborador.delete({ where: { id: col.id } })
+      }
+    } catch (error) {
+      const detalle = error instanceof Error ? error.message : String(error)
+      console.warn(`catalogo.e2e cleanup fallo (no rompe teardown): ${detalle}`)
+    }
+
     if (app) {
       await app.close()
     }
@@ -201,13 +227,10 @@ describe.runIf(RUN_E2E)("catalogo e2e", () => {
     expect((res.body as { code: string }).code).toBe("AREA_NO_ENCONTRADA")
   })
 
-  it("validacion Zod: ?page=0 rechazado por el pipe (400 INVALID_BODY)", async () => {
+  it("validacion Zod: ?page=0 rechazado por el pipe (400 INVALID_QUERY)", async () => {
     const res = await agente.get("/api/v1/catalogo/areas?page=0")
-    // El ZodValidationPipe del proyecto siempre arroja BadRequestException con
-    // code=INVALID_BODY, independientemente del origen (body vs query). Patron
-    // existente; no es alcance de este slice cambiarlo.
     expect(res.status).toBe(400)
-    expect((res.body as { code: string }).code).toBe("INVALID_BODY")
+    expect((res.body as { code: string }).code).toBe("INVALID_QUERY")
   })
 
   it("GET /catalogo/bloques/:id devuelve detalle CON `contenido`", async () => {

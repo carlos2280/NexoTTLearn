@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common"
 import { AreaResponse, ListarAreasQuery, Paginated } from "@nexott-learn/shared-types"
 import { Prisma } from "@prisma/client"
 import { apiErrorCodes } from "../../common/errors/api-error.codes"
-import { buildPaginatedResponse } from "../../common/http/paginated"
+import { buildPaginatedResponse, resolvePaginacion } from "../../common/http/paginated"
 import { PrismaService } from "../../common/prisma/prisma.service"
 
 const SELECT_AREA_FIELDS = {
@@ -30,7 +30,8 @@ export class AreasService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listar(query: ListarAreasQuery): Promise<Paginated<AreaResponse>> {
-    const { page, pageSize, q } = query
+    const { q } = query
+    const { skip, take, page, pageSize } = resolvePaginacion(query)
     const where: Prisma.AreaWhereInput = q ? { nombre: { contains: q, mode: "insensitive" } } : {}
 
     const [filas, total] = await this.prisma.$transaction([
@@ -38,8 +39,8 @@ export class AreasService {
         where,
         select: SELECT_AREA_FIELDS,
         orderBy: { nombre: "asc" },
-        take: pageSize,
-        skip: (page - 1) * pageSize,
+        take,
+        skip,
       }),
       this.prisma.area.count({ where }),
     ])

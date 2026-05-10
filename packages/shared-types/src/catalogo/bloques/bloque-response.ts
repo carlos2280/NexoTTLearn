@@ -19,9 +19,11 @@ export interface BloqueResponse {
 
 /**
  * Bloque en endpoint de detalle — incluye `contenido` tipado como
- * `Record<string, unknown>`. La forma concreta del JSONB depende del `tipo` y
- * se valida cuando se mute (P3); aqui se expone tal cual desde la BD.
+ * `Record<string, unknown> | null`. `null` representa un bloque sin contenido
+ * persistido (mismo patron que `Cliente.datosContacto`). La forma concreta
+ * del JSONB depende del `tipo` y se valida cuando se mute (P3); aqui se
+ * expone tal cual desde la BD.
  */
 export interface BloqueDetalleResponse extends BloqueResponse {
-  readonly contenido: Record<string, unknown>
+  readonly contenido: Record<string, unknown> | null
 }

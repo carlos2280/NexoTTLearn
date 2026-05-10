@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, PipeTransform } from "@nestjs/common"
+import { ArgumentMetadata, BadRequestException, Injectable, PipeTransform } from "@nestjs/common"
 import { ZodError, ZodSchema } from "zod"
 import { apiErrorCodes } from "../errors/api-error.codes"
 
@@ -8,6 +8,10 @@ import { apiErrorCodes } from "../errors/api-error.codes"
  * Se aplica por endpoint (NO global): ValidationPipe global de Nest opera
  * sobre class-validator y entra en conflicto con la transformacion de Zod.
  *
+ * Emite codigos de error distintos segun el origen del valor:
+ * - `@Body()`  -> `INVALID_BODY`  ("El cuerpo de la peticion no cumple el contrato.")
+ * - `@Query()` -> `INVALID_QUERY` ("Los parametros de consulta no cumplen el contrato.")
+ *
  * Uso:
  *   @UsePipes(new ZodValidationPipe(crearCursoSchema))
  *   async crear(@Body() input: CrearCursoInput) { ... }
@@ -16,12 +20,15 @@ import { apiErrorCodes } from "../errors/api-error.codes"
 export class ZodValidationPipe<T> implements PipeTransform<unknown, T> {
   constructor(private readonly schema: ZodSchema<T>) {}
 
-  transform(value: unknown): T {
+  transform(value: unknown, metadata: ArgumentMetadata): T {
     const result = this.schema.safeParse(value)
     if (!result.success) {
+      const isQuery = metadata.type === "query"
       throw new BadRequestException({
-        code: apiErrorCodes.invalidBody,
-        message: "El cuerpo de la peticion no cumple el contrato.",
+        code: isQuery ? apiErrorCodes.invalidQuery : apiErrorCodes.invalidBody,
+        message: isQuery
+          ? "Los parametros de consulta no cumplen el contrato."
+          : "El cuerpo de la peticion no cumple el contrato.",
         details: this.formatErrors(result.error),
       })
     }

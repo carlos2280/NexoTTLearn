@@ -7,7 +7,7 @@ import {
 } from "@nexott-learn/shared-types"
 import { Prisma } from "@prisma/client"
 import { apiErrorCodes } from "../../common/errors/api-error.codes"
-import { buildPaginatedResponse } from "../../common/http/paginated"
+import { buildPaginatedResponse, resolvePaginacion } from "../../common/http/paginated"
 import { PrismaService } from "../../common/prisma/prisma.service"
 
 /**
@@ -53,10 +53,13 @@ function toBloqueResponse(row: BloqueRow): BloqueResponse {
 function toBloqueDetalleResponse(row: BloqueDetalleRow): BloqueDetalleResponse {
   return {
     ...toBloqueResponse(row),
-    // El JSONB de Prisma viene tipado como JsonValue. Lo exponemos como
-    // Record<string, unknown>; la forma concreta del contenido depende del
-    // tipo del bloque y se validara cuando se mute en P3.
-    contenido: (row.contenido ?? {}) as Record<string, unknown>,
+    // Preserva `null` literal de la BD (mismo patron que ClientesService con
+    // datosContacto). La forma concreta del JSONB depende del `tipo` del
+    // bloque y se validara cuando se mute en P3.
+    contenido:
+      row.contenido === null || row.contenido === undefined
+        ? null
+        : (row.contenido as Record<string, unknown>),
   }
 }
 
@@ -65,7 +68,8 @@ export class BloquesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listar(query: ListarBloquesQuery): Promise<Paginated<BloqueResponse>> {
-    const { page, pageSize, seccionId, tipo, estado } = query
+    const { seccionId, tipo, estado } = query
+    const { skip, take, page, pageSize } = resolvePaginacion(query)
     const where: Prisma.BloqueWhereInput = {
       ...(seccionId ? { seccionId } : {}),
       ...(tipo ? { tipo } : {}),
@@ -77,8 +81,8 @@ export class BloquesService {
         where,
         select: SELECT_BLOQUE_FIELDS,
         orderBy: [{ seccionId: "asc" }, { orden: "asc" }],
-        take: pageSize,
-        skip: (page - 1) * pageSize,
+        take,
+        skip,
       }),
       this.prisma.bloque.count({ where }),
     ])
