@@ -27,6 +27,9 @@ export const apiErrorCodes = {
   passwordRepetido: "VALIDACION_PASSWORD_REPETIDO",
   conflictEmailDuplicado: "CONFLICT_EMAIL_DUPLICADO",
   mfaPendienteFaseP1B: "MFA_PENDIENTE_FASE_P1B",
+  codigoMfaInvalido: "CODIGO_MFA_INVALIDO",
+  mfaChallengeExpirado: "MFA_CHALLENGE_EXPIRADO",
+  setupMfaRequerido: "SETUP_MFA_REQUERIDO",
   modoAutomaticoNoDisponible: "MODO_AUTOMATICO_NO_DISPONIBLE",
 } as const
 

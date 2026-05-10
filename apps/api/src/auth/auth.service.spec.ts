@@ -11,6 +11,7 @@ import { AuditLogService } from "../common/audit/audit-log.service"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { AuthService } from "./auth.service"
+import { MfaService } from "./mfa/mfa.service"
 
 interface UsuarioMock {
   id: string
@@ -106,16 +107,29 @@ function buildAuditLogMock(): MockAuditLog {
   }
 }
 
+interface MockMfa {
+  crearChallenge: ReturnType<typeof vi.fn>
+}
+
+function buildMfaMock(): MockMfa {
+  return {
+    crearChallenge: vi.fn().mockResolvedValue({ mfaChallengeId: "ch-1" }),
+  }
+}
+
 let prisma: MockPrisma
 let auditLog: MockAuditLog
+let mfa: MockMfa
 let service: AuthService
 
 beforeEach(() => {
   prisma = buildPrismaMock()
   auditLog = buildAuditLogMock()
+  mfa = buildMfaMock()
   service = new AuthService(
     prisma as unknown as PrismaService,
     auditLog as unknown as AuditLogService,
+    mfa as unknown as MfaService,
   )
 })
 
@@ -129,7 +143,11 @@ describe("AuthService.validarCredenciales", () => {
     prisma.usuario.findFirst.mockResolvedValue(usuario)
     prisma.aceptacionAvisoPrivacidad.findFirst.mockResolvedValue({ id: "aap-1" })
 
-    const { perfil } = await service.validarCredenciales("user@nttdata.test", "Password1!")
+    const resultado = await service.validarCredenciales("user@nttdata.test", "Password1!")
+    if (resultado.tipo !== "completo") {
+      throw new Error("se esperaba login completo")
+    }
+    const { perfil } = resultado
 
     expect(perfil.usuarioId).toBe("usr-1")
     expect(perfil.rol).toBe(RolUsuario.PARTICIPANTE)
@@ -254,21 +272,25 @@ describe("AuthService.validarCredenciales", () => {
     }
   })
 
-  it("mfaHabilitado=true: 501 MFA_PENDIENTE_FASE_P1B", async () => {
+  it("mfaHabilitado=true: devuelve mfaPendiente con mfaChallengeId y NO emite cookie", async () => {
     const usuario = buildUsuario({
       mfaHabilitado: true,
       passwordHash: await bcrypt.hash("Password1!", 4),
     })
     prisma.usuario.findFirst.mockResolvedValue(usuario)
 
-    try {
-      await service.validarCredenciales("user@nttdata.test", "Password1!")
-      throw new Error("se esperaba que lanzara")
-    } catch (error) {
-      expect(error).toBeInstanceOf(NotImplementedException)
-      const r = (error as NotImplementedException).getResponse() as { code: string }
-      expect(r.code).toBe(apiErrorCodes.mfaPendienteFaseP1B)
+    const resultado = await service.validarCredenciales("user@nttdata.test", "Password1!")
+    expect(resultado.tipo).toBe("mfaPendiente")
+    if (resultado.tipo !== "mfaPendiente") {
+      throw new Error("tipo inesperado")
     }
+    expect(resultado.mfaChallengeId).toBe("ch-1")
+    expect(mfa.crearChallenge).toHaveBeenCalledWith("usr-1", expect.any(Object))
+    // No registra LOGIN_OK aun (es solo el primer factor): la creacion del
+    // challenge audita LOGIN_PARCIAL_OK desde MfaService.
+    expect(auditLog.record).not.toHaveBeenCalledWith(
+      expect.objectContaining({ accion: AccionAuditoria.LOGIN_OK }),
+    )
   })
 
   it("aviso de privacidad pendiente: requiereAceptarAvisoPrivacidad=true en perfil", async () => {
@@ -276,8 +298,11 @@ describe("AuthService.validarCredenciales", () => {
     prisma.usuario.findFirst.mockResolvedValue(usuario)
     prisma.aceptacionAvisoPrivacidad.findFirst.mockResolvedValue(null)
 
-    const { perfil } = await service.validarCredenciales(usuario.colaborador.email, "Password1!")
-    expect(perfil.requiereAceptarAvisoPrivacidad).toBe(true)
+    const resultado = await service.validarCredenciales(usuario.colaborador.email, "Password1!")
+    if (resultado.tipo !== "completo") {
+      throw new Error("se esperaba login completo")
+    }
+    expect(resultado.perfil.requiereAceptarAvisoPrivacidad).toBe(true)
   })
 })
 

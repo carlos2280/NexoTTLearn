@@ -264,6 +264,12 @@ enum AccionAuditoria {
   SESION_ELIMINADA
   COLABORADOR_CREADO
   AVISO_ACEPTADO
+  LOGIN_PARCIAL_OK
+  MFA_SETUP_INICIADO
+  MFA_ENABLED
+  MFA_VERIFY_OK
+  MFA_VERIFY_FAIL
+  MFA_DISABLED
 
   @@map("accion_auditoria_enum")
 }
@@ -574,6 +580,7 @@ model Usuario {
   requiereCambioPassword Boolean    @default(true) @map("requiere_cambio_password")
   mfaHabilitado          Boolean    @default(false) @map("mfa_habilitado")
   mfaSecret              String?    @map("mfa_secret")
+  requiereSetupMfa       Boolean    @default(false) @map("requiere_setup_mfa")
   intentosFallidos       Int        @default(0) @map("intentos_fallidos")
   bloqueado              Boolean    @default(false)
   ultimoLogin            DateTime?  @map("ultimo_login") @db.Timestamptz(6)
@@ -595,8 +602,27 @@ model Usuario {
   ajustesPlan           AjustePlan[]                @relation("AjustePlan_Autor")
   historicoNotasSkill   HistoricoNotaSkill[]        @relation("HistNotaSkill_Autor")
   activityLogs          ActivityLog[]
+  mfaChallenges         MfaChallenge[]
 
   @@map("usuarios")
+}
+
+/// Challenges TOTP del segundo paso del login MFA. Una fila por intento de
+/// login con MFA habilitado. Expira a los 5 min, se invalida tras 5 intentos
+/// fallidos o tras un verify exitoso. Tabla append-only desde el codigo: el
+/// `MfaService` solo crea, lee y marca `usado=true` / incrementa `intentos`.
+model MfaChallenge {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuarioId String   @map("usuario_id") @db.Uuid
+  creadoEn  DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
+  expiraEn  DateTime @map("expira_en") @db.Timestamptz(6)
+  usado     Boolean  @default(false)
+  intentos  Int      @default(0)
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, creadoEn(sort: Desc)], map: "idx_mfa_challenges_usuario")
+  @@map("mfa_challenges")
 }
 
 /// Audit log estructural (OWASP A09). Append-only desde el codigo:

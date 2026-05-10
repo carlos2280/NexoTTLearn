@@ -62,6 +62,7 @@ export class ColaboradoresService {
             requiereCambioPassword: true,
             passwordInicialCaduca,
             mfaHabilitado: false,
+            requiereSetupMfa: input.habilitarMfa,
             intentosFallidos: 0,
             bloqueado: false,
           },
@@ -90,11 +91,11 @@ export class ColaboradoresService {
           id: resultado.usuario.id,
           rol: resultado.usuario.rol,
           requiereCambioPassword: true,
+          requiereSetupMfa: input.habilitarMfa,
           passwordInicialCaducaEn: passwordInicialCaduca,
         },
         modoEntrega: "MANUAL",
         passwordTemporal,
-        mfaPendienteSetupP1B: input.habilitarMfa,
       }
     } catch (error) {
       if (

@@ -19,14 +19,15 @@ export interface AltaColaboradorResponse {
     readonly id: string
     readonly rol: "ADMIN" | "PARTICIPANTE"
     readonly requiereCambioPassword: true
+    /**
+     * Refleja `dto.habilitarMfa`: si el admin marco la casilla, se persistio
+     * `Usuario.requiereSetupMfa=true` y el `MustSetupMfaGuard` obligara al
+     * usuario a completar /auth/mfa/setup + /auth/mfa/enable en su primer
+     * acceso antes de operar otros endpoints (P1b — D-MFA-4).
+     */
+    readonly requiereSetupMfa: boolean
     readonly passwordInicialCaducaEn: Date
   }
   readonly modoEntrega: "MANUAL"
   readonly passwordTemporal: string
-  /**
-   * En P1a el flag `habilitarMfa` recibido en el alta NO se persiste; el setup
-   * real ocurre cuando el usuario hace `auth/mfa/setup` + `enable` en P1b. Si
-   * el admin lo solicito en true, se devuelve esta nota como recordatorio.
-   */
-  readonly mfaPendienteSetupP1B: boolean
 }

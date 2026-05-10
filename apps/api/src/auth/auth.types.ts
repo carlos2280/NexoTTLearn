@@ -42,10 +42,17 @@ export interface PerfilSesion {
   readonly mfaHabilitado: boolean
 }
 
-export interface LoginResponse {
+export interface LoginResponseSinMfa {
   readonly mfaRequired: false
   readonly perfil: PerfilSesion
 }
+
+export interface LoginResponseConMfa {
+  readonly mfaRequired: true
+  readonly mfaChallengeId: string
+}
+
+export type LoginResponse = LoginResponseSinMfa | LoginResponseConMfa
 
 export interface ResultadoRegenerarPassword {
   readonly modoEntrega: "MANUAL"

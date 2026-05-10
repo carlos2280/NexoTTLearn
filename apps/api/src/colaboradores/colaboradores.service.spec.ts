@@ -206,8 +206,9 @@ describe("ColaboradoresService.crear", () => {
     }
   })
 
-  it("habilitarMfa=true: NO se persiste, queda como pendiente para P1b", async () => {
+  it("habilitarMfa=true: persiste requiereSetupMfa=true, mfaHabilitado=false (estado bisagra)", async () => {
     let mfaPersistido: boolean | undefined
+    let requiereSetupPersistido: boolean | undefined
     prisma.$transaction.mockImplementation(
       async (cb: (tx: unknown) => Promise<unknown>) =>
         await cb({
@@ -220,10 +221,15 @@ describe("ColaboradoresService.crear", () => {
             }),
           },
           usuario: {
-            create: vi.fn().mockImplementation((args: { data: { mfaHabilitado: boolean } }) => {
-              mfaPersistido = args.data.mfaHabilitado
-              return Promise.resolve({ id: "u", rol: RolUsuario.PARTICIPANTE })
-            }),
+            create: vi
+              .fn()
+              .mockImplementation(
+                (args: { data: { mfaHabilitado: boolean; requiereSetupMfa: boolean } }) => {
+                  mfaPersistido = args.data.mfaHabilitado
+                  requiereSetupPersistido = args.data.requiereSetupMfa
+                  return Promise.resolve({ id: "u", rol: RolUsuario.PARTICIPANTE })
+                },
+              ),
           },
           historicoPassword: { create: vi.fn().mockResolvedValue(undefined) },
         }),
@@ -238,6 +244,42 @@ describe("ColaboradoresService.crear", () => {
       ADMIN_ID,
     )
     expect(mfaPersistido).toBe(false)
-    expect(result.mfaPendienteSetupP1B).toBe(true)
+    expect(requiereSetupPersistido).toBe(true)
+    expect(result.usuario.requiereSetupMfa).toBe(true)
+  })
+
+  it("habilitarMfa=false: persiste requiereSetupMfa=false (sin bisagra)", async () => {
+    let requiereSetupPersistido: boolean | undefined
+    prisma.$transaction.mockImplementation(
+      async (cb: (tx: unknown) => Promise<unknown>) =>
+        await cb({
+          colaborador: {
+            create: vi.fn().mockResolvedValue({
+              id: "x",
+              email: "x@y.z",
+              nombre: "n",
+              estadoEmpleado: "ACTIVO",
+            }),
+          },
+          usuario: {
+            create: vi.fn().mockImplementation((args: { data: { requiereSetupMfa: boolean } }) => {
+              requiereSetupPersistido = args.data.requiereSetupMfa
+              return Promise.resolve({ id: "u", rol: RolUsuario.PARTICIPANTE })
+            }),
+          },
+          historicoPassword: { create: vi.fn().mockResolvedValue(undefined) },
+        }),
+    )
+    const result = await service.crear(
+      {
+        email: "x@y.z",
+        nombre: "n",
+        rol: RolUsuario.PARTICIPANTE,
+        habilitarMfa: false,
+      },
+      ADMIN_ID,
+    )
+    expect(requiereSetupPersistido).toBe(false)
+    expect(result.usuario.requiereSetupMfa).toBe(false)
   })
 })

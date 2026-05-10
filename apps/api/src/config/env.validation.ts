@@ -1,6 +1,13 @@
 import { z } from "zod"
 
 /**
+ * Placeholder hex de 64 caracteres de SECRETS_ENCRYPTION_KEY usado en
+ * apps/api/.env.example. En NODE_ENV=production se rechaza esta clave para
+ * forzar a operaciones a generar una nueva con `openssl rand -hex 32`.
+ */
+const SECRETS_ENCRYPTION_KEY_PLACEHOLDER = "0".repeat(64)
+
+/**
  * Las claves del schema mapean nombres de variables de entorno
  * (POSIX/Docker/CI), por lo que deben ser SCREAMING_SNAKE_CASE: cambiar a
  * camelCase rompe la lectura de `process.env.*`. Se suprime la regla
@@ -37,6 +44,11 @@ const envSchema = z
           .map((origin) => origin.trim())
           .filter((origin) => origin.length > 0),
       ),
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    SECRETS_ENCRYPTION_KEY: z
+      .string()
+      .length(64, "SECRETS_ENCRYPTION_KEY debe tener 64 caracteres hex (32 bytes)")
+      .regex(/^[0-9a-fA-F]+$/, "SECRETS_ENCRYPTION_KEY debe ser hex"),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV !== "production") {
@@ -54,6 +66,14 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ["ALLOWED_ORIGINS"],
         message: "ALLOWED_ORIGINS no puede estar vacio en NODE_ENV=production",
+      })
+    }
+    if (data.SECRETS_ENCRYPTION_KEY.toLowerCase() === SECRETS_ENCRYPTION_KEY_PLACEHOLDER) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["SECRETS_ENCRYPTION_KEY"],
+        message:
+          "SECRETS_ENCRYPTION_KEY no puede ser el placeholder de desarrollo en NODE_ENV=production",
       })
     }
   })

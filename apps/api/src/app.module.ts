@@ -8,6 +8,7 @@ import { AuditLogModule } from "./common/audit/audit-log.module"
 import { PrismaExceptionFilter } from "./common/filters/prisma-exception.filter"
 import { CsrfGuard } from "./common/guards/csrf.guard"
 import { MotivoGuard } from "./common/guards/motivo.guard"
+import { MustSetupMfaGuard } from "./common/guards/must-setup-mfa.guard"
 import { RolesGuard } from "./common/guards/roles.guard"
 import { SesionGuard } from "./common/guards/sesion.guard"
 import { PrismaModule } from "./common/prisma/prisma.module"
@@ -18,11 +19,16 @@ import { HealthModule } from "./health/health.module"
  * Modulo raiz.
  *
  * Orden de guards globales (APP_GUARD se aplica en orden de registro):
- *   1. SesionGuard      -> denegacion por defecto, allow-list via @Public.
- *   2. CsrfGuard        -> exige X-XSRF-TOKEN en mutaciones.
- *   3. RolesGuard       -> @Roles(...) tras pasar autenticacion + CSRF.
- *   4. MotivoGuard      -> @RequiereMotivo() exige header X-Motivo.
- *   5. ThrottlerGuard   -> rate limiting por endpoint.
+ *   1. SesionGuard       -> denegacion por defecto, allow-list via @Public.
+ *   2. CsrfGuard         -> exige X-XSRF-TOKEN en mutaciones.
+ *   3. MustSetupMfaGuard -> bloquea endpoints fuera del flujo MFA si el
+ *                            usuario tiene `requiere_setup_mfa=true` (D-MFA-4).
+ *                            Va despues de la sesion (necesita usuarioId) y
+ *                            antes de Roles (incluso un admin debe completar
+ *                            setup antes de operar).
+ *   4. RolesGuard        -> @Roles(...) tras pasar autenticacion + CSRF.
+ *   5. MotivoGuard       -> @RequiereMotivo() exige header X-Motivo.
+ *   6. ThrottlerGuard    -> rate limiting por endpoint.
  *
  * El correlation id se inyecta como middleware Express en main.ts (antes de
  * session/cors) para cubrir respuestas generadas por guards globales antes de
@@ -51,6 +57,7 @@ import { HealthModule } from "./health/health.module"
   providers: [
     { provide: APP_GUARD, useClass: SesionGuard },
     { provide: APP_GUARD, useClass: CsrfGuard },
+    { provide: APP_GUARD, useClass: MustSetupMfaGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: MotivoGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },

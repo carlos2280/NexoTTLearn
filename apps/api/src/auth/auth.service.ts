@@ -26,6 +26,7 @@ import {
   SELECT_USUARIO_AUTH,
   UsuarioAuthRow,
 } from "./auth.types"
+import { MfaService } from "./mfa/mfa.service"
 
 const FACTOR_BCRYPT = 12
 const MAX_INTENTOS_FALLIDOS = 5
@@ -33,10 +34,18 @@ const DIAS_CADUCIDAD_PASSWORD_INICIAL = 7
 const MS_POR_DIA = 24 * 60 * 60 * 1000
 const REGEX_FORTALEZA_PASSWORD = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{10,}$/
 
-interface ResultadoLogin {
+interface ResultadoLoginCompleto {
+  readonly tipo: "completo"
   readonly usuario: UsuarioAuthRow
   readonly perfil: PerfilSesion
 }
+
+interface ResultadoLoginMfaPendiente {
+  readonly tipo: "mfaPendiente"
+  readonly mfaChallengeId: string
+}
+
+export type ResultadoLogin = ResultadoLoginCompleto | ResultadoLoginMfaPendiente
 
 /**
  * AuthService — credenciales, password, sesiones server-side.
@@ -55,6 +64,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
+    private readonly mfaService: MfaService,
   ) {}
 
   async validarCredenciales(
@@ -139,11 +149,15 @@ export class AuthService {
     }
 
     if (usuario.mfaHabilitado) {
-      this.logger.log(`Login con MFA habilitado para ${usuario.id} - flujo P1b pendiente`)
-      throw new NotImplementedException({
-        code: apiErrorCodes.mfaPendienteFaseP1B,
-        message: "El factor MFA se implementa en la fase P1b.",
+      // Resetea intentos fallidos al validar la primera factor; el ultimoLogin
+      // se actualiza recien al completar verify (sino se ensucia el contador
+      // si el usuario abandona el flujo).
+      await this.prisma.usuario.update({
+        where: { id: usuario.id },
+        data: { intentosFallidos: 0 },
       })
+      const { mfaChallengeId } = await this.mfaService.crearChallenge(usuario.id, contexto)
+      return { tipo: "mfaPendiente", mfaChallengeId }
     }
 
     await this.prisma.usuario.update({
@@ -159,7 +173,7 @@ export class AuthService {
     })
 
     const perfil = await this.construirPerfil(usuario)
-    return { usuario, perfil }
+    return { tipo: "completo", usuario, perfil }
   }
 
   async cambiarPassword(

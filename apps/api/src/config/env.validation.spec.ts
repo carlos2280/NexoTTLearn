@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 import { validateEnv } from "./env.validation"
 
 const SECRETO_MINIMO = "x".repeat(32)
+const ENCRYPTION_KEY_VALIDA = "a".repeat(64)
+const ENCRYPTION_KEY_PLACEHOLDER = "0".repeat(64)
 
 type Override = readonly [string, string]
 
@@ -10,6 +12,7 @@ function buildEnv(...overrides: readonly Override[]): Record<string, string> {
     ["NODE_ENV", "development"],
     ["DATABASE_URL", "postgresql://user:pass@localhost:5432/db"],
     ["SESSION_SECRET", SECRETO_MINIMO],
+    ["SECRETS_ENCRYPTION_KEY", ENCRYPTION_KEY_VALIDA],
   ])
   for (const [key, value] of overrides) {
     entries.set(key, value)
@@ -67,5 +70,35 @@ describe("validateEnv", () => {
     )
     expect(env.COOKIE_SECURE).toBe(true)
     expect(env.ALLOWED_ORIGINS).toEqual(["https://app.example.com", "https://admin.example.com"])
+  })
+
+  it("rechaza SECRETS_ENCRYPTION_KEY con longitud distinta de 64", () => {
+    expect(() => validateEnv(buildEnv(["SECRETS_ENCRYPTION_KEY", "a".repeat(63)]))).toThrow(
+      /SECRETS_ENCRYPTION_KEY/,
+    )
+  })
+
+  it("rechaza SECRETS_ENCRYPTION_KEY que no sea hex", () => {
+    expect(() => validateEnv(buildEnv(["SECRETS_ENCRYPTION_KEY", `${"a".repeat(63)}z`]))).toThrow(
+      /SECRETS_ENCRYPTION_KEY/,
+    )
+  })
+
+  it("rechaza SECRETS_ENCRYPTION_KEY placeholder en NODE_ENV=production", () => {
+    expect(() =>
+      validateEnv(
+        buildEnv(
+          ["NODE_ENV", "production"],
+          ["COOKIE_SECURE", "true"],
+          ["ALLOWED_ORIGINS", "https://app.example.com"],
+          ["SECRETS_ENCRYPTION_KEY", ENCRYPTION_KEY_PLACEHOLDER],
+        ),
+      ),
+    ).toThrow(/SECRETS_ENCRYPTION_KEY/)
+  })
+
+  it("acepta SECRETS_ENCRYPTION_KEY placeholder en development", () => {
+    const env = validateEnv(buildEnv(["SECRETS_ENCRYPTION_KEY", ENCRYPTION_KEY_PLACEHOLDER]))
+    expect(env.SECRETS_ENCRYPTION_KEY).toBe(ENCRYPTION_KEY_PLACEHOLDER)
   })
 })

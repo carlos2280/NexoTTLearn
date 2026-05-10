@@ -57,11 +57,18 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<LoginResponse> {
-    const { perfil } = await this.authService.validarCredenciales(
+    const resultado = await this.authService.validarCredenciales(
       input.email,
       input.password,
       extractContextoHttp(req),
     )
+
+    if (resultado.tipo === "mfaPendiente") {
+      // No se emite cookie ni CSRF: la sesion se completa tras /auth/mfa/verify.
+      return { mfaRequired: true, mfaChallengeId: resultado.mfaChallengeId }
+    }
+
+    const { perfil } = resultado
 
     await new Promise<void>((resolve, reject) => {
       req.session.regenerate((err: unknown) => {
