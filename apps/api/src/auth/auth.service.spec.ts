@@ -4,9 +4,10 @@ import {
   UnauthorizedException,
   UnprocessableEntityException,
 } from "@nestjs/common"
-import { EstadoEmpleado, ModoEntregaPassword, RolUsuario } from "@prisma/client"
+import { AccionAuditoria, EstadoEmpleado, ModoEntregaPassword, RolUsuario } from "@prisma/client"
 import bcrypt from "bcrypt"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { AuditLogService } from "../common/audit/audit-log.service"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { AuthService } from "./auth.service"
@@ -95,12 +96,27 @@ function buildPrismaMock(): MockPrisma {
   return prisma
 }
 
+interface MockAuditLog {
+  record: ReturnType<typeof vi.fn>
+}
+
+function buildAuditLogMock(): MockAuditLog {
+  return {
+    record: vi.fn().mockResolvedValue(undefined),
+  }
+}
+
 let prisma: MockPrisma
+let auditLog: MockAuditLog
 let service: AuthService
 
 beforeEach(() => {
   prisma = buildPrismaMock()
-  service = new AuthService(prisma as unknown as PrismaService)
+  auditLog = buildAuditLogMock()
+  service = new AuthService(
+    prisma as unknown as PrismaService,
+    auditLog as unknown as AuditLogService,
+  )
 })
 
 afterEach(() => {
@@ -121,6 +137,13 @@ describe("AuthService.validarCredenciales", () => {
     expect(prisma.usuario.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ intentosFallidos: 0 }) }),
     )
+    expect(auditLog.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usuarioId: "usr-1",
+        accion: AccionAuditoria.LOGIN_OK,
+        exito: true,
+      }),
+    )
   })
 
   it("email no existe: 401 generico CREDENCIALES_INVALIDAS (sin revelar el email)", async () => {
@@ -133,6 +156,13 @@ describe("AuthService.validarCredenciales", () => {
       const r = (error as UnauthorizedException).getResponse() as { code: string }
       expect(r.code).toBe(apiErrorCodes.credencialesInvalidas)
     }
+    expect(auditLog.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usuarioId: null,
+        accion: AccionAuditoria.LOGIN_FAIL,
+        exito: false,
+      }),
+    )
   })
 
   it("password incorrecto: incrementa intentos y lanza 401 generico", async () => {
@@ -147,6 +177,13 @@ describe("AuthService.validarCredenciales", () => {
     )
     expect(prisma.usuario.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ intentosFallidos: 3 }) }),
+    )
+    expect(auditLog.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usuarioId: "usr-1",
+        accion: AccionAuditoria.LOGIN_FAIL,
+        exito: false,
+      }),
     )
   })
 
@@ -253,6 +290,13 @@ describe("AuthService.cambiarPassword", () => {
     await service.cambiarPassword("usr-1", "sid-actual", "OldPassword1!", "NewPassword2@")
     expect(prisma.$transaction).toHaveBeenCalledTimes(1)
     expect(prisma.$executeRaw).toHaveBeenCalled()
+    expect(auditLog.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usuarioId: "usr-1",
+        accion: AccionAuditoria.PASSWORD_CHANGED,
+        exito: true,
+      }),
+    )
   })
 
   it("password actual invalida: 401 PASSWORD_ACTUAL_INVALIDO", async () => {
@@ -300,11 +344,20 @@ describe("AuthService.regenerarPasswordInicial", () => {
     prisma.configuracionSistema.findUnique.mockResolvedValue({
       modoEntregaPassword: ModoEntregaPassword.MANUAL,
     })
-    const resultado = await service.regenerarPasswordInicial("usr-2")
+    const resultado = await service.regenerarPasswordInicial("admin-1", "usr-2")
     expect(resultado.modoEntrega).toBe("MANUAL")
     expect(resultado.passwordTemporal.length).toBeGreaterThanOrEqual(12)
     expect(prisma.$transaction).toHaveBeenCalled()
     expect(prisma.$executeRaw).toHaveBeenCalled()
+    expect(auditLog.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usuarioId: "admin-1",
+        accion: AccionAuditoria.PASSWORD_REGENERATED,
+        exito: true,
+        recursoTipo: "usuario",
+        recursoId: "usr-2",
+      }),
+    )
   })
 
   it("modo AUTOMATICO: 501 MODO_AUTOMATICO_NO_DISPONIBLE", async () => {
@@ -312,7 +365,7 @@ describe("AuthService.regenerarPasswordInicial", () => {
       modoEntregaPassword: ModoEntregaPassword.AUTOMATICO,
     })
     try {
-      await service.regenerarPasswordInicial("usr-2")
+      await service.regenerarPasswordInicial("admin-1", "usr-2")
       throw new Error("se esperaba que lanzara")
     } catch (error) {
       expect(error).toBeInstanceOf(NotImplementedException)
@@ -324,10 +377,65 @@ describe("AuthService.regenerarPasswordInicial", () => {
 
 describe("AuthService.desbloquear", () => {
   it("limpia bloqueado e intentos_fallidos", async () => {
-    await service.desbloquear("usr-3")
+    await service.desbloquear("admin-1", "usr-3")
     expect(prisma.usuario.update).toHaveBeenCalledWith({
       where: { id: "usr-3" },
       data: { bloqueado: false, intentosFallidos: 0 },
     })
+    expect(auditLog.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usuarioId: "admin-1",
+        accion: AccionAuditoria.USUARIO_DESBLOQUEADO,
+        exito: true,
+        recursoTipo: "usuario",
+        recursoId: "usr-3",
+      }),
+    )
+  })
+})
+
+describe("AuthService.eliminarSesion", () => {
+  it("elimina la sesion y registra SESION_ELIMINADA", async () => {
+    await service.eliminarSesion("admin-1", "sid-x")
+    expect(prisma.$executeRaw).toHaveBeenCalled()
+    expect(auditLog.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usuarioId: "admin-1",
+        accion: AccionAuditoria.SESION_ELIMINADA,
+        exito: true,
+        recursoTipo: "sesion",
+        recursoId: "sid-x",
+      }),
+    )
+  })
+})
+
+describe("AuthService.registrarLogout", () => {
+  it("registra evento LOGOUT con exito=true", async () => {
+    await service.registrarLogout("usr-9")
+    expect(auditLog.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usuarioId: "usr-9",
+        accion: AccionAuditoria.LOGOUT,
+        exito: true,
+      }),
+    )
+  })
+})
+
+describe("AuthService.aceptarAvisoPrivacidad", () => {
+  it("crea aceptacion y registra AVISO_ACEPTADO", async () => {
+    prisma.aceptacionAvisoPrivacidad.create.mockResolvedValue(undefined)
+    await service.aceptarAvisoPrivacidad("usr-5", "v1")
+    expect(prisma.aceptacionAvisoPrivacidad.create).toHaveBeenCalledWith({
+      data: { usuarioId: "usr-5", versionAviso: "v1" },
+    })
+    expect(auditLog.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usuarioId: "usr-5",
+        accion: AccionAuditoria.AVISO_ACEPTADO,
+        exito: true,
+      }),
+    )
   })
 })

@@ -7,9 +7,17 @@ import {
   UnprocessableEntityException,
 } from "@nestjs/common"
 import { AVISO_VIGENTE_VERSION } from "@nexott-learn/shared-types"
-import { EstadoEmpleado, ModoEntregaPassword, Prisma, RolUsuario } from "@prisma/client"
+import {
+  AccionAuditoria,
+  EstadoEmpleado,
+  ModoEntregaPassword,
+  Prisma,
+  RolUsuario,
+} from "@prisma/client"
 import bcrypt from "bcrypt"
 import { generarPasswordSegura } from "../colaboradores/password-generator"
+import { AuditLogService } from "../common/audit/audit-log.service"
+import { ContextoHttpAuditoria } from "../common/audit/audit-log.types"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
 import {
@@ -38,14 +46,22 @@ interface ResultadoLogin {
  *   - mensaje generico en login (no revelar si el email existe).
  *   - identidad SIEMPRE de la sesion / del id verificado, jamas del body.
  *   - 0 logs de email/password/hash. Para correlar, `usuarioId` (uuid).
+ *   - audit log estructural via `AuditLogService.record()` fire-and-forget.
  */
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name)
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLog: AuditLogService,
+  ) {}
 
-  async validarCredenciales(email: string, password: string): Promise<ResultadoLogin> {
+  async validarCredenciales(
+    email: string,
+    password: string,
+    contexto: ContextoHttpAuditoria = {},
+  ): Promise<ResultadoLogin> {
     const usuario = await this.prisma.usuario.findFirst({
       where: { colaborador: { email } },
       select: SELECT_USUARIO_AUTH,
@@ -58,10 +74,22 @@ export class AuthService {
       })
 
     if (!usuario) {
+      await this.auditLog.record({
+        usuarioId: null,
+        accion: AccionAuditoria.LOGIN_FAIL,
+        exito: false,
+        ...contexto,
+      })
       throw credencialesInvalidas()
     }
     if (usuario.colaborador.estadoEmpleado === EstadoEmpleado.EX_EMPLEADO) {
       this.logger.warn(`Login bloqueado: usuario ${usuario.id} es EX_EMPLEADO`)
+      await this.auditLog.record({
+        usuarioId: usuario.id,
+        accion: AccionAuditoria.LOGIN_FAIL,
+        exito: false,
+        ...contexto,
+      })
       throw new ForbiddenException({
         code: apiErrorCodes.usuarioExEmpleado,
         message: "La cuenta esta deshabilitada.",
@@ -69,6 +97,12 @@ export class AuthService {
     }
     if (usuario.bloqueado) {
       this.logger.warn(`Login bloqueado: usuario ${usuario.id} esta bloqueado`)
+      await this.auditLog.record({
+        usuarioId: usuario.id,
+        accion: AccionAuditoria.LOGIN_FAIL,
+        exito: false,
+        ...contexto,
+      })
       throw new ForbiddenException({
         code: apiErrorCodes.usuarioBloqueado,
         message: "La cuenta esta bloqueada. Solicite desbloqueo a un administrador.",
@@ -80,6 +114,12 @@ export class AuthService {
       usuario.passwordInicialCaduca.getTime() < Date.now()
     ) {
       this.logger.warn(`Login bloqueado: password inicial caducada para ${usuario.id}`)
+      await this.auditLog.record({
+        usuarioId: usuario.id,
+        accion: AccionAuditoria.LOGIN_FAIL,
+        exito: false,
+        ...contexto,
+      })
       throw new ForbiddenException({
         code: apiErrorCodes.passwordInicialCaducada,
         message: "La contrasena inicial ha caducado. Solicite una nueva al administrador.",
@@ -89,6 +129,12 @@ export class AuthService {
     const valido = await bcrypt.compare(password, usuario.passwordHash)
     if (!valido) {
       await this.registrarIntentoFallido(usuario.id, usuario.intentosFallidos)
+      await this.auditLog.record({
+        usuarioId: usuario.id,
+        accion: AccionAuditoria.LOGIN_FAIL,
+        exito: false,
+        ...contexto,
+      })
       throw credencialesInvalidas()
     }
 
@@ -105,6 +151,12 @@ export class AuthService {
       data: { intentosFallidos: 0, ultimoLogin: new Date() },
     })
     this.logger.log(`Login exitoso para ${usuario.id}`)
+    await this.auditLog.record({
+      usuarioId: usuario.id,
+      accion: AccionAuditoria.LOGIN_OK,
+      exito: true,
+      ...contexto,
+    })
 
     const perfil = await this.construirPerfil(usuario)
     return { usuario, perfil }
@@ -115,6 +167,7 @@ export class AuthService {
     sidActual: string,
     passwordActual: string,
     passwordNuevo: string,
+    contexto: ContextoHttpAuditoria = {},
   ): Promise<void> {
     if (!REGEX_FORTALEZA_PASSWORD.test(passwordNuevo)) {
       throw new UnprocessableEntityException({
@@ -185,13 +238,29 @@ export class AuthService {
 
     await this.invalidarOtrasSesiones(usuarioId, sidActual)
     this.logger.log(`Password cambiada para ${usuarioId}`)
+    await this.auditLog.record({
+      usuarioId,
+      accion: AccionAuditoria.PASSWORD_CHANGED,
+      exito: true,
+      ...contexto,
+    })
   }
 
-  async aceptarAvisoPrivacidad(usuarioId: string, versionAviso: string): Promise<void> {
+  async aceptarAvisoPrivacidad(
+    usuarioId: string,
+    versionAviso: string,
+    contexto: ContextoHttpAuditoria = {},
+  ): Promise<void> {
     await this.prisma.aceptacionAvisoPrivacidad.create({
       data: { usuarioId, versionAviso },
     })
     this.logger.log(`Aviso ${versionAviso} aceptado por ${usuarioId}`)
+    await this.auditLog.record({
+      usuarioId,
+      accion: AccionAuditoria.AVISO_ACEPTADO,
+      exito: true,
+      ...contexto,
+    })
   }
 
   async obtenerPerfil(usuarioId: string): Promise<PerfilSesion> {
@@ -208,7 +277,11 @@ export class AuthService {
     return this.construirPerfil(usuario)
   }
 
-  async regenerarPasswordInicial(usuarioObjetivoId: string): Promise<ResultadoRegenerarPassword> {
+  async regenerarPasswordInicial(
+    adminUsuarioId: string,
+    usuarioObjetivoId: string,
+    contexto: ContextoHttpAuditoria = {},
+  ): Promise<ResultadoRegenerarPassword> {
     const config = await this.prisma.configuracionSistema.findUnique({
       where: { id: 1 },
       select: { modoEntregaPassword: true },
@@ -243,19 +316,60 @@ export class AuthService {
 
     await this.invalidarTodasLasSesiones(usuarioObjetivoId)
     this.logger.log(`Password inicial regenerada para ${usuarioObjetivoId}`)
+    await this.auditLog.record({
+      usuarioId: adminUsuarioId,
+      accion: AccionAuditoria.PASSWORD_REGENERATED,
+      exito: true,
+      recursoTipo: "usuario",
+      recursoId: usuarioObjetivoId,
+      ...contexto,
+    })
     return { modoEntrega: "MANUAL", passwordTemporal, caducaEn }
   }
 
-  async desbloquear(usuarioObjetivoId: string): Promise<void> {
+  async desbloquear(
+    adminUsuarioId: string,
+    usuarioObjetivoId: string,
+    contexto: ContextoHttpAuditoria = {},
+  ): Promise<void> {
     await this.prisma.usuario.update({
       where: { id: usuarioObjetivoId },
       data: { bloqueado: false, intentosFallidos: 0 },
     })
     this.logger.log(`Usuario desbloqueado ${usuarioObjetivoId}`)
+    await this.auditLog.record({
+      usuarioId: adminUsuarioId,
+      accion: AccionAuditoria.USUARIO_DESBLOQUEADO,
+      exito: true,
+      recursoTipo: "usuario",
+      recursoId: usuarioObjetivoId,
+      ...contexto,
+    })
   }
 
-  async eliminarSesion(sid: string): Promise<void> {
+  async eliminarSesion(
+    adminUsuarioId: string,
+    sid: string,
+    contexto: ContextoHttpAuditoria = {},
+  ): Promise<void> {
     await this.prisma.$executeRaw`DELETE FROM sesiones WHERE sid = ${sid}`
+    await this.auditLog.record({
+      usuarioId: adminUsuarioId,
+      accion: AccionAuditoria.SESION_ELIMINADA,
+      exito: true,
+      recursoTipo: "sesion",
+      recursoId: sid,
+      ...contexto,
+    })
+  }
+
+  async registrarLogout(usuarioId: string, contexto: ContextoHttpAuditoria = {}): Promise<void> {
+    await this.auditLog.record({
+      usuarioId,
+      accion: AccionAuditoria.LOGOUT,
+      exito: true,
+      ...contexto,
+    })
   }
 
   async invalidarOtrasSesiones(usuarioId: string, sidActual: string): Promise<void> {

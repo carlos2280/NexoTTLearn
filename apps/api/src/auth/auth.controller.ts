@@ -24,6 +24,7 @@ import {
 } from "@nexott-learn/shared-types"
 import { RolUsuario } from "@prisma/client"
 import { Request, Response } from "express"
+import { extractContextoHttp } from "../common/audit/extract-contexto"
 import { CurrentUser } from "../common/decorators/current-user.decorator"
 import { Public } from "../common/decorators/public.decorator"
 import { RequiereMotivo } from "../common/decorators/requiere-motivo.decorator"
@@ -56,7 +57,11 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<LoginResponse> {
-    const { perfil } = await this.authService.validarCredenciales(input.email, input.password)
+    const { perfil } = await this.authService.validarCredenciales(
+      input.email,
+      input.password,
+      extractContextoHttp(req),
+    )
 
     await new Promise<void>((resolve, reject) => {
       req.session.regenerate((err: unknown) => {
@@ -99,6 +104,8 @@ export class AuthController {
   @Delete("session")
   @HttpCode(HttpStatus.NO_CONTENT)
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<void> {
+    const usuarioId = req.session.usuarioId
+    const contexto = extractContextoHttp(req)
     await new Promise<void>((resolve, reject) => {
       req.session.destroy((err: unknown) => {
         if (err) {
@@ -110,6 +117,9 @@ export class AuthController {
     })
     res.clearCookie(NOMBRE_COOKIE_SESION, { path: "/" })
     limpiarCookieCsrf(res)
+    if (usuarioId) {
+      await this.authService.registrarLogout(usuarioId, contexto)
+    }
   }
 
   @Delete("sesiones-otras")
@@ -146,6 +156,7 @@ export class AuthController {
       req.sessionID,
       input.passwordActual,
       input.passwordNuevo,
+      extractContextoHttp(req),
     )
   }
 
@@ -155,6 +166,7 @@ export class AuthController {
     @Body(new ZodValidationPipe(aceptarAvisoPrivacidadSchema))
     input: { versionAviso: string },
     @CurrentUser() usuario: SesionUsuario | undefined,
+    @Req() req: Request,
   ): Promise<void> {
     if (!usuario) {
       throw new UnauthorizedException({
@@ -162,7 +174,11 @@ export class AuthController {
         message: "Sesion invalida.",
       })
     }
-    await this.authService.aceptarAvisoPrivacidad(usuario.usuarioId, input.versionAviso)
+    await this.authService.aceptarAvisoPrivacidad(
+      usuario.usuarioId,
+      input.versionAviso,
+      extractContextoHttp(req),
+    )
   }
 
   @Post("regenerar-password-inicial")
@@ -173,6 +189,7 @@ export class AuthController {
     @Body(new ZodValidationPipe(regenerarPasswordInicialSchema))
     input: { usuarioId: string },
     @CurrentUser() admin: SesionUsuario | undefined,
+    @Req() req: Request,
   ): Promise<ResultadoRegenerarPassword> {
     if (!admin) {
       throw new InternalServerErrorException({
@@ -186,7 +203,11 @@ export class AuthController {
         message: "Un administrador no puede regenerar su propia contrasena por este endpoint.",
       })
     }
-    return await this.authService.regenerarPasswordInicial(input.usuarioId)
+    return await this.authService.regenerarPasswordInicial(
+      admin.usuarioId,
+      input.usuarioId,
+      extractContextoHttp(req),
+    )
   }
 
   @Post("desbloquear")
@@ -195,15 +216,33 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async desbloquear(
     @Body(new ZodValidationPipe(desbloquearSchema)) input: { usuarioId: string },
+    @CurrentUser() admin: SesionUsuario | undefined,
+    @Req() req: Request,
   ): Promise<void> {
-    await this.authService.desbloquear(input.usuarioId)
+    if (!admin) {
+      throw new InternalServerErrorException({
+        code: apiErrorCodes.errorInterno,
+        message: "Sesion invalida tras pasar guards.",
+      })
+    }
+    await this.authService.desbloquear(admin.usuarioId, input.usuarioId, extractContextoHttp(req))
   }
 
   @Delete("sesiones/:sid")
   @Roles(RolUsuario.ADMIN)
   @RequiereMotivo()
   @HttpCode(HttpStatus.NO_CONTENT)
-  async eliminarSesion(@Param("sid") sid: string): Promise<void> {
-    await this.authService.eliminarSesion(sid)
+  async eliminarSesion(
+    @Param("sid") sid: string,
+    @CurrentUser() admin: SesionUsuario | undefined,
+    @Req() req: Request,
+  ): Promise<void> {
+    if (!admin) {
+      throw new InternalServerErrorException({
+        code: apiErrorCodes.errorInterno,
+        message: "Sesion invalida tras pasar guards.",
+      })
+    }
+    await this.authService.eliminarSesion(admin.usuarioId, sid, extractContextoHttp(req))
   }
 }

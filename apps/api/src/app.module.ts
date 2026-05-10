@@ -4,6 +4,7 @@ import { APP_FILTER, APP_GUARD } from "@nestjs/core"
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler"
 import { AuthModule } from "./auth/auth.module"
 import { ColaboradoresModule } from "./colaboradores/colaboradores.module"
+import { AuditLogModule } from "./common/audit/audit-log.module"
 import { PrismaExceptionFilter } from "./common/filters/prisma-exception.filter"
 import { CsrfGuard } from "./common/guards/csrf.guard"
 import { MotivoGuard } from "./common/guards/motivo.guard"
@@ -42,6 +43,7 @@ import { HealthModule } from "./health/health.module"
       { name: "long", ttl: 60_000, limit: 100 },
     ]),
     PrismaModule,
+    AuditLogModule,
     HealthModule,
     AuthModule,
     ColaboradoresModule,

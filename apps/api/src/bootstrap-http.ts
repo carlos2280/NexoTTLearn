@@ -2,6 +2,7 @@ import { INestApplication, RequestMethod } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
 import connectPgSimple from "connect-pg-simple"
 import cookieParser from "cookie-parser"
+import { NextFunction, Request, Response } from "express"
 import session from "express-session"
 import helmet from "helmet"
 import { crearMiddlewareCsrfFallback } from "./common/http/csrf-helper"
@@ -9,6 +10,18 @@ import { crearMiddlewareRequestId } from "./common/http/request-id-middleware"
 import { AppEnv } from "./config/env.validation"
 
 const NOMBRE_COOKIE_SESION = "nexott.sid"
+
+/**
+ * Permissions-Policy restrictiva: deshabilita features potentes del navegador
+ * que esta API publica nunca debe necesitar. Reduce superficie ante XSS.
+ */
+const PERMISSIONS_POLICY =
+  "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+
+function aplicarPermissionsPolicy(_req: Request, res: Response, next: NextFunction): void {
+  res.setHeader("Permissions-Policy", PERMISSIONS_POLICY)
+  next()
+}
 
 /**
  * Aplica al `INestApplication` los middlewares HTTP (helmet, session, CSRF,
@@ -38,8 +51,18 @@ export function configurarHttp(app: INestApplication): void {
         },
       },
       crossOriginEmbedderPolicy: false,
+      strictTransportSecurity: {
+        maxAge: 31_536_000,
+        includeSubDomains: true,
+        preload: true,
+      },
+      referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+      crossOriginOpenerPolicy: { policy: "same-origin" },
+      crossOriginResourcePolicy: { policy: "same-origin" },
     }),
   )
+
+  app.use(aplicarPermissionsPolicy)
 
   app.use(cookieParser())
 

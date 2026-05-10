@@ -1,7 +1,8 @@
 import { ConflictException, NotImplementedException } from "@nestjs/common"
-import { ModoEntregaPassword, Prisma, RolUsuario } from "@prisma/client"
+import { AccionAuditoria, ModoEntregaPassword, Prisma, RolUsuario } from "@prisma/client"
 import bcrypt from "bcrypt"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { AuditLogService } from "../common/audit/audit-log.service"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { ColaboradoresService } from "./colaboradores.service"
@@ -20,14 +21,30 @@ function buildPrismaMock(): MockPrisma {
   }
 }
 
+interface MockAuditLog {
+  record: ReturnType<typeof vi.fn>
+}
+
+function buildAuditLogMock(): MockAuditLog {
+  return {
+    record: vi.fn().mockResolvedValue(undefined),
+  }
+}
+
 const REGEX_FORTALEZA = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{10,}$/
+const ADMIN_ID = "admin-1"
 
 let prisma: MockPrisma
+let auditLog: MockAuditLog
 let service: ColaboradoresService
 
 beforeEach(() => {
   prisma = buildPrismaMock()
-  service = new ColaboradoresService(prisma as unknown as PrismaService)
+  auditLog = buildAuditLogMock()
+  service = new ColaboradoresService(
+    prisma as unknown as PrismaService,
+    auditLog as unknown as AuditLogService,
+  )
 })
 
 describe("ColaboradoresService.crear", () => {
@@ -50,18 +67,30 @@ describe("ColaboradoresService.crear", () => {
         }),
     )
 
-    const result = await service.crear({
-      email: "nuevo@nttdata.test",
-      nombre: "Nuevo",
-      rol: RolUsuario.PARTICIPANTE,
-      habilitarMfa: false,
-    })
+    const result = await service.crear(
+      {
+        email: "nuevo@nttdata.test",
+        nombre: "Nuevo",
+        rol: RolUsuario.PARTICIPANTE,
+        habilitarMfa: false,
+      },
+      ADMIN_ID,
+    )
 
     expect(result.colaborador.email).toBe("nuevo@nttdata.test")
     expect(result.usuario.requiereCambioPassword).toBe(true)
     expect(result.modoEntrega).toBe("MANUAL")
     expect(REGEX_FORTALEZA.test(result.passwordTemporal)).toBe(true)
     expect(historicoCreate).toHaveBeenCalled()
+    expect(auditLog.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usuarioId: ADMIN_ID,
+        accion: AccionAuditoria.COLABORADOR_CREADO,
+        exito: true,
+        recursoTipo: "colaborador",
+        recursoId: "col-1",
+      }),
+    )
   })
 
   it("password generada cumple la regex de fortaleza", async () => {
@@ -80,12 +109,15 @@ describe("ColaboradoresService.crear", () => {
           historicoPassword: { create: vi.fn().mockResolvedValue(undefined) },
         }),
     )
-    const result = await service.crear({
-      email: "x@y.z",
-      nombre: "n",
-      rol: RolUsuario.PARTICIPANTE,
-      habilitarMfa: false,
-    })
+    const result = await service.crear(
+      {
+        email: "x@y.z",
+        nombre: "n",
+        rol: RolUsuario.PARTICIPANTE,
+        habilitarMfa: false,
+      },
+      ADMIN_ID,
+    )
     expect(REGEX_FORTALEZA.test(result.passwordTemporal)).toBe(true)
   })
 
@@ -111,12 +143,15 @@ describe("ColaboradoresService.crear", () => {
           historicoPassword: { create: vi.fn().mockResolvedValue(undefined) },
         }),
     )
-    const result = await service.crear({
-      email: "x@y.z",
-      nombre: "n",
-      rol: RolUsuario.PARTICIPANTE,
-      habilitarMfa: false,
-    })
+    const result = await service.crear(
+      {
+        email: "x@y.z",
+        nombre: "n",
+        rol: RolUsuario.PARTICIPANTE,
+        habilitarMfa: false,
+      },
+      ADMIN_ID,
+    )
     expect(hashPersistido).toBeDefined()
     expect(hashPersistido).not.toBe(result.passwordTemporal)
     const ok = await bcrypt.compare(result.passwordTemporal, hashPersistido as string)
@@ -128,12 +163,15 @@ describe("ColaboradoresService.crear", () => {
       modoEntregaPassword: ModoEntregaPassword.AUTOMATICO,
     })
     try {
-      await service.crear({
-        email: "x@y.z",
-        nombre: "n",
-        rol: RolUsuario.PARTICIPANTE,
-        habilitarMfa: false,
-      })
+      await service.crear(
+        {
+          email: "x@y.z",
+          nombre: "n",
+          rol: RolUsuario.PARTICIPANTE,
+          habilitarMfa: false,
+        },
+        ADMIN_ID,
+      )
       throw new Error("se esperaba que lanzara")
     } catch (error) {
       expect(error).toBeInstanceOf(NotImplementedException)
@@ -151,12 +189,15 @@ describe("ColaboradoresService.crear", () => {
       }),
     )
     try {
-      await service.crear({
-        email: "dup@y.z",
-        nombre: "n",
-        rol: RolUsuario.PARTICIPANTE,
-        habilitarMfa: false,
-      })
+      await service.crear(
+        {
+          email: "dup@y.z",
+          nombre: "n",
+          rol: RolUsuario.PARTICIPANTE,
+          habilitarMfa: false,
+        },
+        ADMIN_ID,
+      )
       throw new Error("se esperaba que lanzara")
     } catch (error) {
       expect(error).toBeInstanceOf(ConflictException)
@@ -187,12 +228,15 @@ describe("ColaboradoresService.crear", () => {
           historicoPassword: { create: vi.fn().mockResolvedValue(undefined) },
         }),
     )
-    const result = await service.crear({
-      email: "x@y.z",
-      nombre: "n",
-      rol: RolUsuario.PARTICIPANTE,
-      habilitarMfa: true,
-    })
+    const result = await service.crear(
+      {
+        email: "x@y.z",
+        nombre: "n",
+        rol: RolUsuario.PARTICIPANTE,
+        habilitarMfa: true,
+      },
+      ADMIN_ID,
+    )
     expect(mfaPersistido).toBe(false)
     expect(result.mfaPendienteSetupP1B).toBe(true)
   })

@@ -1,7 +1,9 @@
 import { ConflictException, Injectable, Logger, NotImplementedException } from "@nestjs/common"
 import { CrearColaboradorInput } from "@nexott-learn/shared-types"
-import { ModoEntregaPassword, Prisma } from "@prisma/client"
+import { AccionAuditoria, ModoEntregaPassword, Prisma } from "@prisma/client"
 import bcrypt from "bcrypt"
+import { AuditLogService } from "../common/audit/audit-log.service"
+import { ContextoHttpAuditoria } from "../common/audit/audit-log.types"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { AltaColaboradorResponse } from "./colaboradores.types"
@@ -15,9 +17,16 @@ const MS_POR_DIA = 24 * 60 * 60 * 1000
 export class ColaboradoresService {
   private readonly logger = new Logger(ColaboradoresService.name)
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLog: AuditLogService,
+  ) {}
 
-  async crear(input: CrearColaboradorInput): Promise<AltaColaboradorResponse> {
+  async crear(
+    input: CrearColaboradorInput,
+    adminUsuarioId: string,
+    contexto: ContextoHttpAuditoria = {},
+  ): Promise<AltaColaboradorResponse> {
     const config = await this.prisma.configuracionSistema.findUnique({
       where: { id: 1 },
       select: { modoEntregaPassword: true },
@@ -67,6 +76,14 @@ export class ColaboradoresService {
       this.logger.log(
         `Colaborador creado ${resultado.colaborador.id} (rol ${resultado.usuario.rol})`,
       )
+      await this.auditLog.record({
+        usuarioId: adminUsuarioId,
+        accion: AccionAuditoria.COLABORADOR_CREADO,
+        exito: true,
+        recursoTipo: "colaborador",
+        recursoId: resultado.colaborador.id,
+        ...contexto,
+      })
       return {
         colaborador: resultado.colaborador,
         usuario: {

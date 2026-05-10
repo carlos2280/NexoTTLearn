@@ -95,7 +95,8 @@ Nada con errores debe llegar a `develop` o `main`. Capas activas:
 2. **Commit-msg** (commitlint) → bloquea commits que no sigan Conventional Commits.
 3. **Pre-push** (husky) → corre `make validate` (typecheck + lint + test).
 4. **CI** → lint + typecheck + test + workflow `biome-no-relax.yml` que bloquea PRs que bajen severidades en `biome.json`.
-5. **Permisos Claude** → deny de `--no-verify`, `HUSKY=0`, `biome check --fix`. Ask para tocar `biome.json`, `.husky/*`, `commitlint.config.js`, `turbo.json`, `tsconfig*.json`, `Makefile`, workflows.
+5. **CI security** → workflow `security.yml` corre `pnpm audit --audit-level=high --prod` en cada PR/push a `develop`/`main`. Bloquea si hay CVE high/critical en deps de producción. `pnpm.overrides` en el `package.json` raíz fuerza versiones parcheadas de transitivas (lodash, multer, path-to-regexp, tar, @remix-run/router).
+6. **Permisos Claude** → deny de `--no-verify`, `HUSKY=0`, `biome check --fix`. Ask para tocar `biome.json`, `.husky/*`, `commitlint.config.js`, `turbo.json`, `tsconfig*.json`, `Makefile`, workflows.
 
 Reglas inviolables documentadas en `../.claude/rules/blindaje.md`. Lectura obligatoria.
 

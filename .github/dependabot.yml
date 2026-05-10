@@ -1,10 +1,9 @@
 # Dependabot — actualizaciones automaticas de dependencias
 #
-# Crea PRs cada lunes con bumps de deps.
-# Agrupa por ecosistema y por tipo (minor/patch vs major) para no saturar.
-#
-# Las actualizaciones major requieren revision manual; minor/patch normalmente
-# son seguros y se pueden mergear con un vistazo si CI pasa.
+# Politica (P1a.2):
+#   - Patch en devDependencies     -> label "automerge" (auto-merge si CI pasa).
+#   - Minor / major en cualquier   -> label "needs-review" (PR manual).
+#   - Major de Prisma se ignora    -> requiere migracion planificada.
 #
 # Docs: https://docs.github.com/code-security/dependabot/dependabot-version-updates
 
@@ -18,28 +17,29 @@ updates:
       day: monday
       time: "06:00"
       timezone: America/Santiago
-    open-pull-requests-limit: 5
-    labels:
-      - dependencies
-      - automated
+    open-pull-requests-limit: 10
     commit-message:
       prefix: "chore(deps)"
       include: scope
     groups:
-      # Agrupa minor + patch para reducir ruido
-      minor-and-patch:
+      # Patch en devDependencies -> automerge (CI sigue mandando)
+      devdeps-patch:
+        dependency-type: development
+        update-types: ["patch"]
+      # Patch en deps de produccion -> revision manual
+      prod-patch:
+        dependency-type: production
+        update-types: ["patch"]
+      # Minor agrupado para reducir ruido (revision manual)
+      minor-updates:
         patterns: ["*"]
-        update-types: ["minor", "patch"]
-      # Major se separa para revision manual (uno por uno)
+        update-types: ["minor"]
+      # Stacks majors agrupados por familia
       typescript-stack:
-        patterns:
-          - "typescript"
-          - "@types/*"
-          - "tsx"
+        patterns: ["typescript", "@types/*", "tsx"]
         update-types: ["major"]
       nestjs-stack:
-        patterns:
-          - "@nestjs/*"
+        patterns: ["@nestjs/*"]
         update-types: ["major"]
       react-stack:
         patterns:
@@ -50,13 +50,13 @@ updates:
           - "react-router-dom"
         update-types: ["major"]
       vite-stack:
-        patterns:
-          - "vite"
-          - "@vitejs/*"
-          - "vitest"
+        patterns: ["vite", "@vitejs/*", "vitest"]
         update-types: ["major"]
+    labels:
+      - dependencies
+      - needs-review
     ignore:
-      # Ignorar major bumps de Prisma (migraciones manuales requeridas)
+      # Major de Prisma requiere plan de migracion explicito
       - dependency-name: "@prisma/client"
         update-types: ["version-update:semver-major"]
       - dependency-name: "prisma"
@@ -70,11 +70,11 @@ updates:
       day: monday
       time: "06:00"
       timezone: America/Santiago
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 5
     labels:
       - dependencies
       - github-actions
-      - automated
+      - needs-review
     commit-message:
       prefix: "ci(deps)"
       include: scope

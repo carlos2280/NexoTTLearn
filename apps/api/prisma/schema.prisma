@@ -254,6 +254,20 @@ enum AccionAjustePlan {
   @@map("accion_ajuste_plan_enum")
 }
 
+enum AccionAuditoria {
+  LOGIN_OK
+  LOGIN_FAIL
+  LOGOUT
+  PASSWORD_CHANGED
+  PASSWORD_REGENERATED
+  USUARIO_DESBLOQUEADO
+  SESION_ELIMINADA
+  COLABORADOR_CREADO
+  AVISO_ACEPTADO
+
+  @@map("accion_auditoria_enum")
+}
+
 // =============================================================================
 // CATALOGO: areas, skills, modulos, secciones, bloques
 // =============================================================================
@@ -580,8 +594,32 @@ model Usuario {
   histEstadosAsignacion HistoricoEstadoAsignacion[] @relation("HistEstadoAsig_Autor")
   ajustesPlan           AjustePlan[]                @relation("AjustePlan_Autor")
   historicoNotasSkill   HistoricoNotaSkill[]        @relation("HistNotaSkill_Autor")
+  activityLogs          ActivityLog[]
 
   @@map("usuarios")
+}
+
+/// Audit log estructural (OWASP A09). Append-only desde el codigo:
+/// `AuditLogService.record()` es fire-and-forget y NUNCA propaga errores
+/// al request en curso. `usuarioId` es nullable porque eventos como
+/// LOGIN_FAIL con email inexistente no tienen usuario asociado.
+model ActivityLog {
+  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuarioId   String?         @map("usuario_id") @db.Uuid
+  accion      AccionAuditoria
+  exito       Boolean
+  recursoTipo String?         @map("recurso_tipo")
+  recursoId   String?         @map("recurso_id")
+  ip          String?
+  userAgent   String?         @map("user_agent")
+  requestId   String?         @map("request_id")
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  usuario Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@index([usuarioId, createdAt(sort: Desc)], map: "idx_activity_logs_usuario")
+  @@index([accion, createdAt(sort: Desc)], map: "idx_activity_logs_accion")
+  @@map("activity_logs")
 }
 
 model HistoricoPassword {
