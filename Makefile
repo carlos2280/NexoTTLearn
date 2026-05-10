@@ -54,7 +54,7 @@ clean: kill ## Limpia node_modules, dist y .turbo
 db-up: ## Levanta Postgres en Docker
 	@printf "$(C_BLUE)→ Levantando Postgres…$(C_RESET)\n"
 	docker compose up -d
-	@printf "$(C_GREEN)✓ Postgres listo en localhost:5434$(C_RESET)\n"
+	@printf "$(C_GREEN)✓ Postgres listo en localhost:5435$(C_RESET)\n"
 
 .PHONY: db-down
 db-down: ## Detiene Postgres
@@ -129,8 +129,8 @@ ps: ## Lista procesos dev del proyecto
 .PHONY: ports
 ports: ## Muestra qué procesos ocupan los puertos del proyecto
 	@printf "$(C_BLUE)Puertos del proyecto:$(C_RESET)\n"
-	@echo "  5173 (web), 5174 (web fallback), 4000 (api), 5434 (postgres)"
-	@ss -tlnp 2>/dev/null | grep -E ":5173|:5174|:4000|:5434" || echo "  (todos libres)"
+	@echo "  5173 (web), 5174 (web fallback), 4000 (api), 5435 (postgres)"
+	@ss -tlnp 2>/dev/null | grep -E ":5173|:5174|:4000|:5435" || echo "  (todos libres)"
 
 # ─────────────────────────────────────────────────────────
 # Calidad
