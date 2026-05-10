@@ -31,7 +31,8 @@
     "pnpm": ">=10"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,jsx,json,md}": ["biome check --write --no-errors-on-unmatched"]
+    "*.{ts,js,json,md}": ["biome check --write --no-errors-on-unmatched"],
+    "*.{tsx,jsx}": ["biome format --write --no-errors-on-unmatched"]
   },
   "pnpm": {
     "onlyBuiltDependencies": [
