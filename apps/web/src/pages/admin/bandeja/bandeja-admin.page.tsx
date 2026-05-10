@@ -1,234 +1,120 @@
-import { useAdminDashboard } from "@/features/admin-dashboard/hooks/use-admin-dashboard"
+import { useAdminDashboard } from "@/features/admin-dashboard/hooks/use-dashboard"
 import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
+import { ApiError } from "@/shared/api/api-error"
 import { RUTAS } from "@/shared/constants/rutas"
-import { obtenerSaludo } from "@/shared/lib/saludo"
-import {
-  NxtBadge,
-  NxtButton,
-  NxtCard,
-  NxtEyebrow,
-  NxtHeading,
-  NxtIconTile,
-  type NxtIconTileGradient,
-  type NxtIconoNombre,
-  NxtKpi,
-  NxtStream,
-  type NxtStreamHighlightTone,
-  type NxtStreamTagVariant,
-  NxtTag,
-  NxtText,
-} from "@carlos2280/nexott-ui/react"
-import { Box, Grid, Stack } from "@carlos2280/nexott-ui/react-primitives"
+import { EmptyState } from "@/shared/ui/patterns/empty-state"
+import { PageHeader } from "@/shared/ui/patterns/page-header"
+import { Button } from "@/shared/ui/primitives/button"
+import { AlertTriangle, Plus, RefreshCw } from "lucide-react"
 import { useNavigate } from "react-router-dom"
-
-// Acciones rapidas: navegacion estatica, no depende del backend.
-type AccionRapida = {
-  id: string
-  label: string
-  icon: NxtIconoNombre
-  href: string
-}
-
-const ACCIONES_RAPIDAS: AccionRapida[] = [
-  { id: "qa-1", label: "Nuevo curso", icon: "plus-circle", href: RUTAS.admin.cursoNuevo },
-  { id: "qa-2", label: "Crear diagnostico", icon: "compass", href: RUTAS.admin.diagnosticoNuevo },
-  {
-    id: "qa-3",
-    label: "Centro de revision",
-    icon: "check-circle",
-    href: RUTAS.admin.centroRevision,
-  },
-  { id: "qa-4", label: "Gestionar personas", icon: "users", href: RUTAS.admin.personas },
-]
+import { ActividadFeed } from "./components/actividad-feed"
+import { AlertasList } from "./components/alertas-list"
+import { CentroRevisionBanner } from "./components/centro-revision-banner"
+import { KpiGrid } from "./components/kpi-grid"
 
 export function BandejaAdminPage() {
-  const { data: usuario } = useUsuarioActual()
-  const { data: dashboard, isLoading, isError, refetch } = useAdminDashboard()
   const navigate = useNavigate()
+  const { data: usuario } = useUsuarioActual()
+  const dashboard = useAdminDashboard()
 
   if (!usuario) {
     return null
   }
 
-  const saludo = obtenerSaludo()
-
   return (
-    <Box slot="content" padding={{ base: "lg", md: "xl" }}>
-      <Stack gap="2xl">
-        {/* Hero saludo */}
-        <Stack gap="xs">
-          <NxtText size="md" tone="dim">
-            {saludo}
-          </NxtText>
-          <NxtHeading level={1} size="hero">
-            {usuario.nombre}
-          </NxtHeading>
-          <Box py="xs">
-            <NxtBadge variant="brand" soft={true} size="md" icon="shield" label="Administrador" />
-          </Box>
-        </Stack>
-
-        {isLoading && (
-          <NxtText size="md" tone="dim">
-            Cargando metricas...
-          </NxtText>
-        )}
-
-        {isError && (
-          <NxtCard variant="surface" padding="lg">
-            <Stack direction="row" align="center" gap="md">
-              <NxtIconTile name="alert-triangle" gradient="rose" size="md" />
-              <Stack gap="xs" style={{ flex: 1 }}>
-                <NxtText size="md" weight="semibold">
-                  No pudimos cargar la bandeja
-                </NxtText>
-                <NxtText size="sm" tone="dim">
-                  Reintenta en unos segundos. Si persiste, revisa el estado de la API.
-                </NxtText>
-              </Stack>
-              <NxtButton variant="ghost" size="md" onNxtButtonClick={() => refetch()}>
-                Reintentar
-              </NxtButton>
-            </Stack>
-          </NxtCard>
-        )}
-
-        {dashboard && (
+    <div className="flex flex-col gap-8 px-6 py-8 md:px-10 md:py-10">
+      <PageHeader
+        eyebrow={saludoPorHora()}
+        title={`Hola, ${usuario.nombre}`}
+        subtitle={subtituloContextual(dashboard.data)}
+        actions={
           <>
-            {/* KPIs */}
-            <Stack gap="md">
-              <NxtEyebrow accent="bar">Metricas globales</NxtEyebrow>
-              <Grid columns={{ base: 1, sm: 2, lg: 4 }} gap="md">
-                {dashboard.kpis.map((kpi) => (
-                  <NxtKpi
-                    key={kpi.id}
-                    variant="metric"
-                    label={kpi.label}
-                    value={kpi.value}
-                    delta={kpi.delta}
-                    trend={kpi.trend}
-                    color={kpi.color}
-                    helper={kpi.helper}
-                    trendData={kpi.trendData}
-                    clickable={!!kpi.href}
-                    href={kpi.href}
-                    onNxtKpiClick={(event) => navigate(event.detail.value)}
-                  />
-                ))}
-              </Grid>
-            </Stack>
-
-            {/* Centro de revision (banner-CTA) */}
-            <Stack gap="md">
-              <NxtEyebrow accent="bar">{dashboard.colaRevision.title}</NxtEyebrow>
-              <NxtCard
-                variant="surface"
-                padding="lg"
-                clickable={true}
-                onNxtCardClick={() => navigate(dashboard.colaRevision.href)}
-              >
-                <Stack direction={{ base: "column", md: "row" }} align="center" gap="md">
-                  <Stack direction="row" align="center" gap="md" style={{ flex: 1 }}>
-                    <NxtIconTile name="check-circle" gradient="indigo" size="md" />
-                    <Stack gap="xs">
-                      <NxtText size="md" weight="semibold">
-                        {dashboard.colaRevision.description}
-                      </NxtText>
-                      <Stack direction="row" gap="sm" wrap={true}>
-                        {dashboard.colaRevision.items.map((item) => (
-                          <NxtTag
-                            key={item.id}
-                            variant={item.tone}
-                            size="md"
-                            icon={item.icon as NxtIconoNombre}
-                            clickable={true}
-                            value={item.href}
-                            onNxtTagClick={(event) => {
-                              event.stopPropagation()
-                              navigate(event.detail.value)
-                            }}
-                          >
-                            {item.count} {item.label}
-                          </NxtTag>
-                        ))}
-                      </Stack>
-                    </Stack>
-                  </Stack>
-                  <NxtButton
-                    variant="ghost"
-                    size="md"
-                    icon="chevron-right"
-                    onNxtButtonClick={() => navigate(dashboard.colaRevision.href)}
-                  >
-                    Ir al centro
-                  </NxtButton>
-                </Stack>
-              </NxtCard>
-            </Stack>
-
-            {/* Alertas */}
-            {dashboard.alertas.length > 0 && (
-              <Stack gap="md">
-                <NxtEyebrow accent="bar">Alertas pendientes</NxtEyebrow>
-                <Stack gap="sm">
-                  {dashboard.alertas.map((alerta) => (
-                    <NxtStream
-                      key={alerta.id}
-                      title={alerta.title}
-                      meta={alerta.meta}
-                      action={alerta.action}
-                      iconTile={alerta.icon as NxtIconoNombre}
-                      iconGradient={alerta.gradient as NxtIconTileGradient}
-                      tag={alerta.tag}
-                      tagVariant={alerta.tagVariant as NxtStreamTagVariant}
-                      value={alerta.href}
-                      onNxtStreamClick={(event) => navigate(event.detail.value)}
-                    />
-                  ))}
-                </Stack>
-              </Stack>
-            )}
-
-            {/* Actividad reciente */}
-            {dashboard.actividad.length > 0 && (
-              <Stack gap="md">
-                <NxtEyebrow accent="bar">Actividad reciente</NxtEyebrow>
-                <Stack gap="sm">
-                  {dashboard.actividad.map((item) => (
-                    <NxtStream
-                      key={item.id}
-                      iconTile={item.icon as NxtIconoNombre}
-                      iconGradient={item.gradient as NxtIconTileGradient}
-                      title={item.title}
-                      highlight={item.highlight}
-                      highlightTone={item.highlightTone as NxtStreamHighlightTone | undefined}
-                      meta={item.meta}
-                    />
-                  ))}
-                </Stack>
-              </Stack>
-            )}
+            <Button variant="secondary" size="md" onClick={() => navigate(RUTAS.admin.cursos)}>
+              <Plus className="size-4" strokeWidth={1.75} />
+              Nuevo curso
+            </Button>
+            <Button variant="ghost" size="md" onClick={() => navigate(RUTAS.admin.seguimiento)}>
+              Seguimiento
+            </Button>
           </>
-        )}
+        }
+      />
 
-        {/* Acciones rapidas */}
-        <Stack gap="md">
-          <NxtEyebrow accent="bar">Acciones rapidas</NxtEyebrow>
-          <Stack direction="row" gap="sm" wrap={true}>
-            {ACCIONES_RAPIDAS.map((accion) => (
-              <NxtButton
-                key={accion.id}
-                variant="ghost"
-                size="md"
-                icon={accion.icon}
-                onNxtButtonClick={() => navigate(accion.href)}
-              >
-                {accion.label}
-              </NxtButton>
-            ))}
-          </Stack>
-        </Stack>
-      </Stack>
-    </Box>
+      {dashboard.isError ? (
+        <ErrorBlock
+          message={mensajeError(dashboard.error)}
+          onRetry={() => dashboard.refetch()}
+          retrying={dashboard.isFetching}
+        />
+      ) : (
+        <>
+          <KpiGrid kpis={dashboard.data?.kpis} loading={dashboard.isLoading} />
+
+          <CentroRevisionBanner cola={dashboard.data?.colaRevision} loading={dashboard.isLoading} />
+
+          <section className="grid gap-6 lg:grid-cols-2">
+            <AlertasList alertas={dashboard.data?.alertas} loading={dashboard.isLoading} />
+            <ActividadFeed actividad={dashboard.data?.actividad} loading={dashboard.isLoading} />
+          </section>
+        </>
+      )}
+    </div>
+  )
+}
+
+function saludoPorHora(): string {
+  const h = new Date().getHours()
+  if (h < 12) {
+    return "Buenos dias"
+  }
+  if (h < 19) {
+    return "Buenas tardes"
+  }
+  return "Buenas noches"
+}
+
+function subtituloContextual(data: ReturnType<typeof useAdminDashboard>["data"]): string {
+  if (!data) {
+    return "Estado del dia."
+  }
+  const cola = data.colaRevision
+  const total = cola?.items.reduce((acc, item) => acc + item.count, 0) ?? 0
+  if (total > 0) {
+    return `Tienes ${total} ${total === 1 ? "item esperando" : "items esperando"} tu revision.`
+  }
+  if (data.alertas.length > 0) {
+    return `Tienes ${data.alertas.length} ${data.alertas.length === 1 ? "alerta nueva" : "alertas nuevas"}.`
+  }
+  return "Todo en orden por aqui."
+}
+
+function mensajeError(error: unknown): string {
+  if (error instanceof ApiError) {
+    return error.message
+  }
+  return "No pudimos cargar el dashboard."
+}
+
+function ErrorBlock({
+  message,
+  onRetry,
+  retrying,
+}: {
+  readonly message: string
+  readonly onRetry: () => void
+  readonly retrying: boolean
+}) {
+  return (
+    <EmptyState
+      icon={AlertTriangle}
+      title="No pudimos cargar el dashboard"
+      description={message}
+      action={
+        <Button onClick={onRetry} loading={retrying} variant="secondary">
+          <RefreshCw className="size-4" strokeWidth={1.75} />
+          Reintentar
+        </Button>
+      }
+    />
   )
 }

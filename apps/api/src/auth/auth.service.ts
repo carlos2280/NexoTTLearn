@@ -52,13 +52,13 @@ export class AuthService {
       where: { email },
     })
 
-    if (!usuario?.activo) {
+    if (!usuario || usuario.bloqueado) {
       await this.eventos.registrar({
         tipo: "LOGIN_FALLIDO",
         email,
         ip: cliente.ip,
         userAgent: cliente.userAgent,
-        metadata: { motivo: "usuario_inexistente_o_inactivo" },
+        metadata: { motivo: "usuario_inexistente_o_bloqueado" },
       })
       throw ApiException.invalidCredentials()
     }
@@ -109,7 +109,7 @@ export class AuthService {
       data: { intentosFallidos: 0, bloqueadoHasta: null },
     })
 
-    if (usuario.mfaEnabled) {
+    if (usuario.mfaActivado) {
       const emailEnmascarado = this.enmascararEmail(usuario.email)
       // mfaConfirmadoEn=null => primera vez, debe configurar (escanear QR).
       // mfaConfirmadoEn=fecha => ya configurado, solo verificar codigo.
@@ -139,7 +139,7 @@ export class AuthService {
     cliente: DatosCliente = {},
   ): Promise<UsuarioSesion> {
     const usuario = await this.prisma.usuario.findUnique({ where: { id: usuarioId } })
-    if (!usuario?.activo) {
+    if (!usuario || usuario.bloqueado) {
       throw ApiException.invalidCredentials()
     }
     await this.prisma.usuario.update({
@@ -176,10 +176,10 @@ export class AuthService {
   ): Promise<void> {
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: usuarioId },
-      select: { id: true, email: true, passwordHash: true, activo: true },
+      select: { id: true, email: true, passwordHash: true, bloqueado: true },
     })
 
-    if (!usuario?.activo) {
+    if (!usuario || usuario.bloqueado) {
       throw new UnauthorizedException("Sesion no valida")
     }
 
@@ -211,7 +211,7 @@ export class AuthService {
 
   async obtenerPorId(id: string): Promise<UsuarioSesion | null> {
     const usuario = await this.prisma.usuario.findUnique({ where: { id } })
-    if (!usuario?.activo) {
+    if (!usuario || usuario.bloqueado) {
       return null
     }
     return this.aPublico(usuario)
@@ -247,9 +247,8 @@ export class AuthService {
     nombre: string
     apellido: string
     rol: string
-    avatar: string | null
     debeCambiarPassword: boolean
-    mfaEnabled: boolean
+    mfaActivado: boolean
   }): UsuarioSesion {
     const rol = usuario.rol === "ADMIN" ? "ADMIN" : "PARTICIPANTE"
     return {
@@ -258,9 +257,8 @@ export class AuthService {
       nombre: usuario.nombre,
       apellido: usuario.apellido,
       rol,
-      avatar: usuario.avatar,
       debeCambiarPassword: usuario.debeCambiarPassword,
-      mfaEnabled: usuario.mfaEnabled,
+      mfaEnabled: usuario.mfaActivado,
     }
   }
 }

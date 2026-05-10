@@ -1,12 +1,22 @@
 import { BandejaAdminPage } from "@/pages/admin/bandeja/bandeja-admin.page"
-import { CursoEditarPage } from "@/pages/admin/cursos/curso-editar.page"
-import { CursosAdminPage } from "@/pages/admin/cursos/cursos-admin.page"
-import { ModuloSeccionesPage } from "@/pages/admin/cursos/modulo-secciones.page"
-import { SeccionEditorPage } from "@/pages/admin/cursos/seccion-editor.page"
-import { BandejaPage } from "@/pages/bandeja/bandeja.page"
+import { CentroRevisionPage } from "@/pages/admin/centro-revision/centro-revision.page"
+import { CursoDetallePage } from "@/pages/admin/cursos/detalle/curso-detalle.page"
+import { CursoEditorPage } from "@/pages/admin/cursos/editor/curso-editor.page"
+import { ListaCursosPage } from "@/pages/admin/cursos/lista-cursos.page"
+import { CursoCandidatosPage } from "@/pages/admin/diagnostico/candidatos.page"
+import { HubDiagnosticoPage } from "@/pages/admin/diagnostico/hub.page"
+import { MantenedoresPage } from "@/pages/admin/mantenedores/mantenedores.page"
+import { FichaParticipantePage } from "@/pages/admin/seguimiento/ficha-participante.page"
+import { HubSeguimientoPage } from "@/pages/admin/seguimiento/hub.page"
 import { CambiarPasswordPage } from "@/pages/cambiar-password/cambiar-password.page"
 import { LoginPage } from "@/pages/login/login.page"
 import { MfaPage } from "@/pages/login/mfa.page"
+import { BandejaParticipantePage } from "@/pages/participante/bandeja/bandeja-participante.page"
+import { FichaCursoLibrePage } from "@/pages/participante/catalogo/ficha-curso-libre.page"
+import { VitrinaCatalogoPage } from "@/pages/participante/catalogo/vitrina.page"
+import { EstudioPage } from "@/pages/participante/estudio/estudio.page"
+import { MisCursosPage } from "@/pages/participante/mis-cursos/mis-cursos.page"
+import { VistaCursoPage } from "@/pages/participante/vista-curso/vista-curso.page"
 import { RecuperarPasswordPage } from "@/pages/recuperar-password/recuperar-password.page"
 import { RUTAS } from "@/shared/constants/rutas"
 import { Navigate, Route, Routes } from "react-router-dom"
@@ -31,33 +41,40 @@ export function AppRoutes() {
 
         {/* Rutas que se bloquean si debeCambiarPassword=true */}
         <Route element={<GuardCambioPassword />}>
-          {/* Participante */}
-          <Route element={<LayoutParticipante />}>
-            <Route path={RUTAS.bandeja} element={<BandejaPage />} />
-          </Route>
-
-          {/* Admin */}
           <Route element={<GuardRol rol="ADMIN" />}>
+            {/* Editor inmersivo · full-screen sin LayoutAdmin (sin sidebar). */}
+            <Route path="/admin/cursos/:id/editor" element={<CursoEditorPage />} />
+
             <Route element={<LayoutAdmin />}>
               <Route path={RUTAS.admin.bandeja} element={<BandejaAdminPage />} />
-              <Route path={RUTAS.admin.cursos} element={<CursosAdminPage />} />
-              <Route path={RUTAS.admin.cursoNuevo} element={<CursoEditarPage />} />
-              <Route path={RUTAS.admin.cursoEditar(":id")} element={<CursoEditarPage />} />
-              <Route
-                path={RUTAS.admin.cursoModuloSecciones(":id", ":moduloId")}
-                element={<ModuloSeccionesPage />}
-              />
-              <Route
-                path={RUTAS.admin.cursoModuloSeccionEditor(":id", ":moduloId", ":seccionId")}
-                element={<SeccionEditorPage />}
-              />
+              <Route path={RUTAS.admin.cursos} element={<ListaCursosPage />} />
+              <Route path="/admin/cursos/:id" element={<CursoDetallePage />} />
+              <Route path="/admin/cursos/:id/candidatos" element={<CursoCandidatosPage />} />
+              <Route path={RUTAS.admin.diagnosticos} element={<HubDiagnosticoPage />} />
+              <Route path={RUTAS.admin.centroRevision} element={<CentroRevisionPage />} />
+              <Route path={RUTAS.admin.seguimiento} element={<HubSeguimientoPage />} />
+              <Route path="/admin/seguimiento/p/:id" element={<FichaParticipantePage />} />
+              <Route path={RUTAS.admin.mantenedores} element={<MantenedoresPage />} />
+            </Route>
+          </Route>
+
+          <Route element={<GuardRol rol="PARTICIPANTE" />}>
+            {/* Modo estudio inmersivo · full-screen sin LayoutParticipante. */}
+            <Route path="/cursos/:slug/modulo/:moduloId" element={<EstudioPage />} />
+
+            <Route element={<LayoutParticipante />}>
+              <Route path={RUTAS.participante.bandeja} element={<BandejaParticipantePage />} />
+              <Route path={RUTAS.participante.misCursos} element={<MisCursosPage />} />
+              <Route path="/cursos/:slug" element={<VistaCursoPage />} />
+              <Route path={RUTAS.participante.catalogo} element={<VitrinaCatalogoPage />} />
+              <Route path="/catalogo/:slug" element={<FichaCursoLibrePage />} />
             </Route>
           </Route>
         </Route>
       </Route>
 
-      {/* Catch-all: redirigir a bandeja (que a su vez requiere sesion) */}
-      <Route path="*" element={<Navigate to={RUTAS.bandeja} replace={true} />} />
+      {/* Catch-all: redirigir a login */}
+      <Route path="*" element={<Navigate to={RUTAS.login} replace={true} />} />
     </Routes>
   )
 }

@@ -4,7 +4,7 @@ import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
 import { calcularRutaPostLogin } from "@/features/auth/lib/calcular-ruta-post-login"
 import { pendingMfaStore } from "@/features/auth/lib/pending-mfa-store"
 import { RUTAS } from "@/shared/constants/rutas"
-import { NxtLayoutAuth } from "@carlos2280/nexott-ui/react"
+import { AuthShell } from "@/shared/ui/patterns/auth-shell"
 import { useState } from "react"
 import { Navigate, useNavigate } from "react-router-dom"
 import { MfaForm } from "./components/mfa-form"
@@ -47,11 +47,11 @@ export function MfaPage() {
   const esSetup = pending.mode === "setup"
 
   return (
-    <NxtLayoutAuth
-      theme="nexott-learn"
+    <AuthShell
       appMark="Nx"
       appName="NexoTT"
       appSub="Learn"
+      heroEyebrow="Verificacion en dos pasos"
       heroTitle={esSetup ? "Activa tu\nMFA." : "Un paso mas\npara entrar."}
       heroSubtitle={
         esSetup
@@ -66,7 +66,7 @@ export function MfaPage() {
       ) : (
         <MfaForm initialPending={pending} onSuccess={setSuccess} />
       )}
-    </NxtLayoutAuth>
+    </AuthShell>
   )
 }
 

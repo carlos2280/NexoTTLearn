@@ -1,0 +1,346 @@
+/* ============================================================
+   NexoTT Learn — globals
+   ============================================================
+   1) tokens.css define las custom properties del ADN.
+   2) @import "tailwindcss" trae el motor utilitario v4.
+   3) @theme expone los tokens como utilidades Tailwind
+      (bg-brand-violet, text-secondary, rounded-md, etc.).
+   4) Reset minimo + clases utilitarias propias para gradientes
+      y patrones que Tailwind por si solo no expresa bien.
+   ============================================================ */
+
+@import "./tokens.css";
+@import "tailwindcss";
+
+@theme {
+  /* Colores — expuestos como text-*, bg-*, border-* */
+  --color-brand-violet: var(--brand-violet);
+  --color-brand-violet-soft: var(--brand-violet-400);
+  --color-brand-violet-deep: var(--brand-violet-700);
+  --color-brand-cyan: var(--brand-cyan);
+  --color-brand-cyan-soft: var(--brand-cyan-300);
+
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+
+  --color-glass-1: var(--glass-1);
+  --color-glass-2: var(--glass-2);
+  --color-glass-3: var(--glass-3);
+  --color-glass-border: var(--glass-border);
+  --color-glass-border-strong: var(--glass-border-strong);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-faint: var(--text-faint);
+  --color-text-on-brand: var(--text-on-brand);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+
+  /* Tipografia */
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  /* Escala tipografica (utilidades text-display, text-h1, ..., text-eyebrow) */
+  --text-display: var(--fs-display);
+  --text-display--line-height: var(--lh-tight);
+  --text-display--letter-spacing: var(--ls-tight);
+
+  --text-h1: var(--fs-h1);
+  --text-h1--line-height: var(--lh-tight);
+  --text-h1--letter-spacing: var(--ls-tight);
+
+  --text-h2: var(--fs-h2);
+  --text-h2--line-height: var(--lh-snug);
+  --text-h2--letter-spacing: var(--ls-tight);
+
+  --text-h3: var(--fs-h3);
+  --text-h3--line-height: var(--lh-snug);
+
+  --text-body: var(--fs-body);
+  --text-body--line-height: var(--lh-normal);
+
+  --text-sm: var(--fs-sm);
+  --text-sm--line-height: var(--lh-normal);
+
+  --text-xs: var(--fs-xs);
+  --text-xs--line-height: var(--lh-normal);
+
+  --text-caption: var(--fs-caption);
+  --text-caption--line-height: var(--lh-normal);
+
+  --text-eyebrow: var(--fs-eyebrow);
+  --text-eyebrow--line-height: var(--lh-normal);
+  --text-eyebrow--letter-spacing: var(--ls-eyebrow);
+
+  /* Layout inmersivo (utilidades w-sidebar-inmersivo, h-header-inmersivo, etc.) */
+  --spacing-header-inmersivo: var(--inmersivo-header-h);
+  --spacing-dock-inmersivo: var(--inmersivo-dock-h);
+  --spacing-sidebar-inmersivo: var(--inmersivo-sidebar-w);
+  --spacing-canvas-bottom: var(--inmersivo-canvas-bottom-pad);
+
+  /* Ancho de lectura (max-w-reading) */
+  --container-reading: var(--reading-measure);
+  --container-reading-wide: var(--reading-measure-wide);
+
+  /* Glass del dock/header sticky inmersivo (consume token semantico tematizado) */
+  --color-dock-glass: var(--dock-glass);
+  --color-dock-border: var(--dock-border);
+
+  /* Radius — rounded-md, rounded-lg, etc. */
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+
+  /* Sombras */
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-glow-violet: var(--shadow-glow-violet);
+  --shadow-glow-cyan: var(--shadow-glow-cyan);
+
+  /* Animaciones (Tailwind v4 expone via animate-*) */
+  --animate-fade-in: fade-in 320ms var(--ease-out) both;
+  --animate-fade-up: fade-up 360ms var(--ease-out) both;
+  --animate-breathing: breathing 4s var(--ease-in-out) infinite;
+  --animate-orb-drift: orb-drift 18s var(--ease-in-out) infinite;
+  --animate-shimmer: shimmer 2.4s linear infinite;
+  --animate-pulse-glow: pulse-glow 2.6s var(--ease-in-out) infinite;
+}
+
+/* ── Keyframes ─────────────────────────────────────────── */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes slide-in-from-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes slide-out-to-right {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes slide-in-from-bottom {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes slide-out-to-bottom {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes breathing {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+}
+@keyframes orb-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(40px, -30px) scale(1.08);
+  }
+  66% {
+    transform: translate(-30px, 40px) scale(0.96);
+  }
+}
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(124 58 237 / 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgb(124 58 237 / 0);
+  }
+}
+
+/* ── Reset minimo (Tailwind ya hace preflight, complementamos) ── */
+/* Tailwind v4 cambio el default de <button> a cursor:default. Restauramos
+   pointer (UX moderna) excepto cuando esta deshabilitado. Aplica tambien
+   a [role="button"] y links interactivos. */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+a[href],
+summary,
+label[for],
+select:not(:disabled),
+[type="button"]:not(:disabled),
+[type="submit"]:not(:disabled),
+[type="reset"]:not(:disabled) {
+  cursor: pointer;
+}
+
+html,
+body,
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+body {
+  margin: 0;
+  background: var(--surface-0);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-feature-settings: var(--font-features-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Numeros tabulares (progreso, contadores, tiempos) */
+.tabular-nums {
+  font-feature-settings: var(--font-features-tabular);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Selection */
+::selection {
+  background: rgb(124 58 237 / 0.4);
+  color: #fff;
+}
+
+/* Scrollbar (sutil, dark) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-3) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--brand-violet-700);
+  background-clip: content-box;
+  border: 2px solid transparent;
+}
+
+/* ── Utilidades propias ────────────────────────────────── */
+
+/* Gradiente de marca para texto */
+.text-gradient-brand {
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Glass surface base (card translucida) */
+.glass-surface {
+  background: var(--glass-1);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+}
+
+/* Grid pattern sutil para fondos heroicos. Color via token para
+   funcionar en dark (rgba blanca) y light (rgba oscura). */
+.bg-grid-subtle {
+  --grid-color: var(--glass-border);
+  background-image: linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+/* Mascara radial (para fades) */
+.mask-radial-fade {
+  mask-image: radial-gradient(circle at center, black 40%, transparent 80%);
+  -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 80%);
+}
+
+/* Focus ring consistente (utility opt-in, escenarios custom) */
+.focus-ring-brand:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-ring-brand);
+}
+
+/* Focus visible global para elementos interactivos. Reemplaza el outline
+   blanco del browser por el ring brand tokenizado. Solo aplica con teclado
+   (focus-visible), nunca con click (mejora UX). */
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-brand);
+  border-radius: var(--radius-sm);
+}
+/* Los inputs/textareas pintan el ring sin redondear extra (tienen su propio radius). */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-brand);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

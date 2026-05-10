@@ -99,11 +99,19 @@
       }
     },
     {
-      "include": ["apps/api/prisma/seed.ts", "apps/api/scripts/**", "apps/web/server.js"],
+      "include": [
+        "apps/api/prisma/seed.ts",
+        "apps/api/prisma/seed/**",
+        "apps/api/scripts/**",
+        "apps/web/server.js"
+      ],
       "linter": {
         "rules": {
-          "suspicious": { "noConsoleLog": "off", "noConsole": "off" },
-          "correctness": { "noNodejsModules": "off" }
+          "suspicious": { "noConsoleLog": "off", "noConsole": "off", "useAwait": "off" },
+          "correctness": { "noNodejsModules": "off" },
+          "complexity": { "noExcessiveCognitiveComplexity": "off" },
+          "nursery": { "noSecrets": "off" },
+          "style": { "useNamingConvention": "off" }
         }
       }
     },

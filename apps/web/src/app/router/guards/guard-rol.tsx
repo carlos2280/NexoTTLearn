@@ -17,7 +17,7 @@ export function GuardRol({ rol }: GuardRolProps) {
   }
 
   if (usuario.rol !== rol) {
-    return <Navigate to={RUTAS.bandeja} replace={true} />
+    return <Navigate to={RUTAS.login} replace={true} />
   }
 
   return <Outlet />

@@ -1,48 +1,57 @@
 import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
-import { AdminSidebar } from "@/shared/components/admin-sidebar"
-import { PersonalizationDrawer } from "@/shared/components/personalization-drawer"
-import { UserMenu } from "@/shared/components/user-menu"
-import {
-  NxtLayout,
-  NxtSidebarToggle,
-  NxtToastProvider,
-  NxtTopbar,
-} from "@carlos2280/nexott-ui/react"
-import { Stack } from "@carlos2280/nexott-ui/react-primitives"
+import { BreadcrumbOverrideContext } from "@/shared/hooks/use-breadcrumb-override"
+import { AppShell } from "@/shared/ui/patterns/app-shell"
+import type { BreadcrumbCrumb } from "@/shared/ui/patterns/app-topbar"
 import { useState } from "react"
-import { Outlet } from "react-router-dom"
+import { Outlet, useLocation } from "react-router-dom"
+import { Toaster } from "sonner"
+import { resolveBreadcrumbs } from "./admin-breadcrumbs"
+import { ADMIN_NAV_FOOTER, ADMIN_NAV_GROUPS } from "./admin-nav-config"
 
 export function LayoutAdmin() {
   const { data: usuario } = useUsuarioActual()
-  const [personalizarAbierto, setPersonalizarAbierto] = useState(false)
+  const location = useLocation()
+  const [override, setOverride] = useState<readonly BreadcrumbCrumb[] | null>(null)
 
   if (!usuario) {
     return null
   }
 
+  const breadcrumbs = override ?? resolveBreadcrumbs(location.pathname)
+
+  const ctxValue = {
+    set: (crumbs: readonly BreadcrumbCrumb[]) => setOverride(crumbs),
+    clear: () => setOverride(null),
+  }
+
   return (
-    <NxtLayout theme="nexott-learn" sidebarPosition="full">
-      <NxtTopbar slot="topbar">
-        <NxtSidebarToggle slot="logo" size="sm" />
+    <BreadcrumbOverrideContext.Provider value={ctxValue}>
+      <AppShell
+        usuario={usuario}
+        groups={ADMIN_NAV_GROUPS}
+        footer={ADMIN_NAV_FOOTER}
+        breadcrumbs={breadcrumbs}
+        appMark="Nx"
+        appName="NexoTT"
+        appSub="Learn"
+      >
+        <Outlet />
+      </AppShell>
 
-        <Stack slot="actions" direction="row" align="center" gap="md">
-          <UserMenu usuario={usuario} onPersonalizarClick={() => setPersonalizarAbierto(true)} />
-        </Stack>
-      </NxtTopbar>
-
-      <AdminSidebar />
-
-      <Outlet />
-
-      <PersonalizationDrawer
-        open={personalizarAbierto}
-        onClose={() => setPersonalizarAbierto(false)}
+      <Toaster
+        position="top-right"
+        visibleToasts={4}
+        theme="system"
+        toastOptions={{
+          classNames: {
+            toast:
+              "rounded-[var(--radius-lg)] border border-glass-border bg-surface-1/95 text-text-primary shadow-lg backdrop-blur-2xl",
+            description: "text-text-secondary",
+            success: "text-success",
+            error: "text-danger",
+          },
+        }}
       />
-
-      {/* Provider global de toasts del DS. La API `toast.success(...)` busca
-          este provider montado en el DOM. Lo dejamos en el layout admin
-          porque por ahora solo hay flows admin que usan toast. */}
-      <NxtToastProvider position="top-right" max={4} />
-    </NxtLayout>
+    </BreadcrumbOverrideContext.Provider>
   )
 }

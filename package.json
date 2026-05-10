@@ -14,7 +14,6 @@
     "db:seed": "turbo db:seed --filter=@nexott-learn/api",
     "db:studio": "turbo db:studio --filter=@nexott-learn/api",
     "clean": "turbo clean && rm -rf node_modules",
-    "lockfile:clean": "bash scripts/lockfile-clean.sh",
     "prepare": "husky"
   },
   "devDependencies": {

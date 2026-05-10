@@ -1,19 +1,1 @@
-# Bloquea commits de pnpm-lock.yaml contaminado por .pnpmfile.cjs local.
-# Si el lockfile staged contiene paths file:/home/... (override local activo
-# durante un pnpm install), CI fallara con ERR_PNPM_LOCKFILE_CONFIG_MISMATCH.
-# Ver docs/DESARROLLO.md seccion "Trabajo en paralelo con nexott-ui".
-if git diff --cached --name-only | grep -qx "pnpm-lock.yaml"; then
-  if git show ":pnpm-lock.yaml" | grep -q "file:/home\|file:/Users\|file:/root"; then
-    echo "❌ pnpm-lock.yaml staged contiene paths LOCALES (file:/home/... o similar)."
-    echo "   Esto sucede si .pnpmfile.cjs estaba activo durante 'pnpm install'."
-    echo "   Solucion: regenerar lockfile limpio (ver docs/DESARROLLO.md)."
-    exit 1
-  fi
-  if git show ":pnpm-lock.yaml" | grep -q "^pnpmfileChecksum:"; then
-    echo "❌ pnpm-lock.yaml staged contiene 'pnpmfileChecksum' (override local activo)."
-    echo "   Solucion: regenerar lockfile limpio (ver docs/DESARROLLO.md)."
-    exit 1
-  fi
-fi
-
 pnpm exec lint-staged

@@ -1,5 +1,5 @@
 // Single source of truth de rutas. NUNCA hardcodear strings de rutas en componentes.
-// Importar siempre desde aqui: navigate(RUTAS.bandeja), <Link to={RUTAS.login} />.
+// Importar siempre desde aqui: navigate(RUTAS.login), <Link to={RUTAS.admin.cursos} />.
 
 export const RUTAS = {
   // Publicas
@@ -10,31 +10,32 @@ export const RUTAS = {
   // Compartidas (requieren sesion)
   cambiarPassword: "/cambiar-password",
 
-  // Participante
-  bandeja: "/bandeja",
-  misCursos: "/mis-cursos",
-  catalogo: "/catalogo",
-  perfil: "/perfil",
-  cursoDetalle: (id: string): string => `/cursos/${id}`,
-  moduloDetalle: (cursoId: string, moduloId: string): string => `/cursos/${cursoId}/${moduloId}`,
-
   // Administrador
   admin: {
     bandeja: "/admin",
+
     cursos: "/admin/cursos",
-    cursoNuevo: "/admin/cursos/nuevo",
-    cursoEditar: (id: string): string => `/admin/cursos/${id}`,
-    cursoModuloSecciones: (cursoId: string, moduloId: string): string =>
-      `/admin/cursos/${cursoId}/modulos/${moduloId}/secciones`,
-    cursoModuloSeccionEditor: (cursoId: string, moduloId: string, seccionId: string): string =>
-      `/admin/cursos/${cursoId}/modulos/${moduloId}/secciones/${seccionId}`,
-    seguimiento: "/admin/seguimiento",
+    cursoDetalle: (id: string): string => `/admin/cursos/${id}`,
+    cursoEditor: (id: string): string => `/admin/cursos/${id}/editor`,
+    cursoCandidatos: (id: string): string => `/admin/cursos/${id}/candidatos`,
+
+    diagnosticos: "/admin/diagnostico",
+
     centroRevision: "/admin/centro-revision",
-    centroRevisionTab: (tab: "entregas" | "proyectos"): string =>
-      `/admin/centro-revision?tab=${tab}`,
-    personas: "/admin/personas",
-    diagnosticos: "/admin/diagnosticos",
-    diagnosticoNuevo: "/admin/diagnosticos/nuevo",
+    seguimiento: "/admin/seguimiento",
+    seguimientoParticipante: (id: string): string => `/admin/seguimiento/p/${id}`,
+    mantenedores: "/admin/mantenedores",
     configuracion: "/admin/configuracion",
+  },
+
+  // Participante
+  participante: {
+    bandeja: "/",
+    misCursos: "/cursos",
+    cursoDetalle: (id: string): string => `/cursos/${id}`,
+    cursoModulo: (slug: string, moduloId: string): string => `/cursos/${slug}/modulo/${moduloId}`,
+    catalogo: "/catalogo",
+    catalogoCurso: (slug: string): string => `/catalogo/${slug}`,
+    expediente: "/expediente",
   },
 } as const

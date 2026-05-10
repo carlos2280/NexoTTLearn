@@ -2,15 +2,27 @@ import { Module } from "@nestjs/common"
 import { ConfigModule } from "@nestjs/config"
 import { APP_GUARD } from "@nestjs/core"
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler"
-import { AreasCompetenciaModule } from "./admin/areas-competencia/areas-competencia.module"
-import { ContenidosModule } from "./admin/contenidos/contenidos.module"
+import { AreasModule } from "./admin/areas/areas.module"
+import { CentroRevisionModule } from "./admin/centro-revision/centro-revision.module"
 import { CursosModule } from "./admin/cursos/cursos.module"
 import { DashboardModule } from "./admin/dashboard/dashboard.module"
-import { ModulosModule } from "./admin/modulos/modulos.module"
-import { SeccionesModule } from "./admin/secciones/secciones.module"
+import { DiagnosticoModule } from "./admin/diagnostico/diagnostico.module"
+import { InscripcionesModule } from "./admin/inscripciones/inscripciones.module"
+import { ParticipantesModule } from "./admin/participantes/participantes.module"
+import { SeguimientoModule } from "./admin/seguimiento/seguimiento.module"
+import { UsuariosModule } from "./admin/usuarios/usuarios.module"
 import { AuthModule } from "./auth/auth.module"
 import { PrismaModule } from "./common/prisma/prisma.module"
 import { HealthModule } from "./health/health.module"
+import { BandejaModule } from "./participante/bandeja/bandeja.module"
+import { CatalogoModule } from "./participante/catalogo/catalogo.module"
+import { MisCursosModule } from "./participante/mis-cursos/mis-cursos.module"
+
+// Migración v2 en curso. Los módulos admin (cursos, módulos, secciones,
+// bloques, dashboard) se reescriben PR a PR contra el schema nuevo. Hasta
+// entonces, el código previo vive en `src/admin/_legacy/` como referencia
+// (excluido del compile, fuera de este árbol).
+// Áreas → reescrito en PR-04 (vive aquí).
 
 @Module({
   imports: [
@@ -30,12 +42,18 @@ import { HealthModule } from "./health/health.module"
     PrismaModule,
     AuthModule,
     HealthModule,
-    DashboardModule,
+    AreasModule,
+    UsuariosModule,
     CursosModule,
-    ModulosModule,
-    SeccionesModule,
-    ContenidosModule,
-    AreasCompetenciaModule,
+    InscripcionesModule,
+    DiagnosticoModule,
+    CentroRevisionModule,
+    SeguimientoModule,
+    ParticipantesModule,
+    DashboardModule,
+    BandejaModule,
+    MisCursosModule,
+    CatalogoModule,
   ],
   providers: [
     {

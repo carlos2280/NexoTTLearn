@@ -55,9 +55,9 @@ export class MfaService {
   async iniciarSetup(usuarioId: string, cliente: DatosCliente = {}): Promise<SetupChallenge> {
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: usuarioId },
-      select: { email: true, activo: true, mfaEnabled: true },
+      select: { email: true, bloqueado: true, mfaActivado: true },
     })
-    if (!(usuario?.activo && usuario.mfaEnabled)) {
+    if (!usuario || usuario.bloqueado || !usuario.mfaActivado) {
       throw new ApiException({
         code: "MFA_INVALID",
         message: "Configuracion MFA invalida",
@@ -166,10 +166,11 @@ export class MfaService {
 
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: challenge.usuarioId },
-      select: { id: true, email: true, mfaSecret: true, mfaEnabled: true, activo: true },
+      select: { id: true, email: true, mfaSecret: true, mfaActivado: true, bloqueado: true },
     })
 
-    const secretCifrado = usuario?.activo && usuario.mfaEnabled ? usuario.mfaSecret : null
+    const secretCifrado =
+      usuario && !usuario.bloqueado && usuario.mfaActivado ? usuario.mfaSecret : null
     if (!(secretCifrado && usuario)) {
       this.challenges.invalidar(challengeId)
       throw new ApiException({

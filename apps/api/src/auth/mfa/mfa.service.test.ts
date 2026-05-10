@@ -38,8 +38,8 @@ vi.mock("otplib", () => ({
 interface UsuarioMock {
   id: string
   email: string
-  activo: boolean
-  mfaEnabled: boolean
+  bloqueado: boolean
+  mfaActivado: boolean
   mfaSecret: string | null
   mfaConfirmadoEn: Date | null
 }
@@ -47,8 +47,8 @@ interface UsuarioMock {
 const USUARIO_BASE: UsuarioMock = {
   id: "user-1",
   email: "user@example.com",
-  activo: true,
-  mfaEnabled: true,
+  bloqueado: false,
+  mfaActivado: true,
   mfaSecret: "ENCRYPTED_SECRET",
   mfaConfirmadoEn: new Date("2025-01-01"),
 }
@@ -106,14 +106,14 @@ describe("MfaService.iniciarSetup", () => {
     )
   })
 
-  it("falla si el usuario no existe o esta inactivo", async () => {
-    const { service } = buildService({ ...USUARIO_BASE, activo: false })
+  it("falla si el usuario no existe o esta bloqueado", async () => {
+    const { service } = buildService({ ...USUARIO_BASE, bloqueado: true })
 
     await expect(service.iniciarSetup("user-1")).rejects.toThrow(ApiException)
   })
 
   it("falla si el usuario no tiene MFA habilitado", async () => {
-    const { service } = buildService({ ...USUARIO_BASE, mfaEnabled: false })
+    const { service } = buildService({ ...USUARIO_BASE, mfaActivado: false })
 
     await expect(service.iniciarSetup("user-1")).rejects.toThrow(ApiException)
   })
@@ -173,8 +173,8 @@ describe("MfaService.verificarChallenge — flujo verify", () => {
     })
   })
 
-  it("usuario inactivo durante verify → MFA_INVALID e invalida challenge", async () => {
-    const { service, challenges } = buildService({ ...USUARIO_BASE, activo: false })
+  it("usuario bloqueado durante verify → MFA_INVALID e invalida challenge", async () => {
+    const { service, challenges } = buildService({ ...USUARIO_BASE, bloqueado: true })
 
     await expectApiException(service.verificarChallenge("challenge-id", "123456"), {
       code: "MFA_INVALID",

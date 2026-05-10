@@ -15,7 +15,6 @@ export const usuarioPublicoSchema = z.object({
   nombre: z.string(),
   apellido: z.string(),
   rol: z.enum(ROLES),
-  avatar: z.string().nullable(),
   debeCambiarPassword: z.boolean(),
   mfaEnabled: z.boolean(),
 })

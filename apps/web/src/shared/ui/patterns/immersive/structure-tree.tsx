@@ -1,0 +1,285 @@
+import { cn } from "@/shared/lib/cn"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuTrigger,
+} from "@/shared/ui/primitives/context-menu"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/shared/ui/primitives/dropdown-menu"
+import { ChevronRight, MoreHorizontal } from "lucide-react"
+import { type ReactNode, useState } from "react"
+import type { ImmersiveMode, TreeMenu, TreeNode } from "./types"
+
+interface StructureTreeProps {
+  readonly nodes: readonly TreeNode[]
+  readonly selectedId: string | null
+  readonly onSelect: (id: string) => void
+  readonly mode?: ImmersiveMode
+  /** Conjunto de ids inicialmente expandidos. Default: todos los del primer nivel. */
+  readonly defaultExpanded?: ReadonlySet<string>
+}
+
+/**
+ * Árbol jerárquico genérico. No conoce el dominio (cursos, módulos, etc).
+ * Se le pasan nodos con label/icon/meta/children y dispara onSelect.
+ *
+ * Diseñado para reuso entre admin (modo edit con [+ Acción] al final de la
+ * fila) y participante (modo read sin acciones).
+ */
+export function StructureTree({
+  nodes,
+  selectedId,
+  onSelect,
+  mode = "edit",
+  defaultExpanded,
+}: StructureTreeProps) {
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    if (defaultExpanded) {
+      return new Set(defaultExpanded)
+    }
+    return new Set(nodes.map((n) => n.id))
+  })
+
+  const toggle = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+
+  return (
+    <div className="flex flex-col gap-0.5 px-2 py-2">
+      {nodes.map((node) => (
+        <TreeRow
+          key={node.id}
+          node={node}
+          depth={0}
+          selectedId={selectedId}
+          expanded={expanded}
+          onSelect={onSelect}
+          onToggle={toggle}
+          mode={mode}
+        />
+      ))}
+    </div>
+  )
+}
+
+interface TreeRowProps {
+  readonly node: TreeNode
+  readonly depth: number
+  readonly selectedId: string | null
+  readonly expanded: ReadonlySet<string>
+  readonly onSelect: (id: string) => void
+  readonly onToggle: (id: string) => void
+  readonly mode: ImmersiveMode
+}
+
+function TreeRow({ node, depth, selectedId, expanded, onSelect, onToggle, mode }: TreeRowProps) {
+  const isSelected = selectedId === node.id
+  const hasChildren = Boolean(node.children && node.children.length > 0)
+  const isExpanded = expanded.has(node.id)
+
+  return (
+    <div className="flex flex-col">
+      {node.divider ? <hr className="my-1.5 border-glass-border" /> : null}
+      <TreeRowHeader
+        node={node}
+        depth={depth}
+        isSelected={isSelected}
+        isExpanded={isExpanded}
+        hasChildren={hasChildren}
+        onSelect={onSelect}
+        onToggle={onToggle}
+        mode={mode}
+      />
+
+      {hasChildren && isExpanded ? (
+        <div>
+          {node.children?.map((child) => (
+            <TreeRow
+              key={child.id}
+              node={child}
+              depth={depth + 1}
+              selectedId={selectedId}
+              expanded={expanded}
+              onSelect={onSelect}
+              onToggle={onToggle}
+              mode={mode}
+            />
+          ))}
+        </div>
+      ) : null}
+      {isExpanded && node.footer ? (
+        <div style={{ paddingLeft: `${(depth + 1) * 12 + 6}px` }} className="pr-1.5">
+          {node.footer}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+interface TreeRowHeaderProps {
+  readonly node: TreeNode
+  readonly depth: number
+  readonly isSelected: boolean
+  readonly isExpanded: boolean
+  readonly hasChildren: boolean
+  readonly onSelect: (id: string) => void
+  readonly onToggle: (id: string) => void
+  readonly mode: ImmersiveMode
+}
+
+function TreeRowHeader(props: TreeRowHeaderProps) {
+  const { node, mode } = props
+  const row = <TreeRowBody {...props} />
+
+  if (mode === "edit" && node.menu) {
+    return <RowContextWrapper menu={node.menu}>{row}</RowContextWrapper>
+  }
+  return row
+}
+
+function TreeRowBody({
+  node,
+  depth,
+  isSelected,
+  isExpanded,
+  hasChildren,
+  onSelect,
+  onToggle,
+  mode,
+}: TreeRowHeaderProps) {
+  return (
+    <div
+      className={cn(
+        "group flex items-center gap-1.5 rounded-[var(--radius-sm)] py-1.5 pr-1.5 text-sm",
+        "transition-colors duration-150",
+        isSelected
+          ? "bg-[var(--gradient-brand-soft)] text-text-primary"
+          : "text-text-secondary hover:bg-glass-2 hover:text-text-primary",
+        node.muted && !isSelected && "opacity-60",
+      )}
+      style={{ paddingLeft: `${depth * 12 + 6}px` }}
+    >
+      <button
+        type="button"
+        aria-label={isExpanded ? "Colapsar" : "Expandir"}
+        aria-expanded={isExpanded}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (hasChildren) {
+            onToggle(node.id)
+          }
+        }}
+        className={cn(
+          "flex size-4 shrink-0 items-center justify-center rounded text-text-muted",
+          "transition-transform duration-200",
+          !hasChildren && "invisible",
+          isExpanded && "rotate-90",
+        )}
+      >
+        <ChevronRight className="size-3.5" strokeWidth={2} />
+      </button>
+
+      <RowLabelButton node={node} isSelected={isSelected} onSelect={onSelect} />
+
+      {mode === "edit" && node.menu ? <RowMenuButton items={node.menu.dropdownItems} /> : null}
+
+      {mode === "edit" && node.action ? (
+        <span className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
+          {node.action}
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
+function RowLabelButton({
+  node,
+  isSelected,
+  onSelect,
+}: {
+  readonly node: TreeNode
+  readonly isSelected: boolean
+  readonly onSelect: (id: string) => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(node.id)}
+      className="flex min-w-0 flex-1 items-center gap-2 text-left"
+    >
+      {node.icon ? (
+        <span
+          className={cn("shrink-0", isSelected ? "text-brand-violet-soft" : "text-text-muted")}
+          style={node.accent ? { color: node.accent } : undefined}
+          aria-hidden="true"
+        >
+          {node.icon}
+        </span>
+      ) : null}
+
+      <span className={cn("truncate font-medium", isSelected && "text-text-primary")}>
+        {node.label}
+      </span>
+
+      {node.meta ? (
+        <span className="ml-auto shrink-0 text-[11px] text-text-muted">{node.meta}</span>
+      ) : null}
+
+      {node.badge}
+    </button>
+  )
+}
+
+function RowContextWrapper({
+  menu,
+  children,
+}: {
+  readonly menu: TreeMenu
+  readonly children: ReactNode
+}) {
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild={true}>{children}</ContextMenuTrigger>
+      <ContextMenuContent>{menu.contextItems}</ContextMenuContent>
+    </ContextMenu>
+  )
+}
+
+function RowMenuButton({ items }: { readonly items: ReactNode }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild={true}>
+        <button
+          type="button"
+          aria-label="Abrir menú"
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            "flex size-5 shrink-0 items-center justify-center rounded",
+            "text-text-muted transition-all duration-150",
+            "opacity-0 group-hover:opacity-100",
+            "hover:bg-glass-2 hover:text-text-primary",
+            "data-[state=open]:bg-glass-2 data-[state=open]:text-text-primary",
+            "data-[state=open]:opacity-100",
+            "focus-visible:opacity-100 focus-visible:outline-none",
+            "focus-visible:ring-2 focus-visible:ring-brand-violet/40",
+          )}
+        >
+          <MoreHorizontal className="size-3.5" strokeWidth={2} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" sideOffset={4} className="min-w-[10rem]">
+        {items}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}

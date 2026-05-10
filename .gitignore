@@ -30,6 +30,3 @@ pgdata/
 
 # Prisma
 apps/api/prisma/migrations/dev.db*
-
-# Local link a la libreria nexott-ui (solo desarrollo local)
-.pnpmfile.cjs

@@ -11,12 +11,11 @@ interface UsuarioMock {
   nombre: string
   apellido: string
   rol: string
-  avatar: string | null
   passwordHash: string
-  activo: boolean
+  bloqueado: boolean
   intentosFallidos: number
   bloqueadoHasta: Date | null
-  mfaEnabled: boolean
+  mfaActivado: boolean
   mfaConfirmadoEn: Date | null
   debeCambiarPassword: boolean
 }
@@ -30,12 +29,11 @@ function buildUsuario(overrides: Partial<UsuarioMock> = {}): UsuarioMock {
     nombre: "User",
     apellido: "Demo",
     rol: "PARTICIPANTE",
-    avatar: null,
     passwordHash: PASSWORD_HASH,
-    activo: true,
+    bloqueado: false,
     intentosFallidos: 0,
     bloqueadoHasta: null,
-    mfaEnabled: false,
+    mfaActivado: false,
     mfaConfirmadoEn: null,
     debeCambiarPassword: false,
     ...overrides,
@@ -81,13 +79,13 @@ describe("AuthService.validarCredenciales", () => {
       expect(eventos.registrar).toHaveBeenCalledWith(
         expect.objectContaining({
           tipo: "LOGIN_FALLIDO",
-          metadata: { motivo: "usuario_inexistente_o_inactivo" },
+          metadata: { motivo: "usuario_inexistente_o_bloqueado" },
         }),
       )
     })
 
-    it("usuario inactivo → INVALID_CREDENTIALS (no leak de status)", async () => {
-      const { service } = buildService(buildUsuario({ activo: false }))
+    it("usuario bloqueado → INVALID_CREDENTIALS (no leak de status)", async () => {
+      const { service } = buildService(buildUsuario({ bloqueado: true }))
       await expectApiException(service.validarCredenciales("user@example.com", "Password1234!"), {
         code: "INVALID_CREDENTIALS",
         status: 401,
@@ -219,9 +217,9 @@ describe("AuthService.validarCredenciales", () => {
   })
 
   describe("login OK con MFA — branching setup vs verify", () => {
-    it("mfaEnabled=true + mfaConfirmadoEn=null → mfa-setup-pendiente con email enmascarado", async () => {
+    it("mfaActivado=true + mfaConfirmadoEn=null → mfa-setup-pendiente con email enmascarado", async () => {
       const { service } = buildService(
-        buildUsuario({ mfaEnabled: true, mfaConfirmadoEn: null, email: "javier@nttdata.com" }),
+        buildUsuario({ mfaActivado: true, mfaConfirmadoEn: null, email: "javier@nttdata.com" }),
       )
       const result = await service.validarCredenciales("javier@nttdata.com", "Password1234!")
       expect(result.tipo).toBe("mfa-setup-pendiente")
@@ -232,9 +230,9 @@ describe("AuthService.validarCredenciales", () => {
       }
     })
 
-    it("mfaEnabled=true + mfaConfirmadoEn=fecha → mfa-verify-pendiente", async () => {
+    it("mfaActivado=true + mfaConfirmadoEn=fecha → mfa-verify-pendiente", async () => {
       const { service } = buildService(
-        buildUsuario({ mfaEnabled: true, mfaConfirmadoEn: new Date("2025-01-01") }),
+        buildUsuario({ mfaActivado: true, mfaConfirmadoEn: new Date("2025-01-01") }),
       )
       const result = await service.validarCredenciales("user@example.com", "Password1234!")
       expect(result.tipo).toBe("mfa-verify-pendiente")
@@ -242,7 +240,7 @@ describe("AuthService.validarCredenciales", () => {
 
     it("en flujo MFA NO emite LOGIN_OK (eso ocurre tras verify/setup)", async () => {
       const { service, eventos } = buildService(
-        buildUsuario({ mfaEnabled: true, mfaConfirmadoEn: null }),
+        buildUsuario({ mfaActivado: true, mfaConfirmadoEn: null }),
       )
       await service.validarCredenciales("user@example.com", "Password1234!")
       const tipos = (eventos.registrar as ReturnType<typeof vi.fn>).mock.calls.map(
@@ -266,8 +264,8 @@ describe("AuthService.confirmarLoginPostMfa", () => {
     )
   })
 
-  it("usuario inactivo → INVALID_CREDENTIALS", async () => {
-    const { service } = buildService(buildUsuario({ activo: false }))
+  it("usuario bloqueado → INVALID_CREDENTIALS", async () => {
+    const { service } = buildService(buildUsuario({ bloqueado: true }))
     await expectApiException(service.confirmarLoginPostMfa("user-1"), {
       code: "INVALID_CREDENTIALS",
       status: 401,
@@ -315,7 +313,7 @@ describe("AuthService.cambiarPassword", () => {
 })
 
 describe("AuthService.obtenerPorId", () => {
-  it("devuelve UsuarioSesion si activo", async () => {
+  it("devuelve UsuarioSesion si no bloqueado", async () => {
     const { service } = buildService()
     const usuario = await service.obtenerPorId("user-1")
     expect(usuario?.email).toBe("user@example.com")
@@ -326,8 +324,8 @@ describe("AuthService.obtenerPorId", () => {
     expect(await service.obtenerPorId("nope")).toBeNull()
   })
 
-  it("devuelve null si inactivo", async () => {
-    const { service } = buildService(buildUsuario({ activo: false }))
+  it("devuelve null si bloqueado", async () => {
+    const { service } = buildService(buildUsuario({ bloqueado: true }))
     expect(await service.obtenerPorId("user-1")).toBeNull()
   })
 })

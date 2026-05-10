@@ -1,48 +1,51 @@
-import { useLogout } from "@/features/auth/hooks/use-logout"
 import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
-import { RUTAS } from "@/shared/constants/rutas"
-import { NxtAvatar, NxtButton, NxtLayout, NxtLogo, NxtTopbar } from "@carlos2280/nexott-ui/react"
-import { Stack } from "@carlos2280/nexott-ui/react-primitives"
-import { Outlet, useNavigate } from "react-router-dom"
+import { ParticipanteTopbar } from "@/pages/participante/bandeja/components/participante-topbar"
+import { AmbientMesh } from "@/shared/ui/patterns/ambient-mesh"
+import { ParticipanteDock } from "@/shared/ui/patterns/participante-dock"
+import { TooltipProvider } from "@radix-ui/react-tooltip"
+import { Outlet } from "react-router-dom"
+import { Toaster } from "sonner"
 
+// Layout del participante. Minimalista por decision §3 del doc canonico:
+// max-width 860px en main, sin sidebar. El dock fixed bottom entra en
+// Fase 2 cuando haya 3 destinos para hospedarlo.
 export function LayoutParticipante() {
-  const navigate = useNavigate()
   const { data: usuario } = useUsuarioActual()
-  const logoutMutation = useLogout()
 
   if (!usuario) {
     return null
   }
 
-  const iniciales = `${usuario.nombre[0] ?? ""}${usuario.apellido[0] ?? ""}`.toUpperCase()
-
-  const cerrarSesion = async (): Promise<void> => {
-    await logoutMutation.mutateAsync()
-    navigate(RUTAS.login, { replace: true })
-  }
-
   return (
-    <NxtLayout theme="nexott-learn">
-      <NxtTopbar slot="topbar">
-        <NxtLogo slot="logo" mark="Nx" text="NexoTT" subtext="Learn" />
-        <Stack slot="actions" direction="row" align="center" gap="md">
-          <span style={{ fontSize: "var(--nx-text-sm)", color: "var(--nx-text-secondary)" }}>
-            {usuario.nombre} {usuario.apellido}
-          </span>
-          <NxtAvatar initials={iniciales} size="sm" />
-          <NxtButton
-            variant="ghost"
-            size="sm"
-            onNxtButtonClick={async () => {
-              await cerrarSesion()
-            }}
-          >
-            Cerrar sesion
-          </NxtButton>
-        </Stack>
-      </NxtTopbar>
+    <TooltipProvider delayDuration={200} skipDelayDuration={500}>
+      <div className="relative flex min-h-screen flex-col bg-surface-0 text-text-primary">
+        <AmbientMesh />
 
-      <Outlet />
-    </NxtLayout>
+        <div className="relative z-10 flex flex-1 flex-col">
+          <ParticipanteTopbar usuario={usuario} />
+
+          <main className="flex flex-1 flex-col px-4 pt-6 pb-32 md:px-6">
+            <Outlet />
+          </main>
+        </div>
+
+        <ParticipanteDock />
+
+        <Toaster
+          position="top-right"
+          visibleToasts={4}
+          theme="system"
+          toastOptions={{
+            classNames: {
+              toast:
+                "rounded-[var(--radius-lg)] border border-glass-border bg-surface-1/95 text-text-primary shadow-lg backdrop-blur-2xl",
+              description: "text-text-secondary",
+              success: "text-success",
+              error: "text-danger",
+            },
+          }}
+        />
+      </div>
+    </TooltipProvider>
   )
 }

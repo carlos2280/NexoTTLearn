@@ -10,5 +10,8 @@ export function calcularRutaPostLogin(usuario: UsuarioPublico): string {
   if (usuario.rol === "ADMIN") {
     return RUTAS.admin.bandeja
   }
-  return RUTAS.bandeja
+  if (usuario.rol === "PARTICIPANTE") {
+    return RUTAS.participante.bandeja
+  }
+  return RUTAS.login
 }
