@@ -1,20 +1,10 @@
 <!doctype html>
-<html lang="es" data-theme="dark">
+<html lang="es" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
     <title>NexoTT Learn</title>
-    <script>
-      // Pre-hidratacion: aplica el tema antes del primer paint para evitar
-      // FOUC. Lee de localStorage (clave "nx-theme") y cae a "dark".
-      (function () {
-        try {
-          var saved = localStorage.getItem("nx-theme");
-          var theme = saved === "light" || saved === "dark" ? saved : "dark";
-          document.documentElement.setAttribute("data-theme", theme);
-        } catch (_) {}
-      })();
-    </script>
   </head>
   <body>
     <div id="root"></div>
