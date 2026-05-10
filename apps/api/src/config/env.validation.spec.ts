@@ -1,0 +1,71 @@
+import { describe, expect, it } from "vitest"
+import { validateEnv } from "./env.validation"
+
+const SECRETO_MINIMO = "x".repeat(32)
+
+type Override = readonly [string, string]
+
+function buildEnv(...overrides: readonly Override[]): Record<string, string> {
+  const entries = new Map<string, string>([
+    ["NODE_ENV", "development"],
+    ["DATABASE_URL", "postgresql://user:pass@localhost:5432/db"],
+    ["SESSION_SECRET", SECRETO_MINIMO],
+  ])
+  for (const [key, value] of overrides) {
+    entries.set(key, value)
+  }
+  return Object.fromEntries(entries)
+}
+
+describe("validateEnv", () => {
+  it("acepta el set minimo valido y aplica defaults", () => {
+    const env = validateEnv(buildEnv())
+    expect(env.NODE_ENV).toBe("development")
+    expect(env.PORT).toBe(4000)
+    expect(env.COOKIE_SECURE).toBe(false)
+    expect(env.ALLOWED_ORIGINS).toEqual([])
+    expect(env.SESSION_SECRET).toBe(SECRETO_MINIMO)
+  })
+
+  it("rechaza SESSION_SECRET con menos de 32 caracteres", () => {
+    expect(() => validateEnv(buildEnv(["SESSION_SECRET", "x".repeat(10)]))).toThrow(
+      /SESSION_SECRET/,
+    )
+  })
+
+  it("rechaza DATABASE_URL que no sea una URL valida", () => {
+    expect(() => validateEnv(buildEnv(["DATABASE_URL", "no-es-una-url"]))).toThrow(/DATABASE_URL/)
+  })
+
+  it("rechaza NODE_ENV=production con COOKIE_SECURE=false", () => {
+    expect(() =>
+      validateEnv(
+        buildEnv(
+          ["NODE_ENV", "production"],
+          ["COOKIE_SECURE", "false"],
+          ["ALLOWED_ORIGINS", "https://app.example.com"],
+        ),
+      ),
+    ).toThrow(/COOKIE_SECURE/)
+  })
+
+  it("rechaza NODE_ENV=production con ALLOWED_ORIGINS vacio", () => {
+    expect(() =>
+      validateEnv(
+        buildEnv(["NODE_ENV", "production"], ["COOKIE_SECURE", "true"], ["ALLOWED_ORIGINS", ""]),
+      ),
+    ).toThrow(/ALLOWED_ORIGINS/)
+  })
+
+  it("acepta NODE_ENV=production con COOKIE_SECURE=true y ALLOWED_ORIGINS no vacio", () => {
+    const env = validateEnv(
+      buildEnv(
+        ["NODE_ENV", "production"],
+        ["COOKIE_SECURE", "true"],
+        ["ALLOWED_ORIGINS", "https://app.example.com,https://admin.example.com"],
+      ),
+    )
+    expect(env.COOKIE_SECURE).toBe(true)
+    expect(env.ALLOWED_ORIGINS).toEqual(["https://app.example.com", "https://admin.example.com"])
+  })
+})
