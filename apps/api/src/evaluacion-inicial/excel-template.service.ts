@@ -65,11 +65,11 @@ export class ExcelTemplateService {
         message: `Curso ${cursoId} no encontrado.`,
       })
     }
-    if (curso.areasExigidas.length === 0) {
+    if (curso.areasExigidas.length === 0 && curso.skillsExigidas.length === 0) {
       throw new ConflictException({
         code: apiErrorCodes.conflictCursoNoPublicable,
-        message: "El curso no tiene areas exigidas declaradas.",
-        details: { motivo: "AREAS_VACIAS" },
+        message: "El curso no tiene areas exigidas ni skills exigidas declaradas.",
+        details: { motivo: "SIN_DECLARACION" },
       })
     }
 

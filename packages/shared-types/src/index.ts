@@ -189,3 +189,14 @@ export type {
   PreviewRechazoItem,
   PreviewResponse,
 } from "./evaluacion-inicial/preview.schema"
+// Schemas Zod para validar resumen/cambios/rechazos antes de persistir Json
+// (FIX-P5b-alineacion §5.60).
+export {
+  fuenteCambioPreviewSchema,
+  previewResumenSchema,
+  previewCambioItemSchema,
+  previewErrorCeldaSchema,
+  previewRechazoItemSchema,
+  previewCambiosArraySchema,
+  previewRechazosArraySchema,
+} from "./evaluacion-inicial/preview.schema"

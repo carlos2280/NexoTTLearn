@@ -93,7 +93,12 @@ export class EvaluacionInicialController {
   @UseInterceptors(
     FileInterceptor("archivo", {
       storage: memoryStorage(),
-      limits: { fileSize: MAX_FILE_SIZE_BYTES },
+      limits: {
+        fileSize: MAX_FILE_SIZE_BYTES,
+        files: 1,
+        fields: 10,
+        fieldSize: 1024,
+      },
     }),
   )
   @HttpCode(HttpStatus.CREATED)

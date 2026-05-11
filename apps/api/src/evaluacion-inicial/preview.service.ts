@@ -11,6 +11,9 @@ import {
   PreviewRechazoItem,
   PreviewResponse,
   PreviewResumen,
+  previewCambiosArraySchema,
+  previewRechazosArraySchema,
+  previewResumenSchema,
 } from "@nexott-learn/shared-types"
 import { ArchivoTipo, EstadoAsignado, Prisma, RolAsignacion } from "@prisma/client"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
@@ -31,6 +34,7 @@ import { ExcelParserService } from "./excel-parser.service"
 const TTL_PREVIEW_MIN = 30
 const MS_POR_MIN = 60 * 1000
 const MIME_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+const MAGIC_XLSX = Buffer.from([0x50, 0x4b, 0x03, 0x04])
 
 const SELECT_CURSO_PREVIEW = {
   id: true,
@@ -103,10 +107,15 @@ interface AsignacionComputada {
  *   3. Pide al parser un resultado tipado celda a celda (D-EVI-8).
  *   4. Aplica algoritmo "lo especifico gana" (D-EVI-6) sobre las filas validas
  *      y compara con `notas_skill.notaActual` (una sola query, sin N+1).
- *   5. Persiste el `Archivo` via `StorageService` + crea
- *      `PreviewEvaluacionInicial` con TTL 30 min (D-EVI-2). El audit log se
- *      escribe FUERA del transaction (D-AUDIT-2).
- *   6. Devuelve la respuesta con cambios + rechazos. **NO se aplica
+ *   5. Persiste el `Archivo` via `StorageService` y luego crea
+ *      `PreviewEvaluacionInicial` con TTL 30 min (D-EVI-2). **NO se envuelven
+ *      en `$transaction`**: si `previewEvaluacionInicial.create` falla, el
+ *      `Archivo` queda huérfano en BD y disco (aceptable por D-EVI-1 —
+ *      retención 5 años; el huérfano no compromete seguridad ni integridad
+ *      funcional).
+ *   6. El audit log se escribe DESDE el controller (D-AUDIT-2), fuera del
+ *      flujo del service.
+ *   7. Devuelve la respuesta con cambios + rechazos. **NO se aplica
  *      todo-o-nada** en preview (D-EVI-7 solo aplica al endpoint `aplicar` en
  *      P5c). El preview siempre devuelve 201; solo se rechaza con 422 cuando
  *      los encabezados son invalidos (`validacionExcelEncabezados`).
@@ -128,6 +137,12 @@ export class PreviewService {
       throw new BadRequestException({
         code: apiErrorCodes.invalidBody,
         message: "El archivo debe ser .xlsx (Office Open XML Spreadsheet).",
+      })
+    }
+    if (input.buffer.length < 4 || !input.buffer.subarray(0, 4).equals(MAGIC_XLSX)) {
+      throw new BadRequestException({
+        code: apiErrorCodes.invalidBody,
+        message: "El archivo no es un .xlsx válido (magic bytes incorrectos).",
       })
     }
 
@@ -190,7 +205,16 @@ export class PreviewService {
       emailsValidos,
     }
 
-    const parserResult = await this.parser.parsear({ buffer: input.buffer, esperado })
+    let parserResult: ParserResultado
+    try {
+      parserResult = await this.parser.parsear({ buffer: input.buffer, esperado })
+    } catch (err) {
+      throw new BadRequestException({
+        code: apiErrorCodes.invalidBody,
+        message: "El archivo .xlsx está corrupto o no puede leerse.",
+        details: { causa: err instanceof Error ? err.message : "desconocido" },
+      })
+    }
     this.asegurarEncabezadosValidos(parserResult)
 
     const { cambios, rechazos, filasValidas, filasRechazadas } = await this.computarPreview(
@@ -252,7 +276,7 @@ export class PreviewService {
 
     const archivoId = preview.archivoId
     const borrado = await this.prisma.previewEvaluacionInicial.deleteMany({
-      where: { id: previewId, aplicadoEn: null },
+      where: { id: previewId, cursoId, aplicadoEn: null },
     })
     if (borrado.count === 0) {
       throw new ConflictException({
@@ -454,6 +478,9 @@ export class PreviewService {
       subidoPorUsuarioId: input.sesion.usuarioId,
       metadata: this.buildMetadataArchivo(input.cursoId, input.resumen),
     })
+    const resumenValidado = previewResumenSchema.parse(input.resumen)
+    const cambiosValidados = previewCambiosArraySchema.parse(input.cambios)
+    const rechazosValidados = previewRechazosArraySchema.parse(input.rechazos)
     const expiraEn = new Date(Date.now() + TTL_PREVIEW_MIN * MS_POR_MIN)
     const preview = await this.prisma.previewEvaluacionInicial.create({
       data: {
@@ -461,9 +488,9 @@ export class PreviewService {
         archivoId: archivo.archivoId,
         creadoPorUsuarioId: input.sesion.usuarioId,
         expiraEn,
-        resumen: input.resumen as unknown as Prisma.InputJsonValue,
-        cambios: input.cambios as unknown as Prisma.InputJsonValue,
-        rechazos: input.rechazos as unknown as Prisma.InputJsonValue,
+        resumen: resumenValidado satisfies Prisma.InputJsonValue,
+        cambios: cambiosValidados satisfies Prisma.InputJsonValue,
+        rechazos: rechazosValidados satisfies Prisma.InputJsonValue,
       },
       select: { id: true },
     })

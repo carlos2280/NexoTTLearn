@@ -1,4 +1,5 @@
 import { ConflictException, NotFoundException, UnprocessableEntityException } from "@nestjs/common"
+import { previewCambiosArraySchema, previewResumenSchema } from "@nexott-learn/shared-types"
 import { Prisma, RolUsuario } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
@@ -13,6 +14,9 @@ const CURSO_ID = "curso-1"
 const ADMIN_ID = "usr-admin"
 const SESION_ADMIN: SesionUsuario = { usuarioId: ADMIN_ID, rol: RolUsuario.ADMIN }
 const MIME_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+// Magic bytes OOXML (`PK\x03\x04`) + padding para superar la guarda de longitud
+// minima del check de magic bytes en `PreviewService.crearPreview`.
+const BUFFER_XLSX_OK = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00])
 
 interface PrismaMock {
   curso: { findUnique: ReturnType<typeof vi.fn> }
@@ -175,7 +179,7 @@ describe("PreviewService.crearPreview", () => {
     try {
       await service.crearPreview({
         cursoId: CURSO_ID,
-        buffer: Buffer.from(""),
+        buffer: BUFFER_XLSX_OK,
         mimeType: MIME_XLSX,
         tamanioBytes: 100,
         sesion: SESION_ADMIN,
@@ -200,7 +204,7 @@ describe("PreviewService.crearPreview", () => {
     try {
       await service.crearPreview({
         cursoId: CURSO_ID,
-        buffer: Buffer.from(""),
+        buffer: BUFFER_XLSX_OK,
         mimeType: MIME_XLSX,
         tamanioBytes: 100,
         sesion: SESION_ADMIN,
@@ -222,7 +226,7 @@ describe("PreviewService.crearPreview", () => {
     try {
       await service.crearPreview({
         cursoId: CURSO_ID,
-        buffer: Buffer.from(""),
+        buffer: BUFFER_XLSX_OK,
         mimeType: MIME_XLSX,
         tamanioBytes: 100,
         sesion: SESION_ADMIN,
@@ -245,7 +249,7 @@ describe("PreviewService.crearPreview", () => {
     try {
       await service.crearPreview({
         cursoId: CURSO_ID,
-        buffer: Buffer.from(""),
+        buffer: BUFFER_XLSX_OK,
         mimeType: MIME_XLSX,
         tamanioBytes: 100,
         sesion: SESION_ADMIN,
@@ -289,7 +293,7 @@ describe("PreviewService.crearPreview", () => {
 
     const res = await service.crearPreview({
       cursoId: CURSO_ID,
-      buffer: Buffer.from("x"),
+      buffer: BUFFER_XLSX_OK,
       mimeType: MIME_XLSX,
       tamanioBytes: 1,
       sesion: SESION_ADMIN,
@@ -329,7 +333,7 @@ describe("PreviewService.crearPreview", () => {
 
     const res = await service.crearPreview({
       cursoId: CURSO_ID,
-      buffer: Buffer.from("x"),
+      buffer: BUFFER_XLSX_OK,
       mimeType: MIME_XLSX,
       tamanioBytes: 1,
       sesion: SESION_ADMIN,
@@ -367,7 +371,7 @@ describe("PreviewService.crearPreview", () => {
 
     const res = await service.crearPreview({
       cursoId: CURSO_ID,
-      buffer: Buffer.from("x"),
+      buffer: BUFFER_XLSX_OK,
       mimeType: MIME_XLSX,
       tamanioBytes: 1,
       sesion: SESION_ADMIN,
@@ -410,7 +414,7 @@ describe("PreviewService.crearPreview", () => {
 
     const res = await service.crearPreview({
       cursoId: CURSO_ID,
-      buffer: Buffer.from("x"),
+      buffer: BUFFER_XLSX_OK,
       mimeType: MIME_XLSX,
       tamanioBytes: 1,
       sesion: SESION_ADMIN,
@@ -452,7 +456,7 @@ describe("PreviewService.crearPreview", () => {
 
     const res = await service.crearPreview({
       cursoId: CURSO_ID,
-      buffer: Buffer.from("x"),
+      buffer: BUFFER_XLSX_OK,
       mimeType: MIME_XLSX,
       tamanioBytes: 1,
       sesion: SESION_ADMIN,
@@ -501,7 +505,7 @@ describe("PreviewService.crearPreview", () => {
 
     const res = await service.crearPreview({
       cursoId: CURSO_ID,
-      buffer: Buffer.from("x"),
+      buffer: BUFFER_XLSX_OK,
       mimeType: MIME_XLSX,
       tamanioBytes: 1,
       sesion: SESION_ADMIN,
@@ -542,7 +546,7 @@ describe("PreviewService.crearPreview", () => {
     const antes = Date.now()
     const res = await service.crearPreview({
       cursoId: CURSO_ID,
-      buffer: Buffer.from("x"),
+      buffer: BUFFER_XLSX_OK,
       mimeType: MIME_XLSX,
       tamanioBytes: 1,
       sesion: SESION_ADMIN,
@@ -560,6 +564,60 @@ describe("PreviewService.crearPreview", () => {
       data: { aplicadoPorCargaId?: unknown; resumen: unknown; cambios: unknown; rechazos: unknown }
     }
     expect(call.data.aplicadoPorCargaId).toBeUndefined()
+  })
+
+  it("buffer sin magic bytes (0x504b0304): 400 invalidBody, no llama al parser", async () => {
+    prisma.curso.findUnique.mockResolvedValue(cursoOk())
+    prisma.asignacionCurso.findMany.mockResolvedValue(asignacionesOk())
+    instanciar({ filas: [], encabezadosFaltantes: [], encabezadosInesperados: [] })
+    const bufferSinMagic = Buffer.from([0x25, 0x50, 0x44, 0x46]) // "%PDF"
+    let caught: unknown
+    try {
+      await service.crearPreview({
+        cursoId: CURSO_ID,
+        buffer: bufferSinMagic,
+        mimeType: MIME_XLSX,
+        tamanioBytes: bufferSinMagic.length,
+        sesion: SESION_ADMIN,
+      })
+    } catch (error) {
+      caught = error
+    }
+    expect((caught as { getResponse: () => { code: string } }).getResponse().code).toBe(
+      apiErrorCodes.invalidBody,
+    )
+    expect(parser.parsear).not.toHaveBeenCalled()
+  })
+
+  it("parser lanza excepcion: 400 invalidBody (mapea exceljs corrupto, no 500)", async () => {
+    prisma.curso.findUnique.mockResolvedValue(cursoOk())
+    prisma.asignacionCurso.findMany.mockResolvedValue(asignacionesOk())
+    parser = {
+      parsear: vi.fn().mockRejectedValue(new Error("OOXML inválido")),
+    }
+    storage = buildStorageMock()
+    service = new PreviewService(
+      prisma as unknown as PrismaService,
+      parser as unknown as ExcelParserService,
+      storage as unknown as StorageService,
+    )
+    let caught: unknown
+    try {
+      await service.crearPreview({
+        cursoId: CURSO_ID,
+        buffer: BUFFER_XLSX_OK,
+        mimeType: MIME_XLSX,
+        tamanioBytes: BUFFER_XLSX_OK.length,
+        sesion: SESION_ADMIN,
+      })
+    } catch (error) {
+      caught = error
+    }
+    const resp = (
+      caught as { getResponse: () => { code: string; details?: { causa?: string } } }
+    ).getResponse()
+    expect(resp.code).toBe(apiErrorCodes.invalidBody)
+    expect(resp.details?.causa).toContain("OOXML")
   })
 
   it("storage.guardar recibe metadata sin PII", async () => {
@@ -587,7 +645,7 @@ describe("PreviewService.crearPreview", () => {
     })
     await service.crearPreview({
       cursoId: CURSO_ID,
-      buffer: Buffer.from("x"),
+      buffer: BUFFER_XLSX_OK,
       mimeType: MIME_XLSX,
       tamanioBytes: 1,
       sesion: SESION_ADMIN,
@@ -634,7 +692,7 @@ describe("PreviewService.descartarPreview", () => {
     const res = await service.descartarPreview(CURSO_ID, "prev-1")
     expect(res.archivoId).toBe("arch-1")
     expect(prisma.previewEvaluacionInicial.deleteMany).toHaveBeenCalledWith({
-      where: { id: "prev-1", aplicadoEn: null },
+      where: { id: "prev-1", cursoId: CURSO_ID, aplicadoEn: null },
     })
   })
 
@@ -687,6 +745,26 @@ describe("PreviewService.descartarPreview", () => {
     })
   })
 
+  it("preview existente pero de otro curso: 404 previewNoEncontrado (cross-curso)", async () => {
+    prisma.previewEvaluacionInicial.findUnique.mockResolvedValue({
+      id: "prev-1",
+      cursoId: "curso-otro",
+      aplicadoEn: null,
+      archivoId: "arch-1",
+    })
+    let caught: unknown
+    try {
+      await service.descartarPreview(CURSO_ID, "prev-1")
+    } catch (error) {
+      caught = error
+    }
+    expect(caught).toBeInstanceOf(NotFoundException)
+    expect((caught as NotFoundException).getResponse()).toMatchObject({
+      code: apiErrorCodes.previewNoEncontrado,
+    })
+    expect(prisma.previewEvaluacionInicial.deleteMany).not.toHaveBeenCalled()
+  })
+
   it("race deleteMany count===0: 409 conflictPreviewYaAplicado", async () => {
     prisma.previewEvaluacionInicial.findUnique.mockResolvedValue({
       id: "prev-1",
@@ -705,5 +783,34 @@ describe("PreviewService.descartarPreview", () => {
     expect((caught as ConflictException).getResponse()).toMatchObject({
       code: apiErrorCodes.conflictPreviewYaAplicado,
     })
+  })
+})
+
+describe("preview schemas Zod (defensa antes de persistir Json)", () => {
+  it("previewResumenSchema rechaza filasTotales como string", () => {
+    const resultado = previewResumenSchema.safeParse({
+      filasTotales: "no-numero",
+      filasValidas: 0,
+      filasRechazadas: 0,
+      skillsAfectadas: 0,
+      colaboradoresAfectados: 0,
+    })
+    expect(resultado.success).toBe(false)
+  })
+
+  it("previewCambiosArraySchema rechaza fuente desconocida", () => {
+    const resultado = previewCambiosArraySchema.safeParse([
+      {
+        colaboradorId: "col-1",
+        email: "x@x.com",
+        nombreColaborador: "X",
+        skillId: "skill-1",
+        etiquetaSkill: "etiqueta",
+        valorAnterior: null,
+        valorNuevo: 80,
+        fuente: "INVENTADA",
+      },
+    ])
+    expect(resultado.success).toBe(false)
   })
 })

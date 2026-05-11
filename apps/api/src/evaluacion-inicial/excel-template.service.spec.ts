@@ -114,10 +114,11 @@ describe("ExcelTemplateService.generarTemplate", () => {
     expect(resp.code).toBe(apiErrorCodes.cursoNoEncontrado)
   })
 
-  it("curso sin areas exigidas: 409 conflictCursoNoPublicable", async () => {
+  it("curso sin areas ni skills: 409 conflictCursoNoPublicable SIN_DECLARACION", async () => {
     prisma.curso.findUnique.mockResolvedValue({
       ...cursoOk(),
       areasExigidas: [],
+      skillsExigidas: [],
     })
 
     let caught: unknown
@@ -132,7 +133,7 @@ describe("ExcelTemplateService.generarTemplate", () => {
       details?: { motivo?: string }
     }
     expect(resp.code).toBe(apiErrorCodes.conflictCursoNoPublicable)
-    expect(resp.details?.motivo).toBe("AREAS_VACIAS")
+    expect(resp.details?.motivo).toBe("SIN_DECLARACION")
   })
 
   it("curso sin asignados activos: 409 conflictCursoNoPublicable", async () => {

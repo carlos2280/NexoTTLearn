@@ -374,20 +374,24 @@ describe.runIf(RUN_E2E)("evaluacion-inicial e2e (P5a + P5b — template + previe
     expect(res.status).toBe(403)
   })
 
-  it("ADMIN GET template curso sin areas: 409 CONFLICT_CURSO_NO_PUBLICABLE", async () => {
+  it("ADMIN GET template curso sin areas ni skills: 409 motivo SIN_DECLARACION", async () => {
     const res = await agenteAdmin.get(
       `/api/v1/cursos/${cursoSinAreasId}/evaluacion-inicial/template`,
     )
     expect(res.status).toBe(409)
-    expect((res.body as { code: string }).code).toBe("CONFLICT_CURSO_NO_PUBLICABLE")
+    const body = res.body as { code: string; details?: { motivo?: string } }
+    expect(body.code).toBe("CONFLICT_CURSO_NO_PUBLICABLE")
+    expect(body.details?.motivo).toBe("SIN_DECLARACION")
   })
 
-  it("ADMIN GET template curso sin asignados: 409 CONFLICT_CURSO_NO_PUBLICABLE", async () => {
+  it("ADMIN GET template curso sin asignados: 409 motivo SIN_ASIGNADOS_ACTIVOS", async () => {
     const res = await agenteAdmin.get(
       `/api/v1/cursos/${cursoSinAsignadosId}/evaluacion-inicial/template`,
     )
     expect(res.status).toBe(409)
-    expect((res.body as { code: string }).code).toBe("CONFLICT_CURSO_NO_PUBLICABLE")
+    const body = res.body as { code: string; details?: { motivo?: string } }
+    expect(body.code).toBe("CONFLICT_CURSO_NO_PUBLICABLE")
+    expect(body.details?.motivo).toBe("SIN_ASIGNADOS_ACTIVOS")
   })
 
   it("ADMIN GET template curso inexistente: 404 CURSO_NO_ENCONTRADO", async () => {
@@ -516,6 +520,18 @@ describe.runIf(RUN_E2E)("evaluacion-inicial e2e (P5a + P5b — template + previe
     expect((res.body as { code: string }).code).toBe("INVALID_BODY")
   })
 
+  it("ADMIN POST preview con PDF renombrado .xlsx + MIME spoofeado: 400 INVALID_BODY (magic bytes)", async () => {
+    const res = await agenteAdmin
+      .post(`/api/v1/cursos/${cursoListoId}/evaluacion-inicial/preview`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .attach("archivo", Buffer.from("%PDF-1.4\n%spoof xlsx\n"), {
+        filename: "fake.xlsx",
+        contentType: mimeXlsx,
+      })
+    expect(res.status).toBe(400)
+    expect((res.body as { code: string }).code).toBe("INVALID_BODY")
+  })
+
   it("ADMIN POST preview con headers faltantes: 422 VALIDACION_EXCEL_ENCABEZADOS", async () => {
     const buffer = await workbookHeadersFaltantes()
     const res = await agenteAdmin
@@ -554,15 +570,45 @@ describe.runIf(RUN_E2E)("evaluacion-inicial e2e (P5a + P5b — template + previe
   })
 
   it("ADMIN DELETE preview no aplicado: 204 + audit log", async () => {
-    const buffer = await workbookValido([
-      { email: PARTICIPANTE_EMAIL, nombre: "A", notaSkill: 90, notaArea: null },
-    ])
-    const crear = await agenteAdmin
-      .post(`/api/v1/cursos/${cursoListoId}/evaluacion-inicial/preview`)
-      .set("X-XSRF-TOKEN", csrfAdmin)
-      .attach("archivo", buffer, { filename: "para-borrar.xlsx", contentType: mimeXlsx })
-    expect(crear.status).toBe(201)
-    const previewId = (crear.body as { previewId: string }).previewId
+    // El preview se siembra via Prisma directo para no consumir cuota del
+    // @Throttle del POST /preview. El override de ThrottlerGuard en el test
+    // module no neutraliza el decorator @Throttle de la ruta. Mismo patron
+    // que el race test mas abajo.
+    const adminId = (
+      await prisma.usuario.findFirstOrThrow({
+        where: { colaborador: { email: ADMIN_EMAIL } },
+        select: { id: true },
+      })
+    ).id
+    const archivo = await prisma.archivo.create({
+      data: {
+        tipo: "EVALUACION_INICIAL_EXCEL",
+        path: `EVALUACION_INICIAL_EXCEL/del/${cursoListoId}.xlsx`,
+        mimeType: mimeXlsx,
+        tamanioBytes: 1,
+        subidoPorUsuarioId: adminId,
+      },
+      select: { id: true },
+    })
+    const previewSemilla = await prisma.previewEvaluacionInicial.create({
+      data: {
+        cursoId: cursoListoId,
+        archivoId: archivo.id,
+        creadoPorUsuarioId: adminId,
+        expiraEn: new Date(Date.now() + 30 * 60 * 1000),
+        resumen: {
+          filasTotales: 0,
+          filasValidas: 0,
+          filasRechazadas: 0,
+          skillsAfectadas: 0,
+          colaboradoresAfectados: 0,
+        },
+        cambios: [],
+        rechazos: [],
+      },
+      select: { id: true },
+    })
+    const previewId = previewSemilla.id
 
     const borrar = await agenteAdmin
       .delete(`/api/v1/cursos/${cursoListoId}/evaluacion-inicial/${previewId}`)

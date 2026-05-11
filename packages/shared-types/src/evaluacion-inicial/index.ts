@@ -14,3 +14,12 @@ export type {
   PreviewRechazoItem,
   PreviewResponse,
 } from "./preview.schema"
+export {
+  fuenteCambioPreviewSchema,
+  previewResumenSchema,
+  previewCambioItemSchema,
+  previewErrorCeldaSchema,
+  previewRechazoItemSchema,
+  previewCambiosArraySchema,
+  previewRechazosArraySchema,
+} from "./preview.schema"
