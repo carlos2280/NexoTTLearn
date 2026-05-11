@@ -3,6 +3,12 @@ export const RUTAS = {
   logout: "/logout",
   bandeja: "/bandeja",
   admin: {
-    bandeja: "/admin",
+    inicio: "/admin",
+    cursos: "/admin/cursos",
+    personas: "/admin/personas",
+    clientes: "/admin/clientes",
+    catalogo: "/admin/catalogo",
+    reportes: "/admin/reportes",
+    sistema: "/admin/sistema",
   },
 } as const

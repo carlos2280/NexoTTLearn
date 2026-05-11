@@ -42,7 +42,7 @@ export function useLoginFlow(): UseLoginFlowResult {
       }
       setPaso("bienvenida")
       window.setTimeout(() => {
-        const destino = data.rol === "ADMIN" ? RUTAS.admin.bandeja : RUTAS.bandeja
+        const destino = data.rol === "ADMIN" ? RUTAS.admin.inicio : RUTAS.bandeja
         navigate(destino, { replace: true })
       }, DURACION_BIENVENIDA_MS)
     },
