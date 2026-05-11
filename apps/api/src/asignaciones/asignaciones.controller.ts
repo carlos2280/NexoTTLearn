@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -35,7 +34,6 @@ import {
 } from "@nexott-learn/shared-types"
 import { AccionAuditoria, RolUsuario } from "@prisma/client"
 import { Request } from "express"
-import { z } from "zod"
 import { AuditLogService } from "../common/audit/audit-log.service"
 import { extractContextoHttp } from "../common/audit/extract-contexto"
 import { CurrentUser } from "../common/decorators/current-user.decorator"
@@ -46,10 +44,11 @@ import { Roles } from "../common/decorators/roles.decorator"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { ZodValidationPipe } from "../common/pipes/zod-validation.pipe"
 import { SesionUsuario } from "../common/types/sesion.types"
-import { HISTORICO_LITERAL_ASIGNADO_ASIGNADO } from "./asignaciones.helpers"
+import {
+  HISTORICO_LITERAL_ASIGNADO_ASIGNADO,
+  requireIdempotencyKeyUuid,
+} from "./asignaciones.helpers"
 import { AsignacionesService } from "./asignaciones.service"
-
-const idempotencyKeyUuidSchema = z.string().uuid()
 
 /**
  * Controller del modulo asignaciones (Slice 6 P6a).
@@ -285,20 +284,13 @@ export class AsignacionesController {
     @Req() req: Request,
   ): Promise<Asignacion> {
     const sesion = this.requireUsuario(usuario)
-    const keyValida =
-      idempotencyKey !== undefined && idempotencyKeyUuidSchema.safeParse(idempotencyKey).success
-    if (!keyValida) {
-      throw new BadRequestException({
-        code: apiErrorCodes.idempotencyKeyRequerida,
-        message: "El header Idempotency-Key es obligatorio y debe ser un UUID v4.",
-      })
-    }
+    const key = requireIdempotencyKeyUuid(idempotencyKey)
 
     const resultado = await this.asignacionesService.cerrarCaso({
       asignacionId,
       bodyRaw,
       motivo: motivo ?? null,
-      idempotencyKey,
+      idempotencyKey: key,
       autorUsuarioId: sesion.usuarioId,
     })
 
@@ -343,19 +335,12 @@ export class AsignacionesController {
     @Req() req: Request,
   ): Promise<Asignacion> {
     const sesion = this.requireUsuario(usuario)
-    const keyValida =
-      idempotencyKey !== undefined && idempotencyKeyUuidSchema.safeParse(idempotencyKey).success
-    if (!keyValida) {
-      throw new BadRequestException({
-        code: apiErrorCodes.idempotencyKeyRequerida,
-        message: "El header Idempotency-Key es obligatorio y debe ser un UUID v4.",
-      })
-    }
+    const key = requireIdempotencyKeyUuid(idempotencyKey)
 
     const resultado = await this.asignacionesService.reabrirCaso({
       asignacionId,
       motivo: motivo ?? "",
-      idempotencyKey,
+      idempotencyKey: key,
       autorUsuarioId: sesion.usuarioId,
     })
 

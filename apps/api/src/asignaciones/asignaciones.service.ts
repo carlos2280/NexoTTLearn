@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from "@nestjs/common"
@@ -34,7 +35,9 @@ import {
   HISTORICO_LITERAL_ASIGNADO_ASIGNADO,
   SELECT_ASIGNACION_DETALLE_FIELDS,
   SELECT_ASIGNACION_FIELDS,
+  esEstadoAsignado,
   esEstadoCerradoParaReabrir,
+  esEstadoVoluntario,
   evaluarCondicionesListo,
   literalEstado,
   toAsignacion,
@@ -77,6 +80,8 @@ export interface ReabrirCasoResultado {
  */
 @Injectable()
 export class AsignacionesService {
+  private readonly logger = new Logger(AsignacionesService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly idempotency: IdempotencyService,
@@ -101,12 +106,14 @@ export class AsignacionesService {
     const { skip, take, page, pageSize } = resolvePaginacion(query)
 
     if (usuario.rol === RolUsuario.PARTICIPANTE) {
-      const colaboradorId = await this.colaboradorIdDeUsuario(usuario.usuarioId)
-      if (!colaboradorId) {
-        return buildPaginatedResponse<Asignacion>([], 0, page, pageSize)
-      }
+      // §5.75: 1 sola query con relacion reverse colaborador.usuarios.
+      // Evita el lookup previo de `colaboradorId` para escenarios donde el
+      // PARTICIPANTE no tiene asignacion en el curso (caso comun en bandeja).
       const propia = await this.prisma.asignacionCurso.findFirst({
-        where: { cursoId, colaboradorId },
+        where: {
+          cursoId,
+          colaborador: { usuario: { is: { id: usuario.usuarioId } } },
+        },
         select: SELECT_ASIGNACION_FIELDS,
       })
       if (!propia) {
@@ -288,6 +295,14 @@ export class AsignacionesService {
         details: { rol: previa.rol },
       })
     }
+    if (previa.rol === RolAsignacion.VOLUNTARIO && previa.estadoVoluntario === null) {
+      // §5.81: CHECK chk_asig_rol_estado deberia prevenir este caso; el
+      // fallback `?? "INSCRITO"` existe como defensa en profundidad y
+      // queda registrado en logs si llegara a dispararse.
+      this.logger.warn(
+        `Asignacion ${previa.id}: rol=VOLUNTARIO con estadoVoluntario=null (CHECK chk_asig_rol_estado deberia prevenirlo)`,
+      )
+    }
     const estadoVoluntarioPrevio = previa.estadoVoluntario ?? "INSCRITO"
 
     return await this.prisma.$transaction(async (tx) => {
@@ -453,21 +468,23 @@ export class AsignacionesService {
    *
    * Scope PARTICIPANTE (D-AS-9 / D-CUR-13): si la asignacion no pertenece
    * al colaborador del usuario, 404 `asignacionNoEncontrada`.
+   *
+   * §5.85 — Nota sobre idempotencia: el noop es post-commit, NO race-safe.
+   * Si dos requests concurrentes con estado `ASIGNADO|INSCRITO` llegan al
+   * mismo tiempo, una transiciona y la otra recibe 409
+   * `conflictAsignacionEstado` (cuando el `updateMany` devuelve `count===0`).
+   * El cliente puede reintentar y obtener el noop con `transiciono=false`.
    */
   async iniciarProgreso(
     asignacionId: string,
     usuario: SesionUsuario,
   ): Promise<IniciarProgresoResultado> {
+    // §5.87: `previa` lee directo `SELECT_ASIGNACION_FIELDS` para devolver
+    // la asignacion en la rama noop sin un segundo SELECT. La rama no-noop
+    // sigue releyendo post-`updateMany` para reflejar el estado nuevo.
     const previa = await this.prisma.asignacionCurso.findUnique({
       where: { id: asignacionId },
-      select: {
-        id: true,
-        rol: true,
-        colaboradorId: true,
-        estadoAsignado: true,
-        estadoVoluntario: true,
-        fechaInicio: true,
-      },
+      select: SELECT_ASIGNACION_FIELDS,
     })
     if (!previa) {
       throw new NotFoundException({
@@ -486,16 +503,13 @@ export class AsignacionesService {
       }
     }
 
-    // Idempotencia implicita: si ya esta EN_PROGRESO, noop.
+    // Idempotencia implicita: si ya esta EN_PROGRESO, noop. Devolvemos la
+    // misma `previa` ya leida con `SELECT_ASIGNACION_FIELDS` (sin segundo SELECT).
     if (
       (previa.rol === RolAsignacion.ASIGNADO && previa.estadoAsignado === "EN_PROGRESO") ||
       (previa.rol === RolAsignacion.VOLUNTARIO && previa.estadoVoluntario === "EN_PROGRESO")
     ) {
-      const row = await this.prisma.asignacionCurso.findUniqueOrThrow({
-        where: { id: asignacionId },
-        select: SELECT_ASIGNACION_FIELDS,
-      })
-      return { asignacion: toAsignacion(row), transiciono: false }
+      return { asignacion: toAsignacion(previa), transiciono: false }
     }
 
     const fechaInicio = previa.fechaInicio ?? new Date()
@@ -1102,15 +1116,24 @@ export class AsignacionesService {
     if (query.estado) {
       // El estado se busca en ambas columnas; CHECK asegura que solo una
       // este poblada por fila. No fuerza rol cuando rol no esta filtrado.
-      where.OR = [
-        { estadoAsignado: query.estado as Prisma.AsignacionCursoWhereInput["estadoAsignado"] },
-        {
-          estadoVoluntario: query.estado as Prisma.AsignacionCursoWhereInput["estadoVoluntario"],
-        },
-      ]
+      // §5.80: el schema valida `estado` como union de los 2 enums; los
+      // type guards estrechan al enum Prisma adecuado y descartan la
+      // columna donde el valor no es valido (e.g. INSCRITO no aplica a
+      // estadoAsignado), reemplazando los `as` antiguos.
+      const branches: Prisma.AsignacionCursoWhereInput[] = []
+      if (esEstadoAsignado(query.estado)) {
+        branches.push({ estadoAsignado: query.estado })
+      }
+      if (esEstadoVoluntario(query.estado)) {
+        branches.push({ estadoVoluntario: query.estado })
+      }
+      where.OR = branches
     }
     if (query.q) {
       const contains = query.q
+      // TODO(post-S6 perf): si /asignaciones?q= se vuelve hot path,
+      // considerar indice trigram (pg_trgm) sobre colaboradores.nombre y .email
+      // para evitar seq-scan con ILIKE %term%.
       where.colaborador = {
         // biome-ignore lint/style/useNamingConvention: Prisma usa la clave OR en PascalCase.
         OR: [

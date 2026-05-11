@@ -1,3 +1,4 @@
+import { BadRequestException } from "@nestjs/common"
 import {
   Asignacion,
   AsignacionDetallada,
@@ -6,7 +7,31 @@ import {
   EstadoVoluntario,
   RolAsignacion,
 } from "@nexott-learn/shared-types"
-import { Prisma } from "@prisma/client"
+import {
+  EstadoAsignado as EstadoAsignadoPrisma,
+  EstadoVoluntario as EstadoVoluntarioPrisma,
+  Prisma,
+} from "@prisma/client"
+import { z } from "zod"
+import { apiErrorCodes } from "../common/errors/api-error.codes"
+
+const idempotencyKeyUuidSchema = z.string().uuid()
+
+/**
+ * Valida el header `Idempotency-Key` requerido por `cerrar-caso` y
+ * `reabrir-caso`. Lanza `BadRequestException(idempotencyKeyRequerida)`
+ * si falta o no es UUID v4. Centraliza la validacion duplicada en el
+ * controller (cierre §5.84).
+ */
+export function requireIdempotencyKeyUuid(headerValue: string | undefined): string {
+  if (headerValue === undefined || !idempotencyKeyUuidSchema.safeParse(headerValue).success) {
+    throw new BadRequestException({
+      code: apiErrorCodes.idempotencyKeyRequerida,
+      message: "El header Idempotency-Key es obligatorio y debe ser un UUID v4.",
+    })
+  }
+  return headerValue
+}
 
 /**
  * Constante para evitar duplicar el literal `"ASIGNADO:ASIGNADO"` del
@@ -31,6 +56,23 @@ export function literalEstado(
     return `ASIGNADO:${estadoAsignado ?? "?"}`
   }
   return `VOLUNTARIO:${estadoVoluntario ?? "?"}`
+}
+
+/**
+ * Type guards para filtrar `query.estado` en el listado (§5.80). El schema
+ * Zod valida `estado` como union de los 2 enums; estos predicados permiten
+ * componer el `WHERE OR` sin `as` y omitir la columna en la que el valor
+ * no puede vivir (e.g. `INSCRITO` no aplica a `estadoAsignado`).
+ */
+const ESTADOS_ASIGNADO_SET = new Set<string>(Object.values(EstadoAsignadoPrisma))
+const ESTADOS_VOLUNTARIO_SET = new Set<string>(Object.values(EstadoVoluntarioPrisma))
+
+export function esEstadoAsignado(estado: string): estado is EstadoAsignadoPrisma {
+  return ESTADOS_ASIGNADO_SET.has(estado)
+}
+
+export function esEstadoVoluntario(estado: string): estado is EstadoVoluntarioPrisma {
+  return ESTADOS_VOLUNTARIO_SET.has(estado)
 }
 
 /**

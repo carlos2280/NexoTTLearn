@@ -347,20 +347,25 @@ describe("AsignacionesService.listarPorCurso scope PARTICIPANTE", () => {
   })
 
   it("PARTICIPANTE inscrito: devuelve UNA asignacion (la suya)", async () => {
-    prisma.usuario.findUnique.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
+    // §5.75: la query usa relacion reverse `colaborador.usuario.is.id` para
+    // ahorrar el lookup previo de `colaboradorId`. Una sola query a
+    // asignacionCurso (+ el guard previo de `curso.findUnique`).
     prisma.asignacionCurso.findFirst.mockResolvedValue(asignacionRow())
 
     const res = await service.listarPorCurso(CURSO_ID, { page: 1, pageSize: 20 }, PARTICIPANTE)
     expect(res.data).toHaveLength(1)
     expect(res.meta.total).toBe(1)
     expect(prisma.asignacionCurso.findFirst).toHaveBeenCalledWith({
-      where: { cursoId: CURSO_ID, colaboradorId: COLABORADOR_ID },
+      where: {
+        cursoId: CURSO_ID,
+        colaborador: { usuario: { is: { id: PARTICIPANTE_ID } } },
+      },
       select: expect.anything(),
     })
+    expect(prisma.usuario.findUnique).not.toHaveBeenCalled()
   })
 
   it("PARTICIPANTE no inscrito: devuelve listado vacio (total=0), no 404", async () => {
-    prisma.usuario.findUnique.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
     prisma.asignacionCurso.findFirst.mockResolvedValue(null)
 
     const res = await service.listarPorCurso(CURSO_ID, { page: 1, pageSize: 20 }, PARTICIPANTE)
@@ -484,22 +489,18 @@ describe("AsignacionesService.iniciarProgreso", () => {
   })
 
   it("idempotencia: ya en EN_PROGRESO -> noop sin historico", async () => {
-    prisma.asignacionCurso.findUnique.mockResolvedValue({
-      id: ASIGNACION_ID,
-      rol: RolAsignacion.ASIGNADO,
-      colaboradorId: COLABORADOR_ID,
-      estadoAsignado: "EN_PROGRESO",
-      estadoVoluntario: null,
-      fechaInicio: FECHA,
-    })
-    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
-      asignacionRow({ estadoAsignado: "EN_PROGRESO" }),
+    // §5.87: `previa` ahora se lee con SELECT_ASIGNACION_FIELDS para
+    // devolver la asignacion directamente en la rama noop, sin un segundo
+    // SELECT. El mock debe incluir todos los campos del proyeccion.
+    prisma.asignacionCurso.findUnique.mockResolvedValue(
+      asignacionRow({ estadoAsignado: "EN_PROGRESO", fechaInicio: FECHA }),
     )
 
     const res = await service.iniciarProgreso(ASIGNACION_ID, ADMIN)
     expect(res.transiciono).toBe(false)
     expect(prisma.historicoEstadoAsignacion.create).not.toHaveBeenCalled()
     expect(prisma.asignacionCurso.updateMany).not.toHaveBeenCalled()
+    expect(prisma.asignacionCurso.findUniqueOrThrow).not.toHaveBeenCalled()
   })
 
   it("404 si la asignacion no existe", async () => {
@@ -931,6 +932,51 @@ describe("AsignacionesService.reabrirCaso", () => {
     expect(prisma.asignacionCurso.updateMany).not.toHaveBeenCalled()
     expect(prisma.historicoEstadoAsignacion.create).not.toHaveBeenCalled()
   })
+
+  it("M1 race-safe: dos invocaciones concurrentes -> 1 cumplida + 1 con 409 conflictAsignacionNoCerrada", async () => {
+    // §5.86: simetria con los race-tests heredados de cerrar-caso (§5.41).
+    // El guard `updateMany WHERE estadoAsignado IN (APTO,NO_APTO)` garantiza
+    // que solo el primer writer transiciona; el segundo recibe count===0 y
+    // lanza `conflictAsignacionNoCerrada`. Idempotency-keys distintas para
+    // que ambos lleguen al ejecutor del `runOnce` (sin cache hit).
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: "APTO",
+      estadoVoluntario: null,
+    })
+    prisma.asignacionCurso.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({ estadoAsignado: "EN_PROGRESO" }),
+    )
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+
+    const resultados = await Promise.allSettled([
+      service.reabrirCaso({
+        asignacionId: ASIGNACION_ID,
+        motivo: "reapertura 1",
+        idempotencyKey: "aaaaaaaa-1111-1111-1111-111111111111",
+        autorUsuarioId: ADMIN_ID,
+      }),
+      service.reabrirCaso({
+        asignacionId: ASIGNACION_ID,
+        motivo: "reapertura 2",
+        idempotencyKey: "bbbbbbbb-2222-2222-2222-222222222222",
+        autorUsuarioId: ADMIN_ID,
+      }),
+    ])
+    const cumplidas = resultados.filter((r) => r.status === "fulfilled")
+    const rechazadas = resultados.filter((r) => r.status === "rejected")
+    expect(cumplidas).toHaveLength(1)
+    expect(rechazadas).toHaveLength(1)
+    expect(
+      ((rechazadas[0] as PromiseRejectedResult).reason as { response?: { code?: string } }).response
+        ?.code,
+    ).toBe(apiErrorCodes.conflictAsignacionNoCerrada)
+    expect(prisma.historicoEstadoAsignacion.create).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe("AsignacionesService.retirar", () => {
@@ -971,6 +1017,41 @@ describe("AsignacionesService.retirar", () => {
     await expect(service.retirar(ASIGNACION_ID, "x", ADMIN_ID)).rejects.toBeInstanceOf(
       NotFoundException,
     )
+  })
+
+  it("M1 race-safe: dos invocaciones concurrentes -> 1 cumplida + 1 con 409 conflictAsignacionEstado", async () => {
+    // §5.86: simetria con los race-tests heredados. `retirar` no usa
+    // Idempotency-Key (cap. 12.1: operacion final unica). El guard
+    // `updateMany WHERE estadoAsignado != "RETIRADO"` deja pasar solo al
+    // primer writer; el segundo recibe count===0 y lanza
+    // `conflictAsignacionEstado`.
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: "EN_PROGRESO",
+      estadoVoluntario: null,
+    })
+    prisma.asignacionCurso.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({ estadoAsignado: "RETIRADO" }),
+    )
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+
+    const resultados = await Promise.allSettled([
+      service.retirar(ASIGNACION_ID, "Renuncia 1", ADMIN_ID),
+      service.retirar(ASIGNACION_ID, "Renuncia 2", ADMIN_ID),
+    ])
+    const cumplidas = resultados.filter((r) => r.status === "fulfilled")
+    const rechazadas = resultados.filter((r) => r.status === "rejected")
+    expect(cumplidas).toHaveLength(1)
+    expect(rechazadas).toHaveLength(1)
+    expect(
+      ((rechazadas[0] as PromiseRejectedResult).reason as { response?: { code?: string } }).response
+        ?.code,
+    ).toBe(apiErrorCodes.conflictAsignacionEstado)
+    expect(prisma.historicoEstadoAsignacion.create).toHaveBeenCalledTimes(1)
   })
 })
 
