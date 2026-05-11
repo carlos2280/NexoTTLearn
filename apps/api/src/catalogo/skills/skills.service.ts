@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common"
+import { ConflictException, Injectable, NotFoundException } from "@nestjs/common"
 import {
   CrearSkillInput,
   ListarSkillsQuery,
@@ -89,8 +89,6 @@ function esViolacionUniqueEtiqueta(error: unknown): boolean {
 
 @Injectable()
 export class SkillsService {
-  private readonly logger = new Logger(SkillsService.name)
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
@@ -181,9 +179,6 @@ export class SkillsService {
         },
         select: SELECT_SKILL_FIELDS,
       })
-      this.logger.log(
-        `Skill creada ${fila.id} (etiqueta=${fila.etiquetaVisible} forzada=${options.forzarCreacion})`,
-      )
       await this.auditLog.record({
         usuarioId: adminUsuarioId,
         accion: AccionAuditoria.SKILL_CREADA,
@@ -264,49 +259,42 @@ export class SkillsService {
     }
     const seleccionadas = Array.from(dedup.values()).slice(0, MAX_CANDIDATAS_WIZARD)
 
-    const candidatas: SkillDuplicadaCandidata[] = []
-    for (const c of seleccionadas) {
-      candidatas.push({
-        id: c.id,
-        etiquetaVisible: c.etiquetaVisible,
-        areaNombre: c.area.nombre,
-        cursosQueLaUsan: await this.contarCursosQueUsanSkill(c.id, c.areaId),
-      })
-    }
-    return candidatas
+    const conteos = await Promise.all(
+      seleccionadas.map((c) => this.contarCursosQueUsanSkill(c.id, c.areaId)),
+    )
+    return seleccionadas.map((c, i) => ({
+      id: c.id,
+      etiquetaVisible: c.etiquetaVisible,
+      areaNombre: c.area.nombre,
+      cursosQueLaUsan: conteos[i] ?? 0,
+    }))
   }
 
   private async contarCursosQueUsanSkill(skillId: string, areaId: string): Promise<number> {
-    try {
-      const [directos, porArea] = await Promise.all([
-        this.prisma.cursoSkillExigida.findMany({
-          where: { skillId },
-          select: { cursoId: true },
-        }),
-        this.prisma.cursoAreaExigida.findMany({
-          where: { areaId },
-          select: { cursoId: true },
-        }),
-      ])
-      const cursos = new Set<string>()
-      for (const c of directos) {
-        cursos.add(c.cursoId)
-      }
-      for (const c of porArea) {
-        cursos.add(c.cursoId)
-      }
-      return cursos.size
-    } catch (error) {
-      const detalle = error instanceof Error ? error.message : String(error)
-      this.logger.warn(`Conteo cursosQueLaUsan para skill ${skillId} fallo: ${detalle}`)
-      return 0
+    const [directos, porArea] = await Promise.all([
+      this.prisma.cursoSkillExigida.findMany({
+        where: { skillId },
+        select: { cursoId: true },
+      }),
+      this.prisma.cursoAreaExigida.findMany({
+        where: { areaId },
+        select: { cursoId: true },
+      }),
+    ])
+    const cursos = new Set<string>()
+    for (const c of directos) {
+      cursos.add(c.cursoId)
     }
+    for (const c of porArea) {
+      cursos.add(c.cursoId)
+    }
+    return cursos.size
   }
 
   async renombrar(
     skillId: string,
     input: RenombrarSkillInput,
-    motivo: string,
+    _motivo: string,
     adminUsuarioId: string,
     contexto: ContextoHttpAuditoria = {},
   ): Promise<SkillResponse> {
@@ -343,9 +331,6 @@ export class SkillsService {
         return actualizada
       })
 
-      this.logger.log(
-        `Skill ${skillId} renombrada ("${actual.etiquetaVisible}" -> "${input.etiquetaVisible}") motivo=${motivo}`,
-      )
       await this.auditLog.record({
         usuarioId: adminUsuarioId,
         accion: AccionAuditoria.SKILL_RENOMBRADA,
@@ -368,7 +353,7 @@ export class SkillsService {
 
   async archivar(
     skillId: string,
-    motivo: string,
+    _motivo: string,
     adminUsuarioId: string,
     contexto: ContextoHttpAuditoria = {},
   ): Promise<void> {
@@ -393,7 +378,6 @@ export class SkillsService {
       data: { estado: EstadoSkill.ARCHIVADA },
       select: { id: true },
     })
-    this.logger.log(`Skill ${skillId} archivada por admin ${adminUsuarioId} motivo=${motivo}`)
     await this.auditLog.record({
       usuarioId: adminUsuarioId,
       accion: AccionAuditoria.SKILL_ARCHIVADA,
@@ -442,7 +426,7 @@ export class SkillsService {
 
   async eliminar(
     skillId: string,
-    motivo: string,
+    _motivo: string,
     adminUsuarioId: string,
     contexto: ContextoHttpAuditoria = {},
   ): Promise<void> {
@@ -475,9 +459,6 @@ export class SkillsService {
     }
 
     await this.prisma.skill.delete({ where: { id: skillId } })
-    this.logger.log(
-      `Skill ${skillId} eliminada (etiqueta="${actual.etiquetaVisible}") motivo=${motivo}`,
-    )
     await this.auditLog.record({
       usuarioId: adminUsuarioId,
       accion: AccionAuditoria.SKILL_ELIMINADA,

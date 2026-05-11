@@ -213,6 +213,32 @@ describe("SkillsService.crear", () => {
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ accion: "SKILL_CREADA" }))
   })
 
+  it("wizard propaga error de DB al contar cursos (no devuelve 0 enganoso)", async () => {
+    prisma.area.findUnique.mockResolvedValue({ id: AREA_ID })
+    prisma.skill.findFirst.mockResolvedValue(null)
+    prisma.skill.findMany
+      .mockResolvedValueOnce([
+        {
+          id: "cand-1",
+          etiquetaVisible: "python.fastapi",
+          areaId: AREA_ID,
+          area: { nombre: "Backend" },
+        },
+      ])
+      .mockResolvedValueOnce([])
+    prisma.cursoSkillExigida.findMany.mockRejectedValue(new Error("DB down"))
+    prisma.cursoAreaExigida.findMany.mockResolvedValue([])
+
+    await expect(
+      service.crear(
+        { etiquetaVisible: "python.fast_api", areaId: AREA_ID },
+        { forzarCreacion: false },
+        ADMIN_ID,
+      ),
+    ).rejects.toThrow("DB down")
+    expect(prisma.skill.create).not.toHaveBeenCalled()
+  })
+
   it("wizard con 'python.fast_api' propone 'python.fastapi' (caso doc §6.5)", async () => {
     prisma.area.findUnique.mockResolvedValue({ id: AREA_ID })
     prisma.skill.findFirst.mockResolvedValue(null)

@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common"
+import { ConflictException, Injectable, NotFoundException } from "@nestjs/common"
 import {
   ActualizarAreaInput,
   AreaResponse,
@@ -44,8 +44,6 @@ function esViolacionUniqueNombre(error: unknown): boolean {
 
 @Injectable()
 export class AreasService {
-  private readonly logger = new Logger(AreasService.name)
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
@@ -149,16 +147,6 @@ export class AreasService {
         select: SELECT_AREA_FIELDS,
       })
 
-      const cambios: Record<string, { antes: unknown; despues: unknown }> = {}
-      if (input.nombre !== undefined && input.nombre !== actual.nombre) {
-        cambios.nombre = { antes: actual.nombre, despues: input.nombre }
-      }
-      if (input.descripcion !== undefined && input.descripcion !== actual.descripcion) {
-        cambios.descripcion = { antes: actual.descripcion, despues: input.descripcion }
-      }
-      this.logger.log(
-        `Area ${id} actualizada por admin ${adminUsuarioId} (cambios=${Object.keys(cambios).join(",") || "ninguno"})`,
-      )
       await this.auditLog.record({
         usuarioId: adminUsuarioId,
         accion: AccionAuditoria.AREA_ACTUALIZADA,
