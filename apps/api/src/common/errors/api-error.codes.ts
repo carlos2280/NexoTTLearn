@@ -124,6 +124,9 @@ export const apiErrorCodes = {
   // Asignaciones P6c — resultado entrevista cliente (D58).
   validacionResultadoSoloAsignado: "VALIDACION_RESULTADO_SOLO_ASIGNADO",
   validacionAsignacionNoCerrada: "VALIDACION_ASIGNACION_NO_CERRADA",
+  // Plan personal P7a (D-S7-B1..B6, D-S7-D1..D2).
+  planNoEncontrado: "PLAN_NO_ENCONTRADO",
+  conflictPlanYaCalculado: "CONFLICT_PLAN_YA_CALCULADO",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]

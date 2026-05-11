@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common"
 import { PrismaModule } from "../common/prisma/prisma.module"
+import { PlanPersonalModule } from "../plan-personal/plan-personal.module"
 import { AsignacionesController } from "./asignaciones.controller"
 import { AsignacionesService } from "./asignaciones.service"
 
@@ -12,7 +13,7 @@ import { AsignacionesService } from "./asignaciones.service"
  * en `common/audit/audit-log.module.ts`, no se reimporta aqui.
  */
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, PlanPersonalModule],
   controllers: [AsignacionesController],
   providers: [AsignacionesService],
   exports: [AsignacionesService],

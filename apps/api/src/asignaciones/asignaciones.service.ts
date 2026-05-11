@@ -31,6 +31,7 @@ import { buildPaginatedResponse, resolvePaginacion } from "../common/http/pagina
 import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
+import { PlanPersonalService } from "../plan-personal/plan-personal.service"
 import {
   HISTORICO_LITERAL_ASIGNADO_ASIGNADO,
   SELECT_ASIGNACION_DETALLE_FIELDS,
@@ -85,6 +86,7 @@ export class AsignacionesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly idempotency: IdempotencyService,
+    private readonly planPersonal: PlanPersonalService,
   ) {}
 
   async listarPorCurso(
@@ -258,8 +260,12 @@ export class AsignacionesService {
           select: SELECT_ASIGNACION_FIELDS,
         })
         creadas.push(toAsignacion(row))
-        // TODO(S7): calcular plan personal al asignar (D-AS-14).
+        // Calculo del plan personal en el mismo flujo (D-S7-B4). Si falla,
+        // el service del plan lo loguea y no aborta el alta; el admin puede
+        // recalcular manualmente (POST /plan/recalcular).
+        await this.planPersonal.calcularSiAsignado(row.id)
         // TODO(S10): emitir notificacion ASIGNACION_CURSO al colaborador (D-AS-13, D88).
+        // TODO(S10): emitir notificacion PLAN_CALCULADO al participante (D-S7-D3).
       } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
           // Race: otro admin asigno el mismo colaborador en paralelo. Lo
@@ -336,7 +342,10 @@ export class AsignacionesService {
         where: { id: asignacionId },
         select: SELECT_ASIGNACION_FIELDS,
       })
-      // TODO(S7): recalcular plan personal tras la conversion (D-AS-14).
+      // Calcular plan personal en el mismo TX (D-S7-B4). El voluntario
+      // promovido pasa a ASIGNADO y obtiene plan calculado desde cero.
+      await this.planPersonal.calcularSiAsignado(asignacionId, tx)
+      // TODO(S10): emitir notificacion PLAN_CALCULADO al participante (D-S7-D3).
       return toAsignacion(row)
     })
   }
@@ -551,7 +560,6 @@ export class AsignacionesService {
         where: { id: asignacionId },
         select: SELECT_ASIGNACION_FIELDS,
       })
-      // TODO(S7): recalcular plan personal si era ASIGNADO (D-AS-14).
       return toAsignacion(row)
     })
 
@@ -600,7 +608,7 @@ export class AsignacionesService {
       select: { transversalId: true, entrevistaIaId: true, toggleCierreAutomatico: true },
     })
 
-    const evaluacion = evaluarCondicionesListo({
+    const evaluacion = await evaluarCondicionesListo(this.prisma, asignacionId, {
       transversalId: curso.transversalId,
       entrevistaIaId: curso.entrevistaIaId,
     })
@@ -909,8 +917,14 @@ export class AsignacionesService {
           where: { id: input.asignacionId },
           select: SELECT_ASIGNACION_FIELDS,
         })
-        // TODO(S7): recalcular plan si aplica tras reabrir (D-AS-14).
+        // §9.5: reabrir NO recalcula el plan automaticamente. Se marca como
+        // desactualizado y el admin decide via POST /plan/recalcular.
+        await tx.planEstudio.updateMany({
+          where: { asignacionId: input.asignacionId },
+          data: { estaDesactualizado: true },
+        })
         // TODO(S10): emitir notificacion CASO_REABIERTO al colaborador (D88).
+        // TODO(S10): emitir notificacion PLAN_DESACTUALIZADO al admin (D-S7-D3).
         return { status: HTTP_OK, body: toAsignacion(row) }
       },
     })

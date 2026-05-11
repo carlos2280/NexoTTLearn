@@ -21,6 +21,7 @@ import { validateEnv } from "./config/env.validation"
 import { CursosModule } from "./cursos/cursos.module"
 import { EvaluacionInicialModule } from "./evaluacion-inicial/evaluacion-inicial.module"
 import { HealthModule } from "./health/health.module"
+import { PlanPersonalModule } from "./plan-personal/plan-personal.module"
 
 /**
  * Modulo raiz.
@@ -67,6 +68,7 @@ import { HealthModule } from "./health/health.module"
     AsignacionesModule,
     CursosModule,
     EvaluacionInicialModule,
+    PlanPersonalModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: SesionGuard },

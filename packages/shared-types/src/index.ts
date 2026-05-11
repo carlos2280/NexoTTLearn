@@ -232,6 +232,31 @@ export {
   reabrirRetirarBodySchema,
   patchResultadoEntrevistaRequestSchema,
 } from "./asignaciones"
+
+// Plan personal — Slice 7 P7a (D-S7-B3, D-S7-D2).
+export {
+  estadoBrechaSnapshotSchema,
+  origenSnapshotSchema,
+  skillSnapshotItemSchema,
+  fichaSnapshotV1Schema,
+} from "./plan-personal"
+export type {
+  EstadoBrechaSnapshot,
+  OrigenSnapshot,
+  SkillSnapshotItem,
+  FichaSnapshotV1,
+  CaracterItemPlan,
+  RazonItemPlan,
+  PlanAvanceBloques,
+  PlanAvance,
+  SeccionPlanItemAdmin,
+  SeccionPlanItemParticipante,
+  ModuloPlanAdmin,
+  ModuloPlanParticipante,
+  PlanResponseAdmin,
+  PlanResponseParticipante,
+  PlanResponse,
+} from "./plan-personal"
 export type {
   RolAsignacion,
   OrigenVoluntario,

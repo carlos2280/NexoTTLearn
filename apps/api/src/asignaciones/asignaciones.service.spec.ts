@@ -7,6 +7,7 @@ import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
+import { PlanPersonalService } from "../plan-personal/plan-personal.service"
 import { AsignacionesService } from "./asignaciones.service"
 
 interface MockPrisma {
@@ -33,6 +34,16 @@ interface MockPrisma {
   }
   colaborador: { findMany: ReturnType<typeof vi.fn> }
   usuario: { findUnique: ReturnType<typeof vi.fn> }
+  // Plan personal (S7): los mocks por defecto simulan "sin items
+  // obligatorios" para que `evaluarCondicionesListo` devuelva planCompleto=true
+  // y los tests existentes de marcarListo/reabrirCaso sigan verdes.
+  planEstudio: {
+    findUnique: ReturnType<typeof vi.fn>
+    updateMany: ReturnType<typeof vi.fn>
+  }
+  itemPlan: { findMany: ReturnType<typeof vi.fn> }
+  intentoBloque: { findMany: ReturnType<typeof vi.fn> }
+  aperturaSeccion: { findMany: ReturnType<typeof vi.fn> }
   $transaction: ReturnType<typeof vi.fn>
 }
 
@@ -52,6 +63,16 @@ function buildPrismaMock(): MockPrisma {
     curso: { findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), findMany: vi.fn(), count: vi.fn() },
     colaborador: { findMany: vi.fn() },
     usuario: { findUnique: vi.fn() },
+    planEstudio: {
+      // Default: plan existente con 0 items obligatorios -> planCompleto=true
+      // vacuamente. Los tests que necesiten "sin plan" sobreescriben con
+      // `mockResolvedValueOnce(null)`.
+      findUnique: vi.fn().mockResolvedValue({ id: "plan-mock" }),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    itemPlan: { findMany: vi.fn().mockResolvedValue([]) },
+    intentoBloque: { findMany: vi.fn().mockResolvedValue([]) },
+    aperturaSeccion: { findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn(),
   }
   mock.$transaction.mockImplementation(
@@ -116,18 +137,27 @@ let idempotency: MockIdempotency
 let service: AsignacionesService
 let moduleRef: TestingModule
 
+const planPersonalMock = {
+  calcularSiAsignado: vi.fn(async () => {
+    /* noop */
+  }),
+}
+
 beforeEach(async () => {
   prisma = buildPrismaMock()
   idempotency = buildIdempotencyMock(prisma)
+  planPersonalMock.calcularSiAsignado.mockClear()
   moduleRef = await Test.createTestingModule({
     providers: [
       {
         provide: AsignacionesService,
-        useFactory: (p: PrismaService, i: IdempotencyService) => new AsignacionesService(p, i),
-        inject: [PrismaService, IdempotencyService],
+        useFactory: (p: PrismaService, i: IdempotencyService, pp: PlanPersonalService) =>
+          new AsignacionesService(p, i, pp),
+        inject: [PrismaService, IdempotencyService, PlanPersonalService],
       },
       { provide: PrismaService, useValue: prisma },
       { provide: IdempotencyService, useValue: idempotency },
+      { provide: PlanPersonalService, useValue: planPersonalMock },
     ],
   }).compile()
   service = moduleRef.get(AsignacionesService)

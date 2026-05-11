@@ -11,9 +11,11 @@ import {
   EstadoAsignado as EstadoAsignadoPrisma,
   EstadoVoluntario as EstadoVoluntarioPrisma,
   Prisma,
+  RolAsignacion as RolAsignacionPrisma,
 } from "@prisma/client"
 import { z } from "zod"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
+import { PrismaService } from "../common/prisma/prisma.service"
 
 const idempotencyKeyUuidSchema = z.string().uuid()
 
@@ -95,16 +97,14 @@ export function esEstadoCerradoParaReabrir(previa: {
 /**
  * D-AS-10 — Evalua las condiciones de cap. 12.3 para pasar a `LISTO`.
  *
- * En S6 con S7/S8/S9 ausentes:
- *  - `planCompleto: true` (TODO(S7) — sustituir por consulta real al plan).
- *  - `transversal: 'NO_APLICA'` si el curso no exige transversal; cuando S8
- *    conecte el intento real, devolvera `APROBADO` / `NO_APROBADO` /
- *    `TODO_S8` segun corresponda.
- *  - `entrevistaIA: 'NO_APLICA'` analoga para S9.
+ * `planCompleto` consulta el avance del plan personal (Slice 7):
+ *  - VOLUNTARIO: planCompleto=true por diseno (los voluntarios no tienen plan
+ *    personal — D-AS-1).
+ *  - ASIGNADO sin plan -> planCompleto=false + faltante PLAN_INCOMPLETO.
+ *  - ASIGNADO con plan: completo si % avance >= 100 sobre secciones
+ *    obligatorias (D-S7-B6). 0 obligatorias -> 100% vacuamente.
  *
- * `cumple` es la conjuncion: todas las dimensiones cumplen (`true` /
- * `NO_APLICA` / `APROBADO`). `faltantes` lista los codigos pendientes
- * para devolverlos en `422 condicionesListoNoCumplidas`.
+ * Transversal/IA conservan los placeholders S6: `NO_APLICA` / `TODO_S*`.
  */
 export interface ResultadoEvaluacionListo {
   readonly cumple: boolean
@@ -119,9 +119,14 @@ interface CursoEvaluacionListo {
   readonly entrevistaIaId: string | null
 }
 
-export function evaluarCondicionesListo(curso: CursoEvaluacionListo): ResultadoEvaluacionListo {
-  // Hoy solo emitimos `true` (TODO(S7) hasta que exista calculo real del plan).
-  const planCompleto = true
+const UMBRAL_BLOQUE_DEFAULT_LISTO = 70
+
+export async function evaluarCondicionesListo(
+  prisma: PrismaService,
+  asignacionId: string,
+  curso: CursoEvaluacionListo,
+): Promise<ResultadoEvaluacionListo> {
+  const planCompleto = await calcularPlanCompleto(prisma, asignacionId)
   // En S6 los placeholders solo emiten `NO_APLICA` o `TODO_*`. Los valores
   // `APROBADO`/`NO_APROBADO` se reservan para cuando S8 y S9 conecten el
   // calculo real (D-AS-10).
@@ -160,6 +165,90 @@ export function evaluarCondicionesListo(curso: CursoEvaluacionListo): ResultadoE
     entrevistaIA,
     faltantes,
   }
+}
+
+async function calcularPlanCompleto(prisma: PrismaService, asignacionId: string): Promise<boolean> {
+  const asignacion = await prisma.asignacionCurso.findUnique({
+    where: { id: asignacionId },
+    select: { rol: true, colaboradorId: true },
+  })
+  if (!asignacion) {
+    return false
+  }
+  if (asignacion.rol !== RolAsignacionPrisma.ASIGNADO) {
+    // Voluntarios no tienen plan personal (D-AS-1).
+    return true
+  }
+  const plan = await prisma.planEstudio.findUnique({
+    where: { asignacionId },
+    select: { id: true },
+  })
+  if (!plan) {
+    return false
+  }
+  const items = await prisma.itemPlan.findMany({
+    where: { planId: plan.id, caracter: "OBLIGATORIA" },
+    select: {
+      seccionId: true,
+      seccion: {
+        select: {
+          id: true,
+          bloques: {
+            where: { estado: "ACTIVO", esEvaluable: true },
+            select: { id: true },
+          },
+        },
+      },
+    },
+  })
+  if (items.length === 0) {
+    return true
+  }
+  const bloqueIds = items.flatMap((i) => i.seccion.bloques.map((b) => b.id))
+  const intentos =
+    bloqueIds.length === 0
+      ? []
+      : await prisma.intentoBloque.findMany({
+          where: {
+            colaboradorId: asignacion.colaboradorId,
+            bloqueId: { in: bloqueIds },
+            esMejorIntento: true,
+            estaInvalidado: false,
+          },
+          select: { bloqueId: true, nota: true },
+        })
+  const intentoPorBloque = new Map<string, number>()
+  for (const it of intentos) {
+    intentoPorBloque.set(it.bloqueId, Number(it.nota.toString()))
+  }
+  const seccionIdsSinBloques = items
+    .filter((i) => i.seccion.bloques.length === 0)
+    .map((i) => i.seccionId)
+  const aperturas =
+    seccionIdsSinBloques.length === 0
+      ? []
+      : await prisma.aperturaSeccion.findMany({
+          where: { asignacionId, seccionId: { in: seccionIdsSinBloques } },
+          select: { seccionId: true },
+        })
+  const aperturasSet = new Set(aperturas.map((a) => a.seccionId))
+  for (const item of items) {
+    const bloques = item.seccion.bloques
+    if (bloques.length === 0) {
+      if (!aperturasSet.has(item.seccionId)) {
+        return false
+      }
+      continue
+    }
+    const todosCumplen = bloques.every((b) => {
+      const nota = intentoPorBloque.get(b.id)
+      return nota !== undefined && nota >= UMBRAL_BLOQUE_DEFAULT_LISTO
+    })
+    if (!todosCumplen) {
+      return false
+    }
+  }
+  return true
 }
 
 /**
