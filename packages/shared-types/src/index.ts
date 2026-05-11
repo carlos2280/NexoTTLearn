@@ -53,9 +53,27 @@ export {
 } from "./catalogo/modulos/listar-modulos.schema"
 export type { ListarModulosQuery, EstadoModulo } from "./catalogo/modulos/listar-modulos.schema"
 export type { ModuloResponse } from "./catalogo/modulos/modulo-response"
+export { crearModuloSchema, actualizarModuloSchema } from "./catalogo/modulos/modulo.schema"
+export type {
+  CrearModuloInput,
+  ActualizarModuloInput,
+  CursoActivoAfectado,
+  SkillHuerfana,
+  PreviewImpactoArchivoModulo,
+} from "./catalogo/modulos/modulo.schema"
 export { listarSeccionesQuerySchema } from "./catalogo/secciones/listar-secciones.schema"
 export type { ListarSeccionesQuery } from "./catalogo/secciones/listar-secciones.schema"
 export type { SeccionResponse } from "./catalogo/secciones/seccion-response"
+export {
+  crearSeccionSchema,
+  actualizarSeccionSchema,
+  reordenarSeccionesSchema,
+} from "./catalogo/secciones/seccion.schema"
+export type {
+  CrearSeccionInput,
+  ActualizarSeccionInput,
+  ReordenarSeccionesInput,
+} from "./catalogo/secciones/seccion.schema"
 export {
   listarBloquesQuerySchema,
   tipoBloqueSchema,
@@ -67,9 +85,25 @@ export type {
   EstadoBloque,
 } from "./catalogo/bloques/listar-bloques.schema"
 export type { BloqueResponse, BloqueDetalleResponse } from "./catalogo/bloques/bloque-response"
+export {
+  crearBloqueSchema,
+  patchBloqueSchema,
+  reordenarBloquesSchema,
+  tipoEdicionBloqueSchema,
+} from "./catalogo/bloques/bloque.schema"
+export type {
+  CrearBloqueInput,
+  PatchBloqueInput,
+  ReordenarBloquesInput,
+  TipoEdicionBloque,
+  ColaboradorAfectadoBloque,
+  PreviewImpactoEliminarBloque,
+} from "./catalogo/bloques/bloque.schema"
 export { listarClientesQuerySchema } from "./catalogo/clientes/listar-clientes.schema"
 export type { ListarClientesQuery } from "./catalogo/clientes/listar-clientes.schema"
 export type {
   ClienteResponse,
   ClienteDetalleResponse,
 } from "./catalogo/clientes/cliente-response"
+export { crearClienteSchema, actualizarClienteSchema } from "./catalogo/clientes/cliente.schema"
+export type { CrearClienteInput, ActualizarClienteInput } from "./catalogo/clientes/cliente.schema"

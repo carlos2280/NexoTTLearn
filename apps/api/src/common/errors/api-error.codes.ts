@@ -50,6 +50,22 @@ export const apiErrorCodes = {
   // Catalogo-admin P3b — cambio de area y fusion de skills.
   skillYaEnAreaDestino: "SKILL_YA_EN_AREA_DESTINO",
   skillNoActiva: "SKILL_NO_ACTIVA",
+  // Catalogo-admin P3c — mutaciones de modulos/secciones/bloques/clientes.
+  moduloYaArchivado: "MODULO_YA_ARCHIVADO",
+  moduloYaActivo: "MODULO_YA_ACTIVO",
+  conflictModuloArchivado: "CONFLICT_MODULO_ARCHIVADO",
+  conflictModuloConReferenciasActivas: "MODULO_CON_REFERENCIAS_ACTIVAS",
+  conflictModuloConSecciones: "MODULO_CON_SECCIONES",
+  seccionOrdenDuplicado: "SECCION_ORDEN_DUPLICADO",
+  seccionOrdenInvalido: "SECCION_ORDEN_INVALIDO",
+  conflictSeccionConBloquesActivos: "SECCION_CON_BLOQUES_ACTIVOS",
+  bloqueOrdenDuplicado: "BLOQUE_ORDEN_DUPLICADO",
+  bloqueOrdenInvalido: "BLOQUE_ORDEN_INVALIDO",
+  bloqueTipoEdicionInvalido: "BLOQUE_TIPO_EDICION_INVALIDO",
+  bloqueSkillObligatoriaEvaluable: "BLOQUE_SKILL_OBLIGATORIA_EVALUABLE",
+  bloqueYaEliminado: "BLOQUE_YA_ELIMINADO",
+  conflictClienteNombreDuplicado: "CONFLICT_CLIENTE_NOMBRE_DUPLICADO",
+  conflictClienteConCursos: "CONFLICT_CLIENTE_CON_CURSOS",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]

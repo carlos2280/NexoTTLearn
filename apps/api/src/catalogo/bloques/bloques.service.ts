@@ -1,14 +1,29 @@
-import { Injectable, NotFoundException } from "@nestjs/common"
+import {
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common"
 import {
   BloqueDetalleResponse,
   BloqueResponse,
+  CrearBloqueInput,
   ListarBloquesQuery,
   Paginated,
+  PatchBloqueInput,
+  PreviewImpactoEliminarBloque,
+  ReordenarBloquesInput,
 } from "@nexott-learn/shared-types"
-import { Prisma } from "@prisma/client"
+import { AccionAuditoria, EstadoBloque, EstadoSkill, Prisma } from "@prisma/client"
+import { AuditLogService } from "../../common/audit/audit-log.service"
+import { ContextoHttpAuditoria } from "../../common/audit/audit-log.types"
 import { apiErrorCodes } from "../../common/errors/api-error.codes"
 import { buildPaginatedResponse, resolvePaginacion } from "../../common/http/paginated"
 import { PrismaService } from "../../common/prisma/prisma.service"
+
+const REORDEN_OFFSET = 1_000_000
 
 /**
  * Listado — excluye `contenido` (JSONB voluminoso, estructura segun `tipo`).
@@ -53,9 +68,6 @@ function toBloqueResponse(row: BloqueRow): BloqueResponse {
 function toBloqueDetalleResponse(row: BloqueDetalleRow): BloqueDetalleResponse {
   return {
     ...toBloqueResponse(row),
-    // Preserva `null` literal de la BD (mismo patron que ClientesService con
-    // datosContacto). La forma concreta del JSONB depende del `tipo` del
-    // bloque y se validara cuando se mute en P3.
     contenido:
       row.contenido === null || row.contenido === undefined
         ? null
@@ -63,9 +75,24 @@ function toBloqueDetalleResponse(row: BloqueDetalleRow): BloqueDetalleResponse {
   }
 }
 
+export interface EliminarBloqueResponse {
+  readonly previewImpacto: PreviewImpactoEliminarBloque
+}
+
+export interface PatchBloqueResultado {
+  readonly bloque: BloqueDetalleResponse
+  readonly tipoEdicion: "COSMETICO" | "CAMBIA_EVALUACION"
+  readonly intentosInvalidados: number
+  readonly versionAnterior: number
+  readonly versionNueva: number
+}
+
 @Injectable()
 export class BloquesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLog: AuditLogService,
+  ) {}
 
   async listar(query: ListarBloquesQuery): Promise<Paginated<BloqueResponse>> {
     const { seccionId, tipo, estado } = query
@@ -102,5 +129,376 @@ export class BloquesService {
       })
     }
     return toBloqueDetalleResponse(fila)
+  }
+
+  async crear(
+    seccionId: string,
+    input: CrearBloqueInput,
+    adminUsuarioId: string,
+    contexto: ContextoHttpAuditoria = {},
+  ): Promise<BloqueDetalleResponse> {
+    const seccion = await this.prisma.seccion.findUnique({
+      where: { id: seccionId },
+      select: { id: true },
+    })
+    if (!seccion) {
+      throw new NotFoundException({
+        code: apiErrorCodes.seccionNoEncontrada,
+        message: "Seccion no encontrada.",
+      })
+    }
+    if (input.skillQueMideId) {
+      await this.validarSkillActiva(input.skillQueMideId)
+    }
+
+    const fila = await this.prisma.$transaction(async (tx) => {
+      let ordenFinal: number
+      if (input.orden !== undefined) {
+        const existente = await tx.bloque.findFirst({
+          where: { seccionId, orden: input.orden },
+          select: { id: true },
+        })
+        if (existente) {
+          throw new ConflictException({
+            code: apiErrorCodes.bloqueOrdenDuplicado,
+            message: "Ya existe un bloque con ese orden en la seccion.",
+          })
+        }
+        ordenFinal = input.orden
+      } else {
+        const max = await tx.bloque.aggregate({
+          where: { seccionId },
+          _max: { orden: true },
+        })
+        ordenFinal = (max._max.orden ?? 0) + 1
+      }
+      return tx.bloque.create({
+        data: {
+          seccionId,
+          tipo: input.tipo,
+          esEvaluable: input.esEvaluable,
+          skillQueMideId: input.skillQueMideId ?? null,
+          contenido: input.contenido as Prisma.InputJsonObject,
+          orden: ordenFinal,
+          estado: EstadoBloque.ACTIVO,
+          version: 1,
+        },
+        select: SELECT_BLOQUE_DETALLE_FIELDS,
+      })
+    })
+
+    await this.auditLog.record({
+      usuarioId: adminUsuarioId,
+      accion: AccionAuditoria.BLOQUE_CREADO,
+      exito: true,
+      recursoTipo: "bloque",
+      recursoId: fila.id,
+      metadata: { seccionId, tipo: input.tipo, esEvaluable: input.esEvaluable },
+      ...contexto,
+    })
+    return toBloqueDetalleResponse(fila)
+  }
+
+  private async validarSkillActiva(skillId: string): Promise<void> {
+    const skill = await this.prisma.skill.findUnique({
+      where: { id: skillId },
+      select: { id: true, estado: true },
+    })
+    if (!skill) {
+      throw new NotFoundException({
+        code: apiErrorCodes.skillNoEncontrada,
+        message: "Skill no encontrada.",
+      })
+    }
+    if (skill.estado !== EstadoSkill.ACTIVA) {
+      throw new ConflictException({
+        code: apiErrorCodes.skillNoActiva,
+        message: "La skill no esta ACTIVA.",
+      })
+    }
+  }
+
+  /**
+   * D-CAT-14: PATCH discriminado por `tipoEdicion`.
+   *  - COSMETICO: solo actualiza `contenido`. NO incrementa version, NO invalida.
+   *  - CAMBIA_EVALUACION: actualiza `contenido` + opcionalmente esEvaluable/
+   *    skillQueMideId. Incrementa version. Invalida intentos previos (sella el
+   *    contrato para cuando P7 entre y llene intentos_bloque).
+   * Releemos dentro del $transaction (FIX-P3b §5.21) para que `versionAnterior`
+   * y `versionNueva` reflejen el estado real al inicio de la transaccion.
+   */
+  async patch(
+    bloqueId: string,
+    input: PatchBloqueInput,
+    motivo: string | undefined,
+    adminUsuarioId: string,
+    contexto: ContextoHttpAuditoria = {},
+  ): Promise<PatchBloqueResultado> {
+    const actual = await this.prisma.bloque.findUnique({
+      where: { id: bloqueId },
+      select: { id: true, version: true, estado: true, esEvaluable: true, skillQueMideId: true },
+    })
+    if (!actual) {
+      throw new NotFoundException({
+        code: apiErrorCodes.bloqueNoEncontrado,
+        message: "Bloque no encontrado.",
+      })
+    }
+    if (actual.estado === EstadoBloque.ELIMINADO) {
+      throw new ConflictException({
+        code: apiErrorCodes.bloqueYaEliminado,
+        message: "El bloque ya esta eliminado.",
+      })
+    }
+
+    if (input.tipoEdicion === "COSMETICO") {
+      const fila = await this.prisma.bloque.update({
+        where: { id: bloqueId },
+        data: { contenido: input.contenido as Prisma.InputJsonObject },
+        select: SELECT_BLOQUE_DETALLE_FIELDS,
+      })
+      await this.auditLog.record({
+        usuarioId: adminUsuarioId,
+        accion: AccionAuditoria.BLOQUE_EDITADO_COSMETICO,
+        exito: true,
+        recursoTipo: "bloque",
+        recursoId: bloqueId,
+        metadata: { tipoEdicion: "COSMETICO" },
+        ...contexto,
+      })
+      return {
+        bloque: toBloqueDetalleResponse(fila),
+        tipoEdicion: "COSMETICO",
+        intentosInvalidados: 0,
+        versionAnterior: actual.version,
+        versionNueva: actual.version,
+      }
+    }
+
+    // CAMBIA_EVALUACION.
+    if (motivo === undefined || motivo.length === 0) {
+      throw new HttpException(
+        {
+          code: apiErrorCodes.motivoRequerido,
+          message: "Se requiere X-Motivo para tipoEdicion=CAMBIA_EVALUACION.",
+        },
+        HttpStatus.UNPROCESSABLE_ENTITY,
+      )
+    }
+    if (input.esEvaluable !== undefined) {
+      const nuevoSkill = input.skillQueMideId ?? actual.skillQueMideId
+      if (input.esEvaluable && !nuevoSkill) {
+        throw new BadRequestException({
+          code: apiErrorCodes.bloqueSkillObligatoriaEvaluable,
+          message: "esEvaluable=true exige skillQueMideId definido.",
+        })
+      }
+      if (!input.esEvaluable && input.skillQueMideId) {
+        throw new BadRequestException({
+          code: apiErrorCodes.bloqueSkillObligatoriaEvaluable,
+          message: "esEvaluable=false exige skillQueMideId nulo.",
+        })
+      }
+    }
+    if (input.skillQueMideId) {
+      await this.validarSkillActiva(input.skillQueMideId)
+    }
+
+    const { fila, intentosInvalidados, versionAnterior, versionNueva } =
+      await this.prisma.$transaction(async (tx) => {
+        const enTx = await tx.bloque.findUnique({
+          where: { id: bloqueId },
+          select: { id: true, version: true, estado: true },
+        })
+        if (!enTx) {
+          throw new NotFoundException({
+            code: apiErrorCodes.bloqueNoEncontrado,
+            message: "Bloque no encontrado.",
+          })
+        }
+        if (enTx.estado === EstadoBloque.ELIMINADO) {
+          throw new ConflictException({
+            code: apiErrorCodes.bloqueYaEliminado,
+            message: "El bloque ya esta eliminado.",
+          })
+        }
+        const versionAnt = enTx.version
+        const versionNueva = versionAnt + 1
+
+        const data: Prisma.BloqueUpdateInput = {
+          contenido: input.contenido as Prisma.InputJsonObject,
+          version: versionNueva,
+        }
+        if (input.esEvaluable !== undefined) {
+          data.esEvaluable = input.esEvaluable
+        }
+        if (input.skillQueMideId !== undefined) {
+          data.skillQueMide =
+            input.skillQueMideId === null
+              ? { disconnect: true }
+              : { connect: { id: input.skillQueMideId } }
+        }
+        const actualizada = await tx.bloque.update({
+          where: { id: bloqueId },
+          data,
+          select: SELECT_BLOQUE_DETALLE_FIELDS,
+        })
+
+        // D-CAT-14: invalidar intentos previos. Hoy 0 filas (P7 aun no llena
+        // `intentos_bloque`), pero el contrato queda sellado.
+        const intentos = await tx.intentoBloque.updateMany({
+          where: {
+            bloqueId,
+            versionBloque: { lt: versionNueva },
+            estaInvalidado: false,
+          },
+          data: { estaInvalidado: true },
+        })
+
+        return {
+          fila: actualizada,
+          intentosInvalidados: intentos.count,
+          versionAnterior: versionAnt,
+          versionNueva,
+        }
+      })
+
+    await this.auditLog.record({
+      usuarioId: adminUsuarioId,
+      accion: AccionAuditoria.BLOQUE_EDITADO_EVALUACION,
+      exito: true,
+      recursoTipo: "bloque",
+      recursoId: bloqueId,
+      metadata: {
+        tipoEdicion: "CAMBIA_EVALUACION",
+        motivo,
+        versionAnterior,
+        versionNueva,
+        intentosInvalidados,
+      },
+      ...contexto,
+    })
+    return {
+      bloque: toBloqueDetalleResponse(fila),
+      tipoEdicion: "CAMBIA_EVALUACION",
+      intentosInvalidados,
+      versionAnterior,
+      versionNueva,
+    }
+  }
+
+  /**
+   * Reordenar bloques de una seccion (D-CAT-19). Dos pasos dentro del tx para
+   * evitar violar el unique `[seccionId, orden]`.
+   */
+  async reordenar(
+    seccionId: string,
+    input: ReordenarBloquesInput,
+    adminUsuarioId: string,
+    contexto: ContextoHttpAuditoria = {},
+  ): Promise<void> {
+    const seccion = await this.prisma.seccion.findUnique({
+      where: { id: seccionId },
+      select: { id: true },
+    })
+    if (!seccion) {
+      throw new NotFoundException({
+        code: apiErrorCodes.seccionNoEncontrada,
+        message: "Seccion no encontrada.",
+      })
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const actuales = await tx.bloque.findMany({
+        where: { seccionId },
+        select: { id: true },
+      })
+      const actualesIds = new Set(actuales.map((b) => b.id))
+      const inputIds = new Set(input.orden.map((o) => o.bloqueId))
+      if (actualesIds.size !== inputIds.size) {
+        throw new BadRequestException({
+          code: apiErrorCodes.bloqueOrdenInvalido,
+          message: "La permutacion no cubre exactamente los bloques de la seccion.",
+          details: { esperado: actualesIds.size, recibido: inputIds.size },
+        })
+      }
+      for (const id of inputIds) {
+        if (!actualesIds.has(id)) {
+          throw new BadRequestException({
+            code: apiErrorCodes.bloqueOrdenInvalido,
+            message: "Algun bloqueId no pertenece a la seccion.",
+          })
+        }
+      }
+      for (const b of actuales) {
+        await tx.bloque.update({
+          where: { id: b.id },
+          data: { orden: { increment: REORDEN_OFFSET } },
+          select: { id: true },
+        })
+      }
+      for (const o of input.orden) {
+        await tx.bloque.update({
+          where: { id: o.bloqueId },
+          data: { orden: o.orden },
+          select: { id: true },
+        })
+      }
+    })
+
+    await this.auditLog.record({
+      usuarioId: adminUsuarioId,
+      accion: AccionAuditoria.BLOQUE_REORDENADO,
+      exito: true,
+      recursoTipo: "seccion",
+      recursoId: seccionId,
+      metadata: { totalBloques: input.orden.length },
+      ...contexto,
+    })
+  }
+
+  /**
+   * Soft-delete del bloque (D-CAT-14): `estado='ELIMINADO'`. NO invalida
+   * intentos previos. Devuelve HTTP 200 con `previewImpacto`; en P3c la lista
+   * de `colaboradoresAfectados` esta vacia y P7 la poblara.
+   */
+  async eliminarSoft(
+    bloqueId: string,
+    motivo: string,
+    adminUsuarioId: string,
+    contexto: ContextoHttpAuditoria = {},
+  ): Promise<EliminarBloqueResponse> {
+    const actual = await this.prisma.bloque.findUnique({
+      where: { id: bloqueId },
+      select: { id: true, estado: true },
+    })
+    if (!actual) {
+      throw new NotFoundException({
+        code: apiErrorCodes.bloqueNoEncontrado,
+        message: "Bloque no encontrado.",
+      })
+    }
+    if (actual.estado === EstadoBloque.ELIMINADO) {
+      throw new ConflictException({
+        code: apiErrorCodes.bloqueYaEliminado,
+        message: "El bloque ya esta eliminado.",
+      })
+    }
+
+    await this.prisma.bloque.update({
+      where: { id: bloqueId },
+      data: { estado: EstadoBloque.ELIMINADO },
+      select: { id: true },
+    })
+    await this.auditLog.record({
+      usuarioId: adminUsuarioId,
+      accion: AccionAuditoria.BLOQUE_ELIMINADO_SOFT,
+      exito: true,
+      recursoTipo: "bloque",
+      recursoId: bloqueId,
+      metadata: { motivo },
+      ...contexto,
+    })
+    return { previewImpacto: { colaboradoresAfectados: [] } }
   }
 }
