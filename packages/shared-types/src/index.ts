@@ -227,6 +227,9 @@ export {
   crearAsignacionesBatchRequestSchema,
   autoInscripcionRequestSchema,
   listarAsignacionesQuerySchema,
+  cerrarCasoAsignadoSchema,
+  cerrarCasoVoluntarioSchema,
+  reabrirRetirarBodySchema,
 } from "./asignaciones"
 export type {
   RolAsignacion,
@@ -245,4 +248,8 @@ export type {
   CrearAsignacionesBatchRequest,
   AutoInscripcionRequest,
   ListarAsignacionesQuery,
+  CerrarCasoAsignadoRequest,
+  CerrarCasoVoluntarioRequest,
+  ReabrirRetirarBody,
+  CondicionesListoFaltante,
 } from "./asignaciones"

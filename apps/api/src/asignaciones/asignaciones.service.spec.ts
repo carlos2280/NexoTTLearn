@@ -1,8 +1,10 @@
 import { ConflictException, ForbiddenException, NotFoundException } from "@nestjs/common"
 import { Test, TestingModule } from "@nestjs/testing"
+import type { Asignacion } from "@nexott-learn/shared-types"
 import { EstadoCurso, Prisma, RolAsignacion, RolUsuario } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
+import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
 import { AsignacionesService } from "./asignaciones.service"
@@ -21,6 +23,7 @@ interface MockPrisma {
   historicoEstadoAsignacion: { create: ReturnType<typeof vi.fn> }
   curso: {
     findUnique: ReturnType<typeof vi.fn>
+    findUniqueOrThrow: ReturnType<typeof vi.fn>
     findMany: ReturnType<typeof vi.fn>
     count: ReturnType<typeof vi.fn>
   }
@@ -42,7 +45,7 @@ function buildPrismaMock(): MockPrisma {
       count: vi.fn(),
     },
     historicoEstadoAsignacion: { create: vi.fn() },
-    curso: { findUnique: vi.fn(), findMany: vi.fn(), count: vi.fn() },
+    curso: { findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), findMany: vi.fn(), count: vi.fn() },
     colaborador: { findMany: vi.fn() },
     usuario: { findUnique: vi.fn() },
     $transaction: vi.fn(),
@@ -88,20 +91,39 @@ function asignacionRow(overrides: Partial<Record<string, unknown>> = {}) {
   }
 }
 
+interface MockIdempotency {
+  runOnce: ReturnType<typeof vi.fn>
+}
+
+function buildIdempotencyMock(prisma: MockPrisma): MockIdempotency {
+  return {
+    runOnce: vi.fn(async (input: { ejecutor: (tx: unknown) => Promise<unknown> }) => {
+      const result = (await input.ejecutor(prisma)) as {
+        status: number
+        body: unknown
+      }
+      return { status: result.status, body: result.body, replay: false }
+    }),
+  }
+}
+
 let prisma: MockPrisma
+let idempotency: MockIdempotency
 let service: AsignacionesService
 let moduleRef: TestingModule
 
 beforeEach(async () => {
   prisma = buildPrismaMock()
+  idempotency = buildIdempotencyMock(prisma)
   moduleRef = await Test.createTestingModule({
     providers: [
       {
         provide: AsignacionesService,
-        useFactory: (p: PrismaService) => new AsignacionesService(p),
-        inject: [PrismaService],
+        useFactory: (p: PrismaService, i: IdempotencyService) => new AsignacionesService(p, i),
+        inject: [PrismaService, IdempotencyService],
       },
       { provide: PrismaService, useValue: prisma },
+      { provide: IdempotencyService, useValue: idempotency },
     ],
   }).compile()
   service = moduleRef.get(AsignacionesService)
@@ -430,5 +452,472 @@ describe("AsignacionesService.listarCursosDisponiblesVoluntario", () => {
     )
     expect(res.data).toHaveLength(0)
     expect(res.meta.total).toBe(0)
+  })
+})
+
+// ===== Slice 6 P6b — Transiciones de estado =====
+
+describe("AsignacionesService.iniciarProgreso", () => {
+  it("ASIGNADO -> EN_PROGRESO: updateMany count=1, crea historico, marca transiciono=true", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      colaboradorId: COLABORADOR_ID,
+      estadoAsignado: "ASIGNADO",
+      estadoVoluntario: null,
+      fechaInicio: null,
+    })
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({ estadoAsignado: "EN_PROGRESO" }),
+    )
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+
+    const res = await service.iniciarProgreso(ASIGNACION_ID, ADMIN)
+    expect(res.transiciono).toBe(true)
+    expect(res.asignacion.estadoAsignado).toBe("EN_PROGRESO")
+    expect(prisma.historicoEstadoAsignacion.create).toHaveBeenCalledTimes(1)
+  })
+
+  it("idempotencia: ya en EN_PROGRESO -> noop sin historico", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      colaboradorId: COLABORADOR_ID,
+      estadoAsignado: "EN_PROGRESO",
+      estadoVoluntario: null,
+      fechaInicio: FECHA,
+    })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({ estadoAsignado: "EN_PROGRESO" }),
+    )
+
+    const res = await service.iniciarProgreso(ASIGNACION_ID, ADMIN)
+    expect(res.transiciono).toBe(false)
+    expect(prisma.historicoEstadoAsignacion.create).not.toHaveBeenCalled()
+    expect(prisma.asignacionCurso.updateMany).not.toHaveBeenCalled()
+  })
+
+  it("404 si la asignacion no existe", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue(null)
+    await expect(service.iniciarProgreso(ASIGNACION_ID, ADMIN)).rejects.toBeInstanceOf(
+      NotFoundException,
+    )
+  })
+
+  it("scope PARTICIPANTE ajeno: 404 asignacionNoEncontrada", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      colaboradorId: OTRO_COLABORADOR_ID,
+      estadoAsignado: "ASIGNADO",
+      estadoVoluntario: null,
+      fechaInicio: null,
+    })
+    prisma.usuario.findUnique.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
+    await expect(service.iniciarProgreso(ASIGNACION_ID, PARTICIPANTE)).rejects.toMatchObject({
+      response: { code: apiErrorCodes.asignacionNoEncontrada },
+    })
+  })
+
+  it("M1 race-safe: dos invocaciones concurrentes -> 1 cumplida + 1 con 409", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      colaboradorId: COLABORADOR_ID,
+      estadoAsignado: "ASIGNADO",
+      estadoVoluntario: null,
+      fechaInicio: null,
+    })
+    prisma.asignacionCurso.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({ estadoAsignado: "EN_PROGRESO" }),
+    )
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+
+    const resultados = await Promise.allSettled([
+      service.iniciarProgreso(ASIGNACION_ID, ADMIN),
+      service.iniciarProgreso(ASIGNACION_ID, ADMIN),
+    ])
+    const cumplidas = resultados.filter((r) => r.status === "fulfilled")
+    const rechazadas = resultados.filter((r) => r.status === "rejected")
+    expect(cumplidas).toHaveLength(1)
+    expect(rechazadas).toHaveLength(1)
+    expect(
+      ((rechazadas[0] as PromiseRejectedResult).reason as { response?: { code?: string } }).response
+        ?.code,
+    ).toBe(apiErrorCodes.conflictAsignacionEstado)
+    expect(prisma.historicoEstadoAsignacion.create).toHaveBeenCalledTimes(1)
+  })
+
+  it("VOLUNTARIO INSCRITO -> EN_PROGRESO transiciona", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.VOLUNTARIO,
+      colaboradorId: COLABORADOR_ID,
+      estadoAsignado: null,
+      estadoVoluntario: "INSCRITO",
+      fechaInicio: null,
+    })
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({
+        rol: RolAsignacion.VOLUNTARIO,
+        estadoAsignado: null,
+        estadoVoluntario: "EN_PROGRESO",
+      }),
+    )
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+
+    const res = await service.iniciarProgreso(ASIGNACION_ID, ADMIN)
+    expect(res.transiciono).toBe(true)
+    expect(res.asignacion.estadoVoluntario).toBe("EN_PROGRESO")
+  })
+})
+
+describe("AsignacionesService.marcarListo", () => {
+  it("happy path: curso sin transversal ni IA, transiciona EN_PROGRESO -> LISTO", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      cursoId: CURSO_ID,
+      estadoAsignado: "EN_PROGRESO",
+      estadoVoluntario: null,
+    })
+    prisma.curso.findUniqueOrThrow = vi.fn().mockResolvedValue({
+      transversalId: null,
+      entrevistaIaId: null,
+      toggleCierreAutomatico: false,
+    })
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({ estadoAsignado: "LISTO" }),
+    )
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+
+    const res = await service.marcarListo(ASIGNACION_ID, ADMIN_ID)
+    expect(res.estadoAsignado).toBe("LISTO")
+    expect(prisma.historicoEstadoAsignacion.create).toHaveBeenCalledTimes(1)
+  })
+
+  it("422 condicionesListoNoCumplidas si el curso tiene transversal pendiente", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      cursoId: CURSO_ID,
+      estadoAsignado: "EN_PROGRESO",
+      estadoVoluntario: null,
+    })
+    prisma.curso.findUniqueOrThrow = vi.fn().mockResolvedValue({
+      transversalId: "trans-id",
+      entrevistaIaId: null,
+      toggleCierreAutomatico: false,
+    })
+
+    await expect(service.marcarListo(ASIGNACION_ID, ADMIN_ID)).rejects.toMatchObject({
+      response: {
+        code: apiErrorCodes.condicionesListoNoCumplidas,
+        details: { faltantes: [{ codigo: "TRANSVERSAL_PENDIENTE" }] },
+      },
+    })
+  })
+
+  it("409 conflictAsignacionEstado si la asignacion no esta EN_PROGRESO", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      cursoId: CURSO_ID,
+      estadoAsignado: "ASIGNADO",
+      estadoVoluntario: null,
+    })
+    await expect(service.marcarListo(ASIGNACION_ID, ADMIN_ID)).rejects.toMatchObject({
+      response: { code: apiErrorCodes.conflictAsignacionEstado },
+    })
+  })
+
+  it("M1 race-safe: dos invocaciones concurrentes -> 1 cumplida + 1 con 409", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      cursoId: CURSO_ID,
+      estadoAsignado: "EN_PROGRESO",
+      estadoVoluntario: null,
+    })
+    prisma.curso.findUniqueOrThrow = vi.fn().mockResolvedValue({
+      transversalId: null,
+      entrevistaIaId: null,
+      toggleCierreAutomatico: false,
+    })
+    prisma.asignacionCurso.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({ estadoAsignado: "LISTO" }),
+    )
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+
+    const resultados = await Promise.allSettled([
+      service.marcarListo(ASIGNACION_ID, ADMIN_ID),
+      service.marcarListo(ASIGNACION_ID, ADMIN_ID),
+    ])
+    expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(1)
+    expect(resultados.filter((r) => r.status === "rejected")).toHaveLength(1)
+    expect(prisma.historicoEstadoAsignacion.create).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("AsignacionesService.cerrarCaso", () => {
+  const idempKey = "11111111-2222-3333-4444-555555555555"
+
+  it("ASIGNADO con resultado APTO: transiciona y persiste fechaCierre", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: "LISTO",
+      estadoVoluntario: null,
+    })
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({ estadoAsignado: "APTO" }),
+    )
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+
+    const res = await service.cerrarCaso({
+      asignacionId: ASIGNACION_ID,
+      bodyRaw: { resultado: "APTO" },
+      motivo: null,
+      idempotencyKey: idempKey,
+      autorUsuarioId: ADMIN_ID,
+    })
+    expect(res.nuevo).toBe(true)
+    expect(res.asignacion.estadoAsignado).toBe("APTO")
+    expect(idempotency.runOnce).toHaveBeenCalledTimes(1)
+  })
+
+  it("VOLUNTARIO: pasa a COMPLETADO sin resultado en body", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.VOLUNTARIO,
+      estadoAsignado: null,
+      estadoVoluntario: "EN_PROGRESO",
+    })
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({
+        rol: RolAsignacion.VOLUNTARIO,
+        estadoAsignado: null,
+        estadoVoluntario: "COMPLETADO",
+      }),
+    )
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+
+    const res = await service.cerrarCaso({
+      asignacionId: ASIGNACION_ID,
+      bodyRaw: {},
+      motivo: null,
+      idempotencyKey: idempKey,
+      autorUsuarioId: ADMIN_ID,
+    })
+    expect(res.asignacion.estadoVoluntario).toBe("COMPLETADO")
+  })
+
+  it("400 invalidBody: ASIGNADO sin resultado en body", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: "LISTO",
+      estadoVoluntario: null,
+    })
+    await expect(
+      service.cerrarCaso({
+        asignacionId: ASIGNACION_ID,
+        bodyRaw: {},
+        motivo: null,
+        idempotencyKey: idempKey,
+        autorUsuarioId: ADMIN_ID,
+      }),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.invalidBody } })
+  })
+
+  it("400 invalidBody: VOLUNTARIO con resultado en body (strict)", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.VOLUNTARIO,
+      estadoAsignado: null,
+      estadoVoluntario: "EN_PROGRESO",
+    })
+    await expect(
+      service.cerrarCaso({
+        asignacionId: ASIGNACION_ID,
+        bodyRaw: { resultado: "APTO" },
+        motivo: null,
+        idempotencyKey: idempKey,
+        autorUsuarioId: ADMIN_ID,
+      }),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.invalidBody } })
+  })
+
+  it("409 si la asignacion no esta en LISTO/EN_PROGRESO", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: "ASIGNADO",
+      estadoVoluntario: null,
+    })
+    // updateMany dentro del runOnce: el guard del estado rechaza con count=0.
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 0 })
+
+    await expect(
+      service.cerrarCaso({
+        asignacionId: ASIGNACION_ID,
+        bodyRaw: { resultado: "APTO" },
+        motivo: null,
+        idempotencyKey: idempKey,
+        autorUsuarioId: ADMIN_ID,
+      }),
+    ).rejects.toMatchObject({
+      response: { code: apiErrorCodes.conflictAsignacionNoListoNiEnProgreso },
+    })
+  })
+
+  it("replay idempotente: nuevo=false cuando runOnce devuelve replay=true", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: "LISTO",
+      estadoVoluntario: null,
+    })
+    idempotency.runOnce.mockResolvedValueOnce({
+      status: 200,
+      body: { id: ASIGNACION_ID } as unknown as Asignacion,
+      replay: true,
+    })
+
+    const res = await service.cerrarCaso({
+      asignacionId: ASIGNACION_ID,
+      bodyRaw: { resultado: "APTO" },
+      motivo: null,
+      idempotencyKey: idempKey,
+      autorUsuarioId: ADMIN_ID,
+    })
+    expect(res.nuevo).toBe(false)
+  })
+})
+
+describe("AsignacionesService.reabrirCaso", () => {
+  const idempKey = "22222222-3333-4444-5555-666666666666"
+
+  it("ASIGNADO APTO -> EN_PROGRESO con historico (motivo)", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: "APTO",
+      estadoVoluntario: null,
+    })
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({ estadoAsignado: "EN_PROGRESO" }),
+    )
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+
+    const res = await service.reabrirCaso({
+      asignacionId: ASIGNACION_ID,
+      motivo: "Cliente solicito revisar",
+      idempotencyKey: idempKey,
+      autorUsuarioId: ADMIN_ID,
+    })
+    expect(res.nuevo).toBe(true)
+    expect(res.asignacion.estadoAsignado).toBe("EN_PROGRESO")
+    expect(prisma.historicoEstadoAsignacion.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ motivo: "Cliente solicito revisar" }),
+      }),
+    )
+  })
+
+  it("VOLUNTARIO COMPLETADO -> EN_PROGRESO", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.VOLUNTARIO,
+      estadoAsignado: null,
+      estadoVoluntario: "COMPLETADO",
+    })
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({
+        rol: RolAsignacion.VOLUNTARIO,
+        estadoAsignado: null,
+        estadoVoluntario: "EN_PROGRESO",
+      }),
+    )
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+
+    const res = await service.reabrirCaso({
+      asignacionId: ASIGNACION_ID,
+      motivo: "Revisar entrega",
+      idempotencyKey: idempKey,
+      autorUsuarioId: ADMIN_ID,
+    })
+    expect(res.asignacion.estadoVoluntario).toBe("EN_PROGRESO")
+  })
+
+  it("409 conflictAsignacionNoCerrada si estado origen es ASIGNADO", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: "ASIGNADO",
+      estadoVoluntario: null,
+    })
+    await expect(
+      service.reabrirCaso({
+        asignacionId: ASIGNACION_ID,
+        motivo: "x",
+        idempotencyKey: idempKey,
+        autorUsuarioId: ADMIN_ID,
+      }),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.conflictAsignacionNoCerrada } })
+  })
+})
+
+describe("AsignacionesService.retirar", () => {
+  it("ASIGNADO en EN_PROGRESO -> RETIRADO con motivo en historico", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: "EN_PROGRESO",
+      estadoVoluntario: null,
+    })
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({ estadoAsignado: "RETIRADO" }),
+    )
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+
+    const res = await service.retirar(ASIGNACION_ID, "Renuncia voluntaria", ADMIN_ID)
+    expect(res.estadoAsignado).toBe("RETIRADO")
+    expect(prisma.historicoEstadoAsignacion.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ motivo: "Renuncia voluntaria" }) }),
+    )
+  })
+
+  it("409 si la asignacion ya esta RETIRADA", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: "RETIRADO",
+      estadoVoluntario: null,
+    })
+    await expect(service.retirar(ASIGNACION_ID, "x", ADMIN_ID)).rejects.toMatchObject({
+      response: { code: apiErrorCodes.conflictAsignacionEstado },
+    })
+  })
+
+  it("404 si la asignacion no existe", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue(null)
+    await expect(service.retirar(ASIGNACION_ID, "x", ADMIN_ID)).rejects.toBeInstanceOf(
+      NotFoundException,
+    )
   })
 })

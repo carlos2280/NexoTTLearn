@@ -116,6 +116,11 @@ export const apiErrorCodes = {
   conflictAsignacionNoVoluntario: "CONFLICT_ASIGNACION_NO_VOLUNTARIO",
   conflictCursoNoActivo: "CONFLICT_CURSO_NO_ACTIVO",
   conflictAutoInscripcionDeshabilitada: "CONFLICT_AUTOINSCRIPCION_DESHABILITADA",
+  // Asignaciones P6b — transiciones de estado (D-AS-5..D-AS-13).
+  conflictAsignacionEstado: "CONFLICT_ASIGNACION_ESTADO",
+  conflictAsignacionNoListoNiEnProgreso: "CONFLICT_ASIGNACION_NO_LISTO_NI_EN_PROGRESO",
+  conflictAsignacionNoCerrada: "CONFLICT_ASIGNACION_NO_CERRADA",
+  condicionesListoNoCumplidas: "CONDICIONES_LISTO_NO_CUMPLIDAS",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]

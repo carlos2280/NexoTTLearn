@@ -30,3 +30,15 @@ export type { AutoInscripcionRequest } from "./auto-inscripcion.schema"
 
 export { listarAsignacionesQuerySchema } from "./listar.schema"
 export type { ListarAsignacionesQuery } from "./listar.schema"
+
+export {
+  cerrarCasoAsignadoSchema,
+  cerrarCasoVoluntarioSchema,
+  reabrirRetirarBodySchema,
+} from "./transiciones.schema"
+export type {
+  CerrarCasoAsignadoRequest,
+  CerrarCasoVoluntarioRequest,
+  ReabrirRetirarBody,
+  CondicionesListoFaltante,
+} from "./transiciones.schema"

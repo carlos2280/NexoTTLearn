@@ -1,31 +1,62 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from "@nestjs/common"
 import {
   Asignacion,
   AsignacionDetallada,
   AsignacionRechazada,
   AutoInscripcionRequest,
+  CerrarCasoAsignadoRequest,
+  CerrarCasoVoluntarioRequest,
   CrearAsignacionesBatchRequest,
   CrearAsignacionesBatchResponse,
   CursoDisponibleVoluntario,
   ListarAsignacionesQuery,
   Paginated,
+  cerrarCasoAsignadoSchema,
+  cerrarCasoVoluntarioSchema,
 } from "@nexott-learn/shared-types"
 import { EstadoCurso, Prisma, RolAsignacion, RolUsuario } from "@prisma/client"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { buildPaginatedResponse, resolvePaginacion } from "../common/http/paginated"
+import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
 import {
+  HISTORICO_LITERAL_ASIGNADO_ASIGNADO,
   SELECT_ASIGNACION_DETALLE_FIELDS,
   SELECT_ASIGNACION_FIELDS,
+  evaluarCondicionesListo,
+  literalEstado,
   toAsignacion,
   toAsignacionDetallada,
 } from "./asignaciones.helpers"
+
+const IDEMPOTENCY_SCOPE_CERRAR = "asignaciones.cerrar-caso"
+const IDEMPOTENCY_SCOPE_REABRIR = "asignaciones.reabrir-caso"
+const HTTP_OK = 200
+
+export interface IniciarProgresoResultado {
+  readonly asignacion: Asignacion
+  /** `true` si la transicion modifico estado; `false` si era noop (idempotencia). */
+  readonly transiciono: boolean
+}
+
+export interface CerrarCasoResultado {
+  readonly asignacion: Asignacion
+  /** `false` cuando el resultado proviene del cache de idempotencia. */
+  readonly nuevo: boolean
+}
+
+export interface ReabrirCasoResultado {
+  readonly asignacion: Asignacion
+  readonly nuevo: boolean
+}
 
 /**
  * Service del modulo asignaciones (Slice 6 P6a). Cubre listados, alta admin
@@ -42,7 +73,10 @@ import {
  */
 @Injectable()
 export class AsignacionesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly idempotency: IdempotencyService,
+  ) {}
 
   async listarPorCurso(
     cursoId: string,
@@ -274,7 +308,7 @@ export class AsignacionesService {
         data: {
           asignacionId,
           estadoAnterior: `VOLUNTARIO:${estadoVoluntarioPrevio}`,
-          estadoNuevo: "ASIGNADO:ASIGNADO",
+          estadoNuevo: HISTORICO_LITERAL_ASIGNADO_ASIGNADO,
           motivo,
           autorUsuarioId,
         },
@@ -403,6 +437,536 @@ export class AsignacionesService {
       }
       throw error
     }
+  }
+
+  // ===== Slice 6 P6b — Transiciones de estado =====
+
+  /**
+   * `POST /asignaciones/:id/iniciar-progreso` — ADMIN o el propio
+   * PARTICIPANTE. Transicion `ASIGNADO|INSCRITO -> EN_PROGRESO`.
+   * Idempotente: si ya estaba en `EN_PROGRESO`, devuelve la asignacion
+   * actual con `transiciono=false` para que el controller omita audit.
+   *
+   * Scope PARTICIPANTE (D-AS-9 / D-CUR-13): si la asignacion no pertenece
+   * al colaborador del usuario, 404 `asignacionNoEncontrada`.
+   */
+  async iniciarProgreso(
+    asignacionId: string,
+    usuario: SesionUsuario,
+  ): Promise<IniciarProgresoResultado> {
+    const previa = await this.prisma.asignacionCurso.findUnique({
+      where: { id: asignacionId },
+      select: {
+        id: true,
+        rol: true,
+        colaboradorId: true,
+        estadoAsignado: true,
+        estadoVoluntario: true,
+        fechaInicio: true,
+      },
+    })
+    if (!previa) {
+      throw new NotFoundException({
+        code: apiErrorCodes.asignacionNoEncontrada,
+        message: `Asignacion ${asignacionId} no encontrada.`,
+      })
+    }
+    if (usuario.rol === RolUsuario.PARTICIPANTE) {
+      const colaboradorId = await this.colaboradorIdDeUsuario(usuario.usuarioId)
+      if (!colaboradorId || previa.colaboradorId !== colaboradorId) {
+        // D-AS-9: ocultar existencia, no 403.
+        throw new NotFoundException({
+          code: apiErrorCodes.asignacionNoEncontrada,
+          message: `Asignacion ${asignacionId} no encontrada.`,
+        })
+      }
+    }
+
+    // Idempotencia implicita: si ya esta EN_PROGRESO, noop.
+    if (
+      (previa.rol === RolAsignacion.ASIGNADO && previa.estadoAsignado === "EN_PROGRESO") ||
+      (previa.rol === RolAsignacion.VOLUNTARIO && previa.estadoVoluntario === "EN_PROGRESO")
+    ) {
+      const row = await this.prisma.asignacionCurso.findUniqueOrThrow({
+        where: { id: asignacionId },
+        select: SELECT_ASIGNACION_FIELDS,
+      })
+      return { asignacion: toAsignacion(row), transiciono: false }
+    }
+
+    const fechaInicio = previa.fechaInicio ?? new Date()
+    const estadoAnterior = literalEstado(previa.rol, previa.estadoAsignado, previa.estadoVoluntario)
+    const estadoNuevo = literalEstado(
+      previa.rol,
+      previa.rol === RolAsignacion.ASIGNADO ? "EN_PROGRESO" : null,
+      previa.rol === RolAsignacion.VOLUNTARIO ? "EN_PROGRESO" : null,
+    )
+
+    const asignacion = await this.prisma.$transaction(async (tx) => {
+      // M1 race-safe (D-AS-6): guard por estado origen esperado.
+      const r = await tx.asignacionCurso.updateMany({
+        where:
+          previa.rol === RolAsignacion.ASIGNADO
+            ? { id: asignacionId, estadoAsignado: "ASIGNADO" }
+            : { id: asignacionId, estadoVoluntario: "INSCRITO" },
+        data:
+          previa.rol === RolAsignacion.ASIGNADO
+            ? { estadoAsignado: "EN_PROGRESO", fechaInicio }
+            : { estadoVoluntario: "EN_PROGRESO", fechaInicio },
+      })
+      if (r.count === 0) {
+        throw new ConflictException({
+          code: apiErrorCodes.conflictAsignacionEstado,
+          message: "La asignacion no esta en un estado valido para iniciar progreso.",
+        })
+      }
+      await tx.historicoEstadoAsignacion.create({
+        data: {
+          asignacionId,
+          estadoAnterior,
+          estadoNuevo,
+          motivo: null,
+          autorUsuarioId: usuario.usuarioId,
+        },
+      })
+      const row = await tx.asignacionCurso.findUniqueOrThrow({
+        where: { id: asignacionId },
+        select: SELECT_ASIGNACION_FIELDS,
+      })
+      // TODO(S7): recalcular plan personal si era ASIGNADO (D-AS-14).
+      return toAsignacion(row)
+    })
+
+    return { asignacion, transiciono: true }
+  }
+
+  /**
+   * `POST /asignaciones/:id/marcar-listo` — ADMIN. Aplica D-AS-10 (helper
+   * `evaluarCondicionesListo`). Transicion `EN_PROGRESO -> LISTO`.
+   *
+   * En S6 con `toggleCierreAutomatico=true` no se encadena cerrar-caso
+   * automatico: el calculo APTO/NO_APTO server-side llega con S7-S9. Hoy
+   * deja en `LISTO` y registra TODO inline (decision documentada en design
+   * doc D-AS-11 / D-AS-12). El admin sigue llamando `cerrar-caso` manual.
+   */
+  async marcarListo(asignacionId: string, autorUsuarioId: string): Promise<Asignacion> {
+    const previa = await this.prisma.asignacionCurso.findUnique({
+      where: { id: asignacionId },
+      select: {
+        id: true,
+        rol: true,
+        cursoId: true,
+        estadoAsignado: true,
+        estadoVoluntario: true,
+      },
+    })
+    if (!previa) {
+      throw new NotFoundException({
+        code: apiErrorCodes.asignacionNoEncontrada,
+        message: `Asignacion ${asignacionId} no encontrada.`,
+      })
+    }
+
+    const enProgreso =
+      (previa.rol === RolAsignacion.ASIGNADO && previa.estadoAsignado === "EN_PROGRESO") ||
+      (previa.rol === RolAsignacion.VOLUNTARIO && previa.estadoVoluntario === "EN_PROGRESO")
+    if (!enProgreso) {
+      throw new ConflictException({
+        code: apiErrorCodes.conflictAsignacionEstado,
+        message: "Solo se puede marcar listo desde EN_PROGRESO.",
+      })
+    }
+
+    const curso = await this.prisma.curso.findUniqueOrThrow({
+      where: { id: previa.cursoId },
+      select: { transversalId: true, entrevistaIaId: true, toggleCierreAutomatico: true },
+    })
+
+    const evaluacion = evaluarCondicionesListo({
+      transversalId: curso.transversalId,
+      entrevistaIaId: curso.entrevistaIaId,
+    })
+    if (!evaluacion.cumple) {
+      throw new UnprocessableEntityException({
+        code: apiErrorCodes.condicionesListoNoCumplidas,
+        message: "El colaborador aun no cumple las condiciones para LISTO.",
+        details: { faltantes: evaluacion.faltantes },
+      })
+    }
+
+    // TODO(S7-S9): cuando `toggleCierreAutomatico=true` y existan plan/transversal/IA,
+    // encadenar `cerrar-caso` dentro de este mismo `$transaction` con el resultado
+    // calculado server-side (D-AS-11). En S6 sin calculo real, se deja en LISTO y
+    // el admin invoca `cerrar-caso` manual con el resultado.
+
+    const estadoAnterior = literalEstado(previa.rol, previa.estadoAsignado, previa.estadoVoluntario)
+    const estadoNuevo = literalEstado(
+      previa.rol,
+      previa.rol === RolAsignacion.ASIGNADO ? "LISTO" : null,
+      previa.rol === RolAsignacion.VOLUNTARIO ? "LISTO" : null,
+    )
+
+    return await this.prisma.$transaction(async (tx) => {
+      const r = await tx.asignacionCurso.updateMany({
+        where:
+          previa.rol === RolAsignacion.ASIGNADO
+            ? { id: asignacionId, estadoAsignado: "EN_PROGRESO" }
+            : { id: asignacionId, estadoVoluntario: "EN_PROGRESO" },
+        data:
+          previa.rol === RolAsignacion.ASIGNADO
+            ? { estadoAsignado: "LISTO" }
+            : { estadoVoluntario: "LISTO" },
+      })
+      if (r.count === 0) {
+        throw new ConflictException({
+          code: apiErrorCodes.conflictAsignacionEstado,
+          message: "Solo se puede marcar listo desde EN_PROGRESO.",
+        })
+      }
+      await tx.historicoEstadoAsignacion.create({
+        data: {
+          asignacionId,
+          estadoAnterior,
+          estadoNuevo,
+          motivo: null,
+          autorUsuarioId,
+        },
+      })
+      const row = await tx.asignacionCurso.findUniqueOrThrow({
+        where: { id: asignacionId },
+        select: SELECT_ASIGNACION_FIELDS,
+      })
+      // TODO(S10): emitir notificacion COLABORADOR_LISTO al admin del curso (D88).
+      return toAsignacion(row)
+    })
+  }
+
+  /**
+   * `POST /asignaciones/:id/cerrar-caso` — ADMIN, idempotency-key requerida.
+   * D-AS-12: body discriminado por rol; asignados llevan `resultado`
+   * (`APTO`|`NO_APTO`), voluntarios solo `observacionesAdmin`. El service
+   * decide el schema segun `asignacion.rol` ya cargado.
+   *
+   * Estado origen: `EN_PROGRESO` o `LISTO`. Otros estados -> 409
+   * `conflictAsignacionNoListoNiEnProgreso`.
+   */
+  async cerrarCaso(input: {
+    readonly asignacionId: string
+    readonly bodyRaw: unknown
+    readonly motivo: string | null
+    readonly idempotencyKey: string
+    readonly autorUsuarioId: string
+  }): Promise<CerrarCasoResultado> {
+    const previa = await this.prisma.asignacionCurso.findUnique({
+      where: { id: input.asignacionId },
+      select: {
+        id: true,
+        rol: true,
+        estadoAsignado: true,
+        estadoVoluntario: true,
+      },
+    })
+    if (!previa) {
+      throw new NotFoundException({
+        code: apiErrorCodes.asignacionNoEncontrada,
+        message: `Asignacion ${input.asignacionId} no encontrada.`,
+      })
+    }
+
+    const esAsignado = previa.rol === RolAsignacion.ASIGNADO
+    const parsed = esAsignado
+      ? cerrarCasoAsignadoSchema.safeParse(input.bodyRaw)
+      : cerrarCasoVoluntarioSchema.safeParse(input.bodyRaw)
+    if (!parsed.success) {
+      throw new BadRequestException({
+        code: apiErrorCodes.invalidBody,
+        message: "Body invalido para cerrar-caso.",
+        details: parsed.error.flatten(),
+      })
+    }
+
+    // La validacion de estado origen se hace DENTRO de `runOnce` para que el
+    // replay idempotente (misma key, mismo body) devuelva el cache aunque el
+    // estado ya haya transicionado. El primer writer obtiene el guard
+    // race-safe via `updateMany WHERE id AND estado IN (LISTO,EN_PROGRESO)`;
+    // un segundo cliente NO idempotente con el estado destino recibe 409 al
+    // verificar el `count===0` del updateMany.
+
+    const ejecucion = await this.idempotency.runOnce<Asignacion>({
+      scope: IDEMPOTENCY_SCOPE_CERRAR,
+      key: input.idempotencyKey,
+      usuarioId: input.autorUsuarioId,
+      requestPayload: {
+        asignacionId: input.asignacionId,
+        body: parsed.data,
+      },
+      ejecutor: async (tx) => {
+        const fechaCierre = new Date()
+        const estadoAnterior = literalEstado(
+          previa.rol,
+          previa.estadoAsignado,
+          previa.estadoVoluntario,
+        )
+
+        if (esAsignado) {
+          const dto = parsed.data as CerrarCasoAsignadoRequest
+          const r = await tx.asignacionCurso.updateMany({
+            where: {
+              id: input.asignacionId,
+              estadoAsignado: { in: ["EN_PROGRESO", "LISTO"] },
+            },
+            data: {
+              estadoAsignado: dto.resultado,
+              fechaCierre,
+              ...(dto.observacionesAdmin !== undefined
+                ? { observacionesAdmin: dto.observacionesAdmin }
+                : {}),
+            },
+          })
+          if (r.count === 0) {
+            throw new ConflictException({
+              code: apiErrorCodes.conflictAsignacionNoListoNiEnProgreso,
+              message: "Solo se puede cerrar desde LISTO o EN_PROGRESO.",
+            })
+          }
+          const estadoNuevo = literalEstado(RolAsignacion.ASIGNADO, dto.resultado, null)
+          await tx.historicoEstadoAsignacion.create({
+            data: {
+              asignacionId: input.asignacionId,
+              estadoAnterior,
+              estadoNuevo,
+              motivo: input.motivo,
+              autorUsuarioId: input.autorUsuarioId,
+            },
+          })
+        } else {
+          const dto = parsed.data as CerrarCasoVoluntarioRequest
+          const r = await tx.asignacionCurso.updateMany({
+            where: {
+              id: input.asignacionId,
+              estadoVoluntario: { in: ["EN_PROGRESO", "LISTO"] },
+            },
+            data: {
+              estadoVoluntario: "COMPLETADO",
+              fechaCierre,
+              ...(dto.observacionesAdmin !== undefined
+                ? { observacionesAdmin: dto.observacionesAdmin }
+                : {}),
+            },
+          })
+          if (r.count === 0) {
+            throw new ConflictException({
+              code: apiErrorCodes.conflictAsignacionNoListoNiEnProgreso,
+              message: "Solo se puede cerrar desde LISTO o EN_PROGRESO.",
+            })
+          }
+          const estadoNuevo = literalEstado(RolAsignacion.VOLUNTARIO, null, "COMPLETADO")
+          await tx.historicoEstadoAsignacion.create({
+            data: {
+              asignacionId: input.asignacionId,
+              estadoAnterior,
+              estadoNuevo,
+              motivo: input.motivo,
+              autorUsuarioId: input.autorUsuarioId,
+            },
+          })
+        }
+        const row = await tx.asignacionCurso.findUniqueOrThrow({
+          where: { id: input.asignacionId },
+          select: SELECT_ASIGNACION_FIELDS,
+        })
+        // TODO(S10): emitir notificacion RESULTADO_CIERRE al colaborador (D88).
+        return { status: HTTP_OK, body: toAsignacion(row) }
+      },
+    })
+
+    return { asignacion: ejecucion.body, nuevo: !ejecucion.replay }
+  }
+
+  /**
+   * `POST /asignaciones/:id/reabrir-caso` — ADMIN, X-Motivo + Idempotency-Key
+   * requeridas. Transicion `APTO|NO_APTO|COMPLETADO -> EN_PROGRESO`.
+   * cap. 12.5: las notas previas se conservan (no se toca
+   * `resultadoEntrevistaCliente`).
+   */
+  async reabrirCaso(input: {
+    readonly asignacionId: string
+    readonly motivo: string
+    readonly idempotencyKey: string
+    readonly autorUsuarioId: string
+  }): Promise<ReabrirCasoResultado> {
+    const previa = await this.prisma.asignacionCurso.findUnique({
+      where: { id: input.asignacionId },
+      select: {
+        id: true,
+        rol: true,
+        estadoAsignado: true,
+        estadoVoluntario: true,
+      },
+    })
+    if (!previa) {
+      throw new NotFoundException({
+        code: apiErrorCodes.asignacionNoEncontrada,
+        message: `Asignacion ${input.asignacionId} no encontrada.`,
+      })
+    }
+
+    const esCerrado =
+      (previa.rol === RolAsignacion.ASIGNADO &&
+        (previa.estadoAsignado === "APTO" || previa.estadoAsignado === "NO_APTO")) ||
+      (previa.rol === RolAsignacion.VOLUNTARIO && previa.estadoVoluntario === "COMPLETADO")
+    if (!esCerrado) {
+      throw new ConflictException({
+        code: apiErrorCodes.conflictAsignacionNoCerrada,
+        message: "Solo se puede reabrir un caso cerrado (APTO/NO_APTO/COMPLETADO).",
+      })
+    }
+
+    const ejecucion = await this.idempotency.runOnce<Asignacion>({
+      scope: IDEMPOTENCY_SCOPE_REABRIR,
+      key: input.idempotencyKey,
+      usuarioId: input.autorUsuarioId,
+      requestPayload: { asignacionId: input.asignacionId },
+      ejecutor: async (tx) => {
+        const estadoAnterior = literalEstado(
+          previa.rol,
+          previa.estadoAsignado,
+          previa.estadoVoluntario,
+        )
+
+        if (previa.rol === RolAsignacion.ASIGNADO) {
+          const r = await tx.asignacionCurso.updateMany({
+            where: {
+              id: input.asignacionId,
+              estadoAsignado: { in: ["APTO", "NO_APTO"] },
+            },
+            data: {
+              estadoAsignado: "EN_PROGRESO",
+              fechaCierre: null,
+            },
+          })
+          if (r.count === 0) {
+            throw new ConflictException({
+              code: apiErrorCodes.conflictAsignacionNoCerrada,
+              message: "Solo se puede reabrir un caso cerrado (APTO/NO_APTO).",
+            })
+          }
+        } else {
+          const r = await tx.asignacionCurso.updateMany({
+            where: {
+              id: input.asignacionId,
+              estadoVoluntario: "COMPLETADO",
+            },
+            data: {
+              estadoVoluntario: "EN_PROGRESO",
+              fechaCierre: null,
+            },
+          })
+          if (r.count === 0) {
+            throw new ConflictException({
+              code: apiErrorCodes.conflictAsignacionNoCerrada,
+              message: "Solo se puede reabrir un caso cerrado (COMPLETADO).",
+            })
+          }
+        }
+
+        const estadoNuevo = literalEstado(
+          previa.rol,
+          previa.rol === RolAsignacion.ASIGNADO ? "EN_PROGRESO" : null,
+          previa.rol === RolAsignacion.VOLUNTARIO ? "EN_PROGRESO" : null,
+        )
+        await tx.historicoEstadoAsignacion.create({
+          data: {
+            asignacionId: input.asignacionId,
+            estadoAnterior,
+            estadoNuevo,
+            motivo: input.motivo,
+            autorUsuarioId: input.autorUsuarioId,
+          },
+        })
+        const row = await tx.asignacionCurso.findUniqueOrThrow({
+          where: { id: input.asignacionId },
+          select: SELECT_ASIGNACION_FIELDS,
+        })
+        // TODO(S7): recalcular plan si aplica tras reabrir (D-AS-14).
+        // TODO(S10): emitir notificacion CASO_REABIERTO al colaborador (D88).
+        return { status: HTTP_OK, body: toAsignacion(row) }
+      },
+    })
+
+    return { asignacion: ejecucion.body, nuevo: !ejecucion.replay }
+  }
+
+  /**
+   * `POST /asignaciones/:id/retirar` — ADMIN, X-Motivo requerido. Transicion
+   * `<cualquier estado activo> -> RETIRADO`. Sin idempotencia (cap. 12.1: es
+   * un cierre final por decision administrativa, no reintenable).
+   */
+  async retirar(asignacionId: string, motivo: string, autorUsuarioId: string): Promise<Asignacion> {
+    const previa = await this.prisma.asignacionCurso.findUnique({
+      where: { id: asignacionId },
+      select: {
+        id: true,
+        rol: true,
+        estadoAsignado: true,
+        estadoVoluntario: true,
+      },
+    })
+    if (!previa) {
+      throw new NotFoundException({
+        code: apiErrorCodes.asignacionNoEncontrada,
+        message: `Asignacion ${asignacionId} no encontrada.`,
+      })
+    }
+    const yaRetirado =
+      (previa.rol === RolAsignacion.ASIGNADO && previa.estadoAsignado === "RETIRADO") ||
+      (previa.rol === RolAsignacion.VOLUNTARIO && previa.estadoVoluntario === "RETIRADO")
+    if (yaRetirado) {
+      throw new ConflictException({
+        code: apiErrorCodes.conflictAsignacionEstado,
+        message: "La asignacion ya esta RETIRADA.",
+      })
+    }
+
+    const estadoAnterior = literalEstado(previa.rol, previa.estadoAsignado, previa.estadoVoluntario)
+    const estadoNuevo = literalEstado(
+      previa.rol,
+      previa.rol === RolAsignacion.ASIGNADO ? "RETIRADO" : null,
+      previa.rol === RolAsignacion.VOLUNTARIO ? "RETIRADO" : null,
+    )
+
+    return await this.prisma.$transaction(async (tx) => {
+      const r = await tx.asignacionCurso.updateMany({
+        where:
+          previa.rol === RolAsignacion.ASIGNADO
+            ? { id: asignacionId, estadoAsignado: { not: "RETIRADO" } }
+            : { id: asignacionId, estadoVoluntario: { not: "RETIRADO" } },
+        data:
+          previa.rol === RolAsignacion.ASIGNADO
+            ? { estadoAsignado: "RETIRADO", fechaCierre: new Date() }
+            : { estadoVoluntario: "RETIRADO", fechaCierre: new Date() },
+      })
+      if (r.count === 0) {
+        throw new ConflictException({
+          code: apiErrorCodes.conflictAsignacionEstado,
+          message: "La asignacion ya esta RETIRADA.",
+        })
+      }
+      await tx.historicoEstadoAsignacion.create({
+        data: {
+          asignacionId,
+          estadoAnterior,
+          estadoNuevo,
+          motivo,
+          autorUsuarioId,
+        },
+      })
+      const row = await tx.asignacionCurso.findUniqueOrThrow({
+        where: { id: asignacionId },
+        select: SELECT_ASIGNACION_FIELDS,
+      })
+      return toAsignacion(row)
+    })
   }
 
   private async colaboradorIdDeUsuario(usuarioId: string): Promise<string | null> {
