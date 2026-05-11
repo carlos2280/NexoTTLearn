@@ -39,6 +39,14 @@ export const apiErrorCodes = {
   seccionNoEncontrada: "SECCION_NO_ENCONTRADA",
   bloqueNoEncontrado: "BLOQUE_NO_ENCONTRADO",
   clienteNoEncontrado: "CLIENTE_NO_ENCONTRADO",
+  // Catalogo-admin P3a — mutaciones de areas y skills.
+  conflictAreaNombreDuplicado: "CONFLICT_AREA_NOMBRE_DUPLICADO",
+  conflictAreaConSkills: "CONFLICT_AREA_CON_SKILLS",
+  conflictSkillNombreDuplicado: "CONFLICT_SKILL_NOMBRE_DUPLICADO",
+  conflictSkillDuplicada: "CONFLICT_SKILL_DUPLICADA",
+  conflictSkillYaArchivada: "CONFLICT_SKILL_YA_ARCHIVADA",
+  conflictSkillYaActiva: "CONFLICT_SKILL_YA_ACTIVA",
+  conflictSkillConReferencias: "CONFLICT_SKILL_CON_REFERENCIAS",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]

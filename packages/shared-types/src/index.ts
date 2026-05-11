@@ -25,9 +25,21 @@ export type { PaginacionQuery, Paginated } from "./catalogo/paginacion"
 export { listarAreasQuerySchema } from "./catalogo/areas/listar-areas.schema"
 export type { ListarAreasQuery } from "./catalogo/areas/listar-areas.schema"
 export type { AreaResponse } from "./catalogo/areas/area-response"
+export { crearAreaSchema, actualizarAreaSchema } from "./catalogo/areas/area.schema"
+export type { CrearAreaInput, ActualizarAreaInput } from "./catalogo/areas/area.schema"
 export { listarSkillsQuerySchema, estadoSkillSchema } from "./catalogo/skills/listar-skills.schema"
 export type { ListarSkillsQuery, EstadoSkill } from "./catalogo/skills/listar-skills.schema"
 export type { SkillResponse } from "./catalogo/skills/skill-response"
+export {
+  crearSkillSchema,
+  renombrarSkillSchema,
+  skillDuplicadaCandidataSchema,
+} from "./catalogo/skills/skill.schema"
+export type {
+  CrearSkillInput,
+  RenombrarSkillInput,
+  SkillDuplicadaCandidata,
+} from "./catalogo/skills/skill.schema"
 export {
   listarModulosQuerySchema,
   estadoModuloSchema,
