@@ -49,6 +49,8 @@ const envSchema = z
       .string()
       .length(64, "SECRETS_ENCRYPTION_KEY debe tener 64 caracteres hex (32 bytes)")
       .regex(/^[0-9a-fA-F]+$/, "SECRETS_ENCRYPTION_KEY debe ser hex"),
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    STORAGE_ROOT: z.string().min(1).default("apps/api/storage"),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV !== "production") {

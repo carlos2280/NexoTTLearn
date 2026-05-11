@@ -298,8 +298,19 @@ enum AccionAuditoria {
   CLIENTE_CREADO
   CLIENTE_ACTUALIZADO
   CLIENTE_ELIMINADO
+  EVALUACION_TEMPLATE_DESCARGADO
+  EVALUACION_PREVIEW_CREADO
+  EVALUACION_PREVIEW_DESCARTADO
+  EVALUACION_APLICADA
+  NOTA_SKILL_EDITADA_MANUALMENTE
 
   @@map("accion_auditoria_enum")
+}
+
+enum ArchivoTipo {
+  EVALUACION_INICIAL_EXCEL
+
+  @@map("archivo_tipo_enum")
 }
 
 // =============================================================================
@@ -517,6 +528,8 @@ model Curso {
   logCambios         LogCambioCurso[]
   asignaciones       AsignacionCurso[]
   intentosBloque     IntentoBloque[]
+  previewsEvalInicial PreviewEvaluacionInicial[] @relation("PreviewEvalInicial_Curso")
+  cargasEvalInicial   CargaEvaluacionInicial[]   @relation("CargaEvalInicial_Curso")
 
   @@index([clienteId], map: "idx_cursos_cliente")
   @@index([estado], map: "idx_cursos_estado")
@@ -632,6 +645,10 @@ model Usuario {
   historicoNotasSkill   HistoricoNotaSkill[]        @relation("HistNotaSkill_Autor")
   activityLogs          ActivityLog[]
   mfaChallenges         MfaChallenge[]
+  archivosSubidos       Archivo[]                     @relation("Archivo_SubidoPor")
+  previewsEvalInicial   PreviewEvaluacionInicial[]    @relation("PreviewEvalInicial_CreadoPor")
+  cargasEvalInicial     CargaEvaluacionInicial[]      @relation("CargaEvalInicial_AplicadoPor")
+  idempotencyKeys       IdempotencyKey[]
 
   @@map("usuarios")
 }
@@ -1093,4 +1110,99 @@ model ConsultaLog {
   autorUsuario Usuario @relation(fields: [autorUsuarioId], references: [id], onDelete: Restrict)
 
   @@map("consultas_logs")
+}
+
+// =============================================================================
+// EVALUACION INICIAL — archivos, previews y cargas (Slice 5 / D-EVI-1, D-EVI-2)
+// =============================================================================
+
+/// Registro de archivo persistido en el storage configurable (`STORAGE_ROOT`).
+/// El contenido fisico vive en filesystem (dev) o Railway Volumes (prod) en
+/// la ruta indicada por `path` (relativa a `STORAGE_ROOT`). D-EVI-1.
+model Archivo {
+  id                 String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tipo               ArchivoTipo
+  path               String
+  mimeType           String      @map("mime_type")
+  tamanioBytes       Int         @map("tamanio_bytes")
+  subidoPorUsuarioId String      @map("subido_por_usuario_id") @db.Uuid
+  metadata           Json?       @db.JsonB
+  createdAt          DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  subidoPor Usuario                    @relation("Archivo_SubidoPor", fields: [subidoPorUsuarioId], references: [id], onDelete: Restrict)
+  previews  PreviewEvaluacionInicial[] @relation("PreviewEvalInicial_Archivo")
+  cargas    CargaEvaluacionInicial[]   @relation("CargaEvalInicial_Archivo")
+
+  @@index([subidoPorUsuarioId], map: "idx_archivos_subido_por")
+  @@index([tipo, createdAt(sort: Desc)], map: "idx_archivos_tipo_fecha")
+  @@map("archivos")
+}
+
+/// Preview transitorio de evaluacion inicial (TTL 30 min). D-EVI-2.
+/// Persistencia con `expiraEn` y `aplicadoEn` para soportar replay del cliente
+/// y eventual cron de purga. `resumen/cambios/rechazos` se materializan como
+/// JSONB para no recomputar el parsing al aplicar.
+model PreviewEvaluacionInicial {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cursoId             String    @map("curso_id") @db.Uuid
+  archivoId           String    @map("archivo_id") @db.Uuid
+  creadoPorUsuarioId  String    @map("creado_por_usuario_id") @db.Uuid
+  expiraEn            DateTime  @map("expira_en") @db.Timestamptz(6)
+  aplicadoEn          DateTime? @map("aplicado_en") @db.Timestamptz(6)
+  aplicadoPorCargaId  String?   @map("aplicado_por_carga_id") @db.Uuid
+  resumen             Json      @db.JsonB
+  cambios             Json      @db.JsonB
+  rechazos            Json      @db.JsonB
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  curso        Curso                   @relation("PreviewEvalInicial_Curso", fields: [cursoId], references: [id], onDelete: Restrict)
+  archivo      Archivo                 @relation("PreviewEvalInicial_Archivo", fields: [archivoId], references: [id], onDelete: Restrict)
+  creadoPor    Usuario                 @relation("PreviewEvalInicial_CreadoPor", fields: [creadoPorUsuarioId], references: [id], onDelete: Restrict)
+  aplicadoPor  CargaEvaluacionInicial? @relation("PreviewEvalInicial_AplicadoPor", fields: [aplicadoPorCargaId], references: [id], onDelete: Restrict)
+
+  @@index([cursoId, createdAt(sort: Desc)], map: "idx_previews_eval_inicial_curso")
+  @@index([expiraEn], map: "idx_previews_eval_inicial_expira")
+  @@map("previews_evaluacion_inicial")
+}
+
+/// Aplicacion definitiva de una carga de evaluacion inicial. Una sola fila
+/// por preview aplicado (`previewId` unique). D-EVI-7 (todo-o-nada).
+model CargaEvaluacionInicial {
+  id                       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cursoId                  String   @map("curso_id") @db.Uuid
+  previewId                String   @unique @map("preview_id") @db.Uuid
+  archivoId                String   @map("archivo_id") @db.Uuid
+  aplicadoPorUsuarioId     String   @map("aplicado_por_usuario_id") @db.Uuid
+  skillsActualizadas       Int      @default(0) @map("skills_actualizadas")
+  colaboradoresActualizados Int     @default(0) @map("colaboradores_actualizados")
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  curso        Curso                      @relation("CargaEvalInicial_Curso", fields: [cursoId], references: [id], onDelete: Restrict)
+  archivo      Archivo                    @relation("CargaEvalInicial_Archivo", fields: [archivoId], references: [id], onDelete: Restrict)
+  aplicadoPor  Usuario                    @relation("CargaEvalInicial_AplicadoPor", fields: [aplicadoPorUsuarioId], references: [id], onDelete: Restrict)
+  previews     PreviewEvaluacionInicial[] @relation("PreviewEvalInicial_AplicadoPor")
+
+  @@index([cursoId, createdAt(sort: Desc)], map: "idx_cargas_eval_inicial_curso")
+  @@map("cargas_evaluacion_inicial")
+}
+
+/// Llave de idempotencia transversal. D-EVI-3.
+/// PK compuesta `(scope, key, usuarioId)`. La persistencia se hace DENTRO del
+/// `$transaction` del ejecutor para garantizar atomicidad estricta.
+model IdempotencyKey {
+  scope          String
+  key            String
+  usuarioId      String   @map("usuario_id") @db.Uuid
+  requestHash    String   @map("request_hash")
+  responseStatus Int      @map("response_status")
+  responseBody   Json     @map("response_body") @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiraEn       DateTime @map("expira_en") @db.Timestamptz(6)
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  @@id([scope, key, usuarioId])
+  @@index([expiraEn], map: "idx_idempotency_keys_expira")
+  @@index([usuarioId], map: "idx_idempotency_keys_usuario")
+  @@map("idempotency_keys")
 }

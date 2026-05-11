@@ -30,3 +30,7 @@ pgdata/
 
 # Prisma
 apps/api/prisma/migrations/dev.db*
+
+# Storage local (archivos subidos en dev/test). En prod va a Railway Volumes
+# o equivalente y nunca al repo. D-EVI-1.
+apps/api/storage/

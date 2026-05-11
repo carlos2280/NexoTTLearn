@@ -89,6 +89,14 @@ export const apiErrorCodes = {
   // Codigos especificos de precondiciones D63 que no encajaban en los existentes:
   validacionAreaPuntajeObjetivoFueraDeRango: "VALIDACION_AREA_PUNTAJE_OBJETIVO_FUERA_DE_RANGO",
   validacionUmbralFueraDeRango: "VALIDACION_UMBRAL_FUERA_DE_RANGO",
+  // Colaboradores P5a — ficha y endpoints relacionados.
+  colaboradorNoEncontrado: "COLABORADOR_NO_ENCONTRADO",
+  // Storage P5a (D-EVI-1).
+  archivoNoEncontrado: "ARCHIVO_NO_ENCONTRADO",
+  archivoPathInvalido: "ARCHIVO_PATH_INVALIDO",
+  // Idempotency transversal P5a (D-EVI-3). Reservado para P5c.
+  conflictIdempotencyKeyReusadaConBodyDistinto:
+    "CONFLICT_IDEMPOTENCY_KEY_REUSADA_CON_BODY_DISTINTO",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]

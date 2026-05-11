@@ -70,6 +70,18 @@ Las convenciones de máxima autoridad viven en `../OLD/CONVENCIONES-ALTA-CALIDAD
 - `apps/web/src/**` → reglas React.
 - `packages/shared-types/**` → reglas de tipos compartidos.
 
+## Estilo de explicación en el chat
+
+**Toda explicación en el chat debe ser:**
+- En español, **simple como para un niño** (sin jerga técnica salvo nombres propios de archivos/comandos).
+- **Resumida**: ir al grano, sin párrafos largos.
+- **Práctica**: decir qué se hizo y qué hacer ahora, no teoría.
+- Usar analogías cotidianas cuando ayuden (ej. "el backend es como el cocinero, el frontend es el mesero").
+- Listas cortas mejor que prosa.
+- Si algo es complejo, primero la versión simple en 1 frase, luego (solo si hace falta) el detalle.
+
+Esto NO aplica al código ni a los comentarios en archivos — ahí siguen las convenciones técnicas normales.
+
 ## Reglas duras del proyecto
 
 1. **Idioma**: respuestas en español. Identificadores de código en inglés salvo dominio ya establecido en español.
