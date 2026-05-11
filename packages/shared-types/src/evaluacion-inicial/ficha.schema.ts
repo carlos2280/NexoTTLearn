@@ -8,6 +8,7 @@ export const origenNotaSkillSchema = z.enum([
   "BLOQUE",
   "TRANSVERSAL",
   "ENTREVISTA_IA",
+  "MANUAL",
 ])
 export type OrigenNotaSkill = z.infer<typeof origenNotaSkillSchema>
 

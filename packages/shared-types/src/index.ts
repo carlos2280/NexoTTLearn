@@ -200,3 +200,16 @@ export {
   previewCambiosArraySchema,
   previewRechazosArraySchema,
 } from "./evaluacion-inicial/preview.schema"
+
+// Evaluacion inicial — Slice 5 P5c: aplicar idempotente + edicion manual + historial.
+export { aplicarRequestSchema, aplicarResponseSchema } from "./evaluacion-inicial/aplicar.schema"
+export type { AplicarRequest, AplicarResponse } from "./evaluacion-inicial/aplicar.schema"
+export {
+  patchSkillRequestSchema,
+  patchSkillResponseSchema,
+} from "./evaluacion-inicial/edicion-manual.schema"
+export type {
+  PatchSkillRequest,
+  PatchSkillResponse,
+} from "./evaluacion-inicial/edicion-manual.schema"
+export type { CargaEvaluacionInicialResumen } from "./evaluacion-inicial/historial.schema"

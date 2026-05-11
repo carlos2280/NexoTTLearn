@@ -1,6 +1,7 @@
 import { Readable } from "node:stream"
 import {
   BadRequestException,
+  Body,
   Controller,
   Delete,
   Get,
@@ -10,6 +11,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Req,
   StreamableFile,
   UploadedFile,
@@ -17,27 +19,44 @@ import {
 } from "@nestjs/common"
 import { FileInterceptor } from "@nestjs/platform-express"
 import { Throttle } from "@nestjs/throttler"
-import { PreviewResponse } from "@nexott-learn/shared-types"
+import {
+  AplicarRequest,
+  AplicarResponse,
+  CargaEvaluacionInicialResumen,
+  PaginacionQuery,
+  Paginated,
+  PreviewResponse,
+  aplicarRequestSchema,
+  paginacionQuerySchema,
+} from "@nexott-learn/shared-types"
 import { AccionAuditoria, RolUsuario } from "@prisma/client"
 import { Request } from "express"
 import { memoryStorage } from "multer"
+import { z } from "zod"
 import { AuditLogService } from "../common/audit/audit-log.service"
 import { extractContextoHttp } from "../common/audit/extract-contexto"
 import { CurrentUser } from "../common/decorators/current-user.decorator"
+import { IdempotencyKey } from "../common/decorators/idempotency-key.decorator"
 import { Roles } from "../common/decorators/roles.decorator"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
+import { ZodValidationPipe } from "../common/pipes/zod-validation.pipe"
 import { SesionUsuario } from "../common/types/sesion.types"
+import { AplicarService } from "./aplicar.service"
 import { ExcelTemplateService } from "./excel-template.service"
+import { HistorialService } from "./historial.service"
 import { PreviewService } from "./preview.service"
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
 const HORA_MS = 60 * 60 * 1000
+const idempotencyKeyUuidSchema = z.string().uuid()
 
 @Controller("cursos/:cursoId/evaluacion-inicial")
 export class EvaluacionInicialController {
   constructor(
     private readonly templateService: ExcelTemplateService,
     private readonly previewService: PreviewService,
+    private readonly aplicarService: AplicarService,
+    private readonly historialService: HistorialService,
     private readonly auditLog: AuditLogService,
   ) {}
 
@@ -169,6 +188,81 @@ export class EvaluacionInicialController {
       metadata: { previewId, archivoId },
       ...extractContextoHttp(req),
     })
+  }
+
+  /**
+   * D-EVI-3 + D-EVI-7 — Aplicar preview idempotente con `Idempotency-Key`.
+   * Toda la mutacion vive en un `$transaction` (`AplicarService.aplicar`).
+   * El audit log se escribe SOLO en el primer aplicar (no en replay).
+   *
+   * Rate-limit `5/min` por usuario (operacion cara; defensa en profundidad).
+   */
+  @Post(":previewId/aplicar")
+  @Roles(RolUsuario.ADMIN)
+  @Throttle({ short: { ttl: 60_000, limit: 5 } })
+  @HttpCode(HttpStatus.OK)
+  async aplicar(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+    @Param("previewId", ParseUUIDPipe) previewId: string,
+    @IdempotencyKey() idempotencyKey: string | undefined,
+    @Body(new ZodValidationPipe(aplicarRequestSchema)) body: AplicarRequest,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+    @Req() req: Request,
+  ): Promise<AplicarResponse> {
+    const sesion = this.requireUsuario(usuario)
+    const keyValida =
+      idempotencyKey !== undefined && idempotencyKeyUuidSchema.safeParse(idempotencyKey).success
+    if (!keyValida) {
+      throw new BadRequestException({
+        code: apiErrorCodes.idempotencyKeyRequerida,
+        message: "El header Idempotency-Key es obligatorio y debe ser un UUID v4.",
+      })
+    }
+
+    const ejecucion = await this.aplicarService.aplicar({
+      cursoId,
+      previewId,
+      idempotencyKey,
+      usuarioId: sesion.usuarioId,
+      body,
+    })
+
+    if (!ejecucion.replay) {
+      await this.auditLog.record({
+        usuarioId: sesion.usuarioId,
+        accion: AccionAuditoria.EVALUACION_APLICADA,
+        exito: true,
+        recursoTipo: "curso",
+        recursoId: cursoId,
+        metadata: {
+          previewId,
+          cargaId: ejecucion.body.cargaId,
+          skillsActualizadas: ejecucion.body.skillsActualizadas,
+          colaboradoresActualizados: ejecucion.body.colaboradoresActualizados,
+          planesMarcadosDesactualizados: ejecucion.body.planesMarcadosDesactualizados,
+        },
+        ...extractContextoHttp(req),
+      })
+    }
+
+    // TODO(S10): emitir notificacion EXCEL_CARGADO (admin, no silenciable)
+    // y PLANES_DESACTUALIZADOS si planesMarcadosDesactualizados > 0
+    // — pendiente NotificacionesModule del Slice 10 (D88).
+
+    return ejecucion.body
+  }
+
+  /**
+   * Lista paginada (Paginated<T>) de cargas aplicadas anteriores del curso.
+   * Lecturas NO se auditan (decision del contrato HTTP).
+   */
+  @Get("historial")
+  @Roles(RolUsuario.ADMIN)
+  historial(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+    @Query(new ZodValidationPipe(paginacionQuerySchema)) query: PaginacionQuery,
+  ): Promise<Paginated<CargaEvaluacionInicialResumen>> {
+    return this.historialService.listar(cursoId, query)
   }
 
   private requireUsuario(usuario: SesionUsuario | undefined): SesionUsuario {

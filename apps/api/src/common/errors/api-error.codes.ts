@@ -108,6 +108,8 @@ export const apiErrorCodes = {
   validacionExcelNotaNoNumerica: "VALIDACION_EXCEL_NOTA_NO_NUMERICA",
   validacionExcelEmailFormatoInvalido: "VALIDACION_EXCEL_EMAIL_FORMATO_INVALIDO",
   validacionExcelEmailDuplicadoEnArchivo: "VALIDACION_EXCEL_EMAIL_DUPLICADO_EN_ARCHIVO",
+  // Evaluacion inicial P5c — aplicar (D-EVI-3 cierre, D-EVI-7 todo-o-nada).
+  validacionPreviewConRechazos: "VALIDACION_PREVIEW_CON_RECHAZOS",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]

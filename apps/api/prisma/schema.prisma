@@ -171,6 +171,7 @@ enum OrigenNotaSkill {
   BLOQUE
   TRANSVERSAL
   ENTREVISTA_IA
+  MANUAL
 
   @@map("origen_nota_skill_enum")
 }
