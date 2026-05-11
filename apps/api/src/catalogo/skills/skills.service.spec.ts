@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from "@nestjs/common"
+import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common"
 import { Test, TestingModule } from "@nestjs/testing"
 import { EstadoSkill } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -554,6 +554,20 @@ describe("SkillsService.cambiarArea (P3b)", () => {
     expect(prisma.skill.update).not.toHaveBeenCalled()
     expect(audit.record).not.toHaveBeenCalled()
   })
+
+  it("releer en tx detecta race: si la skill desaparece dentro de la transaccion, 404", async () => {
+    // Lectura previa OK
+    prisma.skill.findUnique.mockResolvedValueOnce(buildSkillRow())
+    prisma.area.findUnique.mockResolvedValue({ id: AREA_DESTINO_ID })
+    // Lectura dentro de tx: la skill fue eliminada por otro admin entre medias
+    prisma.skill.findUnique.mockResolvedValueOnce(null)
+
+    await expect(
+      service.cambiarArea(SKILL_ID, AREA_DESTINO_ID, "race", ADMIN_ID),
+    ).rejects.toBeInstanceOf(NotFoundException)
+    expect(prisma.skill.update).not.toHaveBeenCalled()
+    expect(audit.record).not.toHaveBeenCalled()
+  })
 })
 
 describe("SkillsService.fusionar (P3b)", () => {
@@ -683,13 +697,13 @@ describe("SkillsService.fusionar (P3b)", () => {
     }
   })
 
-  it("ganadora == perdedora: 409 INVALID_BODY sin abrir transaccion", async () => {
+  it("ganadora == perdedora: 400 INVALID_BODY sin abrir transaccion", async () => {
     try {
       await service.fusionar(SKILL_GANADORA_ID, SKILL_GANADORA_ID, "m", ADMIN_ID)
-      throw new Error("se esperaba 409")
+      throw new Error("se esperaba 400")
     } catch (error) {
-      expect(error).toBeInstanceOf(ConflictException)
-      const r = (error as ConflictException).getResponse() as { code: string }
+      expect(error).toBeInstanceOf(BadRequestException)
+      const r = (error as BadRequestException).getResponse() as { code: string }
       expect(r.code).toBe(apiErrorCodes.invalidBody)
     }
   })

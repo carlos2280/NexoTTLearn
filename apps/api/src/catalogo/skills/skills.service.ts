@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, NotFoundException } from "@nestjs/common"
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common"
 import {
   CrearSkillInput,
   FusionSkillsResponse,
@@ -317,6 +322,20 @@ export class SkillsService {
 
     try {
       const fila = await this.prisma.$transaction(async (tx) => {
+        // Cierre §5.21: releer DENTRO del tx para evitar que dos admins
+        // concurrentes inserten un `etiquetaAnterior` desactualizado en el
+        // historico. La lectura previa fuera del tx solo aborta 404 y aplica
+        // el cortocircuito de "misma etiqueta".
+        const actualEnTx = await tx.skill.findUnique({
+          where: { id: skillId },
+          select: SELECT_SKILL_FIELDS,
+        })
+        if (!actualEnTx) {
+          throw new NotFoundException({
+            code: apiErrorCodes.skillNoEncontrada,
+            message: "Skill no encontrada.",
+          })
+        }
         const actualizada = await tx.skill.update({
           where: { id: skillId },
           data: { etiquetaVisible: input.etiquetaVisible },
@@ -325,7 +344,7 @@ export class SkillsService {
         await tx.historicoRenombradoSkill.create({
           data: {
             skillId,
-            etiquetaAnterior: actual.etiquetaVisible,
+            etiquetaAnterior: actualEnTx.etiquetaVisible,
             etiquetaNueva: input.etiquetaVisible,
             autorUsuarioId: adminUsuarioId,
             motivo,
@@ -744,10 +763,28 @@ export class SkillsService {
       })
     }
 
-    const areaAnteriorId = skill.areaId
-
-    const actualizada = await this.prisma.$transaction(async (tx) => {
-      const fila = await tx.skill.update({
+    const { fila, areaAnteriorIdEnTx } = await this.prisma.$transaction(async (tx) => {
+      // Cierre §5.21: releer DENTRO del tx para que el `areaAnteriorId` que
+      // se persiste en historico y se reporta en el audit log refleje el
+      // estado real al inicio de la transaccion, no la lectura previa.
+      const skillEnTx = await tx.skill.findUnique({
+        where: { id: skillId },
+        select: SELECT_SKILL_FIELDS,
+      })
+      if (!skillEnTx) {
+        throw new NotFoundException({
+          code: apiErrorCodes.skillNoEncontrada,
+          message: "Skill no encontrada.",
+        })
+      }
+      if (skillEnTx.areaId === areaDestinoId) {
+        throw new ConflictException({
+          code: apiErrorCodes.skillYaEnAreaDestino,
+          message: "La skill ya pertenece al area destino.",
+        })
+      }
+      const areaAnteriorIdEnTx = skillEnTx.areaId
+      const actualizada = await tx.skill.update({
         where: { id: skillId },
         data: { areaId: areaDestinoId },
         select: SELECT_SKILL_FIELDS,
@@ -755,26 +792,28 @@ export class SkillsService {
       await tx.historicoCambiosAreaSkill.create({
         data: {
           skillId,
-          areaAnteriorId,
+          areaAnteriorId: areaAnteriorIdEnTx,
           areaNuevaId: areaDestinoId,
           autorUsuarioId: adminUsuarioId,
           motivo,
         },
       })
-      return fila
+      return { fila: actualizada, areaAnteriorIdEnTx }
     })
 
+    // D-AUDIT-2: el audit se mantiene FUERA del $transaction. Un fallo del
+    // audit no debe abortar la mutacion ya commiteada.
     await this.auditLog.record({
       usuarioId: adminUsuarioId,
       accion: AccionAuditoria.SKILL_CAMBIO_AREA,
       exito: true,
       recursoTipo: "skill",
       recursoId: skillId,
-      metadata: { motivo, areaAnteriorId, areaNuevaId: areaDestinoId },
+      metadata: { motivo, areaAnteriorId: areaAnteriorIdEnTx, areaNuevaId: areaDestinoId },
       ...contexto,
     })
 
-    return toSkillResponse(actualizada)
+    return toSkillResponse(fila)
   }
 
   /**
@@ -795,7 +834,7 @@ export class SkillsService {
     contexto: ContextoHttpAuditoria = {},
   ): Promise<FusionSkillsResponse> {
     if (skillGanadoraId === skillPerdedoraId) {
-      throw new ConflictException({
+      throw new BadRequestException({
         code: apiErrorCodes.invalidBody,
         message: "skillGanadoraId y skillPerdedoraId deben ser distintos.",
       })
