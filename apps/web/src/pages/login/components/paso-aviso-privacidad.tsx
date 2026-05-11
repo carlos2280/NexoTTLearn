@@ -2,9 +2,10 @@ import { aceptarAvisoPrivacidad } from "@/features/auth/api/aceptar-aviso-privac
 import { ApiError } from "@/shared/api/api-error"
 import { Banner } from "@/shared/components/ui/banner"
 import { Button } from "@/shared/components/ui/button"
+import { AVISO_VIGENTE_VERSION } from "@nexott-learn/shared-types"
 import { useMutation } from "@tanstack/react-query"
 
-const VERSION_AVISO = "v1.0"
+const VERSION_AVISO = AVISO_VIGENTE_VERSION
 
 interface PasoAvisoPrivacidadProps {
   readonly onExito: () => Promise<void> | void
@@ -27,25 +28,22 @@ export function PasoAvisoPrivacidad({ onExito }: PasoAvisoPrivacidadProps) {
   return (
     <div className="flex flex-col gap-4">
       <header className="flex flex-col gap-1">
-        <h1 className="font-semibold text-[20px] text-[var(--color-text-primary)] leading-7">
-          Aviso de privacidad
-        </h1>
-        <p className="text-[13px] text-[var(--color-text-secondary)] leading-5">
-          Antes de continuar, lee y acepta el aviso ({VERSION_AVISO}).
+        <p className="nx-eyebrow text-text-tertiary">Aviso · {VERSION_AVISO}</p>
+        <h1 className="text-h3 text-text-primary">Cómo tratamos tu ficha</h1>
+        <p className="text-body-sm text-text-secondary">
+          Tu desempeño y skills viven contigo. Lee y confirma antes de seguir.
         </p>
       </header>
 
       {apiError ? <Banner tone="danger">{apiError.message}</Banner> : null}
 
-      <div className="max-h-[260px] overflow-y-auto rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-subtle)] p-4">
-        <div className="flex flex-col gap-3 text-[13px] text-[var(--color-text-secondary)] leading-5">
+      <div className="max-h-[260px] overflow-y-auto rounded-md border border-border bg-subtle p-4">
+        <div className="flex flex-col gap-3 text-body-sm text-text-secondary">
           <p>
-            <strong className="text-[var(--color-text-primary)]">
-              Tratamiento de datos personales.
-            </strong>{" "}
-            NexoTT Learn procesa información sobre tu desempeño formativo — evaluaciones, intentos,
-            plan personal — con la finalidad exclusiva de prepararte para entrevistas con clientes
-            de la consultora.
+            <strong className="text-text-primary">Tratamiento de datos personales.</strong> NexoTT
+            Learn procesa información sobre tu desempeño formativo — evaluaciones, intentos, plan
+            personal — con la finalidad exclusiva de prepararte para entrevistas con clientes de la
+            consultora.
           </p>
           <p>
             Tu ficha de skills es interna y nunca se comparte con clientes externos. Solo

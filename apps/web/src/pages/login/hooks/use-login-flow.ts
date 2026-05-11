@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom"
 import type { MfaChallenge, PasoLogin } from "../login.types"
 
 const DURACION_BIENVENIDA_MS = 2600
+const MFA_CHALLENGE_TTL_MS = 5 * 60 * 1000
 
 interface UseLoginFlowResult {
   readonly paso: PasoLogin
@@ -27,38 +28,45 @@ export function useLoginFlow(): UseLoginFlowResult {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
+  const continuarConPerfil = useCallback(
+    (data: UsuarioSesion): void => {
+      queryClient.setQueryData(USUARIO_ACTUAL_KEY, data)
+      setUsuario(data)
+      if (data.requiereCambioPassword) {
+        setPaso("cambiar-password")
+        return
+      }
+      if (data.requiereAceptarAvisoPrivacidad) {
+        setPaso("aviso-privacidad")
+        return
+      }
+      setPaso("bienvenida")
+      window.setTimeout(() => {
+        const destino = data.rol === "ADMIN" ? RUTAS.admin.bandeja : RUTAS.bandeja
+        navigate(destino, { replace: true })
+      }, DURACION_BIENVENIDA_MS)
+    },
+    [navigate, queryClient],
+  )
+
   const continuarSegunFlags = useCallback(async (): Promise<void> => {
-    const data: UsuarioSesion = await obtenerUsuarioActual()
-    queryClient.setQueryData(USUARIO_ACTUAL_KEY, data)
-    setUsuario(data)
-    if (data.requiereCambioPassword) {
-      setPaso("cambiar-password")
-      return
-    }
-    if (data.requiereAceptarAvisoPrivacidad) {
-      setPaso("aviso-privacidad")
-      return
-    }
-    setPaso("bienvenida")
-    window.setTimeout(() => {
-      const destino = data.rol === "ADMIN" ? RUTAS.admin.bandeja : RUTAS.bandeja
-      navigate(destino, { replace: true })
-    }, DURACION_BIENVENIDA_MS)
-  }, [navigate, queryClient])
+    const data = await obtenerUsuarioActual()
+    continuarConPerfil(data)
+  }, [continuarConPerfil])
 
   const onLoginExitoso = useCallback(
     async (resp: LoginResponse): Promise<void> => {
-      if (resp.mfaRequired && resp.mfaChallengeId && resp.mfaChallengeExpiraEn) {
+      if (resp.mfaRequired) {
         setMfaChallenge({
           id: resp.mfaChallengeId,
-          expiraEn: new Date(resp.mfaChallengeExpiraEn),
+          expiraEn: new Date(Date.now() + MFA_CHALLENGE_TTL_MS),
         })
         setPaso("mfa")
         return
       }
-      await continuarSegunFlags()
+      continuarConPerfil(resp.perfil)
     },
-    [continuarSegunFlags],
+    [continuarConPerfil],
   )
 
   const reiniciar = useCallback(() => {

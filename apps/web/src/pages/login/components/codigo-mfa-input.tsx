@@ -101,16 +101,13 @@ export function CodigoMfaInput(props: CodigoMfaInputProps) {
               disabled={disabled}
               aria-label={`Dígito ${i + 1} de ${LENGTH}`}
               className={cn(
-                "h-14 w-full rounded-[var(--radius-md)] border bg-[var(--color-surface)]",
-                "tabular text-center font-medium font-mono text-[24px] text-[var(--color-text-primary)]",
-                "transition-[border-color,box-shadow,background-color] duration-[var(--duration-base)] ease-[var(--ease-default)]",
-                "focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_rgba(79,70,229,0.18)] focus:outline-none",
+                "h-14 w-full rounded-md border bg-surface",
+                "tabular text-center font-medium font-mono text-mfa text-text-primary",
+                "transition-[border-color,box-shadow,background-color] duration-base ease-default",
+                "focus:border-accent focus:shadow-ring-accent focus:outline-none",
                 "disabled:cursor-not-allowed disabled:opacity-50",
-                valor
-                  ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)]"
-                  : "border-[var(--color-border-strong)]",
-                hasError &&
-                  "border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:shadow-[0_0_0_3px_rgba(220,38,38,0.18)]",
+                valor ? "border-accent bg-accent-soft" : "border-border-strong",
+                hasError && "border-danger focus:border-danger focus:shadow-ring-danger",
               )}
             />
           </motion.div>

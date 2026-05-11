@@ -11,15 +11,15 @@ export function Wordmark({ variant = "compact", className }: WordmarkProps) {
       <span
         className={cn(
           "inline-flex items-baseline gap-1.5 font-semibold tracking-tight",
-          "text-[32px] text-[var(--color-text-primary)] leading-[40px]",
+          "text-h1 text-text-primary",
           className,
         )}
       >
         <span>NexoTT</span>
-        <span aria-hidden="true" className="text-[var(--color-accent)]">
+        <span aria-hidden="true" className="text-accent">
           ·
         </span>
-        <span className="font-medium text-[var(--color-text-secondary)]">Learn</span>
+        <span className="font-medium text-text-secondary">Learn</span>
       </span>
     )
   }
@@ -29,27 +29,18 @@ export function Wordmark({ variant = "compact", className }: WordmarkProps) {
       <span
         className={cn(
           "inline-flex items-baseline gap-1 font-semibold",
-          "text-[14px] text-[var(--color-text-primary)] leading-5",
+          "text-body text-text-primary",
           className,
         )}
       >
         <span>NexoTT</span>
-        <span aria-hidden="true" className="text-[var(--color-accent)]">
+        <span aria-hidden="true" className="text-accent">
           ·
         </span>
-        <span className="text-[var(--color-text-secondary)]">Learn</span>
+        <span className="text-text-secondary">Learn</span>
       </span>
     )
   }
 
-  return (
-    <span
-      className={cn(
-        "font-semibold text-[14px] text-[var(--color-text-primary)] leading-5",
-        className,
-      )}
-    >
-      NexoTT
-    </span>
-  )
+  return <span className={cn("font-semibold text-body text-text-primary", className)}>NexoTT</span>
 }

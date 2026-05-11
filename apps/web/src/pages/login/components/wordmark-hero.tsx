@@ -14,7 +14,7 @@ export function WordmarkHero() {
   const baseDelay = 0.15
 
   return (
-    <h1 className="font-semibold text-[64px] text-[var(--color-text-primary)] leading-[0.95] tracking-[-0.045em] sm:text-[80px] lg:text-[96px]">
+    <h1 className="text-h1 text-text-primary sm:text-display-md lg:text-display-lg xl:text-display-xl">
       <span className="inline-flex items-baseline gap-3">
         <span className="inline-flex">
           {LETRAS.map(({ char, pos }) => (
@@ -38,14 +38,14 @@ export function WordmarkHero() {
         <motion.span
           aria-hidden="true"
           initial={reducedMotion ? { opacity: 1 } : { opacity: 0, scale: 0.2 }}
-          animate={{ opacity: 1, scale: 1 }}
+          animate={reducedMotion ? { opacity: 1, scale: 1 } : { opacity: 1, scale: [0.2, 1.18, 1] }}
           transition={{
             delay: reducedMotion ? 0 : baseDelay + LETRAS.length * 0.045 + 0.08,
-            type: "spring",
-            stiffness: 220,
-            damping: 14,
+            duration: 0.7,
+            ease: [0.16, 1, 0.3, 1],
           }}
-          className="text-[var(--color-accent)]"
+          className="relative inline-flex items-center justify-center text-accent"
+          style={{ textShadow: "0 0 24px rgb(var(--color-accent-rgb) / 0.45)" }}
         >
           ·
         </motion.span>
@@ -58,7 +58,7 @@ export function WordmarkHero() {
             stiffness: 90,
             damping: 18,
           }}
-          className="font-mono font-normal text-[42px] text-[var(--color-text-tertiary)] tracking-tight sm:text-[52px] lg:text-[60px]"
+          className="font-mono font-normal text-[0.62em] text-text-tertiary tracking-tight"
         >
           learn
         </motion.span>

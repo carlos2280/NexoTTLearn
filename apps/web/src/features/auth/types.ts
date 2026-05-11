@@ -1,38 +1,17 @@
-export type Rol = "ADMIN" | "PARTICIPANTE"
+import type {
+  AceptarAvisoPrivacidadInput,
+  CambiarPasswordInput,
+  LoginInput,
+  LoginResponse,
+  MfaVerifyInput,
+  PerfilSesion,
+  RolUsuario,
+} from "@nexott-learn/shared-types"
 
-export interface UsuarioSesion {
-  id: string
-  email: string
-  nombre: string
-  apellido: string
-  rol: Rol
-  avatar: string | null
-  mfaHabilitado: boolean
-  requiereCambioPassword: boolean
-  requiereAceptarAvisoPrivacidad: boolean
-}
+export type Rol = RolUsuario
 
-export interface LoginInput {
-  email: string
-  password: string
-}
+export type UsuarioSesion = PerfilSesion
 
-export interface LoginResponse {
-  mfaRequired: boolean
-  mfaChallengeId?: string
-  mfaChallengeExpiraEn?: string
-}
+export type { LoginInput, LoginResponse, CambiarPasswordInput, AceptarAvisoPrivacidadInput }
 
-export interface VerificarMfaInput {
-  challengeId: string
-  codigo: string
-}
-
-export interface CambiarPasswordInput {
-  passwordActual: string
-  passwordNueva: string
-}
-
-export interface AceptarAvisoPrivacidadInput {
-  versionAviso: string
-}
+export type VerificarMfaInput = MfaVerifyInput

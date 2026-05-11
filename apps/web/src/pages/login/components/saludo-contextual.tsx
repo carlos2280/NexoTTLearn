@@ -36,13 +36,13 @@ export function SaludoContextual({ variant = "saludo" }: SaludoContextualProps) 
 
   if (variant === "timestamp") {
     return (
-      <div className="flex items-center gap-3 text-[12px] text-[var(--color-text-tertiary)] leading-4">
+      <div className="flex items-center gap-3 text-caption text-text-tertiary">
         <span className="tabular font-mono">{formatearHora(ahora)}</span>
-        <span className="h-1 w-1 rounded-full bg-[var(--color-text-tertiary)]" />
+        <span className="h-1 w-1 rounded-pill bg-text-tertiary" />
         <span className="capitalize">{formatearFecha(ahora)}</span>
       </div>
     )
   }
 
-  return <span className="text-[var(--color-text-primary)]">{obtenerSaludo(ahora.getHours())}</span>
+  return <span className="text-text-primary">{obtenerSaludo(ahora.getHours())}</span>
 }

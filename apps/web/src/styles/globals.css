@@ -5,9 +5,17 @@
 @import "@fontsource-variable/fraunces/index.css";
 @import "@fontsource-variable/fraunces/wght-italic.css";
 
+/* ============================================================
+   NexoTT Learn — Design Tokens
+   Cimientos visuales. Todo color, tipografía, sombra, easing
+   y z-index del producto vive aquí. NADA hardcoded fuera.
+   ============================================================ */
+
 @theme {
+  /* ---------- Color · superficies neutras ---------- */
   --color-canvas: #fafaf9;
   --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
   --color-subtle: #f4f4f2;
   --color-muted: #e7e5e4;
 
@@ -20,6 +28,7 @@
   --color-text-tertiary: #a8a29e;
   --color-text-disabled: #d6d3d1;
 
+  /* ---------- Color · acento primario (índigo / trabajo) ---------- */
   --color-accent: #4f46e5;
   --color-accent-hover: #4338ca;
   --color-accent-pressed: #3730a3;
@@ -27,50 +36,187 @@
   --color-accent-soft-hover: #e0e7ff;
   --color-accent-text: #ffffff;
   --color-accent-on-soft: #3730a3;
+  --color-accent-rgb: 79 70 229;
 
+  /* ---------- Color · acento cálido (ámbar / momentos emocionales) ---------- */
+  --color-warmth: #f59e0b;
+  --color-warmth-hover: #d97706;
+  --color-warmth-soft: #fef3c7;
+  --color-warmth-soft-hover: #fde68a;
+  --color-warmth-on-soft: #92400e;
+  --color-warmth-rgb: 245 158 11;
+
+  /* ---------- Color · glow rosa-coral (para mezclas de bienvenida/despedida) ---------- */
+  --color-glow: #f472b6;
+  --color-glow-rgb: 244 114 182;
+
+  /* ---------- Color · semánticos ---------- */
   --color-success: #16a34a;
   --color-success-soft: #dcfce7;
+  --color-success-on-soft: #15803d;
   --color-warning: #d97706;
   --color-warning-soft: #fef3c7;
+  --color-warning-on-soft: #b45309;
   --color-danger: #dc2626;
   --color-danger-soft: #fee2e2;
+  --color-danger-on-soft: #b91c1c;
+  --color-danger-rgb: 220 38 38;
   --color-info: #0891b2;
   --color-info-soft: #cffafe;
+  --color-info-on-soft: #0e7490;
 
+  /* ---------- Color · atmósferas del storytelling ----------
+     Cada paso del flujo tiene su propio aire. Tokens, no hex sueltos. */
+  --color-atmos-credenciales: #eef2ff;
+  --color-atmos-mfa: #e0e7ff;
+  --color-atmos-cambiar-password: #e6faf5;
+  --color-atmos-aviso-privacidad: #f3e8ff;
+  --color-atmos-bienvenida: #fff1e6;
+  --color-atmos-despedida: #fef3c7;
+
+  /* ---------- Radius ---------- */
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+  --radius-pill: 9999px;
 
-  --shadow-sm: 0 1px 2px rgba(12, 10, 9, 0.04), 0 1px 1px rgba(12, 10, 9, 0.06);
-  --shadow-md: 0 4px 8px rgba(12, 10, 9, 0.04), 0 2px 4px rgba(12, 10, 9, 0.06);
-  --shadow-lg: 0 16px 32px rgba(12, 10, 9, 0.08), 0 4px 8px rgba(12, 10, 9, 0.04);
-  --shadow-overlay: 0 24px 48px rgba(12, 10, 9, 0.16);
+  /* ---------- Shadows · elevación neutra ---------- */
+  --shadow-sm: 0 1px 2px rgb(12 10 9 / 0.04), 0 1px 1px rgb(12 10 9 / 0.06);
+  --shadow-md: 0 4px 8px rgb(12 10 9 / 0.04), 0 2px 4px rgb(12 10 9 / 0.06);
+  --shadow-lg: 0 16px 32px rgb(12 10 9 / 0.08), 0 4px 8px rgb(12 10 9 / 0.04);
+  --shadow-overlay: 0 24px 48px rgb(12 10 9 / 0.16);
 
+  /* ---------- Shadows · glow del acento (CTA primaria, focus envolvente) ---------- */
+  --shadow-accent-glow: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 8px 24px
+    rgb(var(--color-accent-rgb) / 0.16);
+  --shadow-accent-glow-lg: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 16px 40px
+    rgb(var(--color-accent-rgb) / 0.22);
+  --shadow-warmth-glow: 0 8px 24px rgb(var(--color-warmth-rgb) / 0.22);
+
+  /* ---------- Rings · halos de focus / estado ----------
+     Reemplazan las repeticiones `focus:shadow-[0_0_0_3px_rgba(...)]`. */
+  --shadow-ring-accent: 0 0 0 3px rgb(var(--color-accent-rgb) / 0.18);
+  --shadow-ring-accent-soft: 0 0 0 3px rgb(var(--color-accent-rgb) / 0.12);
+  --shadow-ring-danger: 0 0 0 3px rgb(var(--color-danger-rgb) / 0.18);
+  --shadow-ring-danger-soft: 0 0 0 3px rgb(var(--color-danger-rgb) / 0.1);
+
+  /* ---------- Movimiento ---------- */
   --ease-default: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-decel: cubic-bezier(0, 0, 0.2, 1);
+  --ease-accel: cubic-bezier(0.4, 0, 1, 1);
+  --ease-anticipate: cubic-bezier(0.68, -0.55, 0.32, 1.55);
 
   --duration-instant: 80ms;
   --duration-fast: 120ms;
   --duration-base: 180ms;
   --duration-slow: 220ms;
   --duration-page: 320ms;
+  --duration-storytelling: 600ms;
+  --duration-cinematic: 900ms;
 
+  /* ---------- Tipografía · familias ---------- */
   --font-sans: "Geist Variable", "Geist", "Inter Variable", "Inter", system-ui, -apple-system,
     BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "Geist Mono Variable", "Geist Mono", "JetBrains Mono", ui-monospace, SFMono-Regular,
     monospace;
   --font-serif: "Fraunces Variable", "Fraunces", ui-serif, Georgia, serif;
+
+  /* ---------- Tipografía · escala (Tailwind v4 expone esto como `text-{name}`) ---------- */
+
+  /* eyebrow — sobrelínea uppercase con tracking; usado en headers de pasos */
+  --text-eyebrow: 11px;
+  --text-eyebrow--line-height: 16px;
+  --text-eyebrow--letter-spacing: 0.22em;
+  --text-eyebrow--font-weight: 500;
+
+  /* caption — labels, hints, microcopy */
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+
+  /* body-sm — textos densos, párrafos secundarios */
+  --text-body-sm: 13px;
+  --text-body-sm--line-height: 20px;
+
+  /* body — texto base de la app */
+  --text-body: 14px;
+  --text-body--line-height: 20px;
+
+  /* body-lg — textos de bienvenida, párrafos hero */
+  --text-body-lg: 16px;
+  --text-body-lg--line-height: 24px;
+
+  /* input — campos de formulario (15px se lee mejor a tamaño táctil) */
+  --text-input: 15px;
+  --text-input--line-height: 24px;
+
+  /* heading scale */
+  --text-h3: 20px;
+  --text-h3--line-height: 28px;
+  --text-h3--letter-spacing: -0.01em;
+  --text-h3--font-weight: 600;
+
+  --text-h2: 24px;
+  --text-h2--line-height: 32px;
+  --text-h2--letter-spacing: -0.015em;
+  --text-h2--font-weight: 600;
+
+  --text-h1: 36px;
+  --text-h1--line-height: 1.05;
+  --text-h1--letter-spacing: -0.03em;
+  --text-h1--font-weight: 600;
+
+  /* display scale — para wordmark hero, bienvenida, despedida */
+  --text-display-md: 44px;
+  --text-display-md--line-height: 1.02;
+  --text-display-md--letter-spacing: -0.035em;
+  --text-display-md--font-weight: 600;
+
+  --text-display-lg: 64px;
+  --text-display-lg--line-height: 1;
+  --text-display-lg--letter-spacing: -0.04em;
+  --text-display-lg--font-weight: 600;
+
+  --text-display-xl: 96px;
+  --text-display-xl--line-height: 0.95;
+  --text-display-xl--letter-spacing: -0.045em;
+  --text-display-xl--font-weight: 600;
+
+  /* quote — frase rotativa serif italic */
+  --text-quote: 30px;
+  --text-quote--line-height: 1.15;
+  --text-quote--letter-spacing: -0.005em;
+
+  /* mfa-digit — dígito monoespaciado grande del input MFA */
+  --text-mfa: 24px;
+  --text-mfa--line-height: 32px;
 }
 
+/* ============================================================
+   Layered tokens — no son `@theme` porque dependen de
+   contexto (z-index escalonado, contornos compuestos).
+   ============================================================ */
+
 :root {
+  --z-base: 0;
+  --z-raised: 10;
+  --z-sticky: 20;
+  --z-overlay: 100;
+  --z-modal: 200;
+  --z-popover: 250;
+  --z-toast: 300;
+  --z-tooltip: 400;
+
   font-family: var(--font-sans);
   font-feature-settings: "ss01", "ss02", "ss03", "ss04", "tnum", "cv01", "cv11";
   color-scheme: light;
 }
 
-.font-serif {
-  font-family: var(--font-serif);
-  font-feature-settings: "ss01", "tnum";
-}
+/* ============================================================
+   Base — reset mínimo + tipografía por defecto
+   ============================================================ */
 
 html,
 body,
@@ -82,8 +228,8 @@ body {
   margin: 0;
   background: var(--color-canvas);
   color: var(--color-text-primary);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -100,10 +246,18 @@ select {
   caret-color: var(--color-accent);
 }
 
+/* Focus visible — fallback global para links y elementos sin tratamiento propio.
+   Los componentes de formulario (input, textarea, select) y botones definen su
+   propio lenguaje de focus (border + ring suave) y suprimen este outline. */
 :focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
-  border-radius: var(--radius-sm);
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -116,15 +270,63 @@ select {
   }
 }
 
-.tabular {
-  font-variant-numeric: tabular-nums;
+/* ============================================================
+   Utilities · duraciones nombradas
+   (Tailwind v4 no expone `--duration-*` como utility automática;
+    las exponemos a mano para mantener `duration-fast` legible.)
+   ============================================================ */
+
+@utility duration-instant {
+  transition-duration: var(--duration-instant);
+}
+@utility duration-fast {
+  transition-duration: var(--duration-fast);
+}
+@utility duration-base {
+  transition-duration: var(--duration-base);
+}
+@utility duration-slow {
+  transition-duration: var(--duration-slow);
+}
+@utility duration-page {
+  transition-duration: var(--duration-page);
+}
+@utility duration-storytelling {
+  transition-duration: var(--duration-storytelling);
+}
+@utility duration-cinematic {
+  transition-duration: var(--duration-cinematic);
+}
+
+/* ============================================================
+   Utility classes — pequeñas, intencionales.
+   Solo lo que Tailwind no expresa limpio en una clase.
+   ============================================================ */
+
+.font-serif {
+  font-family: var(--font-serif);
+  font-feature-settings: "ss01", "tnum";
 }
 
 .font-mono {
   font-family: var(--font-mono);
 }
 
-/* Grano sutil para superficies de marca — se aplica con la utilidad .nx-grain */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Eyebrow uppercase — la sobrelínea con tracking que se repite en cada paso */
+.nx-eyebrow {
+  font-family: var(--font-sans);
+  font-size: var(--text-eyebrow);
+  line-height: var(--text-eyebrow--line-height);
+  letter-spacing: var(--text-eyebrow--letter-spacing);
+  font-weight: var(--text-eyebrow--font-weight);
+  text-transform: uppercase;
+}
+
+/* Grano sutil para superficies de marca */
 .nx-grain {
   position: relative;
 }
@@ -157,7 +359,21 @@ select {
   content: "";
   position: absolute;
   inset: 0;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   background: currentColor;
   animation: nx-pulse 2s ease-out infinite;
+}
+
+/* Halo respirando para CTA primaria en hero del logout */
+@keyframes nx-breathe {
+  0%,
+  100% {
+    box-shadow: 0 8px 24px rgb(var(--color-accent-rgb) / 0.16);
+  }
+  50% {
+    box-shadow: 0 12px 36px rgb(var(--color-accent-rgb) / 0.28);
+  }
+}
+.nx-breathe {
+  animation: nx-breathe 3.6s var(--ease-default) infinite;
 }

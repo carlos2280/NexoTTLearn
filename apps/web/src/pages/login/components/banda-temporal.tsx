@@ -41,12 +41,8 @@ export function BandaTemporal(props: BandaTemporalProps) {
   return (
     <div
       className={cn(
-        "flex items-center gap-2 text-[12px] leading-4",
-        expirada
-          ? "text-[var(--color-danger)]"
-          : enWarning
-            ? "text-[var(--color-warning)]"
-            : "text-[var(--color-text-tertiary)]",
+        "flex items-center gap-2 text-caption",
+        expirada ? "text-danger" : enWarning ? "text-warning" : "text-text-tertiary",
       )}
       aria-live="polite"
     >

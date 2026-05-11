@@ -20,12 +20,11 @@ const RE_PASSWORD_NUMERO = /\d/
 
 function aSesion(u: MockUsuario): UsuarioSesion {
   return {
-    id: u.id,
+    usuarioId: u.id,
+    colaboradorId: u.id,
     email: u.email,
     nombre: u.nombre,
-    apellido: u.apellido,
     rol: u.rol,
-    avatar: u.avatar,
     mfaHabilitado: u.mfaHabilitado,
     requiereCambioPassword: u.requiereCambioPassword,
     requiereAceptarAvisoPrivacidad: u.requiereAceptarAvisoPrivacidad,
@@ -85,13 +84,12 @@ const handleLogin: MockHandler = (req) => {
     const response: LoginResponse = {
       mfaRequired: true,
       mfaChallengeId: challengeId,
-      mfaChallengeExpiraEn: new Date(expiraEn).toISOString(),
     }
     return response
   }
 
   mockState.sesionActual = { usuarioId: usuario.id }
-  const response: LoginResponse = { mfaRequired: false }
+  const response: LoginResponse = { mfaRequired: false, perfil: aSesion(usuario) }
   return response
 }
 

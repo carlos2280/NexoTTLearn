@@ -9,6 +9,15 @@ interface Punto {
   delay: number
 }
 
+interface Conexion {
+  id: string
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  intensidad: number
+}
+
 function generarPuntos(cantidad: number, semilla: number): Punto[] {
   const puntos: Punto[] = []
   let s = semilla
@@ -28,6 +37,65 @@ function generarPuntos(cantidad: number, semilla: number): Punto[] {
   return puntos
 }
 
+/**
+ * Red de skills · cada punto se conecta con sus k vecinos más cercanos.
+ * Metáfora del producto: las habilidades del colaborador forman una red
+ * que viaja con él, no con el curso.
+ */
+function generarConexiones(puntos: Punto[], k: number, distanciaMax: number): Conexion[] {
+  const conexiones: Conexion[] = []
+  const visto = new Set<string>()
+
+  for (let i = 0; i < puntos.length; i++) {
+    const p = puntos[i]
+    if (!p) {
+      continue
+    }
+    const distancias = puntos
+      .map((q, j) => {
+        if (j === i || !q) {
+          return null
+        }
+        const dx = p.x - q.x
+        const dy = p.y - q.y
+        return { idx: j, q, dist: Math.sqrt(dx * dx + dy * dy) }
+      })
+      .filter((d): d is { idx: number; q: Punto; dist: number } => d !== null)
+      .sort((a, b) => a.dist - b.dist)
+      .slice(0, k)
+
+    for (const vecino of distancias) {
+      if (vecino.dist > distanciaMax) {
+        continue
+      }
+      const key = i < vecino.idx ? `${i}-${vecino.idx}` : `${vecino.idx}-${i}`
+      if (visto.has(key)) {
+        continue
+      }
+      visto.add(key)
+      conexiones.push({
+        id: `c-${key}`,
+        x1: p.x,
+        y1: p.y,
+        x2: vecino.q.x,
+        y2: vecino.q.y,
+        intensidad: Math.max(0.04, 0.18 - vecino.dist * 0.006),
+      })
+    }
+  }
+  return conexiones
+}
+
+const FONDO_BASE =
+  "radial-gradient(circle at 80% 15%, rgb(var(--color-accent-rgb) / 0.10), transparent 45%)," +
+  "radial-gradient(circle at 15% 85%, rgb(var(--color-accent-rgb) / 0.08), transparent 45%)"
+
+const FONDO_LUZ =
+  "radial-gradient(circle at var(--lx) var(--ly), rgb(var(--color-accent-rgb) / 0.22), transparent 50%)"
+
+const PUNTO_FILL = "rgb(var(--color-accent-rgb) / 0.55)"
+const LINEA_STROKE = "rgb(var(--color-accent-rgb))"
+
 export function ConstelacionFondo() {
   const reducedMotion = useReducedMotion()
   const ref = useRef<HTMLDivElement | null>(null)
@@ -38,7 +106,8 @@ export function ConstelacionFondo() {
   const lightX = useTransform(sx, (v) => `${v * 100}%`)
   const lightY = useTransform(sy, (v) => `${v * 100}%`)
 
-  const puntos = useMemo(() => generarPuntos(52, 7), [])
+  const puntos = useMemo(() => generarPuntos(42, 7), [])
+  const conexiones = useMemo(() => generarConexiones(puntos, 2, 22), [puntos])
 
   useEffect(() => {
     if (reducedMotion) {
@@ -59,19 +128,11 @@ export function ConstelacionFondo() {
 
   return (
     <div ref={ref} aria-hidden="true" className="absolute inset-0 overflow-hidden">
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(circle at 80% 15%, rgba(79,70,229,0.10), transparent 45%)," +
-            "radial-gradient(circle at 15% 85%, rgba(79,70,229,0.08), transparent 45%)",
-        }}
-      />
+      <div className="absolute inset-0" style={{ background: FONDO_BASE }} />
       <motion.div
         className="-inset-[30%] absolute"
         style={{
-          background:
-            "radial-gradient(circle at var(--lx) var(--ly), rgba(79,70,229,0.22), transparent 50%)",
+          background: FONDO_LUZ,
           ["--lx" as string]: lightX,
           ["--ly" as string]: lightY,
         }}
@@ -81,16 +142,44 @@ export function ConstelacionFondo() {
         viewBox="0 0 100 100"
         preserveAspectRatio="none"
       >
-        <title>Constelación de marca</title>
+        <title>Red de habilidades</title>
+        {conexiones.map((c, i) => (
+          <motion.line
+            key={c.id}
+            x1={c.x1}
+            y1={c.y1}
+            x2={c.x2}
+            y2={c.y2}
+            stroke={LINEA_STROKE}
+            strokeWidth={0.08}
+            strokeLinecap="round"
+            initial={{ opacity: 0, pathLength: 0 }}
+            animate={
+              reducedMotion
+                ? { opacity: c.intensidad, pathLength: 1 }
+                : {
+                    opacity: [0, c.intensidad, c.intensidad * 0.6, c.intensidad],
+                    pathLength: 1,
+                  }
+            }
+            transition={{
+              duration: reducedMotion ? 0.4 : 5 + (i % 4),
+              delay: 0.3 + (i % 7) * 0.18,
+              repeat: reducedMotion ? 0 : Number.POSITIVE_INFINITY,
+              ease: "easeInOut",
+            }}
+            style={{ opacity: c.intensidad }}
+          />
+        ))}
         {puntos.map((p, i) => (
           <motion.circle
             key={p.id}
             cx={p.x}
             cy={p.y}
-            r={p.r * 0.18}
-            fill="rgba(79,70,229,0.55)"
+            r={p.r * 0.22}
+            fill={PUNTO_FILL}
             initial={{ opacity: 0.2 }}
-            animate={reducedMotion ? { opacity: 0.4 } : { opacity: [0.2, 0.6, 0.2] }}
+            animate={reducedMotion ? { opacity: 0.5 } : { opacity: [0.25, 0.7, 0.25] }}
             transition={{
               duration: 4 + (i % 5),
               delay: p.delay,

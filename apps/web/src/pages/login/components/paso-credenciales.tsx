@@ -2,9 +2,9 @@ import { login } from "@/features/auth/api/login.api"
 import type { LoginResponse } from "@/features/auth/types"
 import { ApiError } from "@/shared/api/api-error"
 import { Banner } from "@/shared/components/ui/banner"
+import { Button } from "@/shared/components/ui/button"
 import { Field } from "@/shared/components/ui/field"
 import { Input } from "@/shared/components/ui/input"
-import { MagneticButton } from "@/shared/components/ui/magnetic-button"
 import { useMutation } from "@tanstack/react-query"
 import { motion, useReducedMotion } from "framer-motion"
 import { ArrowRight } from "lucide-react"
@@ -70,14 +70,14 @@ export function PasoCredenciales({ onExito }: PasoCredencialesProps) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-7" noValidate={true}>
       <motion.header {...motionProps(0)} className="flex flex-col gap-2">
-        <p className="font-medium text-[11px] text-[var(--color-text-tertiary)] uppercase leading-4 tracking-[0.22em]">
+        <p className="nx-eyebrow text-text-tertiary">
           <SaludoContextual />
         </p>
-        <h2 className="font-semibold text-[36px] text-[var(--color-text-primary)] leading-[1.05] tracking-[-0.03em]">
-          Continuemos<span className="text-[var(--color-accent)]">.</span>
+        <h2 className="text-h1 text-text-primary">
+          Sigamos preparándote<span className="text-accent">.</span>
         </h2>
-        <p className="text-[14px] text-[var(--color-text-secondary)] leading-5">
-          Te esperábamos. Ingresa para retomar tu preparación.
+        <p className="text-body text-text-secondary">
+          La próxima entrevista se gana hoy. Identifícate para retomar tu plan.
         </p>
       </motion.header>
 
@@ -126,12 +126,12 @@ export function PasoCredenciales({ onExito }: PasoCredencialesProps) {
       </motion.div>
 
       <motion.div {...motionProps(3)} className="flex flex-col gap-3 pt-1">
-        <MagneticButton type="submit" fullWidth={true} isLoading={mutation.isPending}>
-          <span>Entrar</span>
+        <Button type="submit" fullWidth={true} isLoading={mutation.isPending}>
+          <span>Retomar preparación</span>
           {mutation.isPending ? null : <ArrowRight className="h-4 w-4" aria-hidden="true" />}
-        </MagneticButton>
-        <p className="text-center text-[12px] text-[var(--color-text-tertiary)] leading-4">
-          ¿Olvidaste tu contraseña? Tu administrador la regenera.
+        </Button>
+        <p className="text-center text-caption text-text-tertiary">
+          ¿Sin acceso? Tu administrador regenera la contraseña en minutos.
         </p>
       </motion.div>
     </form>

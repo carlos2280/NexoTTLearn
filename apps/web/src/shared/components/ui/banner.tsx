@@ -4,18 +4,14 @@ import type { ReactNode } from "react"
 import { type VariantProps, tv } from "tailwind-variants"
 
 const bannerStyles = tv({
-  base: [
-    "flex items-start gap-3 rounded-[var(--radius-md)] border px-4 py-3",
-    "text-[13px] leading-5",
-  ],
+  base: ["flex items-start gap-3 rounded-md border px-4 py-3 text-body-sm"],
   variants: {
     tone: {
-      info: "bg-[var(--color-info-soft)] border-[var(--color-info-soft)] text-[#0E7490]",
-      success: "bg-[var(--color-success-soft)] border-[var(--color-success-soft)] text-[#15803D]",
-      warning: "bg-[var(--color-warning-soft)] border-[var(--color-warning-soft)] text-[#B45309]",
-      danger: "bg-[var(--color-danger-soft)] border-[var(--color-danger-soft)] text-[#B91C1C]",
-      neutral:
-        "bg-[var(--color-subtle)] border-[var(--color-border)] text-[var(--color-text-secondary)]",
+      info: "bg-info-soft border-info-soft text-info-on-soft",
+      success: "bg-success-soft border-success-soft text-success-on-soft",
+      warning: "bg-warning-soft border-warning-soft text-warning-on-soft",
+      danger: "bg-danger-soft border-danger-soft text-danger-on-soft",
+      neutral: "bg-subtle border-border text-text-secondary",
     },
   },
   defaultVariants: {

@@ -32,6 +32,9 @@ function generarLineas(cantidad: number, semilla: number): Linea[] {
   return lineas
 }
 
+const LINEA_GRADIENTE =
+  "linear-gradient(90deg, rgb(var(--color-accent-rgb) / 0) 0%, rgb(var(--color-accent-rgb) / 0.95) 35%, rgb(var(--color-accent-rgb) / 0) 100%)"
+
 export function StreamVivo() {
   const reducedMotion = useReducedMotion()
   const lineas = useMemo(() => generarLineas(14, 42), [])
@@ -54,8 +57,7 @@ export function StreamVivo() {
               key={l.id}
               className="absolute top-0 left-0 block origin-left rounded-full"
               style={{
-                background:
-                  "linear-gradient(90deg, rgba(79,70,229,0) 0%, rgba(79,70,229,0.95) 35%, rgba(79,70,229,0) 100%)",
+                background: LINEA_GRADIENTE,
                 width: `${l.largo}px`,
                 height: `${l.grosor}px`,
                 transform: `rotate(${(l.angulo * 180) / Math.PI}deg)`,
@@ -77,7 +79,7 @@ export function StreamVivo() {
           )
         })}
         <motion.span
-          className="-translate-x-1/2 -translate-y-1/2 absolute block h-2 w-2 rounded-full bg-[var(--color-accent)]"
+          className="-translate-x-1/2 -translate-y-1/2 absolute block h-2 w-2 rounded-pill bg-accent"
           animate={{
             scale: [1, 1.6, 1],
             opacity: [0.55, 1, 0.55],

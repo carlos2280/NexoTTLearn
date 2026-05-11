@@ -2,7 +2,6 @@ import { verificarMfa } from "@/features/auth/api/verificar-mfa.api"
 import { ApiError } from "@/shared/api/api-error"
 import { Banner } from "@/shared/components/ui/banner"
 import { Button } from "@/shared/components/ui/button"
-import { MagneticButton } from "@/shared/components/ui/magnetic-button"
 import { useMutation } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import { useCallback, useRef, useState } from "react"
@@ -36,7 +35,7 @@ export function PasoMfa({ challenge, onExito, onReiniciar }: PasoMfaProps) {
       }
       ultimoEnviado.current = codigoFinal
       await mutation
-        .mutateAsync({ challengeId: challenge.id, codigo: codigoFinal })
+        .mutateAsync({ mfaChallengeId: challenge.id, codigo: codigoFinal })
         .catch(() => undefined)
     },
     [challenge.id, mutation],
@@ -45,13 +44,11 @@ export function PasoMfa({ challenge, onExito, onReiniciar }: PasoMfaProps) {
   return (
     <div className="flex flex-col gap-7">
       <header className="flex flex-col gap-2">
-        <p className="font-medium text-[11px] text-[var(--color-text-tertiary)] uppercase leading-4 tracking-[0.22em]">
-          Verificación
-        </p>
-        <h2 className="font-semibold text-[36px] text-[var(--color-text-primary)] leading-[1.05] tracking-[-0.03em]">
-          Confírmalo<span className="text-[var(--color-accent)]">.</span>
+        <p className="nx-eyebrow text-text-tertiary">Doble verificación</p>
+        <h2 className="text-h1 text-text-primary">
+          Solo tú<span className="text-accent">.</span>
         </h2>
-        <p className="text-[14px] text-[var(--color-text-secondary)] leading-5">
+        <p className="text-body text-text-secondary">
           Ingresa el código de 6 dígitos de tu app autenticadora.
         </p>
       </header>
@@ -80,7 +77,7 @@ export function PasoMfa({ challenge, onExito, onReiniciar }: PasoMfaProps) {
       />
 
       <div className="flex flex-col gap-2">
-        <MagneticButton
+        <Button
           type="button"
           fullWidth={true}
           isLoading={mutation.isPending}
@@ -88,7 +85,7 @@ export function PasoMfa({ challenge, onExito, onReiniciar }: PasoMfaProps) {
           onClick={() => enviar(codigo)}
         >
           Verificar
-        </MagneticButton>
+        </Button>
         <Button
           type="button"
           variant="ghost"

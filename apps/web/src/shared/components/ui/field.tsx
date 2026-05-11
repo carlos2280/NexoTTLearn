@@ -34,15 +34,12 @@ export function Field(props: FieldProps) {
         "aria-describedby": describedBy,
       })}
       {error ? (
-        <p
-          id={errorId}
-          className="flex items-center gap-1.5 text-[12px] text-[var(--color-danger)] leading-4"
-        >
+        <p id={errorId} className="flex items-center gap-1.5 text-caption text-danger">
           <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           <span>{error}</span>
         </p>
       ) : hint ? (
-        <p id={hintId} className="text-[12px] text-[var(--color-text-tertiary)] leading-4">
+        <p id={hintId} className="text-caption text-text-tertiary">
           {hint}
         </p>
       ) : null}

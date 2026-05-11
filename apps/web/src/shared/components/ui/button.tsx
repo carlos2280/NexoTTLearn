@@ -6,35 +6,36 @@ import { type VariantProps, tv } from "tailwind-variants"
 const buttonStyles = tv({
   base: [
     "inline-flex items-center justify-center gap-2 select-none whitespace-nowrap",
-    "rounded-[var(--radius-sm)] font-medium",
-    "transition-[background-color,border-color,color,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-default)]",
-    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]",
-    "disabled:opacity-50 disabled:cursor-not-allowed",
+    "rounded-pill font-medium",
+    "transition-[background-color,border-color,color,box-shadow,transform] duration-fast ease-default",
+    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+    "active:scale-[0.98]",
+    "disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100",
   ],
   variants: {
     variant: {
       primary: [
-        "bg-[var(--color-accent)] text-[var(--color-accent-text)]",
-        "hover:bg-[var(--color-accent-hover)]",
-        "active:bg-[var(--color-accent-pressed)]",
+        "bg-accent text-accent-text",
+        "shadow-accent-glow hover:shadow-accent-glow-lg",
+        "hover:bg-accent-hover active:bg-accent-pressed",
       ],
       secondary: [
-        "bg-[var(--color-surface)] text-[var(--color-text-primary)]",
-        "border border-[var(--color-border-strong)]",
-        "hover:bg-[var(--color-subtle)]",
+        "bg-surface text-text-primary",
+        "border border-border-strong",
+        "hover:bg-subtle hover:border-border-emphasis",
       ],
-      ghost: ["bg-transparent text-[var(--color-text-primary)]", "hover:bg-[var(--color-subtle)]"],
-      danger: ["bg-[var(--color-danger)] text-white", "hover:opacity-90"],
+      ghost: ["bg-transparent text-text-primary", "hover:bg-subtle"],
+      danger: ["bg-danger text-white", "hover:opacity-90"],
       link: [
-        "bg-transparent text-[var(--color-accent)] p-0 h-auto",
-        "hover:text-[var(--color-accent-hover)] underline-offset-4 hover:underline",
+        "bg-transparent text-accent p-0 h-auto",
+        "hover:text-accent-hover underline-offset-4 hover:underline",
       ],
     },
     size: {
-      sm: "h-8 px-3 text-[12px] leading-4",
-      md: "h-10 px-4 text-[14px] leading-5",
-      lg: "h-11 px-5 text-[14px] leading-5",
-      icon: "h-9 w-9",
+      sm: "h-9 px-4 text-caption",
+      md: "h-11 px-5 text-body",
+      lg: "h-12 px-6 text-body",
+      icon: "h-10 w-10",
     },
     fullWidth: {
       true: "w-full",
@@ -43,7 +44,7 @@ const buttonStyles = tv({
   },
   defaultVariants: {
     variant: "primary",
-    size: "md",
+    size: "lg",
     fullWidth: false,
   },
 })

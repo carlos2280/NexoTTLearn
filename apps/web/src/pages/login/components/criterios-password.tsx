@@ -35,8 +35,8 @@ export function CriteriosPassword({ valor }: CriteriosPasswordProps) {
           <li
             key={c.key}
             className={cn(
-              "flex items-center gap-2 text-[12px] leading-4 transition-colors duration-[var(--duration-fast)]",
-              ok ? "text-[var(--color-success)]" : "text-[var(--color-text-tertiary)]",
+              "flex items-center gap-2 text-caption transition-colors duration-fast",
+              ok ? "text-success" : "text-text-tertiary",
             )}
           >
             {ok ? (

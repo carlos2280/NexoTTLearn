@@ -57,18 +57,19 @@ export function PasoCambiarPassword({ onExito }: PasoCambiarPasswordProps) {
       return
     }
     await mutation
-      .mutateAsync({ passwordActual: actual, passwordNueva: nueva })
+      .mutateAsync({ passwordActual: actual, passwordNuevo: nueva })
       .catch(() => undefined)
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate={true}>
       <header className="flex flex-col gap-1.5">
-        <h2 className="font-semibold text-[24px] text-[var(--color-text-primary)] leading-8 tracking-tight">
-          Crea una nueva contraseña
+        <p className="nx-eyebrow text-text-tertiary">Primer acceso</p>
+        <h2 className="text-h2 text-text-primary">
+          Define tu contraseña<span className="text-accent">.</span>
         </h2>
-        <p className="text-[14px] text-[var(--color-text-secondary)] leading-5">
-          Por seguridad, debes cambiarla antes de continuar.
+        <p className="text-body text-text-secondary">
+          Es la llave a tu ficha de skills. Que sea fuerte y solo tuya.
         </p>
       </header>
 

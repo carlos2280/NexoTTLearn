@@ -10,10 +10,7 @@ export const Label = forwardRef<HTMLLabelElement, LabelProps>(function Label(pro
   return (
     <LabelRoot
       ref={ref}
-      className={cn(
-        "font-medium text-[12px] text-[var(--color-text-secondary)] leading-4",
-        className,
-      )}
+      className={cn("font-medium text-caption text-text-secondary", className)}
       {...rest}
     />
   )
