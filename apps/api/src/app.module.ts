@@ -14,6 +14,7 @@ import { RolesGuard } from "./common/guards/roles.guard"
 import { SesionGuard } from "./common/guards/sesion.guard"
 import { PrismaModule } from "./common/prisma/prisma.module"
 import { validateEnv } from "./config/env.validation"
+import { CursosModule } from "./cursos/cursos.module"
 import { HealthModule } from "./health/health.module"
 
 /**
@@ -55,6 +56,7 @@ import { HealthModule } from "./health/health.module"
     AuthModule,
     CatalogoModule,
     ColaboradoresModule,
+    CursosModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: SesionGuard },

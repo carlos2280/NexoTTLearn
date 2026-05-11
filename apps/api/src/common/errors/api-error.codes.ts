@@ -66,6 +66,14 @@ export const apiErrorCodes = {
   bloqueYaEliminado: "BLOQUE_YA_ELIMINADO",
   conflictClienteNombreDuplicado: "CONFLICT_CLIENTE_NOMBRE_DUPLICADO",
   conflictClienteConCursos: "CONFLICT_CLIENTE_CON_CURSOS",
+  // Cursos P4a — CRUD, lifecycle BORRADOR/ARCHIVADO/CERRADO, duplicar, log-cambios.
+  cursoNoEncontrado: "CURSO_NO_ENCONTRADO",
+  conflictCursoEstado: "CONFLICT_CURSO_ESTADO",
+  conflictCursoNoBorrador: "CONFLICT_CURSO_NO_BORRADOR",
+  conflictCursoNoCerrado: "CONFLICT_CURSO_NO_CERRADO",
+  conflictCursoNoArchivado: "CONFLICT_CURSO_NO_ARCHIVADO",
+  conflictModuloArchivadoNoDuplicable: "CONFLICT_MODULO_ARCHIVADO_NO_DUPLICABLE",
+  validacionCursoFechas: "VALIDACION_CURSO_FECHAS",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]

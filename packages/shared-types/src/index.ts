@@ -107,3 +107,32 @@ export type {
 } from "./catalogo/clientes/cliente-response"
 export { crearClienteSchema, actualizarClienteSchema } from "./catalogo/clientes/cliente.schema"
 export type { CrearClienteInput, ActualizarClienteInput } from "./catalogo/clientes/cliente.schema"
+
+// Cursos P4a — CRUD, lifecycle BORRADOR/ARCHIVADO/CERRADO, duplicar, log-cambios.
+export {
+  estadoCursoSchema,
+  desbloqueoCursoSchema,
+  accionLogCursoSchema,
+} from "./cursos/curso.types"
+export type {
+  EstadoCurso,
+  DesbloqueoCurso,
+  AccionLogCurso,
+  CursoResumen,
+  CursoDetalle,
+  CursoAreaExigida,
+  CursoSkillExigida,
+  CursoModuloHabilitado,
+  LogCambioCurso,
+  DuplicarCursoResponse,
+} from "./cursos/curso.types"
+export { crearCursoSchema } from "./cursos/crear-curso.schema"
+export type { CrearCursoInput } from "./cursos/crear-curso.schema"
+export { actualizarCursoSchema } from "./cursos/actualizar-curso.schema"
+export type { ActualizarCursoInput } from "./cursos/actualizar-curso.schema"
+export { listarCursosQuerySchema } from "./cursos/listar-cursos.query.schema"
+export type { ListarCursosQuery } from "./cursos/listar-cursos.query.schema"
+export { duplicarCursoSchema } from "./cursos/duplicar-curso.schema"
+export type { DuplicarCursoInput } from "./cursos/duplicar-curso.schema"
+export { listarLogCambiosQuerySchema } from "./cursos/log-cambios.query.schema"
+export type { ListarLogCambiosQuery } from "./cursos/log-cambios.query.schema"
