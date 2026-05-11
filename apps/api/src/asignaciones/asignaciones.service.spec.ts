@@ -20,7 +20,11 @@ interface MockPrisma {
     updateMany: ReturnType<typeof vi.fn>
     count: ReturnType<typeof vi.fn>
   }
-  historicoEstadoAsignacion: { create: ReturnType<typeof vi.fn> }
+  historicoEstadoAsignacion: {
+    create: ReturnType<typeof vi.fn>
+    findMany: ReturnType<typeof vi.fn>
+    count: ReturnType<typeof vi.fn>
+  }
   curso: {
     findUnique: ReturnType<typeof vi.fn>
     findUniqueOrThrow: ReturnType<typeof vi.fn>
@@ -44,7 +48,7 @@ function buildPrismaMock(): MockPrisma {
       updateMany: vi.fn(),
       count: vi.fn(),
     },
-    historicoEstadoAsignacion: { create: vi.fn() },
+    historicoEstadoAsignacion: { create: vi.fn(), findMany: vi.fn(), count: vi.fn() },
     curso: { findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), findMany: vi.fn(), count: vi.fn() },
     colaborador: { findMany: vi.fn() },
     usuario: { findUnique: vi.fn() },
@@ -966,6 +970,208 @@ describe("AsignacionesService.retirar", () => {
     prisma.asignacionCurso.findUnique.mockResolvedValue(null)
     await expect(service.retirar(ASIGNACION_ID, "x", ADMIN_ID)).rejects.toBeInstanceOf(
       NotFoundException,
+    )
+  })
+})
+
+// ===== Slice 6 P6c — Resultado entrevista cliente + historico paginado =====
+
+describe("AsignacionesService.registrarResultadoEntrevistaCliente", () => {
+  it("200 PASO con rol=ASIGNADO + estadoAsignado=APTO: campos opcionales null", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: "APTO",
+    })
+    prisma.asignacionCurso.update.mockResolvedValue(
+      asignacionRow({
+        estadoAsignado: "APTO",
+        resultadoEntrevistaCliente: "PASO",
+      }),
+    )
+
+    const res = await service.registrarResultadoEntrevistaCliente(ASIGNACION_ID, {
+      resultadoEntrevistaCliente: "PASO",
+    })
+    expect(res.resultadoEntrevistaCliente).toBe("PASO")
+    expect(prisma.asignacionCurso.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: ASIGNACION_ID },
+        data: expect.objectContaining({
+          resultadoEntrevistaCliente: "PASO",
+          observacionesCliente: null,
+          fechaEntrevistaCliente: null,
+        }),
+      }),
+    )
+  })
+
+  it("200 NO_PASO con rol=ASIGNADO + estadoAsignado=NO_APTO + observaciones + fecha", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: "NO_APTO",
+    })
+    prisma.asignacionCurso.update.mockResolvedValue(
+      asignacionRow({
+        estadoAsignado: "NO_APTO",
+        resultadoEntrevistaCliente: "NO_PASO",
+      }),
+    )
+
+    await service.registrarResultadoEntrevistaCliente(ASIGNACION_ID, {
+      resultadoEntrevistaCliente: "NO_PASO",
+      observacionesCliente: "cliente prefirio otro",
+      fechaEntrevistaCliente: "2026-04-15",
+    })
+    const updateCall = prisma.asignacionCurso.update.mock.calls[0]?.[0] as {
+      data: {
+        resultadoEntrevistaCliente: string
+        observacionesCliente: string
+        fechaEntrevistaCliente: Date
+      }
+    }
+    expect(updateCall.data.resultadoEntrevistaCliente).toBe("NO_PASO")
+    expect(updateCall.data.observacionesCliente).toBe("cliente prefirio otro")
+    expect(updateCall.data.fechaEntrevistaCliente.toISOString()).toBe("2026-04-15T00:00:00.000Z")
+  })
+
+  it("422 validacionResultadoSoloAsignado cuando rol=VOLUNTARIO (sin tocar update)", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.VOLUNTARIO,
+      estadoAsignado: null,
+    })
+    await expect(
+      service.registrarResultadoEntrevistaCliente(ASIGNACION_ID, {
+        resultadoEntrevistaCliente: "PASO",
+      }),
+    ).rejects.toMatchObject({
+      response: { code: apiErrorCodes.validacionResultadoSoloAsignado },
+    })
+    expect(prisma.asignacionCurso.update).not.toHaveBeenCalled()
+  })
+
+  it("422 validacionAsignacionNoCerrada cuando rol=ASIGNADO + estadoAsignado=EN_PROGRESO", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: "EN_PROGRESO",
+    })
+    await expect(
+      service.registrarResultadoEntrevistaCliente(ASIGNACION_ID, {
+        resultadoEntrevistaCliente: "PASO",
+      }),
+    ).rejects.toMatchObject({
+      response: { code: apiErrorCodes.validacionAsignacionNoCerrada },
+    })
+    expect(prisma.asignacionCurso.update).not.toHaveBeenCalled()
+  })
+
+  it("404 asignacionNoEncontrada cuando findUnique devuelve null", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue(null)
+    await expect(
+      service.registrarResultadoEntrevistaCliente(ASIGNACION_ID, {
+        resultadoEntrevistaCliente: "PASO",
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException)
+  })
+})
+
+describe("AsignacionesService.obtenerHistoricoEstados", () => {
+  function historicoRow(overrides: Partial<Record<string, unknown>> = {}) {
+    return {
+      fecha: FECHA,
+      estadoAnterior: "ASIGNADO:ASIGNADO",
+      estadoNuevo: "ASIGNADO:EN_PROGRESO",
+      motivo: null,
+      ...overrides,
+    }
+  }
+
+  it("ADMIN: devuelve historico paginado de cualquier asignacion", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      colaboradorId: OTRO_COLABORADOR_ID,
+    })
+    prisma.historicoEstadoAsignacion.findMany.mockResolvedValue([
+      historicoRow(),
+      historicoRow({ estadoNuevo: "ASIGNADO:APTO", motivo: "ok" }),
+    ])
+    prisma.historicoEstadoAsignacion.count.mockResolvedValue(2)
+
+    const res = await service.obtenerHistoricoEstados(
+      ASIGNACION_ID,
+      { page: 1, pageSize: 20 },
+      ADMIN,
+    )
+    expect(res.data).toHaveLength(2)
+    expect(res.meta.total).toBe(2)
+    expect(prisma.historicoEstadoAsignacion.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { asignacionId: ASIGNACION_ID },
+        orderBy: { fecha: "desc" },
+        skip: 0,
+        take: 20,
+      }),
+    )
+  })
+
+  it("PARTICIPANTE propio: obtiene su historico", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      colaboradorId: COLABORADOR_ID,
+    })
+    prisma.usuario.findUnique.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
+    prisma.historicoEstadoAsignacion.findMany.mockResolvedValue([historicoRow()])
+    prisma.historicoEstadoAsignacion.count.mockResolvedValue(1)
+
+    const res = await service.obtenerHistoricoEstados(
+      ASIGNACION_ID,
+      { page: 1, pageSize: 20 },
+      PARTICIPANTE,
+    )
+    expect(res.data).toHaveLength(1)
+    expect(res.data[0]?.estadoNuevo).toBe("ASIGNADO:EN_PROGRESO")
+  })
+
+  it("PARTICIPANTE ajeno: 404 asignacionNoEncontrada (D-AS-9, NO 403)", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      colaboradorId: OTRO_COLABORADOR_ID,
+    })
+    prisma.usuario.findUnique.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
+
+    await expect(
+      service.obtenerHistoricoEstados(ASIGNACION_ID, { page: 1, pageSize: 20 }, PARTICIPANTE),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.asignacionNoEncontrada } })
+    expect(prisma.historicoEstadoAsignacion.findMany).not.toHaveBeenCalled()
+  })
+
+  it("404 asignacionNoEncontrada cuando la asignacion no existe", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue(null)
+    await expect(
+      service.obtenerHistoricoEstados(ASIGNACION_ID, { page: 1, pageSize: 20 }, ADMIN),
+    ).rejects.toBeInstanceOf(NotFoundException)
+  })
+
+  it("paginacion page=2, pageSize=10: skip=10, take=10, total del count", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      colaboradorId: COLABORADOR_ID,
+    })
+    prisma.historicoEstadoAsignacion.findMany.mockResolvedValue([])
+    prisma.historicoEstadoAsignacion.count.mockResolvedValue(42)
+
+    const res = await service.obtenerHistoricoEstados(
+      ASIGNACION_ID,
+      { page: 2, pageSize: 10 },
+      ADMIN,
+    )
+    expect(res.meta.total).toBe(42)
+    expect(res.meta.page).toBe(2)
+    expect(prisma.historicoEstadoAsignacion.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 10, take: 10 }),
     )
   })
 })

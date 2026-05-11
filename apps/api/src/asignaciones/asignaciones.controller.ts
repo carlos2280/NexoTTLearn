@@ -8,6 +8,7 @@ import {
   InternalServerErrorException,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   Req,
@@ -15,6 +16,7 @@ import {
 import {
   Asignacion,
   AsignacionDetallada,
+  AsignacionHistoricoEntrada,
   AutoInscripcionRequest,
   CrearAsignacionesBatchRequest,
   CrearAsignacionesBatchResponse,
@@ -22,11 +24,13 @@ import {
   ListarAsignacionesQuery,
   PaginacionQuery,
   Paginated,
+  PatchResultadoEntrevistaRequest,
   ReabrirRetirarBody,
   autoInscripcionRequestSchema,
   crearAsignacionesBatchRequestSchema,
   listarAsignacionesQuerySchema,
   paginacionQuerySchema,
+  patchResultadoEntrevistaRequestSchema,
   reabrirRetirarBodySchema,
 } from "@nexott-learn/shared-types"
 import { AccionAuditoria, RolUsuario } from "@prisma/client"
@@ -411,6 +415,68 @@ export class AsignacionesController {
       ...extractContextoHttp(req),
     })
     return respuesta
+  }
+
+  // ===== Slice 6 P6c — Resultado entrevista cliente + historico paginado =====
+
+  /**
+   * `PATCH /asignaciones/:id/resultado-entrevista-cliente` — ADMIN. Registra
+   * el resultado real con el cliente externo (D58, cap. 12.6). Audit
+   * `RESULTADO_ENTREVISTA_CLIENTE_REGISTRADO` con metadata sin PII (no incluye
+   * el texto de `observacionesCliente`, solo flags `tieneObservaciones` /
+   * `tieneFecha`).
+   */
+  @Patch("asignaciones/:asignacionId/resultado-entrevista-cliente")
+  @Roles(RolUsuario.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async registrarResultadoEntrevistaCliente(
+    @Param("asignacionId", ParseUUIDPipe) asignacionId: string,
+    @Body(new ZodValidationPipe(patchResultadoEntrevistaRequestSchema))
+    input: PatchResultadoEntrevistaRequest,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+    @Req() req: Request,
+  ): Promise<Asignacion> {
+    const sesion = this.requireUsuario(usuario)
+    const respuesta = await this.asignacionesService.registrarResultadoEntrevistaCliente(
+      asignacionId,
+      input,
+    )
+    await this.auditLog.record({
+      usuarioId: sesion.usuarioId,
+      accion: AccionAuditoria.RESULTADO_ENTREVISTA_CLIENTE_REGISTRADO,
+      exito: true,
+      recursoTipo: "asignacion",
+      recursoId: asignacionId,
+      metadata: {
+        asignacionId,
+        colaboradorId: respuesta.colaboradorId,
+        cursoId: respuesta.cursoId,
+        resultado: input.resultadoEntrevistaCliente,
+        tieneObservaciones: input.observacionesCliente !== undefined,
+        tieneFecha: input.fechaEntrevistaCliente !== undefined,
+      },
+      ...extractContextoHttp(req),
+    })
+    return respuesta
+  }
+
+  /**
+   * `GET /asignaciones/:id/historico-estados` — ADMIN; PARTICIPANTE para la
+   * suya (D-AS-9: 404 si ajena, NO 403). Paginado, ordenado `fecha DESC`.
+   * Sin audit log (lectura admin/propia frecuente, patron heredado P5c).
+   */
+  @Get("asignaciones/:asignacionId/historico-estados")
+  @Roles(RolUsuario.ADMIN, RolUsuario.PARTICIPANTE)
+  async obtenerHistoricoEstados(
+    @Param("asignacionId", ParseUUIDPipe) asignacionId: string,
+    @Query(new ZodValidationPipe(paginacionQuerySchema)) query: PaginacionQuery,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<Paginated<AsignacionHistoricoEntrada>> {
+    return await this.asignacionesService.obtenerHistoricoEstados(
+      asignacionId,
+      query,
+      this.requireUsuario(usuario),
+    )
   }
 
   private requireUsuario(usuario: SesionUsuario | undefined): SesionUsuario {

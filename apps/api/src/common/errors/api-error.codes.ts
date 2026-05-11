@@ -121,6 +121,9 @@ export const apiErrorCodes = {
   conflictAsignacionNoListoNiEnProgreso: "CONFLICT_ASIGNACION_NO_LISTO_NI_EN_PROGRESO",
   conflictAsignacionNoCerrada: "CONFLICT_ASIGNACION_NO_CERRADA",
   condicionesListoNoCumplidas: "CONDICIONES_LISTO_NO_CUMPLIDAS",
+  // Asignaciones P6c — resultado entrevista cliente (D58).
+  validacionResultadoSoloAsignado: "VALIDACION_RESULTADO_SOLO_ASIGNADO",
+  validacionAsignacionNoCerrada: "VALIDACION_ASIGNACION_NO_CERRADA",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]

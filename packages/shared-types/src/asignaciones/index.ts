@@ -42,3 +42,6 @@ export type {
   ReabrirRetirarBody,
   CondicionesListoFaltante,
 } from "./transiciones.schema"
+
+export { patchResultadoEntrevistaRequestSchema } from "./resultado-entrevista.schema"
+export type { PatchResultadoEntrevistaRequest } from "./resultado-entrevista.schema"

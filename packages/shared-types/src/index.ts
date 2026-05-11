@@ -230,6 +230,7 @@ export {
   cerrarCasoAsignadoSchema,
   cerrarCasoVoluntarioSchema,
   reabrirRetirarBodySchema,
+  patchResultadoEntrevistaRequestSchema,
 } from "./asignaciones"
 export type {
   RolAsignacion,
@@ -252,4 +253,5 @@ export type {
   CerrarCasoVoluntarioRequest,
   ReabrirRetirarBody,
   CondicionesListoFaltante,
+  PatchResultadoEntrevistaRequest,
 } from "./asignaciones"

@@ -9,6 +9,7 @@ import {
 import {
   Asignacion,
   AsignacionDetallada,
+  AsignacionHistoricoEntrada,
   AsignacionRechazada,
   AutoInscripcionRequest,
   CerrarCasoAsignadoRequest,
@@ -17,7 +18,9 @@ import {
   CrearAsignacionesBatchResponse,
   CursoDisponibleVoluntario,
   ListarAsignacionesQuery,
+  PaginacionQuery,
   Paginated,
+  PatchResultadoEntrevistaRequest,
   cerrarCasoAsignadoSchema,
   cerrarCasoVoluntarioSchema,
 } from "@nexott-learn/shared-types"
@@ -971,6 +974,113 @@ export class AsignacionesService {
       })
       return toAsignacion(row)
     })
+  }
+
+  // ===== Slice 6 P6c — Resultado entrevista cliente + historico =====
+
+  /**
+   * `PATCH /asignaciones/:id/resultado-entrevista-cliente` — ADMIN. Registra
+   * el resultado real con el cliente externo (D58, cap. 12.6). No afecta a la
+   * aptitud calculada; alimenta el reporte de eficacia. CHECK
+   * `chk_asig_resultado_solo_asignado` es el guard de ultima instancia en BD.
+   *
+   * No usa Idempotency-Key: es un UPDATE con valores fijos, naturalmente
+   * idempotente. Sin patron M1 race-safe: el CHECK ya bloquea cambios en
+   * estados no permitidos.
+   */
+  async registrarResultadoEntrevistaCliente(
+    asignacionId: string,
+    input: PatchResultadoEntrevistaRequest,
+  ): Promise<Asignacion> {
+    const previa = await this.prisma.asignacionCurso.findUnique({
+      where: { id: asignacionId },
+      select: { id: true, rol: true, estadoAsignado: true },
+    })
+    if (!previa) {
+      throw new NotFoundException({
+        code: apiErrorCodes.asignacionNoEncontrada,
+        message: `Asignacion ${asignacionId} no encontrada.`,
+      })
+    }
+    if (previa.rol !== RolAsignacion.ASIGNADO) {
+      throw new UnprocessableEntityException({
+        code: apiErrorCodes.validacionResultadoSoloAsignado,
+        message: "El resultado de entrevista cliente solo aplica a asignaciones con rol=ASIGNADO.",
+      })
+    }
+    if (previa.estadoAsignado !== "APTO" && previa.estadoAsignado !== "NO_APTO") {
+      throw new UnprocessableEntityException({
+        code: apiErrorCodes.validacionAsignacionNoCerrada,
+        message: "Solo se puede registrar resultado cuando la asignacion esta APTO o NO_APTO.",
+      })
+    }
+
+    const row = await this.prisma.asignacionCurso.update({
+      where: { id: asignacionId },
+      data: {
+        resultadoEntrevistaCliente: input.resultadoEntrevistaCliente,
+        observacionesCliente: input.observacionesCliente ?? null,
+        fechaEntrevistaCliente:
+          input.fechaEntrevistaCliente !== undefined
+            ? new Date(`${input.fechaEntrevistaCliente}T00:00:00Z`)
+            : null,
+      },
+      select: SELECT_ASIGNACION_FIELDS,
+    })
+    return toAsignacion(row)
+  }
+
+  /**
+   * `GET /asignaciones/:id/historico-estados` — ADMIN; PARTICIPANTE solo la
+   * suya (D-AS-9: 404 si ajena, NO 403). Ordenado `fecha DESC`, paginado.
+   * Sin audit log: lectura admin/propia frecuente, patron heredado de
+   * P5c historial (D-CAT-3).
+   */
+  async obtenerHistoricoEstados(
+    asignacionId: string,
+    query: PaginacionQuery,
+    usuario: SesionUsuario,
+  ): Promise<Paginated<AsignacionHistoricoEntrada>> {
+    const previa = await this.prisma.asignacionCurso.findUnique({
+      where: { id: asignacionId },
+      select: { id: true, colaboradorId: true },
+    })
+    if (!previa) {
+      throw new NotFoundException({
+        code: apiErrorCodes.asignacionNoEncontrada,
+        message: `Asignacion ${asignacionId} no encontrada.`,
+      })
+    }
+    if (usuario.rol === RolUsuario.PARTICIPANTE) {
+      const colaboradorId = await this.colaboradorIdDeUsuario(usuario.usuarioId)
+      if (!colaboradorId || previa.colaboradorId !== colaboradorId) {
+        // D-AS-9: ocultar existencia para PARTICIPANTE ajeno.
+        throw new NotFoundException({
+          code: apiErrorCodes.asignacionNoEncontrada,
+          message: `Asignacion ${asignacionId} no encontrada.`,
+        })
+      }
+    }
+
+    const { skip, take, page, pageSize } = resolvePaginacion(query)
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.historicoEstadoAsignacion.findMany({
+        where: { asignacionId },
+        select: { fecha: true, estadoAnterior: true, estadoNuevo: true, motivo: true },
+        orderBy: { fecha: "desc" },
+        skip,
+        take,
+      }),
+      this.prisma.historicoEstadoAsignacion.count({ where: { asignacionId } }),
+    ])
+
+    const data: AsignacionHistoricoEntrada[] = rows.map((h) => ({
+      fecha: h.fecha.toISOString(),
+      estadoAnterior: h.estadoAnterior,
+      estadoNuevo: h.estadoNuevo,
+      motivo: h.motivo,
+    }))
+    return buildPaginatedResponse(data, total, page, pageSize)
   }
 
   private async colaboradorIdDeUsuario(usuarioId: string): Promise<string | null> {
