@@ -15,7 +15,14 @@ import {
   PreviewImpactoArchivoModulo,
   SkillHuerfana,
 } from "@nexott-learn/shared-types"
-import { AccionAuditoria, EstadoCurso, EstadoModulo, EstadoSkill, Prisma } from "@prisma/client"
+import {
+  AccionAuditoria,
+  EstadoBloque,
+  EstadoCurso,
+  EstadoModulo,
+  EstadoSkill,
+  Prisma,
+} from "@prisma/client"
 import { AuditLogService } from "../../common/audit/audit-log.service"
 import { ContextoHttpAuditoria } from "../../common/audit/audit-log.types"
 import { apiErrorCodes } from "../../common/errors/api-error.codes"
@@ -392,7 +399,7 @@ export class ModulosService {
         where: {
           seccion: { moduloId: { in: moduloIds } },
           skillQueMideId: { not: null },
-          estado: { not: "ELIMINADO" },
+          estado: { not: EstadoBloque.ELIMINADO },
         },
         select: { skillQueMideId: true },
       }),

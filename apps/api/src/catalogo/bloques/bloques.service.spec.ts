@@ -292,6 +292,35 @@ describe("BloquesService.patch", () => {
     ).rejects.toBeInstanceOf(BadRequestException)
   })
 
+  it("CAMBIA_EVALUACION: releer skill en tx detecta race si se archiva durante la transaccion, 409", async () => {
+    // Lectura previa fuera del tx: bloque ACTIVO.
+    prisma.bloque.findUnique.mockResolvedValueOnce({
+      id: BLO_ID,
+      version: 1,
+      estado: EstadoBloque.ACTIVO,
+      esEvaluable: true,
+      skillQueMideId: SKILL_ID,
+    })
+    // Dentro del tx: bloque sigue ACTIVO, pero la skill paso a ARCHIVADA.
+    prisma.bloque.findUnique.mockResolvedValueOnce({
+      id: BLO_ID,
+      version: 1,
+      estado: EstadoBloque.ACTIVO,
+    })
+    prisma.skill.findUnique.mockResolvedValue({ id: SKILL_ID, estado: EstadoSkill.ARCHIVADA })
+    await expect(
+      service.patch(
+        BLO_ID,
+        { tipoEdicion: "CAMBIA_EVALUACION", contenido: {}, skillQueMideId: SKILL_ID },
+        "ajuste de rubrica",
+        ADMIN_ID,
+      ),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.skillNoActiva } })
+    expect(prisma.bloque.update).not.toHaveBeenCalled()
+    expect(prisma.intentoBloque.updateMany).not.toHaveBeenCalled()
+    expect(audit.record).not.toHaveBeenCalled()
+  })
+
   it("bloque ya eliminado: 409 BLOQUE_YA_ELIMINADO", async () => {
     prisma.bloque.findUnique.mockResolvedValue({
       id: BLO_ID,

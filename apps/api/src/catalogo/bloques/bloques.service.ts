@@ -147,11 +147,10 @@ export class BloquesService {
         message: "Seccion no encontrada.",
       })
     }
-    if (input.skillQueMideId) {
-      await this.validarSkillActiva(input.skillQueMideId)
-    }
-
     const fila = await this.prisma.$transaction(async (tx) => {
+      if (input.skillQueMideId) {
+        await this.validarSkillActiva(tx, input.skillQueMideId)
+      }
       let ordenFinal: number
       if (input.orden !== undefined) {
         const existente = await tx.bloque.findFirst({
@@ -199,8 +198,11 @@ export class BloquesService {
     return toBloqueDetalleResponse(fila)
   }
 
-  private async validarSkillActiva(skillId: string): Promise<void> {
-    const skill = await this.prisma.skill.findUnique({
+  private async validarSkillActiva(
+    tx: Prisma.TransactionClient | PrismaService,
+    skillId: string,
+  ): Promise<void> {
+    const skill = await tx.skill.findUnique({
       where: { id: skillId },
       select: { id: true, estado: true },
     })
@@ -300,10 +302,6 @@ export class BloquesService {
         })
       }
     }
-    if (input.skillQueMideId) {
-      await this.validarSkillActiva(input.skillQueMideId)
-    }
-
     const { fila, intentosInvalidados, versionAnterior, versionNueva } =
       await this.prisma.$transaction(async (tx) => {
         const enTx = await tx.bloque.findUnique({
@@ -321,6 +319,9 @@ export class BloquesService {
             code: apiErrorCodes.bloqueYaEliminado,
             message: "El bloque ya esta eliminado.",
           })
+        }
+        if (input.skillQueMideId) {
+          await this.validarSkillActiva(tx, input.skillQueMideId)
         }
         const versionAnt = enTx.version
         const versionNueva = versionAnt + 1
@@ -430,13 +431,10 @@ export class BloquesService {
           })
         }
       }
-      for (const b of actuales) {
-        await tx.bloque.update({
-          where: { id: b.id },
-          data: { orden: { increment: REORDEN_OFFSET } },
-          select: { id: true },
-        })
-      }
+      await tx.bloque.updateMany({
+        where: { seccionId },
+        data: { orden: { increment: REORDEN_OFFSET } },
+      })
       for (const o of input.orden) {
         await tx.bloque.update({
           where: { id: o.bloqueId },

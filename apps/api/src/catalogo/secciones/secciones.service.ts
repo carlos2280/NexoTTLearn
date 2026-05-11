@@ -102,11 +102,10 @@ export class SeccionesService {
         message: "Modulo no encontrado.",
       })
     }
-    if (input.skillIds && input.skillIds.length > 0) {
-      await this.validarSkillsActivas(input.skillIds)
-    }
-
     const fila = await this.prisma.$transaction(async (tx) => {
+      if (input.skillIds && input.skillIds.length > 0) {
+        await this.validarSkillsActivas(tx, input.skillIds)
+      }
       let ordenFinal: number
       if (input.orden !== undefined) {
         const existente = await tx.seccion.findFirst({
@@ -171,12 +170,11 @@ export class SeccionesService {
         message: "Seccion no encontrada.",
       })
     }
-    if (input.skillIds) {
-      await this.validarSkillsActivas(input.skillIds)
-    }
-
     const camposCambiados: string[] = []
     const fila = await this.prisma.$transaction(async (tx) => {
+      if (input.skillIds) {
+        await this.validarSkillsActivas(tx, input.skillIds)
+      }
       const actualizada = await this.aplicarCambiosTitulo(
         tx,
         seccionId,
@@ -249,11 +247,14 @@ export class SeccionesService {
     return { cambio: aEliminar.length > 0 || aAgregar.length > 0 }
   }
 
-  private async validarSkillsActivas(skillIds: readonly string[]): Promise<void> {
+  private async validarSkillsActivas(
+    tx: Prisma.TransactionClient | PrismaService,
+    skillIds: readonly string[],
+  ): Promise<void> {
     if (skillIds.length === 0) {
       return
     }
-    const filas = await this.prisma.skill.findMany({
+    const filas = await tx.skill.findMany({
       where: { id: { in: [...skillIds] } },
       select: { id: true, estado: true },
     })
@@ -322,13 +323,10 @@ export class SeccionesService {
       }
 
       // Paso 1: liberar slots con offset temporal.
-      for (const s of actuales) {
-        await tx.seccion.update({
-          where: { id: s.id },
-          data: { orden: { increment: REORDEN_OFFSET } },
-          select: { id: true },
-        })
-      }
+      await tx.seccion.updateMany({
+        where: { moduloId },
+        data: { orden: { increment: REORDEN_OFFSET } },
+      })
       // Paso 2: aplicar el orden final.
       for (const o of input.orden) {
         await tx.seccion.update({

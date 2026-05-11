@@ -17,6 +17,7 @@ interface MockPrisma {
     count: ReturnType<typeof vi.fn>
     create: ReturnType<typeof vi.fn>
     update: ReturnType<typeof vi.fn>
+    updateMany: ReturnType<typeof vi.fn>
     delete: ReturnType<typeof vi.fn>
   }
   seccionSkill: {
@@ -40,6 +41,7 @@ function buildPrismaMock(): MockPrisma {
       count: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       delete: vi.fn(),
     },
     seccionSkill: { findMany: vi.fn(), createMany: vi.fn(), deleteMany: vi.fn() },
@@ -178,6 +180,21 @@ describe("SeccionesService.crear", () => {
   })
 })
 
+describe("SeccionesService.actualizar", () => {
+  it("releer skills en tx detecta race: si una skill se archiva durante la transaccion, 409", async () => {
+    prisma.seccion.findFirst.mockResolvedValue(buildSeccionRow())
+    // Dentro del tx: la validacion de skills lanza por archivada.
+    prisma.skill.findMany.mockResolvedValue([{ id: SKILL_ID, estado: EstadoSkill.ARCHIVADA }])
+    await expect(
+      service.actualizar(MOD_ID, SEC_ID, { skillIds: [SKILL_ID] }, ADMIN_ID),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.skillNoActiva } })
+    expect(prisma.seccion.update).not.toHaveBeenCalled()
+    expect(prisma.seccionSkill.createMany).not.toHaveBeenCalled()
+    expect(prisma.seccionSkill.deleteMany).not.toHaveBeenCalled()
+    expect(audit.record).not.toHaveBeenCalled()
+  })
+})
+
 describe("SeccionesService.reordenar", () => {
   it("rechaza si el set de seccionId no coincide: 400 SECCION_ORDEN_INVALIDO", async () => {
     prisma.modulo.findFirst.mockResolvedValue({ id: MOD_ID })
@@ -198,6 +215,7 @@ describe("SeccionesService.reordenar", () => {
       { id: "22222222-2222-2222-2222-bbbbbbbbbbbb" },
     ])
     prisma.seccion.update.mockResolvedValue({ id: "x" })
+    prisma.seccion.updateMany.mockResolvedValue({ count: 2 })
     await service.reordenar(
       MOD_ID,
       {
@@ -208,8 +226,14 @@ describe("SeccionesService.reordenar", () => {
       },
       ADMIN_ID,
     )
-    // Esperamos N updates con increment + N updates con orden final.
-    expect(prisma.seccion.update).toHaveBeenCalledTimes(4)
+    // Paso 1: un solo updateMany con increment. Paso 2: N updates con orden final.
+    expect(prisma.seccion.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { moduloId: MOD_ID },
+        data: { orden: { increment: 1_000_000 } },
+      }),
+    )
+    expect(prisma.seccion.update).toHaveBeenCalledTimes(2)
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({ accion: "SECCION_REORDENADA" }),
     )
