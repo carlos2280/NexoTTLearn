@@ -125,6 +125,7 @@ export type {
   CursoModuloHabilitado,
   LogCambioCurso,
   DuplicarCursoResponse,
+  CursoConfiguracionResponse,
 } from "./cursos/curso.types"
 export { crearCursoSchema } from "./cursos/crear-curso.schema"
 export type { CrearCursoInput } from "./cursos/crear-curso.schema"
@@ -136,3 +137,36 @@ export { duplicarCursoSchema } from "./cursos/duplicar-curso.schema"
 export type { DuplicarCursoInput } from "./cursos/duplicar-curso.schema"
 export { listarLogCambiosQuerySchema } from "./cursos/log-cambios.query.schema"
 export type { ListarLogCambiosQuery } from "./cursos/log-cambios.query.schema"
+
+// Cursos P4b — configuracion (areas, skills exigidas, modulos habilitados,
+// pesos, umbrales de logro, transversal, entrevista IA).
+export { actualizarAreasCursoSchema } from "./cursos/actualizar-areas-curso.schema"
+export type { ActualizarAreasCursoInput } from "./cursos/actualizar-areas-curso.schema"
+export { actualizarSkillsExigidasCursoSchema } from "./cursos/actualizar-skills-exigidas-curso.schema"
+export type { ActualizarSkillsExigidasCursoInput } from "./cursos/actualizar-skills-exigidas-curso.schema"
+export { actualizarModulosHabilitadosCursoSchema } from "./cursos/actualizar-modulos-habilitados-curso.schema"
+export type {
+  ActualizarModulosHabilitadosCursoInput,
+  SkillSinCobertura,
+} from "./cursos/actualizar-modulos-habilitados-curso.schema"
+export { actualizarPesosCursoSchema } from "./cursos/actualizar-pesos-curso.schema"
+export type { ActualizarPesosCursoInput } from "./cursos/actualizar-pesos-curso.schema"
+export { actualizarUmbralesLogroCursoSchema } from "./cursos/actualizar-umbrales-logro-curso.schema"
+export type {
+  ActualizarUmbralesLogroCursoInput,
+  UmbralesLogroValores,
+} from "./cursos/actualizar-umbrales-logro-curso.schema"
+export { actualizarTransversalCursoSchema } from "./cursos/actualizar-transversal-curso.schema"
+export type { ActualizarTransversalCursoInput } from "./cursos/actualizar-transversal-curso.schema"
+export {
+  actualizarEntrevistaIaCursoSchema,
+  filosofiaEntrevistaSchema,
+  profundidadEntrevistaSchema,
+  tonoEntrevistaSchema,
+} from "./cursos/actualizar-entrevista-ia-curso.schema"
+export type {
+  ActualizarEntrevistaIaCursoInput,
+  FilosofiaEntrevista,
+  ProfundidadEntrevista,
+  TonoEntrevista,
+} from "./cursos/actualizar-entrevista-ia-curso.schema"

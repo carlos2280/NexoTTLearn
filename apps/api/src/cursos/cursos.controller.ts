@@ -13,8 +13,16 @@ import {
   Query,
 } from "@nestjs/common"
 import {
+  ActualizarAreasCursoInput,
   ActualizarCursoInput,
+  ActualizarEntrevistaIaCursoInput,
+  ActualizarModulosHabilitadosCursoInput,
+  ActualizarPesosCursoInput,
+  ActualizarSkillsExigidasCursoInput,
+  ActualizarTransversalCursoInput,
+  ActualizarUmbralesLogroCursoInput,
   CrearCursoInput,
+  CursoConfiguracionResponse,
   CursoDetalle,
   CursoResumen,
   DuplicarCursoInput,
@@ -23,7 +31,14 @@ import {
   ListarLogCambiosQuery,
   LogCambioCurso,
   Paginated,
+  actualizarAreasCursoSchema,
   actualizarCursoSchema,
+  actualizarEntrevistaIaCursoSchema,
+  actualizarModulosHabilitadosCursoSchema,
+  actualizarPesosCursoSchema,
+  actualizarSkillsExigidasCursoSchema,
+  actualizarTransversalCursoSchema,
+  actualizarUmbralesLogroCursoSchema,
   crearCursoSchema,
   duplicarCursoSchema,
   listarCursosQuerySchema,
@@ -151,6 +166,127 @@ export class CursosController {
     @Query(new ZodValidationPipe(listarLogCambiosQuerySchema)) query: ListarLogCambiosQuery,
   ): Promise<Paginated<LogCambioCurso>> {
     return await this.cursosService.listarLogCambios(cursoId, query)
+  }
+
+  // P4b — configuracion del curso. Motivo condicional por estado (D-CUR-4):
+  // BORRADOR no exige header `X-Motivo`; ACTIVO si. La validacion vive en el
+  // service (no `@RequiereMotivo()` global). Patron heredado D-CAT-20.
+
+  @Patch(":cursoId/areas")
+  @Roles(RolUsuario.ADMIN)
+  async actualizarAreas(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+    @Body(new ZodValidationPipe(actualizarAreasCursoSchema)) input: ActualizarAreasCursoInput,
+    @Motivo() motivo: string | undefined,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<CursoConfiguracionResponse> {
+    return await this.cursosService.actualizarAreas(
+      cursoId,
+      input,
+      motivo,
+      this.requireUsuario(usuario).usuarioId,
+    )
+  }
+
+  @Patch(":cursoId/skills-exigidas")
+  @Roles(RolUsuario.ADMIN)
+  async actualizarSkillsExigidas(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+    @Body(new ZodValidationPipe(actualizarSkillsExigidasCursoSchema))
+    input: ActualizarSkillsExigidasCursoInput,
+    @Motivo() motivo: string | undefined,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<CursoConfiguracionResponse> {
+    return await this.cursosService.actualizarSkillsExigidas(
+      cursoId,
+      input,
+      motivo,
+      this.requireUsuario(usuario).usuarioId,
+    )
+  }
+
+  @Patch(":cursoId/modulos-habilitados")
+  @Roles(RolUsuario.ADMIN)
+  async actualizarModulosHabilitados(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+    @Body(new ZodValidationPipe(actualizarModulosHabilitadosCursoSchema))
+    input: ActualizarModulosHabilitadosCursoInput,
+    @Motivo() motivo: string | undefined,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<CursoConfiguracionResponse> {
+    return await this.cursosService.actualizarModulosHabilitados(
+      cursoId,
+      input,
+      motivo,
+      this.requireUsuario(usuario).usuarioId,
+    )
+  }
+
+  @Patch(":cursoId/pesos")
+  @Roles(RolUsuario.ADMIN)
+  async actualizarPesos(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+    @Body(new ZodValidationPipe(actualizarPesosCursoSchema)) input: ActualizarPesosCursoInput,
+    @Motivo() motivo: string | undefined,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<CursoConfiguracionResponse> {
+    return await this.cursosService.actualizarPesos(
+      cursoId,
+      input,
+      motivo,
+      this.requireUsuario(usuario).usuarioId,
+    )
+  }
+
+  @Patch(":cursoId/umbrales-logro")
+  @Roles(RolUsuario.ADMIN)
+  async actualizarUmbralesLogro(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+    @Body(new ZodValidationPipe(actualizarUmbralesLogroCursoSchema))
+    input: ActualizarUmbralesLogroCursoInput,
+    @Motivo() motivo: string | undefined,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<CursoConfiguracionResponse> {
+    return await this.cursosService.actualizarUmbralesLogro(
+      cursoId,
+      input,
+      motivo,
+      this.requireUsuario(usuario).usuarioId,
+    )
+  }
+
+  @Patch(":cursoId/transversal")
+  @Roles(RolUsuario.ADMIN)
+  async actualizarTransversal(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+    @Body(new ZodValidationPipe(actualizarTransversalCursoSchema))
+    input: ActualizarTransversalCursoInput,
+    @Motivo() motivo: string | undefined,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<CursoConfiguracionResponse> {
+    return await this.cursosService.actualizarTransversal(
+      cursoId,
+      input,
+      motivo,
+      this.requireUsuario(usuario).usuarioId,
+    )
+  }
+
+  @Patch(":cursoId/entrevista-ia")
+  @Roles(RolUsuario.ADMIN)
+  async actualizarEntrevistaIa(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+    @Body(new ZodValidationPipe(actualizarEntrevistaIaCursoSchema))
+    input: ActualizarEntrevistaIaCursoInput,
+    @Motivo() motivo: string | undefined,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<CursoConfiguracionResponse> {
+    return await this.cursosService.actualizarEntrevistaIa(
+      cursoId,
+      input,
+      motivo,
+      this.requireUsuario(usuario).usuarioId,
+    )
   }
 
   private requireUsuario(usuario: SesionUsuario | undefined): SesionUsuario {

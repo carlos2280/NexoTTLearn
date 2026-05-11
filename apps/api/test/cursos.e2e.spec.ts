@@ -64,7 +64,7 @@ async function loginYObtenerCsrf(agente: Agent, email: string): Promise<string> 
   return token
 }
 
-describe.runIf(RUN_E2E)("cursos e2e (P4a)", () => {
+describe.runIf(RUN_E2E)("cursos e2e (P4a + P4b)", () => {
   let app: INestApplication
   let agenteAdmin: Agent
   let agentePart: Agent
@@ -187,12 +187,29 @@ describe.runIf(RUN_E2E)("cursos e2e (P4a)", () => {
         select: { id: true },
       })
       const tituloLike = `%${TITULO_PREFIX}%`
+      const cursosBorrar = await prisma.curso.findMany({
+        where: { titulo: { contains: TITULO_PREFIX } },
+        select: { id: true, transversalId: true, entrevistaIaId: true },
+      })
       await prisma.$executeRaw`
         DELETE FROM log_cambios_curso WHERE curso_id IN (
           SELECT id FROM cursos WHERE titulo LIKE ${tituloLike}
         )
       `
       await prisma.curso.deleteMany({ where: { titulo: { contains: TITULO_PREFIX } } })
+      const transversalIds = cursosBorrar
+        .map((c) => c.transversalId)
+        .filter((v): v is string => Boolean(v))
+      if (transversalIds.length > 0) {
+        await prisma.proyectoTransversal.deleteMany({ where: { id: { in: transversalIds } } })
+      }
+      const entrevistaIds = cursosBorrar
+        .map((c) => c.entrevistaIaId)
+        .filter((v): v is string => Boolean(v))
+      if (entrevistaIds.length > 0) {
+        await prisma.entrevistaIA.deleteMany({ where: { id: { in: entrevistaIds } } })
+      }
+      await prisma.area.deleteMany({ where: { nombre: { contains: TITULO_PREFIX } } })
       const cli = await prisma.cliente.findUnique({
         where: { nombre: CLIENTE_NOMBRE },
         select: { id: true },
@@ -386,5 +403,177 @@ describe.runIf(RUN_E2E)("cursos e2e (P4a)", () => {
     for (const c of body.data) {
       expect(c.titulo).not.toMatch(/^P4a-e2e-/u)
     }
+  })
+
+  // ===========================================================================
+  // P4b — Configuracion del curso (7 endpoints)
+  // ===========================================================================
+
+  async function crearCursoBorrador(suffix: string): Promise<string> {
+    const res = await agenteAdmin
+      .post("/api/v1/cursos")
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .send({
+        titulo: `${TITULO_PREFIX}p4b-${suffix}`,
+        clienteId,
+        fechaInicio: "2026-04-01",
+        fechaDeadline: "2026-06-30",
+      })
+    if (res.status !== 201) {
+      throw new Error(`crearCursoBorrador fallo (${res.status}): ${JSON.stringify(res.body)}`)
+    }
+    return (res.body as { id: string }).id
+  }
+
+  async function crearAreaPersistida(nombre: string): Promise<string> {
+    const area = await prisma.area.create({
+      data: { nombre, descripcion: null },
+      select: { id: true },
+    })
+    return area.id
+  }
+
+  it("PATCH /:id/areas: 200 happy path en BORRADOR sin motivo", async () => {
+    const cursoId = await crearCursoBorrador("areas-ok")
+    const areaA = await crearAreaPersistida(`${TITULO_PREFIX}area-A-${Date.now()}`)
+    const areaB = await crearAreaPersistida(`${TITULO_PREFIX}area-B-${Date.now()}`)
+    const res = await agenteAdmin
+      .patch(`/api/v1/cursos/${cursoId}/areas`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .send({
+        areas: [
+          { areaId: areaA, peso: 60, puntajeObjetivo: 70 },
+          { areaId: areaB, peso: 40, puntajeObjetivo: 70 },
+        ],
+      })
+    expect(res.status).toBe(200)
+    const body = res.body as { areasExigidas: readonly unknown[] }
+    expect(body.areasExigidas).toHaveLength(2)
+  })
+
+  it("PATCH /:id/areas: 422 si suma != 100", async () => {
+    const cursoId = await crearCursoBorrador("areas-suma")
+    const areaA = await crearAreaPersistida(`${TITULO_PREFIX}area-suma-${Date.now()}`)
+    const res = await agenteAdmin
+      .patch(`/api/v1/cursos/${cursoId}/areas`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .send({ areas: [{ areaId: areaA, peso: 50, puntajeObjetivo: 70 }] })
+    expect(res.status).toBe(422)
+    expect((res.body as { code: string }).code).toBe("VALIDACION_PESO_NO_SUMA_100")
+  })
+
+  it("PATCH /:id/pesos: 422 si bloques+transversal+entrevista != 100", async () => {
+    const cursoId = await crearCursoBorrador("pesos-bad")
+    const res = await agenteAdmin
+      .patch(`/api/v1/cursos/${cursoId}/pesos`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .send({ pesoBloques: 50, pesoTransversal: 30, pesoEntrevista: 30 })
+    expect(res.status).toBe(422)
+    expect((res.body as { code: string }).code).toBe("VALIDACION_PESO_NO_SUMA_100")
+  })
+
+  it("PATCH /:id/pesos: 200 happy path", async () => {
+    const cursoId = await crearCursoBorrador("pesos-ok")
+    const res = await agenteAdmin
+      .patch(`/api/v1/cursos/${cursoId}/pesos`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .send({ pesoBloques: 50, pesoTransversal: 30, pesoEntrevista: 20 })
+    expect(res.status).toBe(200)
+    expect((res.body as { pesoBloques: number }).pesoBloques).toBe(50)
+  })
+
+  it("PATCH /:id/umbrales-logro: 422 si rompe monotonia", async () => {
+    const cursoId = await crearCursoBorrador("umbrales-bad")
+    const res = await agenteAdmin
+      .patch(`/api/v1/cursos/${cursoId}/umbrales-logro`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .send({ umbralesLogro: { excelencia: 50, solido: 70, enDesarrollo: 30 } })
+    expect(res.status).toBe(422)
+    expect((res.body as { code: string }).code).toBe("VALIDACION_UMBRALES_LOGRO_MONOTONIA")
+  })
+
+  it("PATCH /:id/umbrales-logro: 200 con null (reset)", async () => {
+    const cursoId = await crearCursoBorrador("umbrales-null")
+    const res = await agenteAdmin
+      .patch(`/api/v1/cursos/${cursoId}/umbrales-logro`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .send({ umbralesLogro: null })
+    expect(res.status).toBe(200)
+  })
+
+  it("PATCH /:id/skills-exigidas: 200 sin avisos cuando lista vacia", async () => {
+    const cursoId = await crearCursoBorrador("skills-empty")
+    const res = await agenteAdmin
+      .patch(`/api/v1/cursos/${cursoId}/skills-exigidas`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .send({ skills: [] })
+    expect(res.status).toBe(200)
+  })
+
+  it("PATCH /:id/modulos-habilitados: 200 con lista vacia (BORRADOR no bloquea D82)", async () => {
+    const cursoId = await crearCursoBorrador("modulos-empty")
+    const res = await agenteAdmin
+      .patch(`/api/v1/cursos/${cursoId}/modulos-habilitados`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .send({ moduloIds: [] })
+    expect(res.status).toBe(200)
+  })
+
+  it("PATCH /:id/transversal: 200 al activar (crea ProyectoTransversal lazy)", async () => {
+    const cursoId = await crearCursoBorrador("transv-on")
+    const res = await agenteAdmin
+      .patch(`/api/v1/cursos/${cursoId}/transversal`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .send({
+        activo: true,
+        descripcion: "Proyecto e2e",
+        umbralAprobacion: 70,
+        pesoCapaTests: 40,
+        pesoCapaCualitativa: 30,
+        pesoCapaComprension: 30,
+      })
+    expect(res.status).toBe(200)
+    const body = res.body as { transversalId: string | null }
+    expect(body.transversalId).not.toBeNull()
+  })
+
+  it("PATCH /:id/transversal: 422 si pesos de capas != 100", async () => {
+    const cursoId = await crearCursoBorrador("transv-bad")
+    const res = await agenteAdmin
+      .patch(`/api/v1/cursos/${cursoId}/transversal`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .send({
+        activo: true,
+        pesoCapaTests: 50,
+        pesoCapaCualitativa: 30,
+        pesoCapaComprension: 30,
+      })
+    expect(res.status).toBe(422)
+  })
+
+  it("PATCH /:id/entrevista-ia: 422 si duracionMinutos invalida", async () => {
+    const cursoId = await crearCursoBorrador("eia-dur")
+    const res = await agenteAdmin
+      .patch(`/api/v1/cursos/${cursoId}/entrevista-ia`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .send({ activo: true, duracionMinutos: 20 })
+    expect(res.status).toBe(422)
+    expect((res.body as { code: string }).code).toBe("VALIDACION_DURACION_ENTREVISTA_INVALIDA")
+  })
+
+  it("PATCH /:id/entrevista-ia: 200 al activar con rubrica valida", async () => {
+    const cursoId = await crearCursoBorrador("eia-on")
+    const areaA = await crearAreaPersistida(`${TITULO_PREFIX}area-eia-${Date.now()}`)
+    const res = await agenteAdmin
+      .patch(`/api/v1/cursos/${cursoId}/entrevista-ia`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .send({
+        activo: true,
+        umbralAprobacion: 70,
+        duracionMinutos: 30,
+        rubrica: [{ areaId: areaA, peso: 100 }],
+      })
+    expect(res.status).toBe(200)
+    expect((res.body as { entrevistaIaId: string | null }).entrevistaIaId).not.toBeNull()
   })
 })

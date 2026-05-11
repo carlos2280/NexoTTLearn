@@ -74,6 +74,15 @@ export const apiErrorCodes = {
   conflictCursoNoArchivado: "CONFLICT_CURSO_NO_ARCHIVADO",
   conflictModuloArchivadoNoDuplicable: "CONFLICT_MODULO_ARCHIVADO_NO_DUPLICABLE",
   validacionCursoFechas: "VALIDACION_CURSO_FECHAS",
+  // Cursos P4b — configuracion (areas, skills exigidas, modulos, pesos, transversal, entrevista IA).
+  // D-CUR-11: codigo unificado para suma=100 con `details.contexto` que distingue dominio.
+  validacionPesoNoSuma100: "VALIDACION_PESO_NO_SUMA_100",
+  validacionSkillSinCobertura: "VALIDACION_SKILL_SIN_COBERTURA",
+  validacionUmbralesLogroMonotonia: "VALIDACION_UMBRALES_LOGRO_MONOTONIA",
+  validacionDuracionEntrevistaInvalida: "VALIDACION_DURACION_ENTREVISTA_INVALIDA",
+  conflictModuloArchivadoNoHabilitable: "CONFLICT_MODULO_ARCHIVADO_NO_HABILITABLE",
+  conflictTransversalConIntentos: "CONFLICT_TRANSVERSAL_CON_INTENTOS",
+  conflictEntrevistaConIntentos: "CONFLICT_ENTREVISTA_CON_INTENTOS",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]

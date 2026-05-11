@@ -9,8 +9,16 @@ import {
   UnprocessableEntityException,
 } from "@nestjs/common"
 import {
+  ActualizarAreasCursoInput,
   ActualizarCursoInput,
+  ActualizarEntrevistaIaCursoInput,
+  ActualizarModulosHabilitadosCursoInput,
+  ActualizarPesosCursoInput,
+  ActualizarSkillsExigidasCursoInput,
+  ActualizarTransversalCursoInput,
+  ActualizarUmbralesLogroCursoInput,
   CrearCursoInput,
+  CursoConfiguracionResponse,
   CursoDetalle,
   CursoResumen,
   DuplicarCursoInput,
@@ -19,12 +27,20 @@ import {
   ListarLogCambiosQuery,
   LogCambioCurso as LogCambioCursoDto,
   Paginated,
+  SkillSinCobertura,
+  UmbralesLogroValores,
 } from "@nexott-learn/shared-types"
 import { AccionLogCurso, EstadoCurso, EstadoModulo, Prisma, RolUsuario } from "@prisma/client"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { buildPaginatedResponse, resolvePaginacion } from "../common/http/paginated"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
+import {
+  calcularDiffComposite,
+  validarDuracionEntrevistaIa,
+  validarMonotoniaUmbralesLogro,
+  validarSumaPesosCien,
+} from "./cursos.helpers"
 
 /**
  * Selects explicitos del recurso Curso. D-CUR-12.
@@ -62,6 +78,7 @@ const SELECT_CURSO_DETALLE_FIELDS = {
   pesoEntrevista: true,
   transversalId: true,
   entrevistaIaId: true,
+  umbralesLogro: true,
   desbloqueo: true,
   fechaDesbloqueo: true,
   createdAt: true,
@@ -1005,4 +1022,909 @@ export class CursosService {
     ])
     return buildPaginatedResponse(filas.map(toLogCambio), total, page, pageSize)
   }
+
+  // ===========================================================================
+  // P4b — Configuracion del curso (7 endpoints, D-CUR-3..11)
+  // ===========================================================================
+
+  /**
+   * Lee el curso dentro del `tx` con estado, sub-tablas relevantes y pesos.
+   * Verifica que existe, que el estado admite configuracion (BORRADOR o ACTIVO,
+   * D-CUR-4) y que el motivo este presente cuando el estado lo requiere.
+   * Patron heredado: releer en `tx` (FIX-P3b §5.21, D-CUR-12).
+   */
+  private async leerCursoParaConfigurar(
+    tx: Prisma.TransactionClient,
+    cursoId: string,
+    motivo: string | undefined,
+  ): Promise<CursoDetalleRow> {
+    const actual = await tx.curso.findUnique({
+      where: { id: cursoId },
+      select: SELECT_CURSO_DETALLE_FIELDS,
+    })
+    if (!actual) {
+      throw new NotFoundException({
+        code: apiErrorCodes.cursoNoEncontrado,
+        message: "Curso no encontrado.",
+      })
+    }
+    if (actual.estado !== EstadoCurso.BORRADOR && actual.estado !== EstadoCurso.ACTIVO) {
+      throw new ConflictException({
+        code: apiErrorCodes.conflictCursoEstado,
+        message: "El curso no admite configuracion en su estado actual.",
+        details: { estado: actual.estado },
+      })
+    }
+    this.validarMotivoSegunEstado(actual.estado, motivo)
+    return actual
+  }
+
+  /**
+   * Lee la version final del curso (post-update) para construir el response
+   * `CursoConfiguracionResponse`. Se llama dentro del mismo `$transaction`.
+   */
+  private releerCursoDetalle(
+    tx: Prisma.TransactionClient,
+    cursoId: string,
+  ): Promise<CursoDetalleRow> {
+    return tx.curso.findUniqueOrThrow({
+      where: { id: cursoId },
+      select: SELECT_CURSO_DETALLE_FIELDS,
+    })
+  }
+
+  /**
+   * Texto a persistir en `LogCambioCurso.motivo` cuando el header `X-Motivo`
+   * no fue obligatorio (estado BORRADOR). Garantiza NOT NULL del campo.
+   */
+  private resolverMotivoLog(motivo: string | undefined, etiqueta: string): string {
+    return motivo && motivo.length > 0 ? motivo : etiqueta
+  }
+
+  /**
+   * Endpoint 1/7 — PATCH /api/v1/cursos/:id/areas. D34: suma de pesos = 100;
+   * cada `puntajeObjetivo` en [0,100] (ya validado por Zod).
+   * Diff aEliminar/aAgregar/aActualizar para idempotencia (D-CUR-6).
+   */
+  async actualizarAreas(
+    cursoId: string,
+    input: ActualizarAreasCursoInput,
+    motivo: string | undefined,
+    autorUsuarioId: string,
+  ): Promise<CursoConfiguracionResponse> {
+    validarSumaPesosCien(
+      input.areas.map((a) => a.peso),
+      "AREAS",
+    )
+    const detalle = await this.prisma.$transaction(async (tx) => {
+      const actual = await this.leerCursoParaConfigurar(tx, cursoId, motivo)
+      const enInput = new Map(input.areas.map((a) => [a.areaId, a]))
+      const enBd = new Map(
+        actual.areasExigidas.map((a) => [
+          a.areaId,
+          { peso: Number(a.peso), puntajeObjetivo: Number(a.puntajeObjetivo) },
+        ]),
+      )
+      const diff = calcularDiffComposite(new Set(enBd.keys()), new Set(enInput.keys()))
+      if (diff.aEliminar.length > 0) {
+        await tx.cursoAreaExigida.deleteMany({
+          where: { cursoId, areaId: { in: [...diff.aEliminar] } },
+        })
+      }
+      if (diff.aAgregar.length > 0) {
+        await tx.cursoAreaExigida.createMany({
+          data: diff.aAgregar.map((areaId) => {
+            const dto = enInput.get(areaId)
+            if (!dto) {
+              throw diffInconsistenteError()
+            }
+            return {
+              cursoId,
+              areaId,
+              peso: dto.peso,
+              puntajeObjetivo: dto.puntajeObjetivo,
+            }
+          }),
+        })
+      }
+      for (const areaId of diff.interseccion) {
+        const nuevo = enInput.get(areaId)
+        const previo = enBd.get(areaId)
+        if (!(nuevo && previo)) {
+          continue
+        }
+        if (nuevo.peso !== previo.peso || nuevo.puntajeObjetivo !== previo.puntajeObjetivo) {
+          await tx.cursoAreaExigida.update({
+            where: {
+              // biome-ignore lint/style/useNamingConvention: composite key Prisma.
+              cursoId_areaId: { cursoId, areaId },
+            },
+            data: { peso: nuevo.peso, puntajeObjetivo: nuevo.puntajeObjetivo },
+          })
+        }
+      }
+      const previewImpacto: Prisma.InputJsonValue = {
+        pesosAnteriores: actual.areasExigidas.map((a) => ({
+          areaId: a.areaId,
+          peso: Number(a.peso),
+        })),
+        pesosNuevos: input.areas.map((a) => ({ areaId: a.areaId, peso: a.peso })),
+      }
+      await tx.logCambioCurso.create({
+        data: {
+          cursoId,
+          autorUsuarioId,
+          accion: AccionLogCurso.CAMBIO_AREAS,
+          motivo: this.resolverMotivoLog(motivo, "Configuracion areas"),
+          previewImpacto,
+        },
+      })
+      return this.releerCursoDetalle(tx, cursoId)
+    })
+    return { ...toCursoDetalle(detalle), umbralesLogro: parseUmbralesLogro(detalle.umbralesLogro) }
+  }
+
+  /**
+   * Endpoint 2/7 — PATCH /api/v1/cursos/:id/skills-exigidas. D6, D63. D82 aqui
+   * es solo aviso (no bloquea); se persiste en `previewImpacto` y se devuelve
+   * en `skillsSinCobertura` para que el wizard lo muestre.
+   */
+  async actualizarSkillsExigidas(
+    cursoId: string,
+    input: ActualizarSkillsExigidasCursoInput,
+    motivo: string | undefined,
+    autorUsuarioId: string,
+  ): Promise<CursoConfiguracionResponse> {
+    const resultado = await this.prisma.$transaction(async (tx) => {
+      const actual = await this.leerCursoParaConfigurar(tx, cursoId, motivo)
+      const enInput = new Map(input.skills.map((s) => [s.skillId, s]))
+      const enBd = new Map(
+        actual.skillsExigidas.map((s) => [s.skillId, { notaMinima: Number(s.notaMinima) }]),
+      )
+      const diff = calcularDiffComposite(new Set(enBd.keys()), new Set(enInput.keys()))
+      if (diff.aEliminar.length > 0) {
+        await tx.cursoSkillExigida.deleteMany({
+          where: { cursoId, skillId: { in: [...diff.aEliminar] } },
+        })
+      }
+      if (diff.aAgregar.length > 0) {
+        await tx.cursoSkillExigida.createMany({
+          data: diff.aAgregar.map((skillId) => {
+            const dto = enInput.get(skillId)
+            if (!dto) {
+              throw diffInconsistenteError()
+            }
+            return { cursoId, skillId, notaMinima: dto.notaMinima }
+          }),
+        })
+      }
+      for (const skillId of diff.interseccion) {
+        const nuevo = enInput.get(skillId)
+        const previo = enBd.get(skillId)
+        if (!(nuevo && previo)) {
+          continue
+        }
+        if (nuevo.notaMinima !== previo.notaMinima) {
+          await tx.cursoSkillExigida.update({
+            where: {
+              // biome-ignore lint/style/useNamingConvention: composite key Prisma.
+              cursoId_skillId: { cursoId, skillId },
+            },
+            data: { notaMinima: nuevo.notaMinima },
+          })
+        }
+      }
+      const skillsExigidasIds = input.skills.map((s) => s.skillId)
+      const modulosHabilitadosIds = actual.modulosHabilitados.map((m) => m.moduloId)
+      const skillsSinCobertura = await this.calcularSkillsSinCobertura(
+        tx,
+        skillsExigidasIds,
+        modulosHabilitadosIds,
+      )
+      const previewImpacto: Prisma.InputJsonValue = {
+        aEliminar: [...diff.aEliminar],
+        aAgregar: [...diff.aAgregar],
+        skillsSinCobertura: skillsSinCobertura.map((s) => s.skillId),
+      }
+      await tx.logCambioCurso.create({
+        data: {
+          cursoId,
+          autorUsuarioId,
+          accion: AccionLogCurso.CAMBIO_OBJETIVOS,
+          motivo: this.resolverMotivoLog(motivo, "Configuracion skills exigidas"),
+          previewImpacto,
+        },
+      })
+      const detalle = await this.releerCursoDetalle(tx, cursoId)
+      return { detalle, skillsSinCobertura }
+    })
+    const base = toCursoDetalle(resultado.detalle)
+    if (resultado.skillsSinCobertura.length === 0) {
+      return { ...base, umbralesLogro: parseUmbralesLogro(resultado.detalle.umbralesLogro) }
+    }
+    return {
+      ...base,
+      umbralesLogro: parseUmbralesLogro(resultado.detalle.umbralesLogro),
+      skillsSinCobertura: resultado.skillsSinCobertura,
+    }
+  }
+
+  /**
+   * Endpoint 3/7 — PATCH /api/v1/cursos/:id/modulos-habilitados. D79 + D82.
+   * Rechaza modulos ARCHIVADO siempre. En curso ACTIVO, rechaza si la
+   * deshabilitacion dejaria una skill exigida sin cobertura.
+   */
+  async actualizarModulosHabilitados(
+    cursoId: string,
+    input: ActualizarModulosHabilitadosCursoInput,
+    motivo: string | undefined,
+    autorUsuarioId: string,
+  ): Promise<CursoConfiguracionResponse> {
+    const resultado = await this.prisma.$transaction(async (tx) => {
+      const actual = await this.leerCursoParaConfigurar(tx, cursoId, motivo)
+      await this.validarModulosNoArchivados(tx, input.moduloIds)
+      const enBd = new Set(actual.modulosHabilitados.map((m) => m.moduloId))
+      const enInput = new Set(input.moduloIds)
+      const diff = calcularDiffComposite(enBd, enInput)
+      const skillsExigidasIds = actual.skillsExigidas.map((s) => s.skillId)
+      const skillsSinCobertura = await this.calcularSkillsSinCobertura(
+        tx,
+        skillsExigidasIds,
+        input.moduloIds,
+      )
+      if (actual.estado === EstadoCurso.ACTIVO && skillsSinCobertura.length > 0) {
+        throw new UnprocessableEntityException({
+          code: apiErrorCodes.validacionSkillSinCobertura,
+          message: "El cambio dejaria skills exigidas sin cobertura.",
+          details: { skills: skillsSinCobertura },
+        })
+      }
+      if (diff.aEliminar.length > 0) {
+        await tx.cursoModuloHabilitado.deleteMany({
+          where: { cursoId, moduloId: { in: [...diff.aEliminar] } },
+        })
+      }
+      if (diff.aAgregar.length > 0) {
+        await tx.cursoModuloHabilitado.createMany({
+          data: diff.aAgregar.map((moduloId) => ({ cursoId, moduloId })),
+        })
+      }
+      const previewImpacto: Prisma.InputJsonValue = {
+        aEliminar: [...diff.aEliminar],
+        aAgregar: [...diff.aAgregar],
+        skillsSinCobertura: skillsSinCobertura.map((s) => s.skillId),
+      }
+      await tx.logCambioCurso.create({
+        data: {
+          cursoId,
+          autorUsuarioId,
+          accion: AccionLogCurso.CAMBIO_MODULOS,
+          motivo: this.resolverMotivoLog(motivo, "Configuracion modulos habilitados"),
+          previewImpacto,
+        },
+      })
+      const detalle = await this.releerCursoDetalle(tx, cursoId)
+      return {
+        detalle,
+        skillsSinCobertura,
+        diffAplicado: {
+          aEliminar: [...diff.aEliminar],
+          aAgregar: [...diff.aAgregar],
+        },
+      }
+    })
+    const base = toCursoDetalle(resultado.detalle)
+    const previewImpactoResponse: Record<string, unknown> = {
+      aEliminar: resultado.diffAplicado.aEliminar,
+      aAgregar: resultado.diffAplicado.aAgregar,
+      skillsSinCobertura: resultado.skillsSinCobertura.map((s) => s.skillId),
+    }
+    if (resultado.skillsSinCobertura.length === 0) {
+      return {
+        ...base,
+        umbralesLogro: parseUmbralesLogro(resultado.detalle.umbralesLogro),
+        previewImpacto: previewImpactoResponse,
+      }
+    }
+    return {
+      ...base,
+      umbralesLogro: parseUmbralesLogro(resultado.detalle.umbralesLogro),
+      previewImpacto: previewImpactoResponse,
+      skillsSinCobertura: resultado.skillsSinCobertura,
+    }
+  }
+
+  /**
+   * Endpoint 4/7 — PATCH /api/v1/cursos/:id/pesos. D33: bloques+transversal+
+   * entrevista = 100. Si solo viene un subconjunto, se completa con los valores
+   * actuales del curso antes de validar.
+   */
+  async actualizarPesos(
+    cursoId: string,
+    input: ActualizarPesosCursoInput,
+    motivo: string | undefined,
+    autorUsuarioId: string,
+  ): Promise<CursoConfiguracionResponse> {
+    const detalle = await this.prisma.$transaction(async (tx) => {
+      const actual = await this.leerCursoParaConfigurar(tx, cursoId, motivo)
+      const pesoBloques = input.pesoBloques ?? Number(actual.pesoBloques)
+      const pesoTransversal = input.pesoTransversal ?? Number(actual.pesoTransversal)
+      const pesoEntrevista = input.pesoEntrevista ?? Number(actual.pesoEntrevista)
+      const hayCambioDePeso =
+        input.pesoBloques !== undefined ||
+        input.pesoTransversal !== undefined ||
+        input.pesoEntrevista !== undefined
+      if (hayCambioDePeso) {
+        validarSumaPesosCien([pesoBloques, pesoTransversal, pesoEntrevista], "PESOS_INTRA_SKILL")
+      }
+      const data: Prisma.CursoUpdateInput = {}
+      if (input.pesoBloques !== undefined) {
+        data.pesoBloques = input.pesoBloques
+      }
+      if (input.pesoTransversal !== undefined) {
+        data.pesoTransversal = input.pesoTransversal
+      }
+      if (input.pesoEntrevista !== undefined) {
+        data.pesoEntrevista = input.pesoEntrevista
+      }
+      if (input.umbralNoCumple !== undefined) {
+        data.umbralNoCumple = input.umbralNoCumple
+      }
+      await tx.curso.update({ where: { id: cursoId }, data })
+      const previewImpacto: Prisma.InputJsonValue = {
+        pesosAnteriores: {
+          pesoBloques: Number(actual.pesoBloques),
+          pesoTransversal: Number(actual.pesoTransversal),
+          pesoEntrevista: Number(actual.pesoEntrevista),
+          umbralNoCumple: Number(actual.umbralNoCumple),
+        },
+        pesosNuevos: {
+          pesoBloques,
+          pesoTransversal,
+          pesoEntrevista,
+          umbralNoCumple: input.umbralNoCumple ?? Number(actual.umbralNoCumple),
+        },
+      }
+      await tx.logCambioCurso.create({
+        data: {
+          cursoId,
+          autorUsuarioId,
+          accion: AccionLogCurso.CAMBIO_PESOS,
+          motivo: this.resolverMotivoLog(motivo, "Configuracion pesos"),
+          previewImpacto,
+        },
+      })
+      return this.releerCursoDetalle(tx, cursoId)
+    })
+    return { ...toCursoDetalle(detalle), umbralesLogro: parseUmbralesLogro(detalle.umbralesLogro) }
+  }
+
+  /**
+   * Endpoint 5/7 — PATCH /api/v1/cursos/:id/umbrales-logro. Cap. 10.5: override
+   * por curso. `null` resetea a defaults del sistema. Monotonia
+   * excelencia >= solido >= enDesarrollo.
+   */
+  async actualizarUmbralesLogro(
+    cursoId: string,
+    input: ActualizarUmbralesLogroCursoInput,
+    motivo: string | undefined,
+    autorUsuarioId: string,
+  ): Promise<CursoConfiguracionResponse> {
+    if (input.umbralesLogro !== null) {
+      validarMonotoniaUmbralesLogro(input.umbralesLogro)
+    }
+    const detalle = await this.prisma.$transaction(async (tx) => {
+      const actual = await this.leerCursoParaConfigurar(tx, cursoId, motivo)
+      const valorPersistido: Prisma.InputJsonValue | typeof Prisma.JsonNull =
+        input.umbralesLogro === null ? Prisma.JsonNull : input.umbralesLogro
+      await tx.curso.update({
+        where: { id: cursoId },
+        data: { umbralesLogro: valorPersistido },
+      })
+      const previewImpacto: Prisma.InputJsonValue = {
+        anterior: parseUmbralesLogro(actual.umbralesLogro),
+        nuevo: input.umbralesLogro,
+      }
+      await tx.logCambioCurso.create({
+        data: {
+          cursoId,
+          autorUsuarioId,
+          accion: AccionLogCurso.OTRO,
+          motivo: this.resolverMotivoLog(motivo, "Configuracion umbrales de logro"),
+          previewImpacto,
+        },
+      })
+      return this.releerCursoDetalle(tx, cursoId)
+    })
+    return { ...toCursoDetalle(detalle), umbralesLogro: parseUmbralesLogro(detalle.umbralesLogro) }
+  }
+
+  /**
+   * Endpoint 6/7 — PATCH /api/v1/cursos/:id/transversal. D-CUR-8 lazy:
+   *  - activar sin existente → create + curso.transversalId.
+   *  - activar con existente → update + diff TransversalSkill.
+   *  - desactivar sin intentos → delete (Curso.transversalId queda null via SetNull).
+   *  - desactivar con intentos → 409.
+   * Cuando se aplica, la suma de pesos de capas debe ser 100 (D86).
+   */
+  async actualizarTransversal(
+    cursoId: string,
+    input: ActualizarTransversalCursoInput,
+    motivo: string | undefined,
+    autorUsuarioId: string,
+  ): Promise<CursoConfiguracionResponse> {
+    const detalle = await this.prisma.$transaction(async (tx) => {
+      const actual = await this.leerCursoParaConfigurar(tx, cursoId, motivo)
+      const transversalIdActual = actual.transversalId
+      let activadoCambio: "ACTIVADO" | "DESACTIVADO" | "ACTUALIZADO" | "NINGUNO" = "NINGUNO"
+      let creado = false
+
+      if (input.activo) {
+        const pesosFinal = await this.aplicarTransversalActivar(
+          tx,
+          cursoId,
+          transversalIdActual,
+          input,
+        )
+        creado = pesosFinal.creado
+        activadoCambio = creado ? "ACTIVADO" : "ACTUALIZADO"
+      } else if (transversalIdActual) {
+        await this.aplicarTransversalDesactivar(tx, transversalIdActual)
+        activadoCambio = "DESACTIVADO"
+      }
+
+      const previewImpacto: Prisma.InputJsonValue = { creado, activadoCambio }
+      await tx.logCambioCurso.create({
+        data: {
+          cursoId,
+          autorUsuarioId,
+          accion: AccionLogCurso.TOGGLE_TRANSVERSAL,
+          motivo: this.resolverMotivoLog(motivo, "Configuracion transversal"),
+          previewImpacto,
+        },
+      })
+      return this.releerCursoDetalle(tx, cursoId)
+    })
+    return { ...toCursoDetalle(detalle), umbralesLogro: parseUmbralesLogro(detalle.umbralesLogro) }
+  }
+
+  private async aplicarTransversalActivar(
+    tx: Prisma.TransactionClient,
+    cursoId: string,
+    transversalIdActual: string | null,
+    input: ActualizarTransversalCursoInput,
+  ): Promise<{ readonly creado: boolean }> {
+    validarPesosCapasTransversalSiAplica(input)
+    if (transversalIdActual === null) {
+      await this.crearTransversal(tx, cursoId, input)
+      return { creado: true }
+    }
+    await this.actualizarTransversalExistente(tx, transversalIdActual, input)
+    return { creado: false }
+  }
+
+  private async crearTransversal(
+    tx: Prisma.TransactionClient,
+    cursoId: string,
+    input: ActualizarTransversalCursoInput,
+  ): Promise<void> {
+    const creado = await tx.proyectoTransversal.create({
+      data: {
+        cursoId,
+        descripcion: input.descripcion ?? "",
+        umbralAprobacion: input.umbralAprobacion ?? 70,
+        pesoCapaTests: input.pesoCapaTests ?? 40,
+        pesoCapaCualitativa: input.pesoCapaCualitativa ?? 30,
+        pesoCapaComprension: input.pesoCapaComprension ?? 30,
+        capaTestsActiva: input.capaTestsActiva ?? true,
+        capaCualitativaActiva: input.capaCualitativaActiva ?? true,
+        capaComprensionActiva: input.capaComprensionActiva ?? true,
+      },
+      select: { id: true },
+    })
+    await tx.curso.update({
+      where: { id: cursoId },
+      data: { transversalId: creado.id },
+    })
+    if (input.skillsQueMideIds && input.skillsQueMideIds.length > 0) {
+      await tx.transversalSkill.createMany({
+        data: input.skillsQueMideIds.map((skillId) => ({ transversalId: creado.id, skillId })),
+      })
+    }
+  }
+
+  private async actualizarTransversalExistente(
+    tx: Prisma.TransactionClient,
+    transversalId: string,
+    input: ActualizarTransversalCursoInput,
+  ): Promise<void> {
+    await tx.proyectoTransversal.update({
+      where: { id: transversalId },
+      data: construirDataUpdateTransversal(input),
+    })
+    if (input.skillsQueMideIds) {
+      await this.aplicarDiffTransversalSkills(tx, transversalId, input.skillsQueMideIds)
+    }
+  }
+
+  private async aplicarDiffTransversalSkills(
+    tx: Prisma.TransactionClient,
+    transversalId: string,
+    skillsObjetivo: readonly string[],
+  ): Promise<void> {
+    const actuales = await tx.transversalSkill.findMany({
+      where: { transversalId },
+      select: { skillId: true },
+    })
+    const diff = calcularDiffComposite(
+      new Set(actuales.map((s) => s.skillId)),
+      new Set(skillsObjetivo),
+    )
+    if (diff.aEliminar.length > 0) {
+      await tx.transversalSkill.deleteMany({
+        where: { transversalId, skillId: { in: [...diff.aEliminar] } },
+      })
+    }
+    if (diff.aAgregar.length > 0) {
+      await tx.transversalSkill.createMany({
+        data: diff.aAgregar.map((skillId) => ({ transversalId, skillId })),
+      })
+    }
+  }
+
+  private async aplicarTransversalDesactivar(
+    tx: Prisma.TransactionClient,
+    transversalId: string,
+  ): Promise<void> {
+    const intentos = await tx.intentoTransversal.count({ where: { transversalId } })
+    if (intentos > 0) {
+      throw new ConflictException({
+        code: apiErrorCodes.conflictTransversalConIntentos,
+        message: "No se puede desactivar el transversal: ya tiene intentos registrados.",
+        details: { intentos },
+      })
+    }
+    // Cascade en TransversalSkill; Curso.transversalId queda null via SetNull.
+    await tx.proyectoTransversal.delete({ where: { id: transversalId } })
+  }
+
+  /**
+   * Endpoint 7/7 — PATCH /api/v1/cursos/:id/entrevista-ia. D-CUR-8 lazy.
+   * Reglas: suma rubrica=100, duracion ∈ {15,30,45}, 409 si tiene intentos.
+   */
+  async actualizarEntrevistaIa(
+    cursoId: string,
+    input: ActualizarEntrevistaIaCursoInput,
+    motivo: string | undefined,
+    autorUsuarioId: string,
+  ): Promise<CursoConfiguracionResponse> {
+    if (input.duracionMinutos !== undefined) {
+      validarDuracionEntrevistaIa(input.duracionMinutos)
+    }
+    if (input.rubrica && input.rubrica.length > 0) {
+      validarSumaPesosCien(
+        input.rubrica.map((r) => r.peso),
+        "RUBRICA_ENTREVISTA",
+      )
+    }
+    const detalle = await this.prisma.$transaction(async (tx) => {
+      const actual = await this.leerCursoParaConfigurar(tx, cursoId, motivo)
+      const entrevistaIaIdActual = actual.entrevistaIaId
+      let creado = false
+      let activadoCambio: "ACTIVADO" | "DESACTIVADO" | "ACTUALIZADO" | "NINGUNO" = "NINGUNO"
+
+      if (input.activo) {
+        const r = await this.aplicarEntrevistaIaActivar(tx, cursoId, entrevistaIaIdActual, input)
+        creado = r.creado
+        activadoCambio = creado ? "ACTIVADO" : "ACTUALIZADO"
+      } else if (entrevistaIaIdActual) {
+        await this.aplicarEntrevistaIaDesactivar(tx, entrevistaIaIdActual)
+        activadoCambio = "DESACTIVADO"
+      }
+
+      const previewImpacto: Prisma.InputJsonValue = { creado, activadoCambio }
+      await tx.logCambioCurso.create({
+        data: {
+          cursoId,
+          autorUsuarioId,
+          accion: AccionLogCurso.TOGGLE_ENTREVISTA,
+          motivo: this.resolverMotivoLog(motivo, "Configuracion entrevista IA"),
+          previewImpacto,
+        },
+      })
+      return this.releerCursoDetalle(tx, cursoId)
+    })
+    return { ...toCursoDetalle(detalle), umbralesLogro: parseUmbralesLogro(detalle.umbralesLogro) }
+  }
+
+  private async aplicarEntrevistaIaActivar(
+    tx: Prisma.TransactionClient,
+    cursoId: string,
+    entrevistaIaIdActual: string | null,
+    input: ActualizarEntrevistaIaCursoInput,
+  ): Promise<{ readonly creado: boolean }> {
+    if (entrevistaIaIdActual === null) {
+      await this.crearEntrevistaIa(tx, cursoId, input)
+      return { creado: true }
+    }
+    await this.actualizarEntrevistaIaExistente(tx, entrevistaIaIdActual, input)
+    return { creado: false }
+  }
+
+  private async crearEntrevistaIa(
+    tx: Prisma.TransactionClient,
+    cursoId: string,
+    input: ActualizarEntrevistaIaCursoInput,
+  ): Promise<void> {
+    const creado = await tx.entrevistaIA.create({
+      data: {
+        cursoId,
+        umbralAprobacion: input.umbralAprobacion ?? 70,
+        filosofia: input.filosofia ?? "PREPARACION",
+        profundidad: input.profundidad ?? "SEMI_SENIOR",
+        duracionMinutos: input.duracionMinutos ?? 30,
+        tono: input.tono ?? "CONVERSACIONAL",
+      },
+      select: { id: true },
+    })
+    await tx.curso.update({
+      where: { id: cursoId },
+      data: { entrevistaIaId: creado.id },
+    })
+    if (input.rubrica && input.rubrica.length > 0) {
+      await tx.rubricaEntrevistaIA.createMany({
+        data: input.rubrica.map((r) => ({
+          entrevistaIaId: creado.id,
+          areaId: r.areaId,
+          peso: r.peso,
+        })),
+      })
+    }
+  }
+
+  private async actualizarEntrevistaIaExistente(
+    tx: Prisma.TransactionClient,
+    entrevistaIaId: string,
+    input: ActualizarEntrevistaIaCursoInput,
+  ): Promise<void> {
+    await tx.entrevistaIA.update({
+      where: { id: entrevistaIaId },
+      data: construirDataUpdateEntrevistaIa(input),
+    })
+    if (input.rubrica) {
+      await this.aplicarDiffRubricaEntrevista(tx, entrevistaIaId, input.rubrica)
+    }
+  }
+
+  private async aplicarDiffRubricaEntrevista(
+    tx: Prisma.TransactionClient,
+    entrevistaIaId: string,
+    rubrica: readonly { readonly areaId: string; readonly peso: number }[],
+  ): Promise<void> {
+    const actuales = await tx.rubricaEntrevistaIA.findMany({
+      where: { entrevistaIaId },
+      select: { areaId: true, peso: true },
+    })
+    const enInput = new Map(rubrica.map((r) => [r.areaId, r.peso]))
+    const enBd = new Map(actuales.map((a) => [a.areaId, Number(a.peso)]))
+    const diff = calcularDiffComposite(new Set(enBd.keys()), new Set(enInput.keys()))
+    if (diff.aEliminar.length > 0) {
+      await tx.rubricaEntrevistaIA.deleteMany({
+        where: { entrevistaIaId, areaId: { in: [...diff.aEliminar] } },
+      })
+    }
+    if (diff.aAgregar.length > 0) {
+      await tx.rubricaEntrevistaIA.createMany({
+        data: diff.aAgregar.map((areaId) => {
+          const peso = enInput.get(areaId)
+          if (peso === undefined) {
+            throw diffInconsistenteError()
+          }
+          return { entrevistaIaId, areaId, peso }
+        }),
+      })
+    }
+    for (const areaId of diff.interseccion) {
+      const pesoNuevo = enInput.get(areaId)
+      const pesoPrevio = enBd.get(areaId)
+      if (pesoNuevo === undefined || pesoPrevio === undefined) {
+        continue
+      }
+      if (pesoNuevo !== pesoPrevio) {
+        await tx.rubricaEntrevistaIA.update({
+          where: {
+            // biome-ignore lint/style/useNamingConvention: composite key Prisma.
+            entrevistaIaId_areaId: { entrevistaIaId, areaId },
+          },
+          data: { peso: pesoNuevo },
+        })
+      }
+    }
+  }
+
+  private async aplicarEntrevistaIaDesactivar(
+    tx: Prisma.TransactionClient,
+    entrevistaIaId: string,
+  ): Promise<void> {
+    const intentos = await tx.intentoEntrevistaIA.count({ where: { entrevistaIaId } })
+    if (intentos > 0) {
+      throw new ConflictException({
+        code: apiErrorCodes.conflictEntrevistaConIntentos,
+        message: "No se puede desactivar la entrevista IA: ya tiene intentos registrados.",
+        details: { intentos },
+      })
+    }
+    await tx.entrevistaIA.delete({ where: { id: entrevistaIaId } })
+  }
+
+  /**
+   * Rechaza modulos en estado ARCHIVADO antes de aplicar el set deseado (D79).
+   * Tambien valida que todos los moduloIds existan: P2003 sobre la FK
+   * sera capturado por PrismaExceptionFilter, pero un pre-check explicito
+   * da mensaje accionable al cliente.
+   */
+  private async validarModulosNoArchivados(
+    tx: Prisma.TransactionClient,
+    moduloIds: readonly string[],
+  ): Promise<void> {
+    if (moduloIds.length === 0) {
+      return
+    }
+    const modulos = await tx.modulo.findMany({
+      where: { id: { in: [...moduloIds] } },
+      select: { id: true, estado: true, titulo: true },
+    })
+    const archivados = modulos.filter((m) => m.estado === EstadoModulo.ARCHIVADO)
+    if (archivados.length > 0) {
+      throw new ConflictException({
+        code: apiErrorCodes.conflictModuloArchivadoNoHabilitable,
+        message: "No se pueden habilitar modulos en estado ARCHIVADO.",
+        details: {
+          modulos: archivados.map((m) => ({ moduloId: m.id, titulo: m.titulo })),
+        },
+      })
+    }
+  }
+
+  /**
+   * D82: dada una lista de skills exigidas y una lista de modulos habilitados,
+   * devuelve las skills que no estan cubiertas por ningun modulo habilitado.
+   * Cobertura = existe `SeccionSkill` para `skillId` con `seccion.moduloId`
+   * dentro del set habilitado.
+   */
+  private async calcularSkillsSinCobertura(
+    tx: Prisma.TransactionClient,
+    skillsExigidasIds: readonly string[],
+    modulosHabilitadosIds: readonly string[],
+  ): Promise<SkillSinCobertura[]> {
+    if (skillsExigidasIds.length === 0) {
+      return []
+    }
+    const filas = await tx.seccionSkill.findMany({
+      where: { skillId: { in: [...skillsExigidasIds] } },
+      select: { skillId: true, seccion: { select: { moduloId: true } } },
+    })
+    const cobertura = new Map<string, Set<string>>()
+    for (const f of filas) {
+      const set = cobertura.get(f.skillId) ?? new Set<string>()
+      set.add(f.seccion.moduloId)
+      cobertura.set(f.skillId, set)
+    }
+    const habilitadosSet = new Set(modulosHabilitadosIds)
+    const sinCobertura: string[] = []
+    for (const skillId of skillsExigidasIds) {
+      const modulosQueEnsenan = cobertura.get(skillId) ?? new Set<string>()
+      const cubierta = [...modulosQueEnsenan].some((m) => habilitadosSet.has(m))
+      if (!cubierta) {
+        sinCobertura.push(skillId)
+      }
+    }
+    if (sinCobertura.length === 0) {
+      return []
+    }
+    const skills = await tx.skill.findMany({
+      where: { id: { in: sinCobertura } },
+      select: { id: true, etiquetaVisible: true },
+    })
+    return skills.map((s) => ({ skillId: s.id, etiquetaVisible: s.etiquetaVisible }))
+  }
+}
+
+/**
+ * Lanzador defensivo para ramas que TypeScript no puede excluir pero que en
+ * runtime son inalcanzables (el diff garantiza que `aAgregar` ⊂ `enInput`).
+ * Se prefiere a un `!` no checkeado para mantener "0 any" y trazabilidad.
+ */
+function diffInconsistenteError(): Error {
+  return new Error("Estado inconsistente en diff composite: clave esperada no encontrada.")
+}
+
+function validarPesosCapasTransversalSiAplica(input: ActualizarTransversalCursoInput): void {
+  const { pesoCapaTests, pesoCapaCualitativa, pesoCapaComprension } = input
+  if (
+    pesoCapaTests !== undefined &&
+    pesoCapaCualitativa !== undefined &&
+    pesoCapaComprension !== undefined
+  ) {
+    validarSumaPesosCien(
+      [pesoCapaTests, pesoCapaCualitativa, pesoCapaComprension],
+      "CAPAS_TRANSVERSAL",
+    )
+  }
+}
+
+function construirDataUpdateTransversal(
+  input: ActualizarTransversalCursoInput,
+): Prisma.ProyectoTransversalUpdateInput {
+  const data: Prisma.ProyectoTransversalUpdateInput = {}
+  if (input.descripcion !== undefined) {
+    data.descripcion = input.descripcion
+  }
+  if (input.umbralAprobacion !== undefined) {
+    data.umbralAprobacion = input.umbralAprobacion
+  }
+  if (input.pesoCapaTests !== undefined) {
+    data.pesoCapaTests = input.pesoCapaTests
+  }
+  if (input.pesoCapaCualitativa !== undefined) {
+    data.pesoCapaCualitativa = input.pesoCapaCualitativa
+  }
+  if (input.pesoCapaComprension !== undefined) {
+    data.pesoCapaComprension = input.pesoCapaComprension
+  }
+  if (input.capaTestsActiva !== undefined) {
+    data.capaTestsActiva = input.capaTestsActiva
+  }
+  if (input.capaCualitativaActiva !== undefined) {
+    data.capaCualitativaActiva = input.capaCualitativaActiva
+  }
+  if (input.capaComprensionActiva !== undefined) {
+    data.capaComprensionActiva = input.capaComprensionActiva
+  }
+  return data
+}
+
+function construirDataUpdateEntrevistaIa(
+  input: ActualizarEntrevistaIaCursoInput,
+): Prisma.EntrevistaIAUpdateInput {
+  const data: Prisma.EntrevistaIAUpdateInput = {}
+  if (input.umbralAprobacion !== undefined) {
+    data.umbralAprobacion = input.umbralAprobacion
+  }
+  if (input.filosofia !== undefined) {
+    data.filosofia = input.filosofia
+  }
+  if (input.profundidad !== undefined) {
+    data.profundidad = input.profundidad
+  }
+  if (input.duracionMinutos !== undefined) {
+    data.duracionMinutos = input.duracionMinutos
+  }
+  if (input.tono !== undefined) {
+    data.tono = input.tono
+  }
+  return data
+}
+
+/**
+ * Parser tipado del campo JSONB `Curso.umbralesLogro`. Devuelve `null` si el
+ * valor persistido no respeta el shape esperado (defensa contra escrituras
+ * historicas con shape distinto). El service nunca persiste shapes invalidos.
+ */
+function parseUmbralesLogro(raw: Prisma.JsonValue | null): UmbralesLogroValores | null {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    return null
+  }
+  const obj = raw as Record<string, unknown>
+  const excelencia = obj.excelencia
+  const solido = obj.solido
+  const enDesarrollo = obj.enDesarrollo
+  if (
+    typeof excelencia !== "number" ||
+    typeof solido !== "number" ||
+    typeof enDesarrollo !== "number"
+  ) {
+    return null
+  }
+  return { excelencia, solido, enDesarrollo }
 }

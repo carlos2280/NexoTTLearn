@@ -104,3 +104,25 @@ export interface DuplicarCursoResponse {
   readonly curso: CursoDetalle
   readonly modulosExcluidos: readonly { readonly moduloId: string; readonly titulo: string }[]
 }
+
+/**
+ * Respuesta de los PATCH de configuracion del curso (P4b). Extiende
+ * `CursoDetalle` con avisos opcionales segun el endpoint:
+ *  - `previewImpacto`: estructura libre con el diff del cambio
+ *    (`aEliminar`/`aAgregar`/`pesosAnteriores`/`pesosNuevos`/...).
+ *  - `skillsSinCobertura`: aviso D82 emitido por `/skills-exigidas`
+ *    (no bloqueante) y por `/modulos-habilitados` en BORRADOR.
+ *  - `umbralesLogro`: shape persistido en `Curso.umbralesLogro` o `null`.
+ */
+export interface CursoConfiguracionResponse extends CursoDetalle {
+  readonly previewImpacto?: Record<string, unknown> | null
+  readonly skillsSinCobertura?: readonly {
+    readonly skillId: string
+    readonly etiquetaVisible: string
+  }[]
+  readonly umbralesLogro?: {
+    readonly excelencia: number
+    readonly solido: number
+    readonly enDesarrollo: number
+  } | null
+}
