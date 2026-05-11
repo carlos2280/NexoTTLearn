@@ -7,6 +7,7 @@ import type {
 } from "@nexott-learn/shared-types"
 import { RolAsignacion, RolUsuario } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { AuditLogService } from "../common/audit/audit-log.service"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
 import type { SesionUsuario } from "../common/types/sesion.types"
@@ -24,6 +25,7 @@ const SKILL_CERCA = "32222222-2222-2222-2222-222222222222"
 const SKILL_CUMPLE = "33333333-3333-3333-3333-333333333333"
 const ADMIN_USER_ID = "9000000a-0000-0000-0000-000000000001"
 const PARTICIPANTE_USER_ID = "9000000b-0000-0000-0000-000000000002"
+const AUTOR_USUARIO_ID = ADMIN_USER_ID
 
 const ADMIN: SesionUsuario = { usuarioId: ADMIN_USER_ID, rol: RolUsuario.ADMIN }
 const PARTICIPANTE: SesionUsuario = {
@@ -104,7 +106,10 @@ beforeEach(async () => {
     providers: [
       {
         provide: PlanPersonalService,
-        useFactory: (p: PrismaService) => new PlanPersonalService(p),
+        useFactory: (p: PrismaService) =>
+          new PlanPersonalService(p, {
+            record: vi.fn().mockResolvedValue(undefined),
+          } as unknown as AuditLogService),
         inject: [PrismaService],
       },
       { provide: PrismaService, useValue: prisma },
@@ -412,7 +417,9 @@ describe("PlanPersonalService.recalcular", () => {
     })
     prisma.planEstudio.findUnique.mockResolvedValue(null)
 
-    await expect(service.recalcular(ASIGNACION_ID)).rejects.toMatchObject({
+    await expect(
+      service.recalcular(ASIGNACION_ID, AUTOR_USUARIO_ID, "motivo"),
+    ).rejects.toMatchObject({
       response: { code: apiErrorCodes.planNoEncontrado },
     })
   })
@@ -446,7 +453,7 @@ describe("PlanPersonalService.recalcular", () => {
     prisma.curso.findUniqueOrThrow.mockResolvedValue({ id: CURSO_ID, umbralNoCumple: 10 })
     prisma.planEstudio.update.mockResolvedValue({ id: "plan-existente" })
 
-    await service.recalcular(ASIGNACION_ID)
+    await service.recalcular(ASIGNACION_ID, AUTOR_USUARIO_ID, "motivo")
 
     expect(prisma.itemPlan.deleteMany).toHaveBeenCalledWith({
       where: { planId: "plan-existente" },

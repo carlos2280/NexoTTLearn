@@ -8,12 +8,14 @@ import {
 import type { PlanResponseAdmin, PlanResponseParticipante } from "@nexott-learn/shared-types"
 import { fichaSnapshotV1Schema } from "@nexott-learn/shared-types"
 import {
+  AccionAuditoria,
   Prisma,
   type CaracterItemPlan as PrismaCaracterItemPlan,
   type RazonItemPlan as PrismaRazonItemPlan,
   RolAsignacion,
   RolUsuario,
 } from "@prisma/client"
+import { AuditLogService } from "../common/audit/audit-log.service"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
@@ -53,7 +55,10 @@ interface CalcularInternalInput {
 export class PlanPersonalService {
   private readonly logger = new Logger(PlanPersonalService.name)
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLog: AuditLogService,
+  ) {}
 
   /**
    * Cierre del TODO(S7) en `crearAsignacionesAdmin` y `convertirAAsignado`:
@@ -137,11 +142,15 @@ export class PlanPersonalService {
   /**
    * `POST /plan/recalcular` — ADMIN. Requiere `X-Motivo` (controller).
    * Reemplaza items + actualiza snapshot + `estaDesactualizado=false`.
-   * TODO(P7b): audit `PLAN_RECALCULADO` cuando llegue el ALTER TYPE
-   * accion_auditoria_enum.
+   * Audit `PLAN_RECALCULADO` se registra fuera del TX (D-AUDIT-1) con
+   * metadata estructural sin texto crudo del motivo (D-S7-D4).
    * TODO(S10): emitir notificacion PLAN_RECALCULADO al participante.
    */
-  async recalcular(asignacionId: string): Promise<PlanResponseAdmin> {
+  async recalcular(
+    asignacionId: string,
+    autorUsuarioId: string,
+    motivo: string,
+  ): Promise<PlanResponseAdmin> {
     const previa = await this.prisma.asignacionCurso.findUnique({
       where: { id: asignacionId },
       select: { id: true, rol: true },
@@ -169,7 +178,7 @@ export class PlanPersonalService {
         message: "El plan no existe. Use /plan/calcular para el primer calculo.",
       })
     }
-    return await this.prisma.$transaction(async (tx) => {
+    const respuesta = await this.prisma.$transaction(async (tx) => {
       await this.calcularInterno({ asignacionId, tx, fallarSiExiste: false })
       return (await this.obtenerPlanInterno(
         tx,
@@ -177,6 +186,19 @@ export class PlanPersonalService {
         RolUsuario.ADMIN,
       )) as PlanResponseAdmin
     })
+    await this.auditLog.record({
+      usuarioId: autorUsuarioId,
+      accion: AccionAuditoria.PLAN_RECALCULADO,
+      exito: true,
+      recursoTipo: "plan_estudio",
+      recursoId: planExistente.id,
+      metadata: {
+        planId: planExistente.id,
+        asignacionId,
+        motivoLength: motivo.trim().length,
+      },
+    })
+    return respuesta
   }
 
   /**

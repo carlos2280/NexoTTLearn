@@ -280,3 +280,19 @@ export type {
   CondicionesListoFaltante,
   PatchResultadoEntrevistaRequest,
 } from "./asignaciones"
+
+// Intentos de bloque — Slice 7 P7b (D-S7-C1..C6).
+export {
+  contenidoQuizSchema,
+  crearIntentoBloqueSchema,
+  intentoBloqueResponseSchema,
+  listarIntentosBloqueQuerySchema,
+  listarIntentosCursoBloqueQuerySchema,
+} from "./intentos-bloque"
+export type {
+  ContenidoQuiz,
+  CrearIntentoBloqueInput,
+  IntentoBloqueResponse,
+  ListarIntentosBloqueQuery,
+  ListarIntentosCursoBloqueQuery,
+} from "./intentos-bloque"

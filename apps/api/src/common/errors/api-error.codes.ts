@@ -127,6 +127,14 @@ export const apiErrorCodes = {
   // Plan personal P7a (D-S7-B1..B6, D-S7-D1..D2).
   planNoEncontrado: "PLAN_NO_ENCONTRADO",
   conflictPlanYaCalculado: "CONFLICT_PLAN_YA_CALCULADO",
+  // Intentos de bloque P7b (D-S7-C1..C6).
+  intentoNoEncontrado: "INTENTO_NO_ENCONTRADO",
+  bloqueNoEvaluable: "BLOQUE_NO_EVALUABLE",
+  bloqueSinSkillMedida: "BLOQUE_SIN_SKILL_MEDIDA",
+  conflictAsignacionCerrada: "CONFLICT_ASIGNACION_CERRADA",
+  tipoBloqueNoSoportadoMvp: "TIPO_BLOQUE_NO_SOPORTADO_MVP",
+  conflictIntentoYaInvalidado: "CONFLICT_INTENTO_YA_INVALIDADO",
+  contenidoBloqueInvalido: "CONTENIDO_BLOQUE_INVALIDO",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]

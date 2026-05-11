@@ -12,6 +12,7 @@ import { Throttle } from "@nestjs/throttler"
 import type { PlanResponseAdmin, PlanResponseParticipante } from "@nexott-learn/shared-types"
 import { RolUsuario } from "@prisma/client"
 import { CurrentUser } from "../common/decorators/current-user.decorator"
+import { Motivo } from "../common/decorators/motivo.decorator"
 import { RequiereMotivo } from "../common/decorators/requiere-motivo.decorator"
 import { Roles } from "../common/decorators/roles.decorator"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
@@ -49,10 +50,11 @@ export class PlanPersonalController {
   @HttpCode(HttpStatus.OK)
   async recalcular(
     @Param("asignacionId", ParseUUIDPipe) asignacionId: string,
+    @Motivo() motivo: string | undefined,
     @CurrentUser() usuario: SesionUsuario | undefined,
   ): Promise<PlanResponseAdmin> {
-    this.requireUsuario(usuario)
-    return await this.planService.recalcular(asignacionId)
+    const sesion = this.requireUsuario(usuario)
+    return await this.planService.recalcular(asignacionId, sesion.usuarioId, motivo ?? "")
   }
 
   @Get("asignaciones/:asignacionId/plan")
