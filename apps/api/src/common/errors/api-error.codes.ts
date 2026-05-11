@@ -97,6 +97,17 @@ export const apiErrorCodes = {
   // Idempotency transversal P5a (D-EVI-3). Reservado para P5c.
   conflictIdempotencyKeyReusadaConBodyDistinto:
     "CONFLICT_IDEMPOTENCY_KEY_REUSADA_CON_BODY_DISTINTO",
+  // Evaluacion inicial P5b — preview + parsing (D-EVI-2, D-EVI-6, D-EVI-8).
+  previewNoEncontrado: "PREVIEW_NO_ENCONTRADO",
+  conflictPreviewYaAplicado: "CONFLICT_PREVIEW_YA_APLICADO",
+  validacionExcelEncabezados: "VALIDACION_EXCEL_ENCABEZADOS",
+  validacionExcelFilas: "VALIDACION_EXCEL_FILAS",
+  // Sub-codigos por celda (viajan dentro de `details.filas[].errores[].codigo`).
+  validacionExcelEmailNoAsignado: "VALIDACION_EXCEL_EMAIL_NO_ASIGNADO",
+  validacionExcelNotaFueraRango: "VALIDACION_EXCEL_NOTA_FUERA_RANGO",
+  validacionExcelNotaNoNumerica: "VALIDACION_EXCEL_NOTA_NO_NUMERICA",
+  validacionExcelEmailFormatoInvalido: "VALIDACION_EXCEL_EMAIL_FORMATO_INVALIDO",
+  validacionExcelEmailDuplicadoEnArchivo: "VALIDACION_EXCEL_EMAIL_DUPLICADO_EN_ARCHIVO",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]

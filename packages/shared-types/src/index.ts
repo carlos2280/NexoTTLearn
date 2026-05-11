@@ -180,3 +180,12 @@ export type {
   FichaResponse,
   EntradaHistoricoNotaSkill,
 } from "./evaluacion-inicial/ficha.schema"
+// Evaluacion inicial — Slice 5 P5b: respuesta del preview (D-EVI-2/6/8).
+export type {
+  FuenteCambioPreview,
+  PreviewResumen,
+  PreviewCambioItem,
+  PreviewErrorCelda,
+  PreviewRechazoItem,
+  PreviewResponse,
+} from "./evaluacion-inicial/preview.schema"

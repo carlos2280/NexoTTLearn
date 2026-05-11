@@ -6,3 +6,11 @@ export type {
   FichaResponse,
   EntradaHistoricoNotaSkill,
 } from "./ficha.schema"
+export type {
+  FuenteCambioPreview,
+  PreviewResumen,
+  PreviewCambioItem,
+  PreviewErrorCelda,
+  PreviewRechazoItem,
+  PreviewResponse,
+} from "./preview.schema"

@@ -9,6 +9,7 @@ import {
 import { EstadoSkill, Prisma, RolUsuario } from "@prisma/client"
 import { apiErrorCodes } from "../../common/errors/api-error.codes"
 import { Paginated, buildPaginatedResponse, resolvePaginacion } from "../../common/http/paginated"
+import { decimalAnumero } from "../../common/prisma/decimal"
 import { PrismaService } from "../../common/prisma/prisma.service"
 import { SesionUsuario } from "../../common/types/sesion.types"
 
@@ -43,10 +44,6 @@ interface ListarHistoricoQuery {
 type NotaSkillRow = Prisma.NotaSkillGetPayload<{ select: typeof SELECT_NOTA_SKILL_FIELDS }>
 type SkillFichaRow = Prisma.SkillGetPayload<{ select: typeof SELECT_SKILL_FICHA_FIELDS }>
 type HistoricoRow = Prisma.HistoricoNotaSkillGetPayload<{ select: typeof SELECT_HISTORICO_FIELDS }>
-
-function decimalAnumero(valor: Prisma.Decimal | null): number | null {
-  return valor === null ? null : Number(valor)
-}
 
 function jsonObjectOrNull(value: Prisma.JsonValue | null): Record<string, unknown> | null {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
