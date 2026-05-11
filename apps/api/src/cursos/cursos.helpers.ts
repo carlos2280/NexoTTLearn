@@ -338,3 +338,35 @@ function validarFechas(curso: CursoPublicacionSnapshot, fallas: ValidacionFallid
     }
   }
 }
+
+/**
+ * Construye el subset de pesos a actualizar para PATCH /cursos/:id/pesos
+ * incluyendo unicamente las claves presentes en el input (H-11). El resultado
+ * sirve como `data` para `tx.curso.update` y como `pesosNuevos` para el
+ * `previewImpacto` del log: ambos deben quedar simetricos para evitar drift.
+ */
+export function construirPesosCambiados(input: {
+  readonly pesoBloques?: number
+  readonly pesoTransversal?: number
+  readonly pesoEntrevista?: number
+  readonly umbralNoCumple?: number
+}): Partial<
+  Record<"pesoBloques" | "pesoTransversal" | "pesoEntrevista" | "umbralNoCumple", number>
+> {
+  const out: Partial<
+    Record<"pesoBloques" | "pesoTransversal" | "pesoEntrevista" | "umbralNoCumple", number>
+  > = {}
+  if (input.pesoBloques !== undefined) {
+    out.pesoBloques = input.pesoBloques
+  }
+  if (input.pesoTransversal !== undefined) {
+    out.pesoTransversal = input.pesoTransversal
+  }
+  if (input.pesoEntrevista !== undefined) {
+    out.pesoEntrevista = input.pesoEntrevista
+  }
+  if (input.umbralNoCumple !== undefined) {
+    out.umbralNoCumple = input.umbralNoCumple
+  }
+  return out
+}

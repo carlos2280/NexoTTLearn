@@ -16,6 +16,7 @@ export const apiErrorCodes = {
   errorInterno: "ERROR_INTERNO",
   idempotencyKeyRequerida: "IDEMPOTENCY_KEY_REQUERIDA",
   motivoRequerido: "MOTIVO_REQUERIDO",
+  motivoInvalido: "MOTIVO_INVALIDO",
   rateLimit: "RATE_LIMIT",
   conflict: "CONFLICT",
   credencialesInvalidas: "CREDENCIALES_INVALIDAS",

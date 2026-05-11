@@ -38,6 +38,7 @@ import { SesionUsuario } from "../common/types/sesion.types"
 import {
   type CursoPublicacionSnapshot,
   calcularDiffComposite,
+  construirPesosCambiados,
   validarDuracionEntrevistaIa,
   validarMonotoniaUmbralesLogro,
   validarPrecondicionesPublicacion,
@@ -1064,15 +1065,25 @@ export class CursosService {
   /**
    * Lee la version final del curso (post-update) para construir el response
    * `CursoConfiguracionResponse`. Se llama dentro del mismo `$transaction`.
+   * Si por concurrencia el curso ya no existe, lanzamos `NotFoundException`
+   * tipada con `cursoNoEncontrado` en lugar del error generico de Prisma
+   * (`P2025`) para que el filtro global devuelva el codigo de dominio.
    */
-  private releerCursoDetalle(
+  private async releerCursoDetalle(
     tx: Prisma.TransactionClient,
     cursoId: string,
   ): Promise<CursoDetalleRow> {
-    return tx.curso.findUniqueOrThrow({
+    const detalle = await tx.curso.findUnique({
       where: { id: cursoId },
       select: SELECT_CURSO_DETALLE_FIELDS,
     })
+    if (!detalle) {
+      throw new NotFoundException({
+        code: apiErrorCodes.cursoNoEncontrado,
+        message: "Curso no encontrado.",
+      })
+    }
+    return detalle
   }
 
   /**
@@ -1291,11 +1302,14 @@ export class CursosService {
           data: diff.aAgregar.map((moduloId) => ({ cursoId, moduloId })),
         })
       }
-      const previewImpacto: Prisma.InputJsonValue = {
+      // Misma referencia para el log y para el response (H-9): evita drift
+      // entre lo que se persiste en LogCambioCurso.previewImpacto y lo que
+      // se devuelve al cliente.
+      const previewImpacto = {
         aEliminar: [...diff.aEliminar],
         aAgregar: [...diff.aAgregar],
         skillsSinCobertura: skillsSinCobertura.map((s) => s.skillId),
-      }
+      } satisfies Prisma.InputJsonValue
       await tx.logCambioCurso.create({
         data: {
           cursoId,
@@ -1306,32 +1320,20 @@ export class CursosService {
         },
       })
       const detalle = await this.releerCursoDetalle(tx, cursoId)
-      return {
-        detalle,
-        skillsSinCobertura,
-        diffAplicado: {
-          aEliminar: [...diff.aEliminar],
-          aAgregar: [...diff.aAgregar],
-        },
-      }
+      return { detalle, skillsSinCobertura, previewImpacto }
     })
     const base = toCursoDetalle(resultado.detalle)
-    const previewImpactoResponse: Record<string, unknown> = {
-      aEliminar: resultado.diffAplicado.aEliminar,
-      aAgregar: resultado.diffAplicado.aAgregar,
-      skillsSinCobertura: resultado.skillsSinCobertura.map((s) => s.skillId),
-    }
     if (resultado.skillsSinCobertura.length === 0) {
       return {
         ...base,
         umbralesLogro: parseUmbralesLogro(resultado.detalle.umbralesLogro),
-        previewImpacto: previewImpactoResponse,
+        previewImpacto: resultado.previewImpacto,
       }
     }
     return {
       ...base,
       umbralesLogro: parseUmbralesLogro(resultado.detalle.umbralesLogro),
-      previewImpacto: previewImpactoResponse,
+      previewImpacto: resultado.previewImpacto,
       skillsSinCobertura: resultado.skillsSinCobertura,
     }
   }
@@ -1349,30 +1351,24 @@ export class CursosService {
   ): Promise<CursoConfiguracionResponse> {
     const detalle = await this.prisma.$transaction(async (tx) => {
       const actual = await this.leerCursoParaConfigurar(tx, cursoId, motivo)
-      const pesoBloques = input.pesoBloques ?? Number(actual.pesoBloques)
-      const pesoTransversal = input.pesoTransversal ?? Number(actual.pesoTransversal)
-      const pesoEntrevista = input.pesoEntrevista ?? Number(actual.pesoEntrevista)
       const hayCambioDePeso =
         input.pesoBloques !== undefined ||
         input.pesoTransversal !== undefined ||
         input.pesoEntrevista !== undefined
       if (hayCambioDePeso) {
-        validarSumaPesosCien([pesoBloques, pesoTransversal, pesoEntrevista], "PESOS_INTRA_SKILL")
+        validarSumaPesosCien(
+          [
+            input.pesoBloques ?? Number(actual.pesoBloques),
+            input.pesoTransversal ?? Number(actual.pesoTransversal),
+            input.pesoEntrevista ?? Number(actual.pesoEntrevista),
+          ],
+          "PESOS_INTRA_SKILL",
+        )
       }
-      const data: Prisma.CursoUpdateInput = {}
-      if (input.pesoBloques !== undefined) {
-        data.pesoBloques = input.pesoBloques
-      }
-      if (input.pesoTransversal !== undefined) {
-        data.pesoTransversal = input.pesoTransversal
-      }
-      if (input.pesoEntrevista !== undefined) {
-        data.pesoEntrevista = input.pesoEntrevista
-      }
-      if (input.umbralNoCumple !== undefined) {
-        data.umbralNoCumple = input.umbralNoCumple
-      }
-      await tx.curso.update({ where: { id: cursoId }, data })
+      // H-11: data y pesosNuevos comparten exactamente las mismas claves —
+      // las presentes en input. pesosAnteriores se mantiene completo (snapshot).
+      const pesosNuevos = construirPesosCambiados(input)
+      await tx.curso.update({ where: { id: cursoId }, data: pesosNuevos })
       const previewImpacto: Prisma.InputJsonValue = {
         pesosAnteriores: {
           pesoBloques: Number(actual.pesoBloques),
@@ -1380,12 +1376,7 @@ export class CursosService {
           pesoEntrevista: Number(actual.pesoEntrevista),
           umbralNoCumple: Number(actual.umbralNoCumple),
         },
-        pesosNuevos: {
-          pesoBloques,
-          pesoTransversal,
-          pesoEntrevista,
-          umbralNoCumple: input.umbralNoCumple ?? Number(actual.umbralNoCumple),
-        },
+        pesosNuevos,
       }
       await tx.logCambioCurso.create({
         data: {
@@ -1810,6 +1801,9 @@ export class CursosService {
     autorUsuarioId: string,
     motivo: string | undefined,
   ): Promise<CursoDetalle> {
+    // Defensa interna por si publicarCurso se invoca desde otra capa sin pasar
+    // por el decorator @Motivo (que ya hace trim + saneamiento Zod).
+    const motivoFinal = motivo?.trim() ?? ""
     const detalle = await this.prisma.$transaction(async (tx) => {
       const snapshot = await this.leerSnapshotPublicacion(tx, cursoId)
       const resultado = validarPrecondicionesPublicacion(snapshot.curso)
@@ -1820,16 +1814,26 @@ export class CursosService {
           details: { validacionesFallidas: resultado.validacionesFallidas.map((v) => ({ ...v })) },
         })
       }
-      await tx.curso.update({
-        where: { id: cursoId },
+      // Race-safe transicion BORRADOR -> ACTIVO. Dos publicaciones concurrentes
+      // que pasen el snapshot leyendo BORRADOR colisionaran aqui: solo una vera
+      // count===1 y persistira el log; la otra recibira count===0 -> 409 y el
+      // LogCambioCurso queda revertido por rollback del mismo $transaction.
+      const { count } = await tx.curso.updateMany({
+        where: { id: cursoId, estado: EstadoCurso.BORRADOR },
         data: { estado: EstadoCurso.ACTIVO },
       })
+      if (count === 0) {
+        throw new ConflictException({
+          code: apiErrorCodes.conflictCursoEstado,
+          message: "El curso ya no esta en estado BORRADOR.",
+        })
+      }
       await tx.logCambioCurso.create({
         data: {
           cursoId,
           autorUsuarioId,
           accion: AccionLogCurso.PUBLICACION,
-          motivo: motivo && motivo.length > 0 ? motivo : "Publicación",
+          motivo: motivoFinal.length > 0 ? motivoFinal : "Publicación",
           previewImpacto: {
             estadoAnterior: EstadoCurso.BORRADOR,
             estadoNuevo: EstadoCurso.ACTIVO,

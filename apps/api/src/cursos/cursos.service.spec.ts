@@ -28,6 +28,7 @@ interface MockPrisma {
     count: ReturnType<typeof vi.fn>
     create: ReturnType<typeof vi.fn>
     update: ReturnType<typeof vi.fn>
+    updateMany: ReturnType<typeof vi.fn>
     delete: ReturnType<typeof vi.fn>
   }
   cliente: { findFirst: ReturnType<typeof vi.fn> }
@@ -92,6 +93,7 @@ function buildPrismaMock(): MockPrisma {
       count: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       delete: vi.fn(),
     },
     cliente: { findFirst: vi.fn() },
@@ -631,16 +633,18 @@ function buildCursoConfigRow(
 
 describe("CursosService.actualizarAreas", () => {
   it("BORRADOR: persiste el set y escribe log CAMBIO_AREAS sin exigir motivo", async () => {
-    prisma.curso.findUnique.mockResolvedValue(buildCursoConfigRow({ estado: EstadoCurso.BORRADOR }))
-    prisma.curso.findUniqueOrThrow.mockResolvedValue(
-      buildCursoConfigRow({
-        estado: EstadoCurso.BORRADOR,
-        areasExigidas: [
-          { areaId: AREA_A, peso: 60, puntajeObjetivo: 70 },
-          { areaId: AREA_B, peso: 40, puntajeObjetivo: 70 },
-        ],
-      }),
-    )
+    // H-8: releerCursoDetalle ahora usa findUnique. Encadenamos: snapshot + relookup.
+    prisma.curso.findUnique
+      .mockResolvedValueOnce(buildCursoConfigRow({ estado: EstadoCurso.BORRADOR }))
+      .mockResolvedValueOnce(
+        buildCursoConfigRow({
+          estado: EstadoCurso.BORRADOR,
+          areasExigidas: [
+            { areaId: AREA_A, peso: 60, puntajeObjetivo: 70 },
+            { areaId: AREA_B, peso: 40, puntajeObjetivo: 70 },
+          ],
+        }),
+      )
     const res = await service.actualizarAreas(
       CURSO_ID,
       {
@@ -720,6 +724,45 @@ describe("CursosService.actualizarAreas", () => {
       ),
     ).rejects.toBeInstanceOf(NotFoundException)
   })
+
+  it("H-12 interseccion: actualiza area existente cuando peso o puntajeObjetivo cambia", async () => {
+    // AREA_A en BD con peso 50/po 70 y AREA_B con peso 50/po 70 (suma 100).
+    // El input mantiene ambas pero solo cambia AREA_A (peso 50->50 conserva
+    // suma=100, po 70->80 cambia). AREA_B no cambia => sin update sobre B.
+    prisma.curso.findUnique
+      .mockResolvedValueOnce(
+        buildCursoConfigRow({
+          estado: EstadoCurso.BORRADOR,
+          areasExigidas: [
+            { areaId: AREA_A, peso: 50, puntajeObjetivo: 70 },
+            { areaId: AREA_B, peso: 50, puntajeObjetivo: 70 },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(buildCursoConfigRow())
+    await service.actualizarAreas(
+      CURSO_ID,
+      {
+        areas: [
+          { areaId: AREA_A, peso: 50, puntajeObjetivo: 80 },
+          { areaId: AREA_B, peso: 50, puntajeObjetivo: 70 },
+        ],
+      },
+      undefined,
+      ADMIN_ID,
+    )
+    expect(prisma.cursoAreaExigida.update).toHaveBeenCalledTimes(1)
+    expect(prisma.cursoAreaExigida.update).toHaveBeenCalledWith({
+      where: {
+        // biome-ignore lint/style/useNamingConvention: composite key Prisma.
+        cursoId_areaId: { cursoId: CURSO_ID, areaId: AREA_A },
+      },
+      data: { peso: 50, puntajeObjetivo: 80 },
+    })
+    // No hay altas ni bajas: solo intersección.
+    expect(prisma.cursoAreaExigida.deleteMany).not.toHaveBeenCalled()
+    expect(prisma.cursoAreaExigida.createMany).not.toHaveBeenCalled()
+  })
 })
 
 describe("CursosService.actualizarSkillsExigidas", () => {
@@ -760,6 +803,41 @@ describe("CursosService.actualizarSkillsExigidas", () => {
     await expect(
       service.actualizarSkillsExigidas(CURSO_ID, { skills: [] }, undefined, ADMIN_ID),
     ).rejects.toMatchObject({ response: { code: apiErrorCodes.motivoRequerido } })
+  })
+
+  it("H-12 interseccion: actualiza skill existente cuando notaMinima cambia", async () => {
+    // SKILL_X ya esta en BD con notaMinima 70. El input la mantiene pero la
+    // sube a 80. Solo update; sin altas ni bajas. SKILL_X esta cubierta por
+    // MOD_A (habilitado) -> sin aviso D82.
+    prisma.curso.findUnique
+      .mockResolvedValueOnce(
+        buildCursoConfigRow({
+          estado: EstadoCurso.BORRADOR,
+          skillsExigidas: [{ skillId: SKILL_X, notaMinima: 70 }],
+          modulosHabilitados: [{ moduloId: MOD_A }],
+        }),
+      )
+      .mockResolvedValueOnce(buildCursoConfigRow())
+    prisma.seccionSkill.findMany.mockResolvedValue([
+      { skillId: SKILL_X, seccion: { moduloId: MOD_A } },
+    ])
+    prisma.skill.findMany.mockResolvedValue([])
+    await service.actualizarSkillsExigidas(
+      CURSO_ID,
+      { skills: [{ skillId: SKILL_X, notaMinima: 80 }] },
+      undefined,
+      ADMIN_ID,
+    )
+    expect(prisma.cursoSkillExigida.update).toHaveBeenCalledTimes(1)
+    expect(prisma.cursoSkillExigida.update).toHaveBeenCalledWith({
+      where: {
+        // biome-ignore lint/style/useNamingConvention: composite key Prisma.
+        cursoId_skillId: { cursoId: CURSO_ID, skillId: SKILL_X },
+      },
+      data: { notaMinima: 80 },
+    })
+    expect(prisma.cursoSkillExigida.deleteMany).not.toHaveBeenCalled()
+    expect(prisma.cursoSkillExigida.createMany).not.toHaveBeenCalled()
   })
 })
 
@@ -1086,12 +1164,15 @@ function buildSnapshotRow(overrides: PublicarOverrides = {}) {
 }
 
 function mockSnapshotValido(overrides: PublicarOverrides = {}): void {
-  prisma.curso.findUnique.mockResolvedValue(buildSnapshotRow(overrides))
+  // Primer findUnique = snapshot D63 (shape buildSnapshotRow).
+  // Segundo findUnique = relookup post-publicacion (shape buildCursoConfigRow,
+  // ya con estado=ACTIVO porque el updateMany ya persistio).
+  prisma.curso.findUnique
+    .mockResolvedValueOnce(buildSnapshotRow(overrides))
+    .mockResolvedValueOnce(buildCursoConfigRow({ estado: EstadoCurso.ACTIVO }))
   prisma.seccionSkill.findMany.mockResolvedValue([])
   prisma.skill.findMany.mockResolvedValue([])
-  prisma.curso.findUniqueOrThrow.mockResolvedValue(
-    buildCursoConfigRow({ estado: EstadoCurso.ACTIVO }),
-  )
+  prisma.curso.updateMany.mockResolvedValue({ count: 1 })
 }
 
 describe("CursosService.publicarCurso", () => {
@@ -1099,12 +1180,10 @@ describe("CursosService.publicarCurso", () => {
     mockSnapshotValido()
     const res = await service.publicarCurso(CURSO_ID, ADMIN_ID, undefined)
     expect(res.estado).toBe(EstadoCurso.ACTIVO)
-    expect(prisma.curso.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: CURSO_ID },
-        data: { estado: EstadoCurso.ACTIVO },
-      }),
-    )
+    expect(prisma.curso.updateMany).toHaveBeenCalledWith({
+      where: { id: CURSO_ID, estado: EstadoCurso.BORRADOR },
+      data: { estado: EstadoCurso.ACTIVO },
+    })
     expect(prisma.logCambioCurso.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -1139,7 +1218,7 @@ describe("CursosService.publicarCurso", () => {
     await expect(service.publicarCurso(CURSO_ID, ADMIN_ID, undefined)).rejects.toMatchObject({
       response: { code: apiErrorCodes.conflictCursoEstado },
     })
-    expect(prisma.curso.update).not.toHaveBeenCalled()
+    expect(prisma.curso.updateMany).not.toHaveBeenCalled()
   })
 
   it("estado CERRADO: 409 conflictCursoEstado", async () => {
@@ -1369,12 +1448,45 @@ describe("CursosService.publicarCurso", () => {
     expect(codigos.length).toBeGreaterThanOrEqual(3)
   })
 
-  it("race: si el findUnique en tx ve estado ACTIVO (otro admin publico antes), 409", async () => {
+  it("estado leído en tx ya es ACTIVO (idempotencia, no race)", async () => {
     prisma.curso.findUnique.mockResolvedValue(buildSnapshotRow({ estado: EstadoCurso.ACTIVO }))
     await expect(service.publicarCurso(CURSO_ID, ADMIN_ID, undefined)).rejects.toMatchObject({
       response: { code: apiErrorCodes.conflictCursoEstado },
     })
-    expect(prisma.curso.update).not.toHaveBeenCalled()
+    expect(prisma.curso.updateMany).not.toHaveBeenCalled()
     expect(prisma.logCambioCurso.create).not.toHaveBeenCalled()
+  })
+
+  it("race real: dos publicaciones concurrentes => solo una persiste log", async () => {
+    // Ambas publicaciones leen el snapshot en BORRADOR (pasan el guard de
+    // leerSnapshotPublicacion). El race se decide en el updateMany con guard
+    // estado=BORRADOR: la primera ve count=1 y persiste log, la segunda ve
+    // count=0 y rechaza con 409 conflictCursoEstado (rollback del log de la
+    // segunda implicito por estar en el mismo $transaction).
+    // Orden de findUnique: snapshot1, snapshot2, relookup1.
+    prisma.curso.findUnique
+      .mockResolvedValueOnce(buildSnapshotRow({ estado: EstadoCurso.BORRADOR }))
+      .mockResolvedValueOnce(buildSnapshotRow({ estado: EstadoCurso.BORRADOR }))
+      .mockResolvedValueOnce(buildCursoConfigRow({ estado: EstadoCurso.ACTIVO }))
+    prisma.seccionSkill.findMany.mockResolvedValue([])
+    prisma.skill.findMany.mockResolvedValue([])
+    prisma.curso.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 })
+
+    const resultados = await Promise.allSettled([
+      service.publicarCurso(CURSO_ID, ADMIN_ID, undefined),
+      service.publicarCurso(CURSO_ID, ADMIN_ID, undefined),
+    ])
+
+    const cumplidas = resultados.filter((r) => r.status === "fulfilled")
+    const rechazadas = resultados.filter((r) => r.status === "rejected")
+    expect(cumplidas).toHaveLength(1)
+    expect(rechazadas).toHaveLength(1)
+    const rechazo = rechazadas[0] as PromiseRejectedResult
+    expect(rechazo.reason).toMatchObject({
+      response: { code: apiErrorCodes.conflictCursoEstado },
+    })
+
+    expect(prisma.curso.updateMany).toHaveBeenCalledTimes(2)
+    expect(prisma.logCambioCurso.create).toHaveBeenCalledTimes(1)
   })
 })
