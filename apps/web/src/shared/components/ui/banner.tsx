@@ -1,7 +1,7 @@
+import { cn } from "@/shared/lib/cn"
 import { AlertCircle, CheckCircle2, Clock, Info, type LucideIcon } from "lucide-react"
 import type { ReactNode } from "react"
 import { type VariantProps, tv } from "tailwind-variants"
-import { cn } from "@/shared/lib/cn"
 
 const bannerStyles = tv({
   base: [

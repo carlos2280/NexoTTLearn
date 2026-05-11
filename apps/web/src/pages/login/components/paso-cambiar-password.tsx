@@ -1,12 +1,12 @@
-import { useMutation } from "@tanstack/react-query"
-import { type FormEvent, useState } from "react"
-import { z } from "zod"
 import { cambiarPassword } from "@/features/auth/api/cambiar-password.api"
 import { ApiError } from "@/shared/api/api-error"
 import { Banner } from "@/shared/components/ui/banner"
 import { Button } from "@/shared/components/ui/button"
 import { Field } from "@/shared/components/ui/field"
 import { Input } from "@/shared/components/ui/input"
+import { useMutation } from "@tanstack/react-query"
+import { type FormEvent, useState } from "react"
+import { z } from "zod"
 import { CriteriosPassword, cumpleTodosLosCriterios } from "./criterios-password"
 
 interface PasoCambiarPasswordProps {
@@ -62,7 +62,7 @@ export function PasoCambiarPassword({ onExito }: PasoCambiarPasswordProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate={true}>
       <header className="flex flex-col gap-1.5">
         <h2 className="font-semibold text-[24px] text-[var(--color-text-primary)] leading-8 tracking-tight">
           Crea una nueva contraseña
@@ -80,7 +80,7 @@ export function PasoCambiarPassword({ onExito }: PasoCambiarPasswordProps) {
             {...attrs}
             type="password"
             autoComplete="current-password"
-            autoFocus
+            autoFocus={true}
             value={actual}
             onChange={(e) => setActual(e.target.value)}
             disabled={mutation.isPending}
@@ -119,7 +119,7 @@ export function PasoCambiarPassword({ onExito }: PasoCambiarPasswordProps) {
         )}
       </Field>
 
-      <Button type="submit" fullWidth size="lg" isLoading={mutation.isPending}>
+      <Button type="submit" fullWidth={true} size="lg" isLoading={mutation.isPending}>
         Guardar y continuar
       </Button>
     </form>

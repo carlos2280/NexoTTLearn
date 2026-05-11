@@ -1,6 +1,6 @@
+import { cn } from "@/shared/lib/cn"
 import { motion, useReducedMotion } from "framer-motion"
 import { type ClipboardEvent, type KeyboardEvent, useEffect, useMemo, useState } from "react"
-import { cn } from "@/shared/lib/cn"
 
 interface CodigoMfaInputProps {
   readonly onChange: (codigo: string) => void

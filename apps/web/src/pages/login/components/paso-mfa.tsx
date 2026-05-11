@@ -1,11 +1,11 @@
-import { useMutation } from "@tanstack/react-query"
-import { motion } from "framer-motion"
-import { useCallback, useRef, useState } from "react"
 import { verificarMfa } from "@/features/auth/api/verificar-mfa.api"
 import { ApiError } from "@/shared/api/api-error"
 import { Banner } from "@/shared/components/ui/banner"
 import { Button } from "@/shared/components/ui/button"
 import { MagneticButton } from "@/shared/components/ui/magnetic-button"
+import { useMutation } from "@tanstack/react-query"
+import { motion } from "framer-motion"
+import { useCallback, useRef, useState } from "react"
 import type { MfaChallenge } from "../login.types"
 import { BandaTemporal } from "./banda-temporal"
 import { CodigoMfaInput } from "./codigo-mfa-input"
@@ -82,7 +82,7 @@ export function PasoMfa({ challenge, onExito, onReiniciar }: PasoMfaProps) {
       <div className="flex flex-col gap-2">
         <MagneticButton
           type="button"
-          fullWidth
+          fullWidth={true}
           isLoading={mutation.isPending}
           disabled={codigo.length < 6}
           onClick={() => enviar(codigo)}
@@ -92,7 +92,7 @@ export function PasoMfa({ challenge, onExito, onReiniciar }: PasoMfaProps) {
         <Button
           type="button"
           variant="ghost"
-          fullWidth
+          fullWidth={true}
           onClick={onReiniciar}
           disabled={mutation.isPending}
         >

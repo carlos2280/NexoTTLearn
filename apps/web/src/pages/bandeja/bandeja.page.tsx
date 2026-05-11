@@ -1,10 +1,10 @@
-import { useMutation } from "@tanstack/react-query"
-import { useNavigate } from "react-router-dom"
+import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
 import { httpClient } from "@/shared/api/http-client"
 import { Button } from "@/shared/components/ui/button"
 import { Wordmark } from "@/shared/components/wordmark"
 import { RUTAS } from "@/shared/constants/rutas"
-import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
+import { useMutation } from "@tanstack/react-query"
+import { useNavigate } from "react-router-dom"
 
 export function BandejaPage() {
   const { data: usuario, isLoading } = useUsuarioActual()

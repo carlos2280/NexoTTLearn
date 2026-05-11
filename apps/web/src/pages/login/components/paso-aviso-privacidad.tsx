@@ -1,8 +1,8 @@
-import { useMutation } from "@tanstack/react-query"
 import { aceptarAvisoPrivacidad } from "@/features/auth/api/aceptar-aviso-privacidad.api"
 import { ApiError } from "@/shared/api/api-error"
 import { Banner } from "@/shared/components/ui/banner"
 import { Button } from "@/shared/components/ui/button"
+import { useMutation } from "@tanstack/react-query"
 
 const VERSION_AVISO = "v1.0"
 
@@ -64,7 +64,7 @@ export function PasoAvisoPrivacidad({ onExito }: PasoAvisoPrivacidadProps) {
         </div>
       </div>
 
-      <Button type="button" fullWidth onClick={handleAceptar} isLoading={mutation.isPending}>
+      <Button type="button" fullWidth={true} onClick={handleAceptar} isLoading={mutation.isPending}>
         Acepto y continúo
       </Button>
     </div>

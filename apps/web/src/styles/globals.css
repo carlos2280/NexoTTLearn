@@ -3,7 +3,7 @@
 @import "@fontsource-variable/geist/index.css";
 @import "@fontsource-variable/geist-mono/index.css";
 @import "@fontsource-variable/fraunces/index.css";
-@import "@fontsource-variable/fraunces/italic.css";
+@import "@fontsource-variable/fraunces/wght-italic.css";
 
 @theme {
   --color-canvas: #fafaf9;

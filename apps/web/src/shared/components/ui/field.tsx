@@ -1,7 +1,7 @@
+import { cn } from "@/shared/lib/cn"
 import { AlertCircle } from "lucide-react"
 import type { ReactNode } from "react"
 import { useId } from "react"
-import { cn } from "@/shared/lib/cn"
 import { Label } from "./label"
 
 interface FieldProps {

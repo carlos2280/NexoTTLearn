@@ -1,5 +1,5 @@
-import { motion, useReducedMotion } from "framer-motion"
 import type { UsuarioSesion } from "@/features/auth/types"
+import { motion, useReducedMotion } from "framer-motion"
 
 interface PasoBienvenidaProps {
   readonly usuario: UsuarioSesion

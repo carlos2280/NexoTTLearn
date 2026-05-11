@@ -1,6 +1,6 @@
+import { cn } from "@/shared/lib/cn"
 import { Clock } from "lucide-react"
 import { useEffect, useState } from "react"
-import { cn } from "@/shared/lib/cn"
 
 interface BandaTemporalProps {
   readonly expiraEn: Date

@@ -1,7 +1,7 @@
-import { Navigate, Route, Routes } from "react-router-dom"
-import { LoginPage } from "@/pages/login/login.page"
 import { BandejaPage } from "@/pages/bandeja/bandeja.page"
+import { LoginPage } from "@/pages/login/login.page"
 import { RUTAS } from "@/shared/constants/rutas"
+import { Navigate, Route, Routes } from "react-router-dom"
 import { GuardSesion } from "./guard-sesion"
 
 export function AppRoutes() {

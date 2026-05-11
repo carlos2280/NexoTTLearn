@@ -1,7 +1,7 @@
-import type { ReactNode } from "react"
-import { Navigate } from "react-router-dom"
 import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
 import { RUTAS } from "@/shared/constants/rutas"
+import type { ReactNode } from "react"
+import { Navigate } from "react-router-dom"
 
 interface GuardSesionProps {
   readonly children: ReactNode

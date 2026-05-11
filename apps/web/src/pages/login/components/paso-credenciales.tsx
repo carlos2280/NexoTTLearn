@@ -1,8 +1,3 @@
-import { useMutation } from "@tanstack/react-query"
-import { motion, useReducedMotion } from "framer-motion"
-import { ArrowRight } from "lucide-react"
-import { type FormEvent, useState } from "react"
-import { z } from "zod"
 import { login } from "@/features/auth/api/login.api"
 import type { LoginResponse } from "@/features/auth/types"
 import { ApiError } from "@/shared/api/api-error"
@@ -10,6 +5,11 @@ import { Banner } from "@/shared/components/ui/banner"
 import { Field } from "@/shared/components/ui/field"
 import { Input } from "@/shared/components/ui/input"
 import { MagneticButton } from "@/shared/components/ui/magnetic-button"
+import { useMutation } from "@tanstack/react-query"
+import { motion, useReducedMotion } from "framer-motion"
+import { ArrowRight } from "lucide-react"
+import { type FormEvent, useState } from "react"
+import { z } from "zod"
 import { SaludoContextual } from "./saludo-contextual"
 
 const schema = z.object({
@@ -68,7 +68,7 @@ export function PasoCredenciales({ onExito }: PasoCredencialesProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-7" noValidate>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-7" noValidate={true}>
       <motion.header {...motionProps(0)} className="flex flex-col gap-2">
         <p className="font-medium text-[11px] text-[var(--color-text-tertiary)] uppercase leading-4 tracking-[0.22em]">
           <SaludoContextual />
@@ -98,7 +98,7 @@ export function PasoCredenciales({ onExito }: PasoCredencialesProps) {
               {...attrs}
               type="email"
               autoComplete="email"
-              autoFocus
+              autoFocus={true}
               placeholder="tu.nombre@nexott.local"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -126,9 +126,9 @@ export function PasoCredenciales({ onExito }: PasoCredencialesProps) {
       </motion.div>
 
       <motion.div {...motionProps(3)} className="flex flex-col gap-3 pt-1">
-        <MagneticButton type="submit" fullWidth isLoading={mutation.isPending}>
+        <MagneticButton type="submit" fullWidth={true} isLoading={mutation.isPending}>
           <span>Entrar</span>
-          {!mutation.isPending ? <ArrowRight className="h-4 w-4" aria-hidden="true" /> : null}
+          {mutation.isPending ? null : <ArrowRight className="h-4 w-4" aria-hidden="true" />}
         </MagneticButton>
         <p className="text-center text-[12px] text-[var(--color-text-tertiary)] leading-4">
           ¿Olvidaste tu contraseña? Tu administrador la regenera.

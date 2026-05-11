@@ -66,7 +66,7 @@ export function EscenarioMarca({ paso }: EscenarioMarcaProps) {
           className="flex max-w-[720px] origin-left flex-col gap-6 lg:gap-8"
         >
           <WordmarkHero />
-          {!esBienvenida ? <FraseRotativa /> : null}
+          {esBienvenida ? null : <FraseRotativa />}
         </motion.div>
 
         <motion.div

@@ -1,5 +1,5 @@
-import { Check, X } from "lucide-react"
 import { cn } from "@/shared/lib/cn"
+import { Check, X } from "lucide-react"
 
 interface Criterio {
   readonly key: string

@@ -32,7 +32,7 @@ export function LoginShell({ children, paso }: LoginShellProps) {
         >
           <div className="w-full max-w-[380px]">{children}</div>
         </motion.div>
-        {!esBienvenida ? (
+        {esBienvenida ? null : (
           <motion.footer
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -44,7 +44,7 @@ export function LoginShell({ children, paso }: LoginShellProps) {
               ¿Problemas para entrar? Tu administrador puede regenerar el acceso.
             </p>
           </motion.footer>
-        ) : null}
+        )}
       </motion.section>
     </div>
   )
