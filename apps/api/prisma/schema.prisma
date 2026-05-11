@@ -304,6 +304,15 @@ enum AccionAuditoria {
   EVALUACION_PREVIEW_DESCARTADO
   EVALUACION_APLICADA
   NOTA_SKILL_EDITADA_MANUALMENTE
+  ASIGNACION_CREADA
+  ASIGNACION_CONVERTIDA
+  ASIGNACION_INICIADA
+  ASIGNACION_LISTA
+  ASIGNACION_CERRADA
+  ASIGNACION_REABIERTA
+  ASIGNACION_RETIRADA
+  RESULTADO_ENTREVISTA_CLIENTE_REGISTRADO
+  VOLUNTARIO_AUTOINSCRITO
 
   @@map("accion_auditoria_enum")
 }
@@ -772,6 +781,17 @@ model HistoricoNotaSkill {
 // ASIGNACIONES, PLAN DE ESTUDIO, APERTURAS
 // =============================================================================
 
+/// Asignacion de un colaborador a un curso. Modelo fisico §3.23.
+///
+/// CHECK constraints aplicados via migracion raw (P6a, D-AS-3) — Prisma no
+/// los infiere desde el schema:
+///   - chk_asig_rol_estado: coherencia (rol=ASIGNADO => estado_asignado NOT NULL,
+///     estado_voluntario NULL, origen_voluntario NULL) y simetrico para
+///     rol=VOLUNTARIO.
+///   - chk_asig_resultado_solo_asignado: resultado_entrevista_cliente solo se
+///     persiste cuando rol=ASIGNADO.
+/// Indice parcial idx_asignaciones_estado_asignado(curso_id, estado_asignado)
+/// WHERE rol='ASIGNADO' aplicado via migracion raw (D-AS-4).
 model AsignacionCurso {
   id                         String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   colaboradorId              String                      @map("colaborador_id") @db.Uuid

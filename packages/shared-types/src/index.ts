@@ -214,3 +214,35 @@ export type {
   PatchSkillResponse,
 } from "./evaluacion-inicial/edicion-manual.schema"
 export type { CargaEvaluacionInicialResumen } from "./evaluacion-inicial/historial.schema"
+
+// Asignaciones — Slice 6 P6a: foundation + altas (listados, alta admin batch,
+// conversion voluntario→asignado, auto-inscripcion, bandeja voluntario).
+export {
+  rolAsignacionSchema,
+  origenVoluntarioSchema,
+  estadoAsignadoSchema,
+  estadoVoluntarioSchema,
+  resultadoEntrevistaClienteSchema,
+  motivoRechazoAsignacionSchema,
+  crearAsignacionesBatchRequestSchema,
+  autoInscripcionRequestSchema,
+  listarAsignacionesQuerySchema,
+} from "./asignaciones"
+export type {
+  RolAsignacion,
+  OrigenVoluntario,
+  EstadoAsignado,
+  EstadoVoluntario,
+  ResultadoEntrevistaCliente,
+  Asignacion,
+  AsignacionDetallada,
+  AsignacionColaboradorEmbed,
+  AsignacionHistoricoEntrada,
+  AsignacionRechazada,
+  MotivoRechazoAsignacion,
+  CrearAsignacionesBatchResponse,
+  CursoDisponibleVoluntario,
+  CrearAsignacionesBatchRequest,
+  AutoInscripcionRequest,
+  ListarAsignacionesQuery,
+} from "./asignaciones"

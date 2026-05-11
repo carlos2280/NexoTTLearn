@@ -110,6 +110,12 @@ export const apiErrorCodes = {
   validacionExcelEmailDuplicadoEnArchivo: "VALIDACION_EXCEL_EMAIL_DUPLICADO_EN_ARCHIVO",
   // Evaluacion inicial P5c — aplicar (D-EVI-3 cierre, D-EVI-7 todo-o-nada).
   validacionPreviewConRechazos: "VALIDACION_PREVIEW_CON_RECHAZOS",
+  // Asignaciones P6a — foundation + altas (D-AS-1..D-AS-14).
+  asignacionNoEncontrada: "ASIGNACION_NO_ENCONTRADA",
+  conflictAsignacionDuplicada: "CONFLICT_ASIGNACION_DUPLICADA",
+  conflictAsignacionNoVoluntario: "CONFLICT_ASIGNACION_NO_VOLUNTARIO",
+  conflictCursoNoActivo: "CONFLICT_CURSO_NO_ACTIVO",
+  conflictAutoInscripcionDeshabilitada: "CONFLICT_AUTOINSCRIPCION_DESHABILITADA",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]

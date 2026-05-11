@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config"
 import { APP_FILTER, APP_GUARD } from "@nestjs/core"
 import { ScheduleModule } from "@nestjs/schedule"
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler"
+import { AsignacionesModule } from "./asignaciones/asignaciones.module"
 import { AuthModule } from "./auth/auth.module"
 import { CatalogoModule } from "./catalogo/catalogo.module"
 import { ColaboradoresModule } from "./colaboradores/colaboradores.module"
@@ -63,6 +64,7 @@ import { HealthModule } from "./health/health.module"
     AuthModule,
     CatalogoModule,
     ColaboradoresModule,
+    AsignacionesModule,
     CursosModule,
     EvaluacionInicialModule,
   ],
