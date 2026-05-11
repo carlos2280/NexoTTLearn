@@ -1007,3 +1007,374 @@ describe("CursosService.actualizarEntrevistaIa", () => {
     ).rejects.toMatchObject({ response: { code: apiErrorCodes.validacionPesoNoSuma100 } })
   })
 })
+
+// =============================================================================
+// P4c — Publicacion BORRADOR -> ACTIVO (D63, D-CUR-9)
+// =============================================================================
+
+interface PublicarOverrides {
+  estado?: EstadoCurso
+  clienteId?: string | null
+  fechaInicio?: Date
+  fechaDeadline?: Date
+  fechaDesbloqueo?: Date | null
+  desbloqueo?: DesbloqueoCurso
+  pesoBloques?: number
+  pesoTransversal?: number
+  pesoEntrevista?: number
+  areasExigidas?: ReadonlyArray<{ areaId: string; peso: number; puntajeObjetivo: number }>
+  skillsExigidas?: ReadonlyArray<{ skillId: string }>
+  modulosHabilitados?: ReadonlyArray<{ moduloId: string }>
+  transversal?: {
+    umbralAprobacion?: number
+    pesoCapaTests?: number
+    pesoCapaCualitativa?: number
+    pesoCapaComprension?: number
+  } | null
+  entrevistaIA?: {
+    umbralAprobacion?: number
+    duracionMinutos?: number
+    rubrica?: ReadonlyArray<{ areaId: string; peso: number }>
+  } | null
+}
+
+function buildSnapshotRow(overrides: PublicarOverrides = {}) {
+  const transversal = overrides.transversal
+  const entrevistaIA = overrides.entrevistaIA
+  return {
+    id: CURSO_ID,
+    estado: overrides.estado ?? EstadoCurso.BORRADOR,
+    clienteId: overrides.clienteId === undefined ? CLIENTE_ID : overrides.clienteId,
+    fechaInicio: overrides.fechaInicio ?? new Date("2026-04-01T00:00:00Z"),
+    fechaDeadline: overrides.fechaDeadline ?? new Date("2026-06-30T00:00:00Z"),
+    fechaDesbloqueo: overrides.fechaDesbloqueo ?? null,
+    desbloqueo: overrides.desbloqueo ?? DesbloqueoCurso.ENCADENADO,
+    pesoBloques: decimal(overrides.pesoBloques ?? 70),
+    pesoTransversal: decimal(overrides.pesoTransversal ?? 20),
+    pesoEntrevista: decimal(overrides.pesoEntrevista ?? 10),
+    areasExigidas: (
+      overrides.areasExigidas ?? [
+        { areaId: AREA_A, peso: 60, puntajeObjetivo: 70 },
+        { areaId: AREA_B, peso: 40, puntajeObjetivo: 70 },
+      ]
+    ).map((a) => ({
+      areaId: a.areaId,
+      peso: decimal(a.peso),
+      puntajeObjetivo: decimal(a.puntajeObjetivo),
+    })),
+    skillsExigidas: overrides.skillsExigidas ?? [],
+    modulosHabilitados: overrides.modulosHabilitados ?? [],
+    transversal: transversal
+      ? {
+          umbralAprobacion: decimal(transversal.umbralAprobacion ?? 70),
+          pesoCapaTests: decimal(transversal.pesoCapaTests ?? 40),
+          pesoCapaCualitativa: decimal(transversal.pesoCapaCualitativa ?? 30),
+          pesoCapaComprension: decimal(transversal.pesoCapaComprension ?? 30),
+        }
+      : null,
+    entrevistaIA: entrevistaIA
+      ? {
+          umbralAprobacion: decimal(entrevistaIA.umbralAprobacion ?? 70),
+          duracionMinutos: entrevistaIA.duracionMinutos ?? 30,
+          rubrica: (entrevistaIA.rubrica ?? [{ areaId: AREA_A, peso: 100 }]).map((r) => ({
+            areaId: r.areaId,
+            peso: decimal(r.peso),
+          })),
+        }
+      : null,
+  }
+}
+
+function mockSnapshotValido(overrides: PublicarOverrides = {}): void {
+  prisma.curso.findUnique.mockResolvedValue(buildSnapshotRow(overrides))
+  prisma.seccionSkill.findMany.mockResolvedValue([])
+  prisma.skill.findMany.mockResolvedValue([])
+  prisma.curso.findUniqueOrThrow.mockResolvedValue(
+    buildCursoConfigRow({ estado: EstadoCurso.ACTIVO }),
+  )
+}
+
+describe("CursosService.publicarCurso", () => {
+  it("happy path: BORRADOR con D63 OK pasa a ACTIVO y persiste log PUBLICACION (motivo default)", async () => {
+    mockSnapshotValido()
+    const res = await service.publicarCurso(CURSO_ID, ADMIN_ID, undefined)
+    expect(res.estado).toBe(EstadoCurso.ACTIVO)
+    expect(prisma.curso.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: CURSO_ID },
+        data: { estado: EstadoCurso.ACTIVO },
+      }),
+    )
+    expect(prisma.logCambioCurso.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          cursoId: CURSO_ID,
+          autorUsuarioId: ADMIN_ID,
+          accion: AccionLogCurso.PUBLICACION,
+          motivo: "Publicación",
+        }),
+      }),
+    )
+  })
+
+  it("motivo custom: se persiste tal cual en el log", async () => {
+    mockSnapshotValido()
+    await service.publicarCurso(CURSO_ID, ADMIN_ID, "Lanzamiento Q2")
+    expect(prisma.logCambioCurso.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ motivo: "Lanzamiento Q2" }),
+      }),
+    )
+  })
+
+  it("curso no existe: 404 cursoNoEncontrado", async () => {
+    prisma.curso.findUnique.mockResolvedValue(null)
+    await expect(service.publicarCurso(CURSO_ID, ADMIN_ID, undefined)).rejects.toMatchObject({
+      response: { code: apiErrorCodes.cursoNoEncontrado },
+    })
+  })
+
+  it("estado ACTIVO: 409 conflictCursoEstado (idempotencia)", async () => {
+    prisma.curso.findUnique.mockResolvedValue(buildSnapshotRow({ estado: EstadoCurso.ACTIVO }))
+    await expect(service.publicarCurso(CURSO_ID, ADMIN_ID, undefined)).rejects.toMatchObject({
+      response: { code: apiErrorCodes.conflictCursoEstado },
+    })
+    expect(prisma.curso.update).not.toHaveBeenCalled()
+  })
+
+  it("estado CERRADO: 409 conflictCursoEstado", async () => {
+    prisma.curso.findUnique.mockResolvedValue(buildSnapshotRow({ estado: EstadoCurso.CERRADO }))
+    await expect(service.publicarCurso(CURSO_ID, ADMIN_ID, undefined)).rejects.toMatchObject({
+      response: { code: apiErrorCodes.conflictCursoEstado },
+    })
+  })
+
+  it("estado ARCHIVADO: 409 conflictCursoEstado", async () => {
+    prisma.curso.findUnique.mockResolvedValue(buildSnapshotRow({ estado: EstadoCurso.ARCHIVADO }))
+    await expect(service.publicarCurso(CURSO_ID, ADMIN_ID, undefined)).rejects.toMatchObject({
+      response: { code: apiErrorCodes.conflictCursoEstado },
+    })
+  })
+
+  it("D63#1 cliente null: 422 con clienteNoEncontrado en validacionesFallidas", async () => {
+    prisma.curso.findUnique.mockResolvedValue(buildSnapshotRow({ clienteId: null }))
+    prisma.seccionSkill.findMany.mockResolvedValue([])
+    prisma.skill.findMany.mockResolvedValue([])
+    await expect(service.publicarCurso(CURSO_ID, ADMIN_ID, undefined)).rejects.toMatchObject({
+      response: {
+        code: apiErrorCodes.conflictCursoNoPublicable,
+        details: {
+          validacionesFallidas: expect.arrayContaining([
+            expect.objectContaining({ codigo: apiErrorCodes.clienteNoEncontrado }),
+          ]) as unknown,
+        },
+      },
+    })
+  })
+
+  it("D63#2 areas vacias: 422 contexto AREAS", async () => {
+    prisma.curso.findUnique.mockResolvedValue(buildSnapshotRow({ areasExigidas: [] }))
+    prisma.seccionSkill.findMany.mockResolvedValue([])
+    prisma.skill.findMany.mockResolvedValue([])
+    await expect(service.publicarCurso(CURSO_ID, ADMIN_ID, undefined)).rejects.toMatchObject({
+      response: {
+        code: apiErrorCodes.conflictCursoNoPublicable,
+        details: {
+          validacionesFallidas: expect.arrayContaining([
+            expect.objectContaining({
+              codigo: apiErrorCodes.validacionPesoNoSuma100,
+              detalles: expect.objectContaining({ contexto: "AREAS" }) as unknown,
+            }),
+          ]) as unknown,
+        },
+      },
+    })
+  })
+
+  it("D63#3 puntajeObjetivo fuera de rango: 422 validacionAreaPuntajeObjetivoFueraDeRango", async () => {
+    prisma.curso.findUnique.mockResolvedValue(
+      buildSnapshotRow({
+        areasExigidas: [
+          { areaId: AREA_A, peso: 60, puntajeObjetivo: 70 },
+          { areaId: AREA_B, peso: 40, puntajeObjetivo: 120 },
+        ],
+      }),
+    )
+    prisma.seccionSkill.findMany.mockResolvedValue([])
+    prisma.skill.findMany.mockResolvedValue([])
+    await expect(service.publicarCurso(CURSO_ID, ADMIN_ID, undefined)).rejects.toMatchObject({
+      response: {
+        code: apiErrorCodes.conflictCursoNoPublicable,
+        details: {
+          validacionesFallidas: expect.arrayContaining([
+            expect.objectContaining({
+              codigo: apiErrorCodes.validacionAreaPuntajeObjetivoFueraDeRango,
+            }),
+          ]) as unknown,
+        },
+      },
+    })
+  })
+
+  it("D63#4 skill exigida sin cobertura D82: 422 validacionSkillSinCobertura", async () => {
+    prisma.curso.findUnique.mockResolvedValue(
+      buildSnapshotRow({
+        skillsExigidas: [{ skillId: SKILL_X }],
+        modulosHabilitados: [{ moduloId: MOD_A }],
+      }),
+    )
+    prisma.seccionSkill.findMany.mockResolvedValue([])
+    prisma.skill.findMany.mockResolvedValue([{ id: SKILL_X, etiquetaVisible: "X" }])
+    await expect(service.publicarCurso(CURSO_ID, ADMIN_ID, undefined)).rejects.toMatchObject({
+      response: {
+        code: apiErrorCodes.conflictCursoNoPublicable,
+        details: {
+          validacionesFallidas: expect.arrayContaining([
+            expect.objectContaining({ codigo: apiErrorCodes.validacionSkillSinCobertura }),
+          ]) as unknown,
+        },
+      },
+    })
+  })
+
+  it("D63#5 pesos intra-skill != 100: 422 contexto PESOS_INTRA_SKILL", async () => {
+    prisma.curso.findUnique.mockResolvedValue(
+      buildSnapshotRow({ pesoBloques: 50, pesoTransversal: 30, pesoEntrevista: 30 }),
+    )
+    prisma.seccionSkill.findMany.mockResolvedValue([])
+    prisma.skill.findMany.mockResolvedValue([])
+    await expect(service.publicarCurso(CURSO_ID, ADMIN_ID, undefined)).rejects.toMatchObject({
+      response: {
+        details: {
+          validacionesFallidas: expect.arrayContaining([
+            expect.objectContaining({
+              codigo: apiErrorCodes.validacionPesoNoSuma100,
+              detalles: expect.objectContaining({ contexto: "PESOS_INTRA_SKILL" }) as unknown,
+            }),
+          ]) as unknown,
+        },
+      },
+    })
+  })
+
+  it("D63#6 transversal activo con capas != 100: 422 contexto CAPAS_TRANSVERSAL", async () => {
+    prisma.curso.findUnique.mockResolvedValue(
+      buildSnapshotRow({
+        transversal: { pesoCapaTests: 50, pesoCapaCualitativa: 30, pesoCapaComprension: 30 },
+      }),
+    )
+    prisma.seccionSkill.findMany.mockResolvedValue([])
+    prisma.skill.findMany.mockResolvedValue([])
+    await expect(service.publicarCurso(CURSO_ID, ADMIN_ID, undefined)).rejects.toMatchObject({
+      response: {
+        details: {
+          validacionesFallidas: expect.arrayContaining([
+            expect.objectContaining({
+              codigo: apiErrorCodes.validacionPesoNoSuma100,
+              detalles: expect.objectContaining({ contexto: "CAPAS_TRANSVERSAL" }) as unknown,
+            }),
+          ]) as unknown,
+        },
+      },
+    })
+  })
+
+  it("D63#7 entrevista IA activa con rubrica != 100: 422 contexto RUBRICA_ENTREVISTA", async () => {
+    prisma.curso.findUnique.mockResolvedValue(
+      buildSnapshotRow({
+        entrevistaIA: { rubrica: [{ areaId: AREA_A, peso: 60 }] },
+      }),
+    )
+    prisma.seccionSkill.findMany.mockResolvedValue([])
+    prisma.skill.findMany.mockResolvedValue([])
+    await expect(service.publicarCurso(CURSO_ID, ADMIN_ID, undefined)).rejects.toMatchObject({
+      response: {
+        details: {
+          validacionesFallidas: expect.arrayContaining([
+            expect.objectContaining({
+              codigo: apiErrorCodes.validacionPesoNoSuma100,
+              detalles: expect.objectContaining({ contexto: "RUBRICA_ENTREVISTA" }) as unknown,
+            }),
+          ]) as unknown,
+        },
+      },
+    })
+  })
+
+  it("D63#7 entrevista IA con duracion invalida: 422 validacionDuracionEntrevistaInvalida", async () => {
+    prisma.curso.findUnique.mockResolvedValue(
+      buildSnapshotRow({ entrevistaIA: { duracionMinutos: 20 } }),
+    )
+    prisma.seccionSkill.findMany.mockResolvedValue([])
+    prisma.skill.findMany.mockResolvedValue([])
+    await expect(service.publicarCurso(CURSO_ID, ADMIN_ID, undefined)).rejects.toMatchObject({
+      response: {
+        details: {
+          validacionesFallidas: expect.arrayContaining([
+            expect.objectContaining({
+              codigo: apiErrorCodes.validacionDuracionEntrevistaInvalida,
+            }),
+          ]) as unknown,
+        },
+      },
+    })
+  })
+
+  it("D63#8 fechas invalidas (inicio >= deadline): 422 validacionCursoFechas", async () => {
+    prisma.curso.findUnique.mockResolvedValue(
+      buildSnapshotRow({
+        fechaInicio: new Date("2026-07-01T00:00:00Z"),
+        fechaDeadline: new Date("2026-04-01T00:00:00Z"),
+      }),
+    )
+    prisma.seccionSkill.findMany.mockResolvedValue([])
+    prisma.skill.findMany.mockResolvedValue([])
+    await expect(service.publicarCurso(CURSO_ID, ADMIN_ID, undefined)).rejects.toMatchObject({
+      response: {
+        details: {
+          validacionesFallidas: expect.arrayContaining([
+            expect.objectContaining({ codigo: apiErrorCodes.validacionCursoFechas }),
+          ]) as unknown,
+        },
+      },
+    })
+  })
+
+  it("acumulacion: 3 fallas simultaneas vienen las 3 en details.validacionesFallidas", async () => {
+    prisma.curso.findUnique.mockResolvedValue(
+      buildSnapshotRow({
+        clienteId: null,
+        areasExigidas: [],
+        pesoBloques: 50,
+        pesoTransversal: 30,
+        pesoEntrevista: 30,
+      }),
+    )
+    prisma.seccionSkill.findMany.mockResolvedValue([])
+    prisma.skill.findMany.mockResolvedValue([])
+    interface DetallesCapturados {
+      readonly validacionesFallidas: readonly { readonly codigo: string }[]
+    }
+    let captured: DetallesCapturados | null = null
+    try {
+      await service.publicarCurso(CURSO_ID, ADMIN_ID, undefined)
+    } catch (error) {
+      const e = error as { response?: { details?: DetallesCapturados } }
+      captured = e.response?.details ?? null
+    }
+    expect(captured).not.toBeNull()
+    const codigos = captured?.validacionesFallidas.map((v) => v.codigo) ?? []
+    expect(codigos).toContain(apiErrorCodes.clienteNoEncontrado)
+    expect(codigos).toContain(apiErrorCodes.validacionPesoNoSuma100)
+    expect(codigos.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it("race: si el findUnique en tx ve estado ACTIVO (otro admin publico antes), 409", async () => {
+    prisma.curso.findUnique.mockResolvedValue(buildSnapshotRow({ estado: EstadoCurso.ACTIVO }))
+    await expect(service.publicarCurso(CURSO_ID, ADMIN_ID, undefined)).rejects.toMatchObject({
+      response: { code: apiErrorCodes.conflictCursoEstado },
+    })
+    expect(prisma.curso.update).not.toHaveBeenCalled()
+    expect(prisma.logCambioCurso.create).not.toHaveBeenCalled()
+  })
+})

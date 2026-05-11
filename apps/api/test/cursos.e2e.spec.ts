@@ -209,6 +209,19 @@ describe.runIf(RUN_E2E)("cursos e2e (P4a + P4b)", () => {
       if (entrevistaIds.length > 0) {
         await prisma.entrevistaIA.deleteMany({ where: { id: { in: entrevistaIds } } })
       }
+      // P4c: limpiar grafo Skill/Modulo/Seccion/SeccionSkill creado en los
+      // helpers de publicacion. Orden inverso para respetar FKs Restrict.
+      const seccionesPrefijo = await prisma.seccion.findMany({
+        where: { titulo: { startsWith: "S-" }, modulo: { titulo: { contains: TITULO_PREFIX } } },
+        select: { id: true },
+      })
+      const seccionIds = seccionesPrefijo.map((s) => s.id)
+      if (seccionIds.length > 0) {
+        await prisma.seccionSkill.deleteMany({ where: { seccionId: { in: seccionIds } } })
+        await prisma.seccion.deleteMany({ where: { id: { in: seccionIds } } })
+      }
+      await prisma.modulo.deleteMany({ where: { titulo: { contains: TITULO_PREFIX } } })
+      await prisma.skill.deleteMany({ where: { etiquetaVisible: { contains: TITULO_PREFIX } } })
       await prisma.area.deleteMany({ where: { nombre: { contains: TITULO_PREFIX } } })
       const cli = await prisma.cliente.findUnique({
         where: { nombre: CLIENTE_NOMBRE },
@@ -575,5 +588,164 @@ describe.runIf(RUN_E2E)("cursos e2e (P4a + P4b)", () => {
       })
     expect(res.status).toBe(200)
     expect((res.body as { entrevistaIaId: string | null }).entrevistaIaId).not.toBeNull()
+  })
+
+  // ===========================================================================
+  // P4c — Publicacion BORRADOR -> ACTIVO (D63, D-CUR-9)
+  // ===========================================================================
+
+  async function sembrarSkillConModuloQueLaEnsena(suffix: string): Promise<{
+    readonly skillId: string
+    readonly moduloId: string
+    readonly areaId: string
+  }> {
+    const area = await prisma.area.create({
+      data: { nombre: `${TITULO_PREFIX}area-d63-${suffix}-${Date.now()}` },
+      select: { id: true },
+    })
+    const skill = await prisma.skill.create({
+      data: {
+        etiquetaVisible: `${TITULO_PREFIX}skill-d63-${suffix}-${Date.now()}`,
+        areaId: area.id,
+      },
+      select: { id: true },
+    })
+    const modulo = await prisma.modulo.create({
+      data: { titulo: `${TITULO_PREFIX}mod-d63-${suffix}-${Date.now()}` },
+      select: { id: true },
+    })
+    const seccion = await prisma.seccion.create({
+      data: { moduloId: modulo.id, titulo: `S-${suffix}`, orden: 1 },
+      select: { id: true },
+    })
+    await prisma.seccionSkill.create({ data: { seccionId: seccion.id, skillId: skill.id } })
+    return { skillId: skill.id, moduloId: modulo.id, areaId: area.id }
+  }
+
+  // Configura un curso BORRADOR listo para publicar (D63 OK) sembrando TODO
+  // directamente via Prisma para no consumir slots del ThrottlerGuard (que en
+  // los e2e se comparte para toda la sesion porque el override de guard no
+  // intercepta el APP_GUARD provider con el mismo determinismo).
+  async function configurarCursoPublicable(
+    suffix: string,
+  ): Promise<{ readonly cursoId: string; readonly skillId: string; readonly moduloId: string }> {
+    const { skillId, moduloId, areaId } = await sembrarSkillConModuloQueLaEnsena(suffix)
+    const curso = await prisma.curso.create({
+      data: {
+        titulo: `${TITULO_PREFIX}p4c-${suffix}-${Date.now()}`,
+        clienteId,
+        fechaInicio: new Date("2026-04-01"),
+        fechaDeadline: new Date("2026-06-30"),
+        estado: "BORRADOR",
+        toggleVoluntarios: true,
+      },
+      select: { id: true },
+    })
+    await prisma.cursoAreaExigida.create({
+      data: { cursoId: curso.id, areaId, peso: 100, puntajeObjetivo: 70 },
+    })
+    await prisma.cursoSkillExigida.create({
+      data: { cursoId: curso.id, skillId, notaMinima: 70 },
+    })
+    await prisma.cursoModuloHabilitado.create({ data: { cursoId: curso.id, moduloId } })
+    return { cursoId: curso.id, skillId, moduloId }
+  }
+
+  it("POST /:id/publicar (happy path): 200 ACTIVO + log PUBLICACION motivo default", async () => {
+    const { cursoId } = await configurarCursoPublicable("happy")
+    const res = await agenteAdmin
+      .post(`/api/v1/cursos/${cursoId}/publicar`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+    expect(res.status).toBe(200)
+    expect((res.body as { estado: string }).estado).toBe("ACTIVO")
+    const log = await prisma.logCambioCurso.findFirst({
+      where: { cursoId, accion: "PUBLICACION" },
+      select: { motivo: true },
+    })
+    expect(log).not.toBeNull()
+    expect(log?.motivo).toBe("Publicación")
+  })
+
+  it("POST /:id/publicar con X-Motivo custom: 200 y motivo persiste", async () => {
+    const { cursoId } = await configurarCursoPublicable("motivo")
+    const res = await agenteAdmin
+      .post(`/api/v1/cursos/${cursoId}/publicar`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .set("X-Motivo", "Lanzamiento Q2")
+    expect(res.status).toBe(200)
+    const log = await prisma.logCambioCurso.findFirst({
+      where: { cursoId, accion: "PUBLICACION" },
+      select: { motivo: true },
+    })
+    expect(log?.motivo).toBe("Lanzamiento Q2")
+  })
+
+  it("POST /:id/publicar: 422 con validacionesFallidas estructurado si areas != 100", async () => {
+    const curso = await prisma.curso.create({
+      data: {
+        titulo: `${TITULO_PREFIX}p4c-422-${Date.now()}`,
+        clienteId,
+        fechaInicio: new Date("2026-04-01"),
+        fechaDeadline: new Date("2026-06-30"),
+        estado: "BORRADOR",
+      },
+      select: { id: true },
+    })
+    const res = await agenteAdmin
+      .post(`/api/v1/cursos/${curso.id}/publicar`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+    expect(res.status).toBe(422)
+    const body = res.body as {
+      code: string
+      details: { validacionesFallidas: readonly { codigo: string }[] }
+    }
+    expect(body.code).toBe("CONFLICT_CURSO_NO_PUBLICABLE")
+    expect(Array.isArray(body.details.validacionesFallidas)).toBe(true)
+    const codigos = body.details.validacionesFallidas.map((v) => v.codigo)
+    expect(codigos).toContain("VALIDACION_PESO_NO_SUMA_100")
+  })
+
+  it("POST /:id/publicar dos veces: la segunda rechaza con 409 conflictCursoEstado", async () => {
+    const { cursoId } = await configurarCursoPublicable("idem")
+    const r1 = await agenteAdmin
+      .post(`/api/v1/cursos/${cursoId}/publicar`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+    expect(r1.status).toBe(200)
+    const r2 = await agenteAdmin
+      .post(`/api/v1/cursos/${cursoId}/publicar`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+    expect(r2.status).toBe(409)
+    expect((r2.body as { code: string }).code).toBe("CONFLICT_CURSO_ESTADO")
+  })
+
+  it("POST /:id/publicar sin sesion: 401", async () => {
+    const { cursoId } = await configurarCursoPublicable("anon")
+    const anon = supertest.agent(app.getHttpServer())
+    const res = await anon.post(`/api/v1/cursos/${cursoId}/publicar`)
+    expect(res.status).toBe(401)
+  })
+
+  it("POST /:id/publicar como PARTICIPANTE: 403", async () => {
+    const { cursoId } = await configurarCursoPublicable("part")
+    const res = await agentePart
+      .post(`/api/v1/cursos/${cursoId}/publicar`)
+      .set("X-XSRF-TOKEN", csrfPart)
+    expect(res.status).toBe(403)
+  })
+
+  // Cierra H-6 (bitacora §5.32 / D-CUR-13 rama positiva): tras publicar un
+  // curso a ACTIVO con toggleVoluntarios=true, el PARTICIPANTE (no inscrito)
+  // PUEDE verlo en GET /api/v1/cursos via la rama OR del scope.
+  it("CIERRA H-6: tras publicar (ACTIVO+toggleVoluntarios=true) el PARTICIPANTE lo ve en GET /cursos", async () => {
+    const { cursoId } = await configurarCursoPublicable("h6")
+    const pub = await agenteAdmin
+      .post(`/api/v1/cursos/${cursoId}/publicar`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+    expect(pub.status).toBe(200)
+    const res = await agentePart.get("/api/v1/cursos")
+    expect(res.status).toBe(200)
+    const body = res.body as { data: readonly { id: string }[] }
+    const visto = body.data.find((c) => c.id === cursoId)
+    expect(visto).toBeDefined()
   })
 })

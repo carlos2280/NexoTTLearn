@@ -141,6 +141,27 @@ export class CursosController {
     return await this.cursosService.desarchivar(cursoId, this.requireUsuario(usuario).usuarioId)
   }
 
+  /**
+   * P4c — Transicion BORRADOR -> ACTIVO (D60, D63, D-CUR-9). Motivo OPCIONAL
+   * (D-CUR-4 excepcion: publicacion es semanticamente positiva, no destructiva).
+   * Idempotencia por estado: una segunda llamada sobre un curso ACTIVO rechaza
+   * con 409 `conflictCursoEstado` (no se requiere `Idempotency-Key`).
+   */
+  @Post(":cursoId/publicar")
+  @Roles(RolUsuario.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async publicar(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+    @Motivo() motivo: string | undefined,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<CursoDetalle> {
+    return await this.cursosService.publicarCurso(
+      cursoId,
+      this.requireUsuario(usuario).usuarioId,
+      motivo,
+    )
+  }
+
   @Post(":cursoId/duplicar")
   @Roles(RolUsuario.ADMIN)
   @RequiereMotivo()

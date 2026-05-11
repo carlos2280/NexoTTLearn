@@ -83,6 +83,11 @@ export const apiErrorCodes = {
   conflictModuloArchivadoNoHabilitable: "CONFLICT_MODULO_ARCHIVADO_NO_HABILITABLE",
   conflictTransversalConIntentos: "CONFLICT_TRANSVERSAL_CON_INTENTOS",
   conflictEntrevistaConIntentos: "CONFLICT_ENTREVISTA_CON_INTENTOS",
+  // Cursos P4c — transicion BORRADOR -> ACTIVO (D63, D-CUR-9).
+  conflictCursoNoPublicable: "CONFLICT_CURSO_NO_PUBLICABLE",
+  // Codigos especificos de precondiciones D63 que no encajaban en los existentes:
+  validacionAreaPuntajeObjetivoFueraDeRango: "VALIDACION_AREA_PUNTAJE_OBJETIVO_FUERA_DE_RANGO",
+  validacionUmbralFueraDeRango: "VALIDACION_UMBRAL_FUERA_DE_RANGO",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]

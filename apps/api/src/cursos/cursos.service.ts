@@ -36,9 +36,11 @@ import { buildPaginatedResponse, resolvePaginacion } from "../common/http/pagina
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
 import {
+  type CursoPublicacionSnapshot,
   calcularDiffComposite,
   validarDuracionEntrevistaIa,
   validarMonotoniaUmbralesLogro,
+  validarPrecondicionesPublicacion,
   validarSumaPesosCien,
 } from "./cursos.helpers"
 
@@ -1784,6 +1786,144 @@ export class CursosService {
         },
       })
     }
+  }
+
+  // ===========================================================================
+  // P4c — Publicacion BORRADOR -> ACTIVO (D63, D-CUR-9)
+  // ===========================================================================
+
+  /**
+   * Transicion BORRADOR -> ACTIVO. Releeer el curso dentro del `$transaction`
+   * con todo lo necesario para validar D63 en una sola pasada (D-CUR-9 +
+   * D-CUR-12). Idempotencia por estado: cualquier otro estado distinto de
+   * BORRADOR rechaza con 409 `conflictCursoEstado`. Si alguna precondicion
+   * D63 falla, 422 con `details.validacionesFallidas` recolectando TODAS
+   * (sin early-exit) para que el admin pueda corregir en una edicion.
+   *
+   * El motivo es opcional (D-CUR-4, excepcion semantica positiva): si no
+   * viene, el log persiste `"Publicacion"` por defecto. El `LogCambioCurso`
+   * va DENTRO del mismo tx (D-CUR-3 audit dual). Si la transicion falla,
+   * Prisma hace rollback automatico y no queda log fantasma.
+   */
+  async publicarCurso(
+    cursoId: string,
+    autorUsuarioId: string,
+    motivo: string | undefined,
+  ): Promise<CursoDetalle> {
+    const detalle = await this.prisma.$transaction(async (tx) => {
+      const snapshot = await this.leerSnapshotPublicacion(tx, cursoId)
+      const resultado = validarPrecondicionesPublicacion(snapshot.curso)
+      if (!resultado.ok) {
+        throw new UnprocessableEntityException({
+          code: apiErrorCodes.conflictCursoNoPublicable,
+          message: "El curso no cumple las precondiciones para publicarse.",
+          details: { validacionesFallidas: resultado.validacionesFallidas.map((v) => ({ ...v })) },
+        })
+      }
+      await tx.curso.update({
+        where: { id: cursoId },
+        data: { estado: EstadoCurso.ACTIVO },
+      })
+      await tx.logCambioCurso.create({
+        data: {
+          cursoId,
+          autorUsuarioId,
+          accion: AccionLogCurso.PUBLICACION,
+          motivo: motivo && motivo.length > 0 ? motivo : "Publicación",
+          previewImpacto: {
+            estadoAnterior: EstadoCurso.BORRADOR,
+            estadoNuevo: EstadoCurso.ACTIVO,
+          } satisfies Prisma.InputJsonValue,
+        },
+      })
+      return this.releerCursoDetalle(tx, cursoId)
+    })
+    return toCursoDetalle(detalle)
+  }
+
+  /**
+   * Lectura unica dentro del tx que reune todos los datos necesarios para
+   * validar las 8 precondiciones D63. Hace dos queries en el mismo tx para
+   * no exceder los 2 niveles de include profundo (D-CUR-12):
+   *  1) Curso con sub-relaciones directas (areas, skills exigidas, modulos
+   *     habilitados, transversal con sus pesos, entrevistaIA con rubrica).
+   *  2) Cobertura D82 via `calcularSkillsSinCobertura(tx, ...)`.
+   */
+  private async leerSnapshotPublicacion(
+    tx: Prisma.TransactionClient,
+    cursoId: string,
+  ): Promise<{ readonly curso: CursoPublicacionSnapshot }> {
+    const row = await tx.curso.findUnique({
+      where: { id: cursoId },
+      select: {
+        id: true,
+        estado: true,
+        clienteId: true,
+        fechaInicio: true,
+        fechaDeadline: true,
+        fechaDesbloqueo: true,
+        desbloqueo: true,
+        pesoBloques: true,
+        pesoTransversal: true,
+        pesoEntrevista: true,
+        areasExigidas: {
+          select: { areaId: true, peso: true, puntajeObjetivo: true },
+        },
+        skillsExigidas: { select: { skillId: true } },
+        modulosHabilitados: { select: { moduloId: true } },
+        transversal: {
+          select: {
+            umbralAprobacion: true,
+            pesoCapaTests: true,
+            pesoCapaCualitativa: true,
+            pesoCapaComprension: true,
+          },
+        },
+        entrevistaIA: {
+          select: {
+            umbralAprobacion: true,
+            duracionMinutos: true,
+            rubrica: { select: { areaId: true, peso: true } },
+          },
+        },
+      },
+    })
+    if (!row) {
+      throw new NotFoundException({
+        code: apiErrorCodes.cursoNoEncontrado,
+        message: "Curso no encontrado.",
+      })
+    }
+    if (row.estado !== EstadoCurso.BORRADOR) {
+      throw new ConflictException({
+        code: apiErrorCodes.conflictCursoEstado,
+        message: "Solo se pueden publicar cursos en estado BORRADOR.",
+        details: { estado: row.estado },
+      })
+    }
+    const skillsExigidasIds = row.skillsExigidas.map((s) => s.skillId)
+    const modulosHabilitadosIds = row.modulosHabilitados.map((m) => m.moduloId)
+    const skillsSinCobertura = await this.calcularSkillsSinCobertura(
+      tx,
+      skillsExigidasIds,
+      modulosHabilitadosIds,
+    )
+    const curso: CursoPublicacionSnapshot = {
+      clienteId: row.clienteId,
+      fechaInicio: row.fechaInicio,
+      fechaDeadline: row.fechaDeadline,
+      fechaDesbloqueo: row.fechaDesbloqueo,
+      desbloqueo: row.desbloqueo,
+      pesoBloques: row.pesoBloques,
+      pesoTransversal: row.pesoTransversal,
+      pesoEntrevista: row.pesoEntrevista,
+      areasExigidas: row.areasExigidas,
+      skillsExigidas: row.skillsExigidas,
+      skillsSinCobertura,
+      transversal: row.transversal,
+      entrevistaIa: row.entrevistaIA,
+    }
+    return { curso }
   }
 
   /**
