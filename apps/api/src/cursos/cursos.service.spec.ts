@@ -407,13 +407,45 @@ describe("CursosService.actualizar", () => {
       fechaDesbloqueo: null,
       desbloqueo: DesbloqueoCurso.ENCADENADO,
     })
-    prisma.curso.update.mockResolvedValue(buildCursoDetalleRow({ titulo: "Otro" }))
+    prisma.curso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.curso.findUniqueOrThrow.mockResolvedValue(buildCursoDetalleRow({ titulo: "Otro" }))
     await service.actualizar(CURSO_ID, { titulo: "Otro" }, undefined, ADMIN_ID)
     expect(prisma.logCambioCurso.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ motivo: "Edición" }),
       }),
     )
+  })
+
+  it("race real: 2 actualizaciones concurrentes => 1 cumple, 1 rechaza 409 (no doble log)", async () => {
+    prisma.curso.findUnique
+      .mockResolvedValueOnce({
+        id: CURSO_ID,
+        estado: EstadoCurso.BORRADOR,
+        fechaInicio: new Date("2026-04-01"),
+        fechaDeadline: new Date("2026-06-30"),
+        fechaDesbloqueo: null,
+        desbloqueo: DesbloqueoCurso.ENCADENADO,
+      })
+      .mockResolvedValueOnce({
+        id: CURSO_ID,
+        estado: EstadoCurso.BORRADOR,
+        fechaInicio: new Date("2026-04-01"),
+        fechaDeadline: new Date("2026-06-30"),
+        fechaDesbloqueo: null,
+        desbloqueo: DesbloqueoCurso.ENCADENADO,
+      })
+    prisma.curso.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 })
+    prisma.curso.findUniqueOrThrow.mockResolvedValue(buildCursoDetalleRow({ titulo: "Otro" }))
+
+    const resultados = await Promise.allSettled([
+      service.actualizar(CURSO_ID, { titulo: "A" }, undefined, ADMIN_ID),
+      service.actualizar(CURSO_ID, { titulo: "B" }, undefined, ADMIN_ID),
+    ])
+
+    expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(1)
+    expect(resultados.filter((r) => r.status === "rejected")).toHaveLength(1)
+    expect(prisma.logCambioCurso.create).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -442,10 +474,16 @@ describe("CursosService.eliminar", () => {
 describe("CursosService.archivar", () => {
   it("solo desde CERRADO: pasa a ARCHIVADO y escribe log", async () => {
     prisma.curso.findUnique.mockResolvedValue({ id: CURSO_ID, estado: EstadoCurso.CERRADO })
-    prisma.curso.update.mockResolvedValue(buildCursoDetalleRow({ estado: EstadoCurso.ARCHIVADO }))
+    prisma.curso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.curso.findUniqueOrThrow.mockResolvedValue(
+      buildCursoDetalleRow({ estado: EstadoCurso.ARCHIVADO }),
+    )
     await service.archivar(CURSO_ID, "Motivo válido", ADMIN_ID)
-    expect(prisma.curso.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { estado: EstadoCurso.ARCHIVADO } }),
+    expect(prisma.curso.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: CURSO_ID, estado: EstadoCurso.CERRADO },
+        data: { estado: EstadoCurso.ARCHIVADO },
+      }),
     )
     expect(prisma.logCambioCurso.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -463,15 +501,40 @@ describe("CursosService.archivar", () => {
       response: { code: apiErrorCodes.conflictCursoNoCerrado },
     })
   })
+
+  it("race real: 2 archivados concurrentes => 1 cumple, 1 rechaza 409 (no doble log)", async () => {
+    prisma.curso.findUnique
+      .mockResolvedValueOnce({ id: CURSO_ID, estado: EstadoCurso.CERRADO })
+      .mockResolvedValueOnce({ id: CURSO_ID, estado: EstadoCurso.CERRADO })
+    prisma.curso.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 })
+    prisma.curso.findUniqueOrThrow.mockResolvedValue(
+      buildCursoDetalleRow({ estado: EstadoCurso.ARCHIVADO }),
+    )
+
+    const resultados = await Promise.allSettled([
+      service.archivar(CURSO_ID, "motivo a", ADMIN_ID),
+      service.archivar(CURSO_ID, "motivo b", ADMIN_ID),
+    ])
+
+    expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(1)
+    expect(resultados.filter((r) => r.status === "rejected")).toHaveLength(1)
+    expect(prisma.logCambioCurso.create).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe("CursosService.desarchivar", () => {
   it("solo desde ARCHIVADO: pasa a CERRADO", async () => {
     prisma.curso.findUnique.mockResolvedValue({ id: CURSO_ID, estado: EstadoCurso.ARCHIVADO })
-    prisma.curso.update.mockResolvedValue(buildCursoDetalleRow({ estado: EstadoCurso.CERRADO }))
+    prisma.curso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.curso.findUniqueOrThrow.mockResolvedValue(
+      buildCursoDetalleRow({ estado: EstadoCurso.CERRADO }),
+    )
     await service.desarchivar(CURSO_ID, ADMIN_ID)
-    expect(prisma.curso.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { estado: EstadoCurso.CERRADO } }),
+    expect(prisma.curso.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: CURSO_ID, estado: EstadoCurso.ARCHIVADO },
+        data: { estado: EstadoCurso.CERRADO },
+      }),
     )
   })
 
@@ -480,6 +543,25 @@ describe("CursosService.desarchivar", () => {
     await expect(service.desarchivar(CURSO_ID, ADMIN_ID)).rejects.toMatchObject({
       response: { code: apiErrorCodes.conflictCursoNoArchivado },
     })
+  })
+
+  it("race real: 2 desarchivados concurrentes => 1 cumple, 1 rechaza 409 (no doble log)", async () => {
+    prisma.curso.findUnique
+      .mockResolvedValueOnce({ id: CURSO_ID, estado: EstadoCurso.ARCHIVADO })
+      .mockResolvedValueOnce({ id: CURSO_ID, estado: EstadoCurso.ARCHIVADO })
+    prisma.curso.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 })
+    prisma.curso.findUniqueOrThrow.mockResolvedValue(
+      buildCursoDetalleRow({ estado: EstadoCurso.CERRADO }),
+    )
+
+    const resultados = await Promise.allSettled([
+      service.desarchivar(CURSO_ID, ADMIN_ID),
+      service.desarchivar(CURSO_ID, ADMIN_ID),
+    ])
+
+    expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(1)
+    expect(resultados.filter((r) => r.status === "rejected")).toHaveLength(1)
+    expect(prisma.logCambioCurso.create).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -777,13 +859,8 @@ describe("CursosService.actualizarSkillsExigidas", () => {
     // SKILL_Y no esta cubierta por MOD_A (sin filas en seccionSkill).
     prisma.seccionSkill.findMany.mockResolvedValue([])
     prisma.skill.findMany.mockResolvedValue([{ id: SKILL_Y, etiquetaVisible: "Y" }])
-    prisma.curso.findUniqueOrThrow.mockResolvedValue(
-      buildCursoConfigRow({
-        estado: EstadoCurso.ACTIVO,
-        skillsExigidas: [{ skillId: SKILL_Y, notaMinima: 70 }],
-        modulosHabilitados: [{ moduloId: MOD_A }],
-      }),
-    )
+    // (FIX-P5-cierre §5.43) mock huerfano eliminado: el service usa
+    // `releerCursoDetalle` que llama findUnique, no findUniqueOrThrow.
     const res = await service.actualizarSkillsExigidas(
       CURSO_ID,
       { skills: [{ skillId: SKILL_Y, notaMinima: 70 }] },
@@ -854,13 +931,8 @@ describe("CursosService.actualizarModulosHabilitados", () => {
     // SKILL_X no se ensena en MOD_B; queda sin cobertura.
     prisma.seccionSkill.findMany.mockResolvedValue([])
     prisma.skill.findMany.mockResolvedValue([{ id: SKILL_X, etiquetaVisible: "X" }])
-    prisma.curso.findUniqueOrThrow.mockResolvedValue(
-      buildCursoConfigRow({
-        estado: EstadoCurso.BORRADOR,
-        skillsExigidas: [{ skillId: SKILL_X, notaMinima: 70 }],
-        modulosHabilitados: [{ moduloId: MOD_B }],
-      }),
-    )
+    // (FIX-P5-cierre §5.43) mock huerfano eliminado: el service usa
+    // `releerCursoDetalle` que llama findUnique, no findUniqueOrThrow.
     const res = await service.actualizarModulosHabilitados(
       CURSO_ID,
       { moduloIds: [MOD_B] },

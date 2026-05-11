@@ -724,9 +724,18 @@ export class CursosService {
           select: SELECT_CURSO_DETALLE_FIELDS,
         })
       }
-      const actualizado = await tx.curso.update({
-        where: { id: cursoId },
+      const { count } = await tx.curso.updateMany({
+        where: { id: cursoId, estado: EstadoCurso.BORRADOR },
         data,
+      })
+      if (count === 0) {
+        throw new ConflictException({
+          code: apiErrorCodes.conflictCursoEstado,
+          message: "El curso cambio de estado durante la operacion.",
+        })
+      }
+      const actualizado = await tx.curso.findUniqueOrThrow({
+        where: { id: cursoId },
         select: SELECT_CURSO_DETALLE_FIELDS,
       })
       await tx.logCambioCurso.create({
@@ -790,9 +799,21 @@ export class CursosService {
           details: { estado: actual.estado },
         })
       }
-      const actualizado = await tx.curso.update({
-        where: { id: cursoId },
+      // Patron M1 race-safe (FIX-P4-cierre §5.39): el guard `estado=CERRADO`
+      // viaja al WHERE para que dos writers concurrentes no actualicen el
+      // mismo registro y produzcan dos logs.
+      const { count } = await tx.curso.updateMany({
+        where: { id: cursoId, estado: EstadoCurso.CERRADO },
         data: { estado: EstadoCurso.ARCHIVADO },
+      })
+      if (count === 0) {
+        throw new ConflictException({
+          code: apiErrorCodes.conflictCursoEstado,
+          message: "El curso cambio de estado durante la operacion.",
+        })
+      }
+      const actualizado = await tx.curso.findUniqueOrThrow({
+        where: { id: cursoId },
         select: SELECT_CURSO_DETALLE_FIELDS,
       })
       await tx.logCambioCurso.create({
@@ -828,9 +849,18 @@ export class CursosService {
           details: { estado: actual.estado },
         })
       }
-      const actualizado = await tx.curso.update({
-        where: { id: cursoId },
+      const { count } = await tx.curso.updateMany({
+        where: { id: cursoId, estado: EstadoCurso.ARCHIVADO },
         data: { estado: EstadoCurso.CERRADO },
+      })
+      if (count === 0) {
+        throw new ConflictException({
+          code: apiErrorCodes.conflictCursoEstado,
+          message: "El curso cambio de estado durante la operacion.",
+        })
+      }
+      const actualizado = await tx.curso.findUniqueOrThrow({
+        where: { id: cursoId },
         select: SELECT_CURSO_DETALLE_FIELDS,
       })
       await tx.logCambioCurso.create({

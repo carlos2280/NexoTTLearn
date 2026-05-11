@@ -66,6 +66,7 @@ describe("validateEnv", () => {
         ["NODE_ENV", "production"],
         ["COOKIE_SECURE", "true"],
         ["ALLOWED_ORIGINS", "https://app.example.com,https://admin.example.com"],
+        ["STORAGE_ROOT", "/data/nexott/storage"],
       ),
     )
     expect(env.COOKIE_SECURE).toBe(true)
@@ -100,5 +101,48 @@ describe("validateEnv", () => {
   it("acepta SECRETS_ENCRYPTION_KEY placeholder en development", () => {
     const env = validateEnv(buildEnv(["SECRETS_ENCRYPTION_KEY", ENCRYPTION_KEY_PLACEHOLDER]))
     expect(env.SECRETS_ENCRYPTION_KEY).toBe(ENCRYPTION_KEY_PLACEHOLDER)
+  })
+
+  it("rechaza STORAGE_ROOT relativo en NODE_ENV=production", () => {
+    expect(() =>
+      validateEnv(
+        buildEnv(
+          ["NODE_ENV", "production"],
+          ["COOKIE_SECURE", "true"],
+          ["ALLOWED_ORIGINS", "https://app.example.com"],
+          ["STORAGE_ROOT", "apps/api/storage"],
+        ),
+      ),
+    ).toThrow(/STORAGE_ROOT/)
+  })
+
+  it("rechaza STORAGE_ROOT en lista negra (/var) en NODE_ENV=production", () => {
+    expect(() =>
+      validateEnv(
+        buildEnv(
+          ["NODE_ENV", "production"],
+          ["COOKIE_SECURE", "true"],
+          ["ALLOWED_ORIGINS", "https://app.example.com"],
+          ["STORAGE_ROOT", "/var/data"],
+        ),
+      ),
+    ).toThrow(/STORAGE_ROOT/)
+  })
+
+  it("acepta STORAGE_ROOT absoluto fuera de lista negra en NODE_ENV=production", () => {
+    const env = validateEnv(
+      buildEnv(
+        ["NODE_ENV", "production"],
+        ["COOKIE_SECURE", "true"],
+        ["ALLOWED_ORIGINS", "https://app.example.com"],
+        ["STORAGE_ROOT", "/data/nexott/storage"],
+      ),
+    )
+    expect(env.STORAGE_ROOT).toBe("/data/nexott/storage")
+  })
+
+  it("acepta STORAGE_ROOT relativo (default) en NODE_ENV=development", () => {
+    const env = validateEnv(buildEnv())
+    expect(env.STORAGE_ROOT).toBe("apps/api/storage")
   })
 })

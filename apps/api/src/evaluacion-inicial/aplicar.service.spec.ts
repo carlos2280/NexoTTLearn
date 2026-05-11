@@ -106,7 +106,7 @@ function cambio(
 ) {
   return {
     colaboradorId,
-    email: `${colaboradorId}@test`,
+    email: `${colaboradorId}@test.local`,
     nombreColaborador: "X",
     skillId,
     etiquetaSkill: skillId,

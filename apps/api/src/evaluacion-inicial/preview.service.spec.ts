@@ -25,6 +25,7 @@ interface PrismaMock {
   previewEvaluacionInicial: {
     create: ReturnType<typeof vi.fn>
     findUnique: ReturnType<typeof vi.fn>
+    findFirst: ReturnType<typeof vi.fn>
     deleteMany: ReturnType<typeof vi.fn>
   }
 }
@@ -37,6 +38,7 @@ function buildPrismaMock(): PrismaMock {
     previewEvaluacionInicial: {
       create: vi.fn(),
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       deleteMany: vi.fn(),
     },
   }
@@ -162,6 +164,7 @@ describe("PreviewService.crearPreview", () => {
         buffer: Buffer.from(""),
         mimeType: "application/pdf",
         tamanioBytes: 100,
+        nombreOriginal: "test.xlsx",
         sesion: SESION_ADMIN,
       })
     } catch (error) {
@@ -182,6 +185,7 @@ describe("PreviewService.crearPreview", () => {
         buffer: BUFFER_XLSX_OK,
         mimeType: MIME_XLSX,
         tamanioBytes: 100,
+        nombreOriginal: "test.xlsx",
         sesion: SESION_ADMIN,
       })
     } catch (error) {
@@ -207,6 +211,7 @@ describe("PreviewService.crearPreview", () => {
         buffer: BUFFER_XLSX_OK,
         mimeType: MIME_XLSX,
         tamanioBytes: 100,
+        nombreOriginal: "test.xlsx",
         sesion: SESION_ADMIN,
       })
     } catch (error) {
@@ -229,6 +234,7 @@ describe("PreviewService.crearPreview", () => {
         buffer: BUFFER_XLSX_OK,
         mimeType: MIME_XLSX,
         tamanioBytes: 100,
+        nombreOriginal: "test.xlsx",
         sesion: SESION_ADMIN,
       })
     } catch (error) {
@@ -252,6 +258,7 @@ describe("PreviewService.crearPreview", () => {
         buffer: BUFFER_XLSX_OK,
         mimeType: MIME_XLSX,
         tamanioBytes: 100,
+        nombreOriginal: "test.xlsx",
         sesion: SESION_ADMIN,
       })
     } catch (error) {
@@ -296,6 +303,7 @@ describe("PreviewService.crearPreview", () => {
       buffer: BUFFER_XLSX_OK,
       mimeType: MIME_XLSX,
       tamanioBytes: 1,
+      nombreOriginal: "test.xlsx",
       sesion: SESION_ADMIN,
     })
 
@@ -336,6 +344,7 @@ describe("PreviewService.crearPreview", () => {
       buffer: BUFFER_XLSX_OK,
       mimeType: MIME_XLSX,
       tamanioBytes: 1,
+      nombreOriginal: "test.xlsx",
       sesion: SESION_ADMIN,
     })
 
@@ -374,6 +383,7 @@ describe("PreviewService.crearPreview", () => {
       buffer: BUFFER_XLSX_OK,
       mimeType: MIME_XLSX,
       tamanioBytes: 1,
+      nombreOriginal: "test.xlsx",
       sesion: SESION_ADMIN,
     })
 
@@ -417,6 +427,7 @@ describe("PreviewService.crearPreview", () => {
       buffer: BUFFER_XLSX_OK,
       mimeType: MIME_XLSX,
       tamanioBytes: 1,
+      nombreOriginal: "test.xlsx",
       sesion: SESION_ADMIN,
     })
 
@@ -459,6 +470,7 @@ describe("PreviewService.crearPreview", () => {
       buffer: BUFFER_XLSX_OK,
       mimeType: MIME_XLSX,
       tamanioBytes: 1,
+      nombreOriginal: "test.xlsx",
       sesion: SESION_ADMIN,
     })
 
@@ -508,6 +520,7 @@ describe("PreviewService.crearPreview", () => {
       buffer: BUFFER_XLSX_OK,
       mimeType: MIME_XLSX,
       tamanioBytes: 1,
+      nombreOriginal: "test.xlsx",
       sesion: SESION_ADMIN,
     })
 
@@ -549,6 +562,7 @@ describe("PreviewService.crearPreview", () => {
       buffer: BUFFER_XLSX_OK,
       mimeType: MIME_XLSX,
       tamanioBytes: 1,
+      nombreOriginal: "test.xlsx",
       sesion: SESION_ADMIN,
     })
     const despues = Date.now()
@@ -578,6 +592,7 @@ describe("PreviewService.crearPreview", () => {
         buffer: bufferSinMagic,
         mimeType: MIME_XLSX,
         tamanioBytes: bufferSinMagic.length,
+        nombreOriginal: "test.xlsx",
         sesion: SESION_ADMIN,
       })
     } catch (error) {
@@ -608,6 +623,7 @@ describe("PreviewService.crearPreview", () => {
         buffer: BUFFER_XLSX_OK,
         mimeType: MIME_XLSX,
         tamanioBytes: BUFFER_XLSX_OK.length,
+        nombreOriginal: "test.xlsx",
         sesion: SESION_ADMIN,
       })
     } catch (error) {
@@ -648,14 +664,13 @@ describe("PreviewService.crearPreview", () => {
       buffer: BUFFER_XLSX_OK,
       mimeType: MIME_XLSX,
       tamanioBytes: 1,
+      nombreOriginal: "test.xlsx",
       sesion: SESION_ADMIN,
     })
     const arg = storage.guardar.mock.calls[0]?.[0] as { metadata: Record<string, unknown> }
     expect(arg.metadata).toMatchObject({
       cursoId: CURSO_ID,
-      filasTotales: 1,
-      filasValidas: 1,
-      filasRechazadas: 0,
+      nombreOriginal: "test.xlsx",
     })
     expect(JSON.stringify(arg.metadata)).not.toContain("alice@nttdata.test")
   })
@@ -681,7 +696,7 @@ describe("PreviewService.descartarPreview", () => {
   })
 
   it("happy path: borra preview no aplicado y devuelve archivoId", async () => {
-    prisma.previewEvaluacionInicial.findUnique.mockResolvedValue({
+    prisma.previewEvaluacionInicial.findFirst.mockResolvedValue({
       id: "prev-1",
       cursoId: CURSO_ID,
       aplicadoEn: null,
@@ -697,7 +712,7 @@ describe("PreviewService.descartarPreview", () => {
   })
 
   it("preview inexistente: 404 previewNoEncontrado", async () => {
-    prisma.previewEvaluacionInicial.findUnique.mockResolvedValue(null)
+    prisma.previewEvaluacionInicial.findFirst.mockResolvedValue(null)
     let caught: unknown
     try {
       await service.descartarPreview(CURSO_ID, "prev-1")
@@ -711,12 +726,8 @@ describe("PreviewService.descartarPreview", () => {
   })
 
   it("preview de otro curso: 404 previewNoEncontrado (no revelar existencia)", async () => {
-    prisma.previewEvaluacionInicial.findUnique.mockResolvedValue({
-      id: "prev-1",
-      cursoId: "OTRO",
-      aplicadoEn: null,
-      archivoId: "arch-1",
-    })
+    // findFirst filtra por (id, cursoId): un preview de otro curso => null.
+    prisma.previewEvaluacionInicial.findFirst.mockResolvedValue(null)
     let caught: unknown
     try {
       await service.descartarPreview(CURSO_ID, "prev-1")
@@ -726,13 +737,14 @@ describe("PreviewService.descartarPreview", () => {
     expect(caught).toBeInstanceOf(NotFoundException)
   })
 
-  it("preview ya aplicado: 409 conflictPreviewYaAplicado", async () => {
-    prisma.previewEvaluacionInicial.findUnique.mockResolvedValue({
+  it("preview ya aplicado: 409 conflictPreviewYaAplicado (deleteMany count=0)", async () => {
+    prisma.previewEvaluacionInicial.findFirst.mockResolvedValue({
       id: "prev-1",
       cursoId: CURSO_ID,
       aplicadoEn: new Date(),
       archivoId: "arch-1",
     })
+    prisma.previewEvaluacionInicial.deleteMany.mockResolvedValue({ count: 0 })
     let caught: unknown
     try {
       await service.descartarPreview(CURSO_ID, "prev-1")
@@ -746,12 +758,8 @@ describe("PreviewService.descartarPreview", () => {
   })
 
   it("preview existente pero de otro curso: 404 previewNoEncontrado (cross-curso)", async () => {
-    prisma.previewEvaluacionInicial.findUnique.mockResolvedValue({
-      id: "prev-1",
-      cursoId: "curso-otro",
-      aplicadoEn: null,
-      archivoId: "arch-1",
-    })
+    // findFirst con where: { id, cursoId } => null si cursoId diverge.
+    prisma.previewEvaluacionInicial.findFirst.mockResolvedValue(null)
     let caught: unknown
     try {
       await service.descartarPreview(CURSO_ID, "prev-1")
@@ -766,7 +774,7 @@ describe("PreviewService.descartarPreview", () => {
   })
 
   it("race deleteMany count===0: 409 conflictPreviewYaAplicado", async () => {
-    prisma.previewEvaluacionInicial.findUnique.mockResolvedValue({
+    prisma.previewEvaluacionInicial.findFirst.mockResolvedValue({
       id: "prev-1",
       cursoId: CURSO_ID,
       aplicadoEn: null,

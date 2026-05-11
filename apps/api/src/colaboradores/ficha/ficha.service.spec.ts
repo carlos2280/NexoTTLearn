@@ -12,6 +12,7 @@ const PART_USR_ID = "usr-part"
 
 interface PrismaMock {
   colaborador: { findUnique: ReturnType<typeof vi.fn> }
+  usuario: { findUnique: ReturnType<typeof vi.fn> }
   skill: { findMany: ReturnType<typeof vi.fn>; findUnique: ReturnType<typeof vi.fn> }
   notaSkill: {
     findMany: ReturnType<typeof vi.fn>
@@ -27,6 +28,7 @@ interface PrismaMock {
 function buildPrismaMock(): PrismaMock {
   return {
     colaborador: { findUnique: vi.fn() },
+    usuario: { findUnique: vi.fn() },
     skill: { findMany: vi.fn(), findUnique: vi.fn() },
     notaSkill: { findMany: vi.fn(), findUnique: vi.fn() },
     historicoNotaSkill: { findMany: vi.fn(), count: vi.fn() },
@@ -165,6 +167,44 @@ describe("FichaService.obtenerFicha", () => {
     await expect(service.obtenerFicha("xxx", SESION_ADMIN)).rejects.toBeInstanceOf(
       NotFoundException,
     )
+  })
+})
+
+describe("FichaService.obtenerFichaDeUsuario", () => {
+  let prisma: PrismaMock
+  let service: FichaService
+
+  beforeEach(() => {
+    prisma = buildPrismaMock()
+    service = new FichaService(prisma as unknown as PrismaService)
+  })
+
+  it("usuario sin colaboradorId: 404 colaboradorNoEncontrado", async () => {
+    prisma.usuario.findUnique.mockResolvedValue({ colaboradorId: null })
+
+    let caught: unknown
+    try {
+      await service.obtenerFichaDeUsuario(ADMIN_ID, SESION_ADMIN)
+    } catch (error) {
+      caught = error
+    }
+    expect(caught).toBeInstanceOf(NotFoundException)
+    const resp = (caught as NotFoundException).getResponse() as { code?: string }
+    expect(resp.code).toBe(apiErrorCodes.colaboradorNoEncontrado)
+  })
+
+  it("usuario no existe: 404 colaboradorNoEncontrado", async () => {
+    prisma.usuario.findUnique.mockResolvedValue(null)
+
+    let caught: unknown
+    try {
+      await service.obtenerFichaDeUsuario(ADMIN_ID, SESION_ADMIN)
+    } catch (error) {
+      caught = error
+    }
+    expect(caught).toBeInstanceOf(NotFoundException)
+    const resp = (caught as NotFoundException).getResponse() as { code?: string }
+    expect(resp.code).toBe(apiErrorCodes.colaboradorNoEncontrado)
   })
 })
 

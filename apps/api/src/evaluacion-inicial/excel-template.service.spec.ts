@@ -170,6 +170,53 @@ describe("ExcelTemplateService.generarTemplate", () => {
     expect(idxArea1).toBeGreaterThan(idxSkill1)
   })
 
+  it("A03 Formula Injection: celdas con prefijo activo se escapan con comilla simple", async () => {
+    prisma.curso.findUnique.mockResolvedValue({
+      ...cursoOk(),
+      areasExigidas: [
+        { areaId: "area-1", area: { id: "area-1", nombre: "=SUM(A1:A10)" } },
+        { areaId: "area-2", area: { id: "area-2", nombre: "@cmd|calc" } },
+      ],
+      skillsExigidas: [
+        {
+          skillId: "skill-1",
+          skill: { id: "skill-1", etiquetaVisible: "+evil", areaId: "area-1" },
+        },
+        {
+          skillId: "skill-2",
+          skill: { id: "skill-2", etiquetaVisible: "-formula", areaId: "area-2" },
+        },
+      ],
+    })
+    prisma.asignacionCurso.findMany.mockResolvedValue([
+      {
+        colaboradorId: "col-evil",
+        colaborador: {
+          id: "col-evil",
+          email: '=HYPERLINK("http://evil","click")',
+          nombre: "@SUM(A1:A10)",
+        },
+      },
+    ])
+
+    const resultado = await service.generarTemplate(CURSO_ID)
+    const workbook = new Workbook()
+    await workbook.xlsx.load(resultado.buffer)
+    const hojaNotas = workbook.getWorksheet("Notas")
+    const headers = hojaNotas?.getRow(1).values as (string | undefined)[]
+
+    // Headers con prefijo activo dentro del contenido del corchete: el "["
+    // inicial NO es activo, pero defensa en profundidad: comprobamos que el
+    // identificador codificado se conserva intacto (no se rompe).
+    expect(headers[3]).toContain("skill-1|+evil")
+    expect(headers[5]).toContain("area-1|=SUM")
+
+    // Fila de datos: email y nombre con prefijos activos van con "'" delante.
+    const fila = hojaNotas?.getRow(2).values as (string | undefined)[]
+    expect(fila[1]).toBe(`'=HYPERLINK("http://evil","click")`)
+    expect(fila[2]).toBe("'@SUM(A1:A10)")
+  })
+
   it("query findMany filtra ASIGNADO no RETIRADO", async () => {
     prisma.curso.findUnique.mockResolvedValue(cursoOk())
     prisma.asignacionCurso.findMany.mockResolvedValue(asignaciones())

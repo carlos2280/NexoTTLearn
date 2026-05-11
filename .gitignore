@@ -34,3 +34,7 @@ apps/api/prisma/migrations/dev.db*
 # Storage local (archivos subidos en dev/test). En prod va a Railway Volumes
 # o equivalente y nunca al repo. D-EVI-1.
 apps/api/storage/
+
+# Artefacto cuando STORAGE_ROOT se resuelve relativo desde un cwd anidado
+# (deuda historica §5.49 P5a / §5.70 P5c). No es funcional, no debe versionarse.
+apps/api/apps/

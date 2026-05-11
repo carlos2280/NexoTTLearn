@@ -13,7 +13,7 @@ import { apiErrorCodes } from "../errors/api-error.codes"
  */
 const motivoRegex = /^[\p{L}\p{N} .,;:()\-/]{1,500}$/u
 
-export const motivoSchema = z.string().regex(motivoRegex)
+export const motivoSchema = z.string().trim().regex(motivoRegex)
 
 /**
  * Factory pura del decorator `@Motivo()`, expuesta para testing.
@@ -30,11 +30,10 @@ export function extractMotivo(_data: unknown, ctx: ExecutionContext): string | u
   if (typeof raw !== "string") {
     return undefined
   }
-  const trimmed = raw.trim()
-  if (trimmed.length === 0) {
+  if (raw.trim().length === 0) {
     return undefined
   }
-  const parsed = motivoSchema.safeParse(trimmed)
+  const parsed = motivoSchema.safeParse(raw)
   if (!parsed.success) {
     throw new BadRequestException({
       code: apiErrorCodes.motivoInvalido,

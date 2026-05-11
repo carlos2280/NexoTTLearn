@@ -81,6 +81,9 @@ describe.runIf(RUN_E2E)("evaluacion-inicial e2e (P5c — aplicar + PATCH ficha +
   let archivoId: string
   let csrfAdmin: string
   let csrfPart: string
+  // ThrottlerStorageFake con .reset() (FIX-P5-cierre §5.69) — se inicializa
+  // en beforeAll y se reasigna a esta variable de scope describe.
+  let throttlerStorageFake: { reset: () => void }
 
   async function nuevoArchivoSemilla(): Promise<string> {
     const archivo = await prisma.archivo.create({
@@ -307,11 +310,15 @@ describe.runIf(RUN_E2E)("evaluacion-inicial e2e (P5c — aplicar + PATCH ficha +
     const moduleApp = (await import(join(DIST_DIR, "app.module.js"))) as ModuloApp
     const moduleHttp = (await import(join(DIST_DIR, "bootstrap-http.js"))) as ModuloHttp
     const { Test } = await import("@nestjs/testing")
-    const { ThrottlerGuard } = await import("@nestjs/throttler")
+    const { ThrottlerGuard, ThrottlerStorage } = await import("@nestjs/throttler")
+    const { ThrottlerStorageFake } = await import("./throttler-storage-fake.js")
+    throttlerStorageFake = new ThrottlerStorageFake()
     const throttlerSiempreOk = { canActivate: (): boolean => true }
     const moduleRef = await Test.createTestingModule({ imports: [moduleApp.AppModule] })
       .overrideGuard(ThrottlerGuard)
       .useValue(throttlerSiempreOk)
+      .overrideProvider(ThrottlerStorage)
+      .useValue(throttlerStorageFake)
       .compile()
     app = moduleRef.createNestApplication()
     moduleHttp.configurarHttp(app)
@@ -490,13 +497,11 @@ describe.runIf(RUN_E2E)("evaluacion-inicial e2e (P5c — aplicar + PATCH ficha +
     )
   })
 
-  it("ADMIN POST aplicar preview con rechazos: 422 sin escribir nada (tras espera del bucket throttle)", async () => {
-    // Los 3 tests anteriores consumieron los 5 tokens del bucket `short`
-    // (1 happy + 2 replay + 2 conflict). Esperamos a que el bucket de 60s
-    // se reinicie para los 3 tests "ligeros" siguientes. Patron D-CUR-20:
-    // `overrideGuard(ThrottlerGuard)` no neutraliza el decorator `@Throttle`
-    // a nivel handler; el delay es la salida pragmatica y deterministica.
-    await new Promise<void>((resolve) => setTimeout(resolve, 61_000))
+  it("ADMIN POST aplicar preview con rechazos: 422 sin escribir nada", async () => {
+    // Los 3 tests anteriores consumieron los 5 tokens del bucket `short`.
+    // ThrottlerStorageFake nos permite resetear el bucket sin esperar 60s
+    // (FIX-P5-cierre §5.69; antes habia un setTimeout(61_000)).
+    throttlerStorageFake.reset()
     const { previewId } = await nuevoPreviewSemilla({
       cambios: [],
       rechazos: [

@@ -55,36 +55,44 @@ export interface PreviewResponse {
 
 export const fuenteCambioPreviewSchema = z.enum(["SKILL_DIRECTA", "AREA_HEREDADA"])
 
-export const previewResumenSchema = z.object({
-  filasTotales: z.number().int().nonnegative(),
-  filasValidas: z.number().int().nonnegative(),
-  filasRechazadas: z.number().int().nonnegative(),
-  skillsAfectadas: z.number().int().nonnegative(),
-  colaboradoresAfectados: z.number().int().nonnegative(),
-})
+export const previewResumenSchema = z
+  .object({
+    filasTotales: z.number().int().nonnegative(),
+    filasValidas: z.number().int().nonnegative(),
+    filasRechazadas: z.number().int().nonnegative(),
+    skillsAfectadas: z.number().int().nonnegative(),
+    colaboradoresAfectados: z.number().int().nonnegative(),
+  })
+  .strict()
 
-export const previewCambioItemSchema = z.object({
-  colaboradorId: z.string().min(1),
-  email: z.string(),
-  nombreColaborador: z.string(),
-  skillId: z.string().min(1),
-  etiquetaSkill: z.string(),
-  valorAnterior: z.number().min(0).max(100).nullable(),
-  valorNuevo: z.number().min(0).max(100).nullable(),
-  fuente: fuenteCambioPreviewSchema,
-})
+export const previewCambioItemSchema = z
+  .object({
+    colaboradorId: z.string().min(1),
+    email: z.string().email().or(z.literal("")),
+    nombreColaborador: z.string(),
+    skillId: z.string().min(1),
+    etiquetaSkill: z.string(),
+    valorAnterior: z.number().min(0).max(100).nullable(),
+    valorNuevo: z.number().min(0).max(100).nullable(),
+    fuente: fuenteCambioPreviewSchema,
+  })
+  .strict()
 
-export const previewErrorCeldaSchema = z.object({
-  celda: z.string(),
-  codigo: z.string(),
-  mensaje: z.string(),
-})
+export const previewErrorCeldaSchema = z
+  .object({
+    celda: z.string(),
+    codigo: z.string(),
+    mensaje: z.string(),
+  })
+  .strict()
 
-export const previewRechazoItemSchema = z.object({
-  fila: z.number().int().positive(),
-  email: z.string().nullable(),
-  errores: z.array(previewErrorCeldaSchema),
-})
+export const previewRechazoItemSchema = z
+  .object({
+    fila: z.number().int().positive(),
+    email: z.string().nullable(),
+    errores: z.array(previewErrorCeldaSchema),
+  })
+  .strict()
 
 export const previewCambiosArraySchema = z.array(previewCambioItemSchema)
 export const previewRechazosArraySchema = z.array(previewRechazoItemSchema)

@@ -50,6 +50,17 @@ interface MapeoHeaders {
  */
 @Injectable()
 export class ExcelParserService {
+  /**
+   * Sanea un valor crudo del Excel para mostrarlo en mensajes de error:
+   * limita a 80 chars y elimina caracteres susceptibles de XSS/HTML
+   * (`<`, `>`, `"`). El destinatario del mensaje es el frontend, asi que
+   * no podemos asumir que escape; defensa en profundidad.
+   */
+  private sanitizarValorCrudo(v: unknown): string {
+    const s = String(v ?? "").slice(0, 80)
+    return s.replace(/[<>"]/g, "?")
+  }
+
   async parsear(input: ParserInput): Promise<ParserResultado> {
     const workbook = await this.cargarWorkbook(input.buffer)
     const hojaNotas = workbook.getWorksheet(HOJA_NOTAS)
@@ -281,7 +292,7 @@ export class ExcelParserService {
       errores.push({
         celda: celdaRef,
         codigo: apiErrorCodes.validacionExcelEmailFormatoInvalido,
-        mensaje: `Email "${crudo}" tiene formato invalido.`,
+        mensaje: `Email "${this.sanitizarValorCrudo(crudo)}" tiene formato invalido.`,
       })
       return { crudo, normalizado: null }
     }
@@ -343,7 +354,7 @@ export class ExcelParserService {
       errores.push({
         celda: celdaRef,
         codigo: apiErrorCodes.validacionExcelEmailDuplicadoEnArchivo,
-        mensaje: `Email "${normalizado}" aparece duplicado en el archivo.`,
+        mensaje: `Email "${this.sanitizarValorCrudo(normalizado)}" aparece duplicado en el archivo.`,
       })
       return
     }
@@ -352,7 +363,7 @@ export class ExcelParserService {
       errores.push({
         celda: celdaRef,
         codigo: apiErrorCodes.validacionExcelEmailNoAsignado,
-        mensaje: `Email "${normalizado}" no corresponde a un colaborador asignado al curso.`,
+        mensaje: `Email "${this.sanitizarValorCrudo(normalizado)}" no corresponde a un colaborador asignado al curso.`,
       })
     }
   }
@@ -379,7 +390,7 @@ export class ExcelParserService {
           error: {
             celda: celdaRef,
             codigo: apiErrorCodes.validacionExcelNotaNoNumerica,
-            mensaje: `Valor "${valor}" no es numerico.`,
+            mensaje: `Valor "${this.sanitizarValorCrudo(valor)}" no es numerico.`,
           },
         }
       }
@@ -410,7 +421,7 @@ export class ExcelParserService {
         error: {
           celda: celdaRef,
           codigo: apiErrorCodes.validacionExcelNotaFueraRango,
-          mensaje: `Valor ${num} fuera del rango [${NOTA_MIN}, ${NOTA_MAX}].`,
+          mensaje: `Valor ${this.sanitizarValorCrudo(num)} fuera del rango [${NOTA_MIN}, ${NOTA_MAX}].`,
         },
       }
     }

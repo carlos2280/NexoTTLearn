@@ -140,6 +140,7 @@ export class EvaluacionInicialController {
       buffer: archivo.buffer,
       mimeType: archivo.mimetype,
       tamanioBytes: archivo.size,
+      nombreOriginal: archivo.originalname ?? "archivo.xlsx",
       sesion,
     })
     await this.auditLog.record({

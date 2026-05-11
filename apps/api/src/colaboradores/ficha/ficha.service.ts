@@ -68,6 +68,25 @@ function jsonObjectOrNull(value: Prisma.JsonValue | null): Record<string, unknow
 export class FichaService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Resuelve la ficha del colaborador asociado a una sesion (atajo `/me/ficha`).
+   * Encapsula el lookup `Usuario -> colaboradorId` para que `MeController`
+   * quede delgado y sin dependencia directa de `PrismaService`.
+   */
+  async obtenerFichaDeUsuario(usuarioId: string, sesion: SesionUsuario): Promise<FichaResponse> {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: usuarioId },
+      select: { colaboradorId: true },
+    })
+    if (!usuario || !usuario.colaboradorId) {
+      throw new NotFoundException({
+        code: apiErrorCodes.colaboradorNoEncontrado,
+        message: "Colaborador no encontrado.",
+      })
+    }
+    return this.obtenerFicha(usuario.colaboradorId, sesion)
+  }
+
   async obtenerFicha(colaboradorId: string, sesion: SesionUsuario): Promise<FichaResponse> {
     await this.assertAccesoYExistencia(colaboradorId, sesion)
 

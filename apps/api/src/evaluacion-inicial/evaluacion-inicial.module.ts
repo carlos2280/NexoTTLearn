@@ -5,6 +5,7 @@ import { EvaluacionInicialController } from "./evaluacion-inicial.controller"
 import { ExcelParserService } from "./excel-parser.service"
 import { ExcelTemplateService } from "./excel-template.service"
 import { HistorialService } from "./historial.service"
+import { PreviewPurgaService } from "./preview-purga.service"
 import { PreviewService } from "./preview.service"
 
 /**
@@ -25,6 +26,7 @@ import { PreviewService } from "./preview.service"
     ExcelTemplateService,
     ExcelParserService,
     PreviewService,
+    PreviewPurgaService,
     AplicarService,
     HistorialService,
   ],

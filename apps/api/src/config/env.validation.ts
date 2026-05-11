@@ -1,4 +1,41 @@
+import { isAbsolute, resolve } from "node:path"
 import { z } from "zod"
+
+/**
+ * Prefijos de paths absolutos prohibidos para STORAGE_ROOT en produccion.
+ * El listado cubre raices del sistema y rutas dentro del repo para evitar
+ * que un volumen montado quede dentro del checkout de la aplicacion.
+ */
+const STORAGE_ROOT_BLACKLIST_PROD: readonly string[] = [
+  "/",
+  "/etc",
+  "/var",
+  "/usr",
+  "/bin",
+  "/sbin",
+  "/root",
+  "/home",
+  "/tmp",
+]
+
+function storageRootProhibidoEnProd(value: string): string | null {
+  const normalizado = resolve(value)
+  if (normalizado === "/") {
+    return "STORAGE_ROOT no puede ser la raiz del sistema"
+  }
+  for (const prefijo of STORAGE_ROOT_BLACKLIST_PROD) {
+    if (prefijo === "/") {
+      continue
+    }
+    if (normalizado === prefijo || normalizado.startsWith(`${prefijo}/`)) {
+      return `STORAGE_ROOT no puede estar dentro de ${prefijo}`
+    }
+  }
+  if (normalizado.endsWith("/apps/api/storage")) {
+    return "STORAGE_ROOT en produccion no puede ser apps/api/storage (path interno del repo)"
+  }
+  return null
+}
 
 /**
  * Placeholder hex de 64 caracteres de SECRETS_ENCRYPTION_KEY usado en
@@ -76,6 +113,22 @@ const envSchema = z
         path: ["SECRETS_ENCRYPTION_KEY"],
         message:
           "SECRETS_ENCRYPTION_KEY no puede ser el placeholder de desarrollo en NODE_ENV=production",
+      })
+    }
+    if (!isAbsolute(data.STORAGE_ROOT)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["STORAGE_ROOT"],
+        message: `STORAGE_ROOT must be absolute in production (got: "${data.STORAGE_ROOT}")`,
+      })
+      return
+    }
+    const motivo = storageRootProhibidoEnProd(data.STORAGE_ROOT)
+    if (motivo) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["STORAGE_ROOT"],
+        message: `${motivo} (got: "${data.STORAGE_ROOT}")`,
       })
     }
   })

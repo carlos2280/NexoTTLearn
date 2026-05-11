@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from "@nestjs/common"
@@ -77,6 +78,7 @@ interface CrearPreviewInput {
   readonly buffer: Buffer
   readonly mimeType: string
   readonly tamanioBytes: number
+  readonly nombreOriginal: string
   readonly sesion: SesionUsuario
 }
 
@@ -126,6 +128,8 @@ interface AsignacionComputada {
  */
 @Injectable()
 export class PreviewService {
+  private readonly logger = new Logger(PreviewService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly parser: ExcelParserService,
@@ -209,6 +213,14 @@ export class PreviewService {
     try {
       parserResult = await this.parser.parsear({ buffer: input.buffer, esperado })
     } catch (err) {
+      this.logger.warn(
+        {
+          cursoId: input.cursoId,
+          tamanioBytes: input.buffer.length,
+          errName: err instanceof Error ? err.name : "desconocido",
+        },
+        "Excel parser fallo",
+      )
       throw new BadRequestException({
         code: apiErrorCodes.invalidBody,
         message: "El archivo .xlsx está corrupto o no puede leerse.",
@@ -237,6 +249,7 @@ export class PreviewService {
       cursoId: input.cursoId,
       buffer: input.buffer,
       mimeType: input.mimeType,
+      nombreOriginal: input.nombreOriginal,
       sesion: input.sesion,
       resumen,
       cambios,
@@ -257,34 +270,31 @@ export class PreviewService {
     cursoId: string,
     previewId: string,
   ): Promise<{ readonly archivoId: string }> {
-    const preview = await this.prisma.previewEvaluacionInicial.findUnique({
-      where: { id: previewId },
+    // Lectura previa para conseguir `archivoId` (audit log del controller).
+    // El comportamiento race-safe lo aporta el `deleteMany` con guard
+    // `aplicadoEn: null`: el caso 404 se distingue del 409 con un solo
+    // releckup en la rama de fallo (FIX-P5-cierre §5.65 — antes habia dos
+    // ramas previas + un guard duplicado tras el borrado).
+    const preview = await this.prisma.previewEvaluacionInicial.findFirst({
+      where: { id: previewId, cursoId },
       select: SELECT_PREVIEW_DESCARTAR,
     })
-    if (!preview || preview.cursoId !== cursoId) {
+    if (!preview) {
       throw new NotFoundException({
         code: apiErrorCodes.previewNoEncontrado,
         message: `Preview ${previewId} no encontrado.`,
       })
     }
-    if (preview.aplicadoEn !== null) {
+    const { count } = await this.prisma.previewEvaluacionInicial.deleteMany({
+      where: { id: previewId, cursoId, aplicadoEn: null },
+    })
+    if (count === 0) {
       throw new ConflictException({
         code: apiErrorCodes.conflictPreviewYaAplicado,
         message: "El preview ya fue aplicado y no puede descartarse.",
       })
     }
-
-    const archivoId = preview.archivoId
-    const borrado = await this.prisma.previewEvaluacionInicial.deleteMany({
-      where: { id: previewId, cursoId, aplicadoEn: null },
-    })
-    if (borrado.count === 0) {
-      throw new ConflictException({
-        code: apiErrorCodes.conflictPreviewYaAplicado,
-        message: "El preview fue aplicado entre la lectura y el borrado.",
-      })
-    }
-    return { archivoId }
+    return { archivoId: preview.archivoId }
   }
 
   private asegurarEncabezadosValidos(parser: ParserResultado): void {
@@ -466,6 +476,7 @@ export class PreviewService {
     readonly cursoId: string
     readonly buffer: Buffer
     readonly mimeType: string
+    readonly nombreOriginal: string
     readonly sesion: SesionUsuario
     readonly resumen: PreviewResumen
     readonly cambios: readonly PreviewCambioItem[]
@@ -476,7 +487,11 @@ export class PreviewService {
       mimeType: input.mimeType,
       tipo: ArchivoTipo.EVALUACION_INICIAL_EXCEL,
       subidoPorUsuarioId: input.sesion.usuarioId,
-      metadata: this.buildMetadataArchivo(input.cursoId, input.resumen),
+      metadata: this.buildMetadataArchivo({
+        cursoId: input.cursoId,
+        subidoPorUsuarioId: input.sesion.usuarioId,
+        nombreOriginal: input.nombreOriginal,
+      }),
     })
     const resumenValidado = previewResumenSchema.parse(input.resumen)
     const cambiosValidados = previewCambiosArraySchema.parse(input.cambios)
@@ -504,12 +519,16 @@ export class PreviewService {
     }
   }
 
-  private buildMetadataArchivo(cursoId: string, resumen: PreviewResumen): Prisma.InputJsonObject {
+  private buildMetadataArchivo(input: {
+    readonly cursoId: string
+    readonly subidoPorUsuarioId: string
+    readonly nombreOriginal: string
+  }): Prisma.InputJsonObject {
     return {
-      cursoId,
-      filasTotales: resumen.filasTotales,
-      filasValidas: resumen.filasValidas,
-      filasRechazadas: resumen.filasRechazadas,
+      tipo: ArchivoTipo.EVALUACION_INICIAL_EXCEL,
+      cursoId: input.cursoId,
+      subidoPorUsuarioId: input.subidoPorUsuarioId,
+      nombreOriginal: input.nombreOriginal,
     }
   }
 }

@@ -25,7 +25,13 @@ Heredadas del paraguas: ver `../../.claude/rules/prisma-schema.md`.
 
 ## Reglas de schema obligatorias
 
-1. Todo modelo: `id String @id @default(cuid())`, `createdAt`, `updatedAt @updatedAt`.
+1. Todo modelo: `id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid`,
+   `createdAt`, `updatedAt @updatedAt`.
+
+   Nota: NexoTTLearn usa `gen_random_uuid()` + `@db.Uuid` (no `cuid()`)
+   por coherencia con el modelo físico existente desde la migración
+   inicial. La regla `cuid()` del paraguas sigue válida para
+   proyectos nuevos; este proyecto la sobreescribe.
 2. `@map`/`@@map` en TODOS los campos y modelos (snake_case en BD).
 3. Índice en TODA FK: `@@index([campoId])`.
 4. `onDelete` explícito en cada relación.

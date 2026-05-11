@@ -1,7 +1,8 @@
 import { ConflictException, Injectable, NotFoundException } from "@nestjs/common"
 import { EstadoAsignado, Prisma, RolAsignacion } from "@prisma/client"
 import { Workbook } from "exceljs"
-import type { Workbook as WorkbookType } from "exceljs"
+
+type WorkbookType = InstanceType<typeof Workbook>
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
 import {
@@ -38,6 +39,10 @@ const COLUMN_WIDTH_EMAIL = 32
 const COLUMN_WIDTH_NOMBRE = 28
 const COLUMN_WIDTH_NOTA = 28
 
+// A03 — Caracteres "activos" en hojas de calculo: empiezan formulas si la
+// celda comienza con uno de ellos. Excluimos prefijandolos con comilla simple.
+const FORMULA_PREFIX_REGEX = /^[=+\-@\t\r]/
+
 /**
  * ExcelTemplateService — genera el template Excel para evaluacion inicial
  * (P5a, D7, D-EVI-6).
@@ -53,6 +58,16 @@ const COLUMN_WIDTH_NOTA = 28
 @Injectable()
 export class ExcelTemplateService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Defensa A03 contra Formula Injection en celdas de Excel: prefija con
+   * comilla simple ('`') cualquier cadena que empiece por un caracter
+   * "activo" para que el motor de hojas de calculo la trate como literal,
+   * no como formula.
+   */
+  private escapeFormula(v: string): string {
+    return FORMULA_PREFIX_REGEX.test(v) ? `'${v}` : v
+  }
 
   async generarTemplate(cursoId: string): Promise<ExcelTemplateResult> {
     const curso = await this.prisma.curso.findUnique({
@@ -165,8 +180,10 @@ export class ExcelTemplateService {
   ): void {
     const hoja = workbook.addWorksheet("Notas")
 
-    const skillHeaders = skills.map((s) => `[SKILL:${s.skillId}|${s.etiquetaVisible}]`)
-    const areaHeaders = areas.map((a) => `[AREA:${a.areaId}|${a.nombre}]`)
+    const skillHeaders = skills.map((s) =>
+      this.escapeFormula(`[SKILL:${s.skillId}|${s.etiquetaVisible}]`),
+    )
+    const areaHeaders = areas.map((a) => this.escapeFormula(`[AREA:${a.areaId}|${a.nombre}]`))
 
     const headers: readonly string[] = ["email", "nombre", ...skillHeaders, ...areaHeaders]
     hoja.addRow([...headers])
@@ -182,7 +199,10 @@ export class ExcelTemplateService {
     }
 
     for (const asignado of asignados) {
-      const fila: (string | number | null)[] = [asignado.email, asignado.nombre]
+      const fila: (string | number | null)[] = [
+        this.escapeFormula(asignado.email),
+        this.escapeFormula(asignado.nombre),
+      ]
       for (let i = 0; i < skills.length + areas.length; i += 1) {
         fila.push(null)
       }

@@ -1,10 +1,9 @@
-import { Controller, Get, InternalServerErrorException, NotFoundException } from "@nestjs/common"
+import { Controller, Get, InternalServerErrorException } from "@nestjs/common"
 import { FichaResponse } from "@nexott-learn/shared-types"
 import { RolUsuario } from "@prisma/client"
 import { CurrentUser } from "../common/decorators/current-user.decorator"
 import { Roles } from "../common/decorators/roles.decorator"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
-import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
 import { FichaService } from "./ficha/ficha.service"
 
@@ -16,10 +15,7 @@ import { FichaService } from "./ficha/ficha.service"
  */
 @Controller("me")
 export class MeController {
-  constructor(
-    private readonly fichaService: FichaService,
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly fichaService: FichaService) {}
 
   /**
    * Atajo equivalente a `GET /colaboradores/<miColaboradorId>/ficha`. La
@@ -30,17 +26,7 @@ export class MeController {
   @Roles(RolUsuario.PARTICIPANTE, RolUsuario.ADMIN)
   async obtenerMiFicha(@CurrentUser() usuario: SesionUsuario | undefined): Promise<FichaResponse> {
     const sesion = this.requireUsuario(usuario)
-    const usuarioRow = await this.prisma.usuario.findUnique({
-      where: { id: sesion.usuarioId },
-      select: { colaboradorId: true },
-    })
-    if (!usuarioRow) {
-      throw new NotFoundException({
-        code: apiErrorCodes.colaboradorNoEncontrado,
-        message: "Colaborador no encontrado.",
-      })
-    }
-    return await this.fichaService.obtenerFicha(usuarioRow.colaboradorId, sesion)
+    return this.fichaService.obtenerFichaDeUsuario(sesion.usuarioId, sesion)
   }
 
   private requireUsuario(usuario: SesionUsuario | undefined): SesionUsuario {

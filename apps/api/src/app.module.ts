@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common"
 import { ConfigModule } from "@nestjs/config"
 import { APP_FILTER, APP_GUARD } from "@nestjs/core"
+import { ScheduleModule } from "@nestjs/schedule"
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler"
 import { AuthModule } from "./auth/auth.module"
 import { CatalogoModule } from "./catalogo/catalogo.module"
@@ -53,6 +54,7 @@ import { HealthModule } from "./health/health.module"
       { name: "short", ttl: 1000, limit: 10 },
       { name: "long", ttl: 60_000, limit: 100 },
     ]),
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuditLogModule,
     StorageModule,

@@ -1163,6 +1163,9 @@ model PreviewEvaluacionInicial {
 
   @@index([cursoId, createdAt(sort: Desc)], map: "idx_previews_eval_inicial_curso")
   @@index([expiraEn], map: "idx_previews_eval_inicial_expira")
+  @@index([archivoId], map: "idx_previews_eval_inicial_archivo")
+  @@index([creadoPorUsuarioId], map: "idx_previews_eval_inicial_creado_por")
+  @@index([aplicadoPorCargaId], map: "idx_previews_eval_inicial_aplicado_por_carga")
   @@map("previews_evaluacion_inicial")
 }
 
@@ -1184,6 +1187,8 @@ model CargaEvaluacionInicial {
   previews     PreviewEvaluacionInicial[] @relation("PreviewEvalInicial_AplicadoPor")
 
   @@index([cursoId, createdAt(sort: Desc)], map: "idx_cargas_eval_inicial_curso")
+  @@index([archivoId], map: "idx_cargas_eval_inicial_archivo")
+  @@index([aplicadoPorUsuarioId], map: "idx_cargas_eval_inicial_aplicado_por")
   @@map("cargas_evaluacion_inicial")
 }
 

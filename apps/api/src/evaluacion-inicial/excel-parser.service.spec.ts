@@ -218,6 +218,31 @@ describe("ExcelParserService.parsear", () => {
     expect(fila.valoresSkill.get("skill-1")).toBe(75.5)
   })
 
+  it("valor crudo no numerico con HTML/JS injection: mensaje escapado y truncado", async () => {
+    const inyeccion = `<script>alert("xss")</script>${"x".repeat(200)}`
+    const buffer = await workbookConFilas(HEADERS_OK, [
+      ["alice@nttdata.test", "Alice", inyeccion, null, null, null],
+    ])
+    const res = await service.parsear({ buffer, esperado: buildEsperado() })
+    const fila = res.filas[0] as FilaParseadaRechazada
+    expect(fila.tipo).toBe("RECHAZADA")
+    const errorNumerico = fila.errores.find(
+      (e) => e.codigo === apiErrorCodes.validacionExcelNotaNoNumerica,
+    )
+    expect(errorNumerico).toBeDefined()
+    const mensaje = errorNumerico?.mensaje ?? ""
+    // El mensaje envuelve el valor crudo entre comillas dobles externas
+    // (e.g. `Valor "..." no es numerico.`). Extraemos el contenido interior
+    // y verificamos que no contiene <, >, " ni excede 80 chars.
+    const match = /Valor "([^"]*)" no es numerico\./u.exec(mensaje)
+    expect(match).not.toBeNull()
+    const interior = match?.[1] ?? ""
+    expect(interior).not.toContain("<")
+    expect(interior).not.toContain(">")
+    expect(interior).not.toContain('"')
+    expect(interior.length).toBeLessThanOrEqual(80)
+  })
+
   it("fila con todas las celdas vacias pero email valido: VALIDA con mapas vacios de valores", async () => {
     const buffer = await workbookConFilas(HEADERS_OK, [
       ["alice@nttdata.test", "Alice", null, null, null, null],

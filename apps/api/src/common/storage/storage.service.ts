@@ -1,11 +1,22 @@
 import { promises as fs } from "node:fs"
 import { isAbsolute, resolve, sep } from "node:path"
-import { Injectable, InternalServerErrorException, Logger, NotFoundException } from "@nestjs/common"
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
 import { ArchivoTipo, Prisma } from "@prisma/client"
 import { apiErrorCodes } from "../errors/api-error.codes"
 import { PrismaService } from "../prisma/prisma.service"
-import { GuardarArchivoInput, GuardarArchivoResult, LeerArchivoResult } from "./storage.types"
+import {
+  GuardarArchivoInput,
+  GuardarArchivoResult,
+  LeerArchivoResult,
+  archivoMetadataSchema,
+} from "./storage.types"
 
 const SELECT_ARCHIVO_FIELDS = {
   id: true,
@@ -50,32 +61,50 @@ export class StorageService {
     this.storageRoot = isAbsolute(raw) ? resolve(raw) : resolve(process.cwd(), raw)
   }
 
-  async guardar(input: GuardarArchivoInput): Promise<GuardarArchivoResult> {
-    const archivo = await this.prisma.archivo.create({
-      data: {
-        tipo: input.tipo,
-        path: "",
-        mimeType: input.mimeType,
-        tamanioBytes: input.contenido.length,
-        subidoPorUsuarioId: input.subidoPorUsuarioId,
-        metadata: input.metadata ?? Prisma.JsonNull,
-      },
-      select: { id: true },
-    })
+  /**
+   * Persiste el archivo en BD + filesystem de forma atomica: si la escritura
+   * fisica falla, la fila `archivos` se revierte por rollback del tx propio,
+   * eliminando registros huerfanos. Cuando el caller necesita componer la
+   * escritura con otras mutaciones, puede inyectar su propio `tx`.
+   */
+  async guardar(
+    input: GuardarArchivoInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<GuardarArchivoResult> {
+    const metadataValidada = this.validarMetadata(input.metadata)
 
-    const relativePath = this.buildRelativePath(input.tipo, archivo.id, input.mimeType)
-    const absolutePath = this.resolveSeguro(relativePath)
+    const ejecutor = async (client: Prisma.TransactionClient): Promise<GuardarArchivoResult> => {
+      const archivo = await client.archivo.create({
+        data: {
+          tipo: input.tipo,
+          path: "",
+          mimeType: input.mimeType,
+          tamanioBytes: input.contenido.length,
+          subidoPorUsuarioId: input.subidoPorUsuarioId,
+          metadata: metadataValidada ?? Prisma.JsonNull,
+        },
+        select: { id: true },
+      })
 
-    await fs.mkdir(resolve(absolutePath, ".."), { recursive: true })
-    await fs.writeFile(absolutePath, input.contenido)
+      const relativePath = this.buildRelativePath(input.tipo, archivo.id, input.mimeType)
+      const absolutePath = this.resolveSeguro(relativePath)
 
-    await this.prisma.archivo.update({
-      where: { id: archivo.id },
-      data: { path: relativePath },
-      select: { id: true },
-    })
+      await fs.mkdir(resolve(absolutePath, ".."), { recursive: true })
+      await fs.writeFile(absolutePath, input.contenido)
 
-    return { archivoId: archivo.id, path: relativePath }
+      await client.archivo.update({
+        where: { id: archivo.id },
+        data: { path: relativePath },
+        select: { id: true },
+      })
+
+      return { archivoId: archivo.id, path: relativePath }
+    }
+
+    if (tx) {
+      return ejecutor(tx)
+    }
+    return this.prisma.$transaction(ejecutor)
   }
 
   async leer(archivoId: string): Promise<LeerArchivoResult> {
@@ -106,10 +135,30 @@ export class StorageService {
       const absolutePath = this.resolveSeguro(archivo.path)
       await fs.unlink(absolutePath)
     } catch (error) {
-      const detalle = error instanceof Error ? error.message : String(error)
-      this.logger.warn(`No se pudo borrar archivo fisico ${archivoId}: ${detalle}`)
+      const errCode =
+        error instanceof Error && "code" in error
+          ? (error as NodeJS.ErrnoException).code
+          : "UNKNOWN"
+      this.logger.warn({ archivoId, errCode }, "Fallo al borrar archivo fisico")
     }
     await this.prisma.archivo.delete({ where: { id: archivoId } })
+  }
+
+  private validarMetadata(
+    metadata: Prisma.InputJsonValue | undefined,
+  ): Prisma.InputJsonValue | null {
+    if (metadata === undefined) {
+      return null
+    }
+    const result = archivoMetadataSchema.safeParse(metadata)
+    if (!result.success) {
+      throw new BadRequestException({
+        code: apiErrorCodes.invalidBody,
+        message: "metadata de archivo invalida.",
+        details: result.error.flatten(),
+      })
+    }
+    return result.data as Prisma.InputJsonValue
   }
 
   private buildRelativePath(tipo: ArchivoTipo, archivoId: string, mimeType: string): string {
