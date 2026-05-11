@@ -352,6 +352,7 @@ model HistoricoRenombradoSkill {
   etiquetaAnterior String   @map("etiqueta_anterior")
   etiquetaNueva    String   @map("etiqueta_nueva")
   autorUsuarioId   String   @map("autor_usuario_id") @db.Uuid
+  motivo           String?
 
   skill        Skill   @relation(fields: [skillId], references: [id], onDelete: Restrict)
   autorUsuario Usuario @relation("HistRenombradoSkill_Autor", fields: [autorUsuarioId], references: [id], onDelete: Restrict)
@@ -667,6 +668,7 @@ model ActivityLog {
   ip          String?
   userAgent   String?         @map("user_agent")
   requestId   String?         @map("request_id")
+  metadata    Json?           @db.JsonB
   createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
 
   usuario Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)

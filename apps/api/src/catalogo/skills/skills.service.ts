@@ -1,8 +1,10 @@
 import { ConflictException, Injectable, NotFoundException } from "@nestjs/common"
 import {
   CrearSkillInput,
+  FusionSkillsResponse,
   ListarSkillsQuery,
   Paginated,
+  PreviewCambioAreaResponse,
   RenombrarSkillInput,
   SkillDuplicadaCandidata,
   SkillResponse,
@@ -294,7 +296,7 @@ export class SkillsService {
   async renombrar(
     skillId: string,
     input: RenombrarSkillInput,
-    _motivo: string,
+    motivo: string,
     adminUsuarioId: string,
     contexto: ContextoHttpAuditoria = {},
   ): Promise<SkillResponse> {
@@ -326,11 +328,16 @@ export class SkillsService {
             etiquetaAnterior: actual.etiquetaVisible,
             etiquetaNueva: input.etiquetaVisible,
             autorUsuarioId: adminUsuarioId,
+            motivo,
           },
         })
         return actualizada
       })
 
+      // Cierre §5.20: el motivo del rename se persiste en
+      // `historico_renombrados_skill.motivo` (fuente primaria de auditoria
+      // por entidad). NO se duplica en `activity_logs.metadata` para evitar
+      // divergencia entre las dos tablas (D-CAT-18).
       await this.auditLog.record({
         usuarioId: adminUsuarioId,
         accion: AccionAuditoria.SKILL_RENOMBRADA,
@@ -353,7 +360,7 @@ export class SkillsService {
 
   async archivar(
     skillId: string,
-    _motivo: string,
+    motivo: string,
     adminUsuarioId: string,
     contexto: ContextoHttpAuditoria = {},
   ): Promise<void> {
@@ -378,12 +385,15 @@ export class SkillsService {
       data: { estado: EstadoSkill.ARCHIVADA },
       select: { id: true },
     })
+    // §5.20: archivar no tiene tabla historico propia; el motivo se persiste
+    // como metadata estructural del activity_log.
     await this.auditLog.record({
       usuarioId: adminUsuarioId,
       accion: AccionAuditoria.SKILL_ARCHIVADA,
       exito: true,
       recursoTipo: "skill",
       recursoId: skillId,
+      metadata: { motivo },
       ...contexto,
     })
   }
@@ -426,7 +436,7 @@ export class SkillsService {
 
   async eliminar(
     skillId: string,
-    _motivo: string,
+    motivo: string,
     adminUsuarioId: string,
     contexto: ContextoHttpAuditoria = {},
   ): Promise<void> {
@@ -459,12 +469,15 @@ export class SkillsService {
     }
 
     await this.prisma.skill.delete({ where: { id: skillId } })
+    // §5.20: hard-delete sin tabla historico propia; el motivo se persiste
+    // como metadata estructural del activity_log.
     await this.auditLog.record({
       usuarioId: adminUsuarioId,
       accion: AccionAuditoria.SKILL_ELIMINADA,
       exito: true,
       recursoTipo: "skill",
       recursoId: skillId,
+      metadata: { motivo },
       ...contexto,
     })
   }
@@ -551,6 +564,343 @@ export class SkillsService {
         moduloId: f.seccion.moduloId,
         tituloSeccion: f.seccion.titulo,
       })),
+    }
+  }
+
+  /**
+   * P3b — preview de cambio de area (D-CAT-16 §preview). No escribe; calcula
+   * el impacto agregando:
+   *  - cursos exigidos directamente por la skill (cursos_skills_exigidas)
+   *  - cursos exigidos por el area actual (cursos_areas_exigidas) — porque al
+   *    mover la skill, deja de heredarse via su area de origen
+   *  - secciones que tienen la skill explicita (secciones_skills)
+   *  - bloques cuya `skill_que_mide_id` es la skill
+   *  - modulos derivados de ambas vias (secciones_skills y bloques)
+   *
+   * NO toca `nota_skill`: la consolidacion de notas se difiere a P7 (deuda
+   * documentada). Aqui solo se reporta el impacto estructural.
+   */
+  async previewCambioArea(
+    skillId: string,
+    areaDestinoId: string,
+  ): Promise<PreviewCambioAreaResponse> {
+    const skill = await this.prisma.skill.findUnique({
+      where: { id: skillId },
+      select: { id: true, areaId: true },
+    })
+    if (!skill) {
+      throw new NotFoundException({
+        code: apiErrorCodes.skillNoEncontrada,
+        message: "Skill no encontrada.",
+      })
+    }
+
+    const areaDestino = await this.prisma.area.findUnique({
+      where: { id: areaDestinoId },
+      select: { id: true },
+    })
+    if (!areaDestino) {
+      throw new NotFoundException({
+        code: apiErrorCodes.areaNoEncontrada,
+        message: "Area destino no encontrada.",
+      })
+    }
+
+    if (skill.areaId === areaDestinoId) {
+      throw new ConflictException({
+        code: apiErrorCodes.skillYaEnAreaDestino,
+        message: "La skill ya pertenece al area destino.",
+      })
+    }
+
+    const impacto = await this.calcularImpactoCambioArea(skillId, skill.areaId)
+    return {
+      skillId,
+      areaActualId: skill.areaId,
+      areaDestinoId,
+      impacto,
+    }
+  }
+
+  private async calcularImpactoCambioArea(
+    skillId: string,
+    areaActualId: string,
+  ): Promise<PreviewCambioAreaResponse["impacto"]> {
+    const [
+      cursosDirectos,
+      cursosPorArea,
+      seccionesConSkill,
+      bloquesConSkill,
+      bloquesAfectados,
+      seccionesAfectadas,
+    ] = await Promise.all([
+      this.prisma.cursoSkillExigida.findMany({
+        where: { skillId },
+        select: { cursoId: true } satisfies Prisma.CursoSkillExigidaSelect,
+      }),
+      this.prisma.cursoAreaExigida.findMany({
+        where: { areaId: areaActualId },
+        select: { cursoId: true } satisfies Prisma.CursoAreaExigidaSelect,
+      }),
+      this.prisma.seccionSkill.findMany({
+        where: { skillId },
+        select: { seccionId: true } satisfies Prisma.SeccionSkillSelect,
+      }),
+      this.prisma.bloque.findMany({
+        where: { skillQueMideId: skillId },
+        select: { seccionId: true } satisfies Prisma.BloqueSelect,
+      }),
+      this.prisma.bloque.count({ where: { skillQueMideId: skillId } }),
+      this.prisma.seccionSkill.count({ where: { skillId } }),
+    ])
+
+    const cursoIds = Array.from(
+      new Set<string>([
+        ...cursosDirectos.map((c) => c.cursoId),
+        ...cursosPorArea.map((c) => c.cursoId),
+      ]),
+    )
+    const seccionIds = Array.from(
+      new Set<string>([
+        ...seccionesConSkill.map((s) => s.seccionId),
+        ...bloquesConSkill.map((b) => b.seccionId),
+      ]),
+    )
+
+    const [cursos, moduloIdsRows] = await Promise.all([
+      cursoIds.length > 0
+        ? this.prisma.curso.findMany({
+            where: { id: { in: cursoIds } },
+            select: { id: true, titulo: true } satisfies Prisma.CursoSelect,
+            orderBy: { titulo: "asc" },
+          })
+        : Promise.resolve([] as { id: string; titulo: string }[]),
+      seccionIds.length > 0
+        ? this.prisma.seccion.findMany({
+            where: { id: { in: seccionIds } },
+            select: { moduloId: true } satisfies Prisma.SeccionSelect,
+          })
+        : Promise.resolve([] as { moduloId: string }[]),
+    ])
+
+    const moduloIds = Array.from(new Set(moduloIdsRows.map((m) => m.moduloId)))
+    const modulos =
+      moduloIds.length > 0
+        ? await this.prisma.modulo.findMany({
+            where: { id: { in: moduloIds } },
+            select: { id: true, titulo: true } satisfies Prisma.ModuloSelect,
+            orderBy: { titulo: "asc" },
+          })
+        : []
+
+    return {
+      cursosAfectados: cursos.map((c) => ({ cursoId: c.id, titulo: c.titulo })),
+      modulosAfectados: modulos.map((m) => ({ moduloId: m.id, titulo: m.titulo })),
+      bloquesAfectados,
+      seccionesAfectadas,
+      totalReferencias: cursoIds.length + seccionesAfectadas + bloquesAfectados,
+    }
+  }
+
+  /**
+   * P3b — aplica el cambio de area de una skill (D-CAT-16). Transaccion
+   * atomica: actualiza `skill.areaId` y deja rastro en
+   * `historico_cambios_area_skill` (tabla con `motivo` not-null desde el
+   * schema base).
+   */
+  async cambiarArea(
+    skillId: string,
+    areaDestinoId: string,
+    motivo: string,
+    adminUsuarioId: string,
+    contexto: ContextoHttpAuditoria = {},
+  ): Promise<SkillResponse> {
+    const skill = await this.prisma.skill.findUnique({
+      where: { id: skillId },
+      select: SELECT_SKILL_FIELDS,
+    })
+    if (!skill) {
+      throw new NotFoundException({
+        code: apiErrorCodes.skillNoEncontrada,
+        message: "Skill no encontrada.",
+      })
+    }
+
+    const areaDestino = await this.prisma.area.findUnique({
+      where: { id: areaDestinoId },
+      select: { id: true },
+    })
+    if (!areaDestino) {
+      throw new NotFoundException({
+        code: apiErrorCodes.areaNoEncontrada,
+        message: "Area destino no encontrada.",
+      })
+    }
+
+    if (skill.areaId === areaDestinoId) {
+      throw new ConflictException({
+        code: apiErrorCodes.skillYaEnAreaDestino,
+        message: "La skill ya pertenece al area destino.",
+      })
+    }
+
+    const areaAnteriorId = skill.areaId
+
+    const actualizada = await this.prisma.$transaction(async (tx) => {
+      const fila = await tx.skill.update({
+        where: { id: skillId },
+        data: { areaId: areaDestinoId },
+        select: SELECT_SKILL_FIELDS,
+      })
+      await tx.historicoCambiosAreaSkill.create({
+        data: {
+          skillId,
+          areaAnteriorId,
+          areaNuevaId: areaDestinoId,
+          autorUsuarioId: adminUsuarioId,
+          motivo,
+        },
+      })
+      return fila
+    })
+
+    await this.auditLog.record({
+      usuarioId: adminUsuarioId,
+      accion: AccionAuditoria.SKILL_CAMBIO_AREA,
+      exito: true,
+      recursoTipo: "skill",
+      recursoId: skillId,
+      metadata: { motivo, areaAnteriorId, areaNuevaId: areaDestinoId },
+      ...contexto,
+    })
+
+    return toSkillResponse(actualizada)
+  }
+
+  /**
+   * P3b — fusion de skills (D-CAT-16 §fusion). La perdedora queda ARCHIVADA y
+   * sus referencias se migran a la ganadora en `seccion_skill`,
+   * `curso_skill_exigida` y `bloque.skill_que_mide_id`. La tabla `nota_skill`
+   * NO se toca: consolidacion deferida a P7 (deuda documentada).
+   *
+   * Tratamiento de duplicados en composite keys: si una seccion / curso ya
+   * referencia ambas skills, primero se borra la referencia de la perdedora
+   * para evitar violar el unique compuesto al hacer el updateMany.
+   */
+  async fusionar(
+    skillGanadoraId: string,
+    skillPerdedoraId: string,
+    motivo: string,
+    adminUsuarioId: string,
+    contexto: ContextoHttpAuditoria = {},
+  ): Promise<FusionSkillsResponse> {
+    if (skillGanadoraId === skillPerdedoraId) {
+      throw new ConflictException({
+        code: apiErrorCodes.invalidBody,
+        message: "skillGanadoraId y skillPerdedoraId deben ser distintos.",
+      })
+    }
+
+    const resultado = await this.prisma.$transaction(async (tx) => {
+      const [ganadora, perdedora] = await Promise.all([
+        tx.skill.findUnique({ where: { id: skillGanadoraId }, select: SELECT_SKILL_FIELDS }),
+        tx.skill.findUnique({ where: { id: skillPerdedoraId }, select: SELECT_SKILL_FIELDS }),
+      ])
+      if (!(ganadora && perdedora)) {
+        throw new NotFoundException({
+          code: apiErrorCodes.skillNoEncontrada,
+          message: "Una o ambas skills no fueron encontradas.",
+        })
+      }
+      if (ganadora.estado !== EstadoSkill.ACTIVA || perdedora.estado !== EstadoSkill.ACTIVA) {
+        throw new ConflictException({
+          code: apiErrorCodes.skillNoActiva,
+          message: "Ambas skills deben estar ACTIVAS para fusionarse.",
+        })
+      }
+
+      // 1) Deduplicar en SeccionSkill: si la seccion ya tiene la ganadora,
+      //    borrar la referencia a la perdedora antes de migrar.
+      const seccionesConGanadora = await tx.seccionSkill.findMany({
+        where: { skillId: skillGanadoraId },
+        select: { seccionId: true },
+      })
+      const seccionesIds = seccionesConGanadora.map((s) => s.seccionId)
+      if (seccionesIds.length > 0) {
+        await tx.seccionSkill.deleteMany({
+          where: { skillId: skillPerdedoraId, seccionId: { in: seccionesIds } },
+        })
+      }
+      const seccionesMigradas = await tx.seccionSkill.updateMany({
+        where: { skillId: skillPerdedoraId },
+        data: { skillId: skillGanadoraId },
+      })
+
+      // 2) Deduplicar en CursoSkillExigida.
+      const cursosConGanadora = await tx.cursoSkillExigida.findMany({
+        where: { skillId: skillGanadoraId },
+        select: { cursoId: true },
+      })
+      const cursosIds = cursosConGanadora.map((c) => c.cursoId)
+      if (cursosIds.length > 0) {
+        await tx.cursoSkillExigida.deleteMany({
+          where: { skillId: skillPerdedoraId, cursoId: { in: cursosIds } },
+        })
+      }
+      const cursosMigrados = await tx.cursoSkillExigida.updateMany({
+        where: { skillId: skillPerdedoraId },
+        data: { skillId: skillGanadoraId },
+      })
+
+      // 3) Bloques: skill_que_mide_id es nullable sin unique compuesto.
+      const bloquesMigrados = await tx.bloque.updateMany({
+        where: { skillQueMideId: skillPerdedoraId },
+        data: { skillQueMideId: skillGanadoraId },
+      })
+
+      // 4) Archivar la perdedora.
+      const perdedoraArchivada = await tx.skill.update({
+        where: { id: skillPerdedoraId },
+        data: { estado: EstadoSkill.ARCHIVADA },
+        select: SELECT_SKILL_FIELDS,
+      })
+
+      // 5) Releer ganadora actualizada (timestamps consistentes).
+      const ganadoraActualizada = await tx.skill.findUniqueOrThrow({
+        where: { id: skillGanadoraId },
+        select: SELECT_SKILL_FIELDS,
+      })
+
+      return {
+        ganadora: ganadoraActualizada,
+        perdedora: perdedoraArchivada,
+        referenciasMigradas: {
+          secciones: seccionesMigradas.count,
+          cursos: cursosMigrados.count,
+          bloques: bloquesMigrados.count,
+        },
+      }
+    })
+
+    await this.auditLog.record({
+      usuarioId: adminUsuarioId,
+      accion: AccionAuditoria.SKILL_FUSIONADA,
+      exito: true,
+      recursoTipo: "skill",
+      recursoId: skillGanadoraId,
+      metadata: {
+        motivo,
+        skillGanadoraId,
+        skillPerdedoraId,
+        referenciasMigradas: resultado.referenciasMigradas,
+      },
+      ...contexto,
+    })
+
+    return {
+      skillGanadora: toSkillResponse(resultado.ganadora),
+      skillPerdedora: toSkillResponse(resultado.perdedora),
+      referenciasMigradas: resultado.referenciasMigradas,
     }
   }
 }

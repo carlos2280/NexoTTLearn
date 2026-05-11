@@ -15,12 +15,18 @@ import {
   Req,
 } from "@nestjs/common"
 import {
+  CambiarAreaSkillInput,
   CrearSkillInput,
+  FusionSkillsResponse,
+  FusionarSkillsInput,
   ListarSkillsQuery,
   Paginated,
+  PreviewCambioAreaResponse,
   RenombrarSkillInput,
   SkillResponse,
+  cambiarAreaSkillSchema,
   crearSkillSchema,
+  fusionarSkillsSchema,
   listarSkillsQuerySchema,
   renombrarSkillSchema,
 } from "@nexott-learn/shared-types"
@@ -175,5 +181,70 @@ export class SkillsController {
   @Roles(RolUsuario.ADMIN)
   async cobertura(@Param("id", ParseUUIDPipe) id: string): Promise<CoberturaSkillResponse> {
     return await this.skillsService.cobertura(id)
+  }
+
+  /**
+   * P3b — preview de cambio de area (D-CAT-16). Solo lectura: no audita ni
+   * persiste. No requiere `X-Motivo` porque no muta estado.
+   */
+  @Post(":id/preview-cambio-area")
+  @Roles(RolUsuario.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async previewCambioArea(
+    @Param("id", ParseUUIDPipe) skillId: string,
+    @Body(new ZodValidationPipe(cambiarAreaSkillSchema)) input: CambiarAreaSkillInput,
+  ): Promise<PreviewCambioAreaResponse> {
+    return await this.skillsService.previewCambioArea(skillId, input.areaDestinoId)
+  }
+
+  @Post(":id/area")
+  @Roles(RolUsuario.ADMIN)
+  @RequiereMotivo()
+  @HttpCode(HttpStatus.OK)
+  async cambiarArea(
+    @Param("id", ParseUUIDPipe) skillId: string,
+    @Body(new ZodValidationPipe(cambiarAreaSkillSchema)) input: CambiarAreaSkillInput,
+    @Motivo() motivo: string | undefined,
+    @CurrentUser() admin: SesionUsuario | undefined,
+    @Req() req: Request,
+  ): Promise<SkillResponse> {
+    if (!admin) {
+      throw new InternalServerErrorException({
+        code: apiErrorCodes.errorInterno,
+        message: "Sesion invalida tras pasar guards.",
+      })
+    }
+    return await this.skillsService.cambiarArea(
+      skillId,
+      input.areaDestinoId,
+      motivo ?? "",
+      admin.usuarioId,
+      extractContextoHttp(req),
+    )
+  }
+
+  @Post("fusionar")
+  @Roles(RolUsuario.ADMIN)
+  @RequiereMotivo()
+  @HttpCode(HttpStatus.OK)
+  async fusionar(
+    @Body(new ZodValidationPipe(fusionarSkillsSchema)) input: FusionarSkillsInput,
+    @Motivo() motivo: string | undefined,
+    @CurrentUser() admin: SesionUsuario | undefined,
+    @Req() req: Request,
+  ): Promise<FusionSkillsResponse> {
+    if (!admin) {
+      throw new InternalServerErrorException({
+        code: apiErrorCodes.errorInterno,
+        message: "Sesion invalida tras pasar guards.",
+      })
+    }
+    return await this.skillsService.fusionar(
+      input.skillGanadoraId,
+      input.skillPerdedoraId,
+      motivo ?? "",
+      admin.usuarioId,
+      extractContextoHttp(req),
+    )
   }
 }

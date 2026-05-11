@@ -29,16 +29,23 @@ export { crearAreaSchema, actualizarAreaSchema } from "./catalogo/areas/area.sch
 export type { CrearAreaInput, ActualizarAreaInput } from "./catalogo/areas/area.schema"
 export { listarSkillsQuerySchema, estadoSkillSchema } from "./catalogo/skills/listar-skills.schema"
 export type { ListarSkillsQuery, EstadoSkill } from "./catalogo/skills/listar-skills.schema"
-export type { SkillResponse } from "./catalogo/skills/skill-response"
+export type { SkillResponse, FusionSkillsResponse } from "./catalogo/skills/skill-response"
 export {
   crearSkillSchema,
   renombrarSkillSchema,
   skillDuplicadaCandidataSchema,
+  cambiarAreaSkillSchema,
+  fusionarSkillsSchema,
 } from "./catalogo/skills/skill.schema"
 export type {
   CrearSkillInput,
   RenombrarSkillInput,
   SkillDuplicadaCandidata,
+  CambiarAreaSkillInput,
+  FusionarSkillsInput,
+  ImpactoCambioAreaSkill,
+  PreviewCambioAreaResponse,
+  ReferenciasMigradasFusion,
 } from "./catalogo/skills/skill.schema"
 export {
   listarModulosQuerySchema,

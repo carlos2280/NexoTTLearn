@@ -47,6 +47,9 @@ export const apiErrorCodes = {
   conflictSkillYaArchivada: "CONFLICT_SKILL_YA_ARCHIVADA",
   conflictSkillYaActiva: "CONFLICT_SKILL_YA_ACTIVA",
   conflictSkillConReferencias: "CONFLICT_SKILL_CON_REFERENCIAS",
+  // Catalogo-admin P3b — cambio de area y fusion de skills.
+  skillYaEnAreaDestino: "SKILL_YA_EN_AREA_DESTINO",
+  skillNoActiva: "SKILL_NO_ACTIVA",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]

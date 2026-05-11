@@ -1,4 +1,4 @@
-import { AccionAuditoria } from "@prisma/client"
+import { AccionAuditoria, Prisma } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { PrismaService } from "../prisma/prisma.service"
 import { AuditLogService } from "./audit-log.service"
@@ -48,6 +48,7 @@ describe("AuditLogService.record", () => {
         ip: "127.0.0.1",
         userAgent: "vitest",
         requestId: "req-1",
+        metadata: Prisma.JsonNull,
       },
     })
   })
@@ -69,6 +70,32 @@ describe("AuditLogService.record", () => {
         ip: null,
         userAgent: null,
         requestId: null,
+        metadata: Prisma.JsonNull,
+      },
+    })
+  })
+
+  it("metadata estructural se persiste cuando se proporciona", async () => {
+    await service.record({
+      usuarioId: "usr-1",
+      accion: AccionAuditoria.SKILL_ARCHIVADA,
+      exito: true,
+      recursoTipo: "skill",
+      recursoId: "skill-1",
+      metadata: { motivo: "obsoleta", origen: "panel-admin" },
+    })
+
+    expect(prisma.activityLog.create).toHaveBeenCalledWith({
+      data: {
+        usuarioId: "usr-1",
+        accion: AccionAuditoria.SKILL_ARCHIVADA,
+        exito: true,
+        recursoTipo: "skill",
+        recursoId: "skill-1",
+        ip: null,
+        userAgent: null,
+        requestId: null,
+        metadata: { motivo: "obsoleta", origen: "panel-admin" },
       },
     })
   })
