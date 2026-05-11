@@ -36,12 +36,17 @@ export function AdminTopbar({ sidebarColapsado, onAlternarSidebar }: AdminTopbar
       </span>
       <div className="ml-auto flex items-center gap-2">
         {usuario ? (
-          <div className="flex items-center gap-2 rounded-pill border border-border bg-subtle py-1 pr-3 pl-1">
+          <button
+            type="button"
+            onClick={() => navigate(RUTAS.cuenta)}
+            aria-label="Ir a mi cuenta"
+            className="flex items-center gap-2 rounded-pill border border-border bg-subtle py-1 pr-3 pl-1 transition-colors duration-fast ease-default hover:bg-subtle/60 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+          >
             <AvatarIniciales nombre={usuario.nombre} tamano="sm" />
             <span className="hidden text-body-sm text-text-primary sm:inline">
               {usuario.nombre}
             </span>
-          </div>
+          </button>
         ) : null}
         <Button
           variant="ghost"

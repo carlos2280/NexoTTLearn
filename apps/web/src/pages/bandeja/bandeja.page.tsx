@@ -22,10 +22,17 @@ export function BandejaPage() {
         <Wordmark variant="full" />
         <div className="flex items-center gap-2 sm:gap-3">
           {usuario ? (
-            <span className="hidden text-body-sm text-text-secondary sm:inline">
+            <button
+              type="button"
+              onClick={() => navigate(RUTAS.cuenta)}
+              className="hidden text-body-sm text-text-secondary transition-colors duration-fast hover:text-text-primary focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 sm:inline"
+            >
               {usuario.nombre}
-            </span>
+            </button>
           ) : null}
+          <Button variant="ghost" size="sm" onClick={() => navigate(RUTAS.cuenta)}>
+            Mi cuenta
+          </Button>
           <Button variant="ghost" size="sm" onClick={() => navigate(RUTAS.logout)}>
             Cerrar sesión
           </Button>

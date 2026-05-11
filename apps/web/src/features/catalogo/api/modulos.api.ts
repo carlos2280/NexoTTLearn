@@ -24,6 +24,10 @@ export function listarModulos(query: ListarModulosQuery): Promise<Paginated<Modu
   return httpClient.get<Paginated<ModuloResponse>>(`/catalogo/modulos${buildQueryString(query)}`)
 }
 
+export function obtenerModulo(id: string): Promise<ModuloResponse> {
+  return httpClient.get<ModuloResponse>(`/catalogo/modulos/${id}`)
+}
+
 export function crearModulo(input: CrearModuloInput): Promise<ModuloResponse> {
   return httpClient.post<ModuloResponse>("/catalogo/modulos", input)
 }

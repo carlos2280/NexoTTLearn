@@ -1,8 +1,12 @@
 import { AdminShell } from "@/features/admin/layout/components/admin-shell"
 import { CatalogoPage } from "@/pages/admin/catalogo/catalogo.page"
+import { ModuloDetallePage } from "@/pages/admin/catalogo/modulo-detalle/modulo-detalle.page"
+import { CursoDetallePage } from "@/pages/admin/cursos/curso-detalle.page"
+import { CursosPage } from "@/pages/admin/cursos/cursos.page"
 import { InicioPage } from "@/pages/admin/inicio/inicio.page"
 import { ProximamentePage } from "@/pages/admin/proximamente/proximamente.page"
 import { BandejaPage } from "@/pages/bandeja/bandeja.page"
+import { CuentaPage } from "@/pages/cuenta/cuenta.page"
 import { LoginPage } from "@/pages/login/login.page"
 import { LogoutPage } from "@/pages/logout/logout.page"
 import { RUTAS } from "@/shared/constants/rutas"
@@ -10,7 +14,7 @@ import { Navigate, Route, Routes } from "react-router-dom"
 import { GuardRol } from "./guard-rol"
 import { GuardSesion } from "./guard-sesion"
 
-const SEGMENTOS_ADMIN: readonly string[] = ["cursos", "personas", "clientes", "reportes", "sistema"]
+const SEGMENTOS_ADMIN: readonly string[] = ["personas", "clientes", "reportes", "sistema"]
 
 export function AppRoutes() {
   return (
@@ -26,6 +30,16 @@ export function AppRoutes() {
         }
       />
       <Route
+        path={RUTAS.cuenta}
+        element={
+          <GuardSesion>
+            <div className="min-h-full bg-bg px-6 py-10">
+              <CuentaPage />
+            </div>
+          </GuardSesion>
+        }
+      />
+      <Route
         path={RUTAS.admin.inicio}
         element={
           <GuardSesion>
@@ -37,6 +51,9 @@ export function AppRoutes() {
       >
         <Route index={true} element={<InicioPage />} />
         <Route path="catalogo" element={<CatalogoPage />} />
+        <Route path="catalogo/modulos/:moduloId" element={<ModuloDetallePage />} />
+        <Route path="cursos" element={<CursosPage />} />
+        <Route path="cursos/:cursoId" element={<CursoDetallePage />} />
         {SEGMENTOS_ADMIN.map((segmento) => (
           <Route key={segmento} path={segmento} element={<ProximamentePage />} />
         ))}

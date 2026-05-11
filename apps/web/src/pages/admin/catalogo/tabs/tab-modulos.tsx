@@ -5,9 +5,11 @@ import { MenuAcciones } from "@/shared/components/ui/menu-acciones"
 import { Pagination } from "@/shared/components/ui/pagination"
 import { SearchField } from "@/shared/components/ui/search-field"
 import { Select } from "@/shared/components/ui/select"
+import { RUTAS } from "@/shared/constants/rutas"
 import type { EstadoModulo } from "@nexott-learn/shared-types"
 import { Library, Plus } from "lucide-react"
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { accionesPorModulo } from "./modulos-acciones-menu"
 import { COLUMNAS_MODULOS } from "./modulos-columnas"
 import { ModulosDialogos } from "./modulos-dialogos"
@@ -28,6 +30,7 @@ export function TabModulos() {
     estado: estadoFiltro === "TODOS" ? undefined : estadoFiltro,
   })
   const orq = useModulosOrquestacion()
+  const navigate = useNavigate()
 
   return (
     <div className="flex flex-col gap-4">
@@ -69,6 +72,7 @@ export function TabModulos() {
         vacioIcono={Library}
         vacioTitulo="Aún no hay módulos"
         vacioDescripcion="Crea el primer módulo y empieza a estructurar el aprendizaje."
+        onClickFila={(m) => navigate(RUTAS.admin.catalogoModuloDetalle(m.id))}
         accionFila={(m) => (
           <MenuAcciones
             etiquetaAria={`Acciones de ${m.titulo}`}
