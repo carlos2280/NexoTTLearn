@@ -879,6 +879,54 @@ describe("AsignacionesService.reabrirCaso", () => {
       }),
     ).rejects.toMatchObject({ response: { code: apiErrorCodes.conflictAsignacionNoCerrada } })
   })
+
+  it("replay con misma Idempotency-Key tras exito devuelve cache (no 409) aunque estado ya transiciono", async () => {
+    // Regresion FIX-P6b: antes la validacion `esCerrado` estaba FUERA del
+    // `runOnce`, lo que hacia que un cliente legitimo reintentando con misma
+    // key recibiera 409 espurio (estado ya era EN_PROGRESO tras el primer exito).
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: "EN_PROGRESO",
+      estadoVoluntario: null,
+    })
+    const cached = { id: ASIGNACION_ID, estadoAsignado: "EN_PROGRESO" } as unknown as Asignacion
+    idempotency.runOnce.mockResolvedValueOnce({ status: 200, body: cached, replay: true })
+
+    const res = await service.reabrirCaso({
+      asignacionId: ASIGNACION_ID,
+      motivo: "reintento",
+      idempotencyKey: idempKey,
+      autorUsuarioId: ADMIN_ID,
+    })
+    expect(res.nuevo).toBe(false)
+    expect(res.asignacion).toBe(cached)
+    expect(prisma.asignacionCurso.updateMany).not.toHaveBeenCalled()
+    expect(prisma.historicoEstadoAsignacion.create).not.toHaveBeenCalled()
+  })
+
+  it("409 conflictAsignacionNoCerrada se lanza DENTRO del ejecutor sin tocar updateMany", async () => {
+    // Verifica que la validacion `esCerrado` esta dentro del callback de
+    // `runOnce` (FIX-P6b): el corto-circuito ocurre antes de cualquier
+    // updateMany cuando el estado no es cerrado.
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.VOLUNTARIO,
+      estadoAsignado: null,
+      estadoVoluntario: "EN_PROGRESO",
+    })
+    await expect(
+      service.reabrirCaso({
+        asignacionId: ASIGNACION_ID,
+        motivo: "x",
+        idempotencyKey: idempKey,
+        autorUsuarioId: ADMIN_ID,
+      }),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.conflictAsignacionNoCerrada } })
+    expect(idempotency.runOnce).toHaveBeenCalledTimes(1)
+    expect(prisma.asignacionCurso.updateMany).not.toHaveBeenCalled()
+    expect(prisma.historicoEstadoAsignacion.create).not.toHaveBeenCalled()
+  })
 })
 
 describe("AsignacionesService.retirar", () => {

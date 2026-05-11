@@ -581,6 +581,41 @@ describe.runIf(RUN_E2E)("asignaciones transiciones e2e (P6b)", () => {
     expect((res.body as { code: string }).code).toBe("CONFLICT_ASIGNACION_NO_CERRADA")
   })
 
+  it("reabrir-caso replay idempotente: misma Idempotency-Key tras exito devuelve mismo 200 cacheado", async () => {
+    await limpiarAsignacionesDelCurso(cursoSimpleId)
+    const asignacionId = await seedAsignado(colaboradorPart1Id, cursoSimpleId)
+    await prisma.asignacionCurso.update({
+      where: { id: asignacionId },
+      data: { estadoAsignado: "APTO", fechaCierre: new Date() },
+    })
+    const key = randomUUID()
+    const motivo = "Cliente solicito revisar"
+
+    const r1 = await agenteAdmin
+      .post(`/api/v1/asignaciones/${asignacionId}/reabrir-caso`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .set("X-Motivo", motivo)
+      .set("Idempotency-Key", key)
+      .send({})
+    expect(r1.status).toBe(200)
+    expect((r1.body as { estadoAsignado: string }).estadoAsignado).toBe("EN_PROGRESO")
+
+    const r2 = await agenteAdmin
+      .post(`/api/v1/asignaciones/${asignacionId}/reabrir-caso`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .set("X-Motivo", motivo)
+      .set("Idempotency-Key", key)
+      .send({})
+    expect(r2.status).toBe(200)
+    expect(r2.body).toEqual(r1.body)
+
+    // El replay no crea histórico nuevo: solo la 1.ª llamada lo escribió.
+    const historicoCount = await prisma.historicoEstadoAsignacion.count({
+      where: { asignacionId, estadoNuevo: "ASIGNADO:EN_PROGRESO" },
+    })
+    expect(historicoCount).toBe(1)
+  })
+
   // ===== retirar =====
 
   it("retirar con X-Motivo: 200 estadoAsignado=RETIRADO", async () => {

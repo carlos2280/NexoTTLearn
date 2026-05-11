@@ -31,6 +31,7 @@ import {
   HISTORICO_LITERAL_ASIGNADO_ASIGNADO,
   SELECT_ASIGNACION_DETALLE_FIELDS,
   SELECT_ASIGNACION_FIELDS,
+  esEstadoCerradoParaReabrir,
   evaluarCondicionesListo,
   literalEstado,
   toAsignacion,
@@ -811,16 +812,12 @@ export class AsignacionesService {
       })
     }
 
-    const esCerrado =
-      (previa.rol === RolAsignacion.ASIGNADO &&
-        (previa.estadoAsignado === "APTO" || previa.estadoAsignado === "NO_APTO")) ||
-      (previa.rol === RolAsignacion.VOLUNTARIO && previa.estadoVoluntario === "COMPLETADO")
-    if (!esCerrado) {
-      throw new ConflictException({
-        code: apiErrorCodes.conflictAsignacionNoCerrada,
-        message: "Solo se puede reabrir un caso cerrado (APTO/NO_APTO/COMPLETADO).",
-      })
-    }
+    // La validacion de estado origen se hace DENTRO de `runOnce` para que el
+    // replay idempotente (misma key, mismo body) devuelva el cache aunque el
+    // estado ya haya transicionado a EN_PROGRESO. El primer writer obtiene el
+    // guard race-safe via `updateMany WHERE id AND estado IN (APTO,NO_APTO,COMPLETADO)`;
+    // un segundo cliente NO idempotente con el estado destino recibe 409 al
+    // verificar el `count===0` del updateMany.
 
     const ejecucion = await this.idempotency.runOnce<Asignacion>({
       scope: IDEMPOTENCY_SCOPE_REABRIR,
@@ -828,6 +825,13 @@ export class AsignacionesService {
       usuarioId: input.autorUsuarioId,
       requestPayload: { asignacionId: input.asignacionId },
       ejecutor: async (tx) => {
+        if (!esEstadoCerradoParaReabrir(previa)) {
+          throw new ConflictException({
+            code: apiErrorCodes.conflictAsignacionNoCerrada,
+            message: "Solo se puede reabrir un caso cerrado (APTO/NO_APTO/COMPLETADO).",
+          })
+        }
+
         const estadoAnterior = literalEstado(
           previa.rol,
           previa.estadoAsignado,

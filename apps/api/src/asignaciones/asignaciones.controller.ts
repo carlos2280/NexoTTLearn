@@ -42,6 +42,7 @@ import { Roles } from "../common/decorators/roles.decorator"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { ZodValidationPipe } from "../common/pipes/zod-validation.pipe"
 import { SesionUsuario } from "../common/types/sesion.types"
+import { HISTORICO_LITERAL_ASIGNADO_ASIGNADO } from "./asignaciones.helpers"
 import { AsignacionesService } from "./asignaciones.service"
 
 const idempotencyKeyUuidSchema = z.string().uuid()
@@ -161,7 +162,7 @@ export class AsignacionesController {
       metadata: {
         cursoId: respuesta.cursoId,
         colaboradorId: respuesta.colaboradorId,
-        estadoNuevo: "ASIGNADO:ASIGNADO",
+        estadoNuevo: HISTORICO_LITERAL_ASIGNADO_ASIGNADO,
       },
       ...extractContextoHttp(req),
     })

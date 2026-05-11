@@ -34,6 +34,23 @@ export function literalEstado(
 }
 
 /**
+ * Predicado de "estado cerrado" para `reabrirCaso`: cierra ASIGNADO en
+ * `APTO`/`NO_APTO` y VOLUNTARIO en `COMPLETADO` (cap. 12.5). Extraido como
+ * helper para mantener el ejecutor de `runOnce` por debajo del umbral de
+ * complejidad cognitiva (Biome `noExcessiveCognitiveComplexity`).
+ */
+export function esEstadoCerradoParaReabrir(previa: {
+  readonly rol: RolAsignacion
+  readonly estadoAsignado: EstadoAsignado | null
+  readonly estadoVoluntario: EstadoVoluntario | null
+}): boolean {
+  if (previa.rol === "ASIGNADO") {
+    return previa.estadoAsignado === "APTO" || previa.estadoAsignado === "NO_APTO"
+  }
+  return previa.estadoVoluntario === "COMPLETADO"
+}
+
+/**
  * D-AS-10 — Evalua las condiciones de cap. 12.3 para pasar a `LISTO`.
  *
  * En S6 con S7/S8/S9 ausentes:
