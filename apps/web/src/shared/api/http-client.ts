@@ -4,6 +4,20 @@ import { mockHandle } from "./mocks/router"
 const BASE_URL = (import.meta.env.VITE_API_URL ?? "/api/v1") as string
 const USE_MOCKS = (import.meta.env.VITE_USE_MOCKS ?? "true") === "true"
 
+export const EVENTO_NO_AUTORIZADO = "nexott:unauthorized"
+
+const RUTAS_DONDE_401_ES_ESPERADO: readonly string[] = ["/auth/login", "/auth/mfa/verify"]
+
+function emitirNoAutorizado(path: string): void {
+  if (typeof window === "undefined") {
+    return
+  }
+  if (RUTAS_DONDE_401_ES_ESPERADO.some((r) => path.startsWith(r))) {
+    return
+  }
+  window.dispatchEvent(new CustomEvent(EVENTO_NO_AUTORIZADO))
+}
+
 interface RequestOptions {
   readonly signal?: AbortSignal
   readonly idempotencyKey?: string
@@ -80,6 +94,9 @@ async function request<T>(
       message?: string
       details?: unknown
     }
+    if (response.status === 401) {
+      emitirNoAutorizado(path)
+    }
     throw new ApiError(
       response.status,
       errorData.code ?? "UNKNOWN_ERROR",
@@ -100,6 +117,6 @@ export const httpClient = {
     request<T>("PUT", path, body, options),
   patch: <T>(path: string, body: unknown, options?: RequestOptions): Promise<T> =>
     request<T>("PATCH", path, body, options),
-  delete: <T>(path: string, options?: RequestOptions): Promise<T> =>
-    request<T>("DELETE", path, undefined, options),
+  delete: <T>(path: string, options?: RequestOptions & { readonly body?: unknown }): Promise<T> =>
+    request<T>("DELETE", path, options?.body, options),
 }
