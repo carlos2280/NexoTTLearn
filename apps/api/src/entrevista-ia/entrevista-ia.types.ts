@@ -3,20 +3,23 @@ import { Prisma } from "@prisma/client"
 /**
  * Selects explicitos del modulo `entrevista-ia` (P8c — D-S8-D1..D6).
  *
- * El schema actual no tiene columnas `estado`, `fecha_finalizacion` ni
- * `secciones_base_snapshot` JSONB en `intentos_entrevista_ia`. La decision
- * emergente D-EMERG-P8c-1 (documentada en el reporte) congela snapshots y
- * estado interno dentro de `transcripcionOLog` (JSONB existente).
+ * FIX-P8-cierre §5.119: el schema ya tiene columnas dedicadas para `estado`,
+ * `fechaFinalizacion` y `seccionesBaseSnapshot`. La SoT pasa a las columnas;
+ * `transcripcionOLog` mantiene la duplicacion temporalmente como sombra
+ * (eliminacion de la duplicacion = deuda separada fuera del cierre).
  */
 export const SELECT_INTENTO_ENTREVISTA_FIELDS = {
   id: true,
   entrevistaIaId: true,
   colaboradorId: true,
   fecha: true,
+  fechaFinalizacion: true,
+  estado: true,
   notaGlobal: true,
   aprobado: true,
   transcripcionOLog: true,
   rubricaSnapshot: true,
+  seccionesBaseSnapshot: true,
   notaAjustadaAdmin: true,
   anulado: true,
   motivoAjusteOAnulacion: true,
@@ -41,8 +44,10 @@ export type IntentoEntrevistaSeleccionado = Prisma.IntentoEntrevistaIAGetPayload
 
 /**
  * Estructura persistida en `intentos_entrevista_ia.transcripcion_o_log`.
- * Incluye estado interno + snapshots ademas de los turnos para que el flujo
- * de la entrevista sea autocontenido sin DDL adicional (D-EMERG-P8c-1).
+ * Mantenemos `estado`/`fechaFinalizacion`/`seccionesBaseSnapshot` aqui como
+ * sombra de las columnas dedicadas (§5.119) para compatibilidad con la lectura
+ * actual y para que el flujo de la entrevista pueda inspeccionar el snapshot
+ * de areas sin volver a leer la fila.
  */
 export interface TranscripcionInterna {
   readonly estado: "EN_PROGRESO" | "FINALIZADO"

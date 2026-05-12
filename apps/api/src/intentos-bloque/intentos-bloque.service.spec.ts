@@ -18,6 +18,7 @@ import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
 import type { SesionUsuario } from "../common/types/sesion.types"
+import { NotaSkillService } from "../nota-skill/nota-skill.service"
 import { IntentosBloqueService } from "./intentos-bloque.service"
 
 const COLABORADOR_ID = "f0000000-0000-0000-0000-000000000001"
@@ -204,6 +205,7 @@ function configurarBloqueOk(prisma: MockPrisma): void {
 
 let prisma: MockPrisma
 let idempotency: { runOnce: ReturnType<typeof vi.fn> }
+let notaSkill: { recalcularConFuentes: ReturnType<typeof vi.fn> }
 let service: IntentosBloqueService
 let moduleRef: TestingModule
 
@@ -217,15 +219,20 @@ beforeEach(async () => {
       },
     ),
   }
+  notaSkill = {
+    recalcularConFuentes: vi.fn().mockResolvedValue({ notaActual: null }),
+  }
   moduleRef = await Test.createTestingModule({
     providers: [
       {
         provide: IntentosBloqueService,
-        useFactory: (p: PrismaService, i: IdempotencyService) => new IntentosBloqueService(p, i),
-        inject: [PrismaService, IdempotencyService],
+        useFactory: (p: PrismaService, i: IdempotencyService, n: NotaSkillService) =>
+          new IntentosBloqueService(p, i, n),
+        inject: [PrismaService, IdempotencyService, NotaSkillService],
       },
       { provide: PrismaService, useValue: prisma },
       { provide: IdempotencyService, useValue: idempotency },
+      { provide: NotaSkillService, useValue: notaSkill },
     ],
   }).compile()
   service = moduleRef.get(IntentosBloqueService)
@@ -561,14 +568,12 @@ describe("IntentosBloqueService.crear — mejor intento y NotaSkill", () => {
     )
   })
 
-  it("upsert de NotaSkill con promedio sobre mejores vigentes", async () => {
+  it("delega el calculo de NotaSkill al motor unificado recalcularConFuentes", async () => {
+    // FIX-P8-cierre §5.115: el service ya no escribe `notaActual` directo; el
+    // calculo D33 (70/20/10 + D35) lo hace `NotaSkillService.recalcularConFuentes`.
     configurarBloqueOk(prisma)
     prisma.intentoBloque.create.mockResolvedValue(makeIntento({ nota: 100, id: "nuevo" }))
     prisma.intentoBloque.findFirst.mockResolvedValue(null)
-    prisma.intentoBloque.findMany.mockResolvedValue([
-      { nota: new Prisma.Decimal(80) },
-      { nota: new Prisma.Decimal(100) },
-    ])
     prisma.intentoBloque.findUniqueOrThrow.mockResolvedValue(
       makeIntento({ nota: 100, esMejorIntento: true }),
     )
@@ -577,8 +582,16 @@ describe("IntentosBloqueService.crear — mejor intento y NotaSkill", () => {
       idempotencyKey: IDEMPOTENCY_KEY,
       usuario: PARTICIPANTE,
     })
-    expect(prisma.notaSkill.upsert).toHaveBeenCalled()
-    expect(prisma.historicoNotaSkill.create).toHaveBeenCalled()
+    expect(notaSkill.recalcularConFuentes).toHaveBeenCalledWith(
+      prisma,
+      expect.objectContaining({
+        colaboradorId: COLABORADOR_ID,
+        skillId: SKILL_ID,
+        cursoId: CURSO_ID,
+        origen: "BLOQUE",
+        referencia: expect.objectContaining({ evento: "CREADO" }),
+      }),
+    )
   })
 })
 
@@ -695,6 +708,7 @@ describe("IntentosBloqueService.invalidar", () => {
       id: INTENTO_ID,
       colaboradorId: COLABORADOR_ID,
       bloqueId: BLOQUE_ID,
+      cursoId: CURSO_ID,
       esMejorIntento: true,
       estaInvalidado: false,
       bloque: { skillQueMideId: SKILL_ID, version: 1 },
@@ -715,25 +729,41 @@ describe("IntentosBloqueService.invalidar", () => {
         }),
       ]),
     )
-    expect(prisma.notaSkill.upsert).toHaveBeenCalled()
+    expect(notaSkill.recalcularConFuentes).toHaveBeenCalledWith(
+      prisma,
+      expect.objectContaining({
+        colaboradorId: COLABORADOR_ID,
+        skillId: SKILL_ID,
+        cursoId: CURSO_ID,
+        origen: "BLOQUE",
+        referencia: expect.objectContaining({ evento: "INVALIDADO" }),
+      }),
+    )
   })
 
-  it("invalidar mejor intento sin otros vigentes -> NotaSkill.notaActual=null", async () => {
+  it("invalidar mejor intento sin otros vigentes delega al motor con evento INVALIDADO", async () => {
+    // FIX-P8-cierre §5.115: la verificacion de `notaActual=null` es ahora
+    // responsabilidad del motor; aqui solo confirmamos que se delega con la
+    // referencia correcta.
     prisma.intentoBloque.findUnique.mockResolvedValue({
       id: INTENTO_ID,
       colaboradorId: COLABORADOR_ID,
       bloqueId: BLOQUE_ID,
+      cursoId: CURSO_ID,
       esMejorIntento: true,
       estaInvalidado: false,
       bloque: { skillQueMideId: SKILL_ID, version: 1 },
     })
-    prisma.intentoBloque.findFirst.mockResolvedValue(null) // no hay otros
-    prisma.intentoBloque.findMany.mockResolvedValue([])
+    prisma.intentoBloque.findFirst.mockResolvedValue(null)
     prisma.intentoBloque.findUniqueOrThrow.mockResolvedValue(makeIntento({ estaInvalidado: true }))
     await service.invalidar({ intentoId: INTENTO_ID, motivo: "ajuste manual" })
-    expect(prisma.notaSkill.upsert).toHaveBeenCalledWith(
+    expect(notaSkill.recalcularConFuentes).toHaveBeenCalledWith(
+      prisma,
       expect.objectContaining({
-        update: expect.objectContaining({ notaActual: null }),
+        skillId: SKILL_ID,
+        cursoId: CURSO_ID,
+        origen: "BLOQUE",
+        referencia: expect.objectContaining({ evento: "INVALIDADO" }),
       }),
     )
   })

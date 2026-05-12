@@ -319,6 +319,7 @@ enum AccionAuditoria {
   INTENTO_TRANSVERSAL_CREADO
   INTENTO_TRANSVERSAL_FINALIZADO
   INTENTO_TRANSVERSAL_ANULADO
+  INTENTO_TRANSVERSAL_CAPA_CARGADA
   TRANSVERSAL_SKILLS_ACTUALIZADAS
   INTENTO_ENTREVISTA_IA_CREADO
   INTENTO_ENTREVISTA_IA_FINALIZADO
@@ -326,6 +327,14 @@ enum AccionAuditoria {
   INTENTO_ENTREVISTA_IA_ANULADO
 
   @@map("accion_auditoria_enum")
+}
+
+enum IntentoEntrevistaIaEstado {
+  EN_PROGRESO
+  FINALIZADO
+  ANULADO
+
+  @@map("intento_entrevista_ia_estado_enum")
 }
 
 enum EstadoIntentoTransversal {
@@ -527,6 +536,12 @@ model Cliente {
   @@map("clientes")
 }
 
+/// Curso del catalogo. La FK `transversalId` (1-1 opcional) materializa el lado
+/// `Curso -> ProyectoTransversal`. La FK inversa logica `proyectos_transversales.
+/// curso_id @unique` se mantiene como double-side por compatibilidad con seeders
+/// e2e existentes (D-S8-A2, §5.110). Consolidar en una sola direccion queda
+/// diferido al rediseno de cursos cerrados (Slice 11/12) — el coste de
+/// migracion supera hoy el beneficio.
 model Curso {
   id                     String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   titulo                 String
@@ -952,6 +967,10 @@ model IntentoBloque {
 // PROYECTOS TRANSVERSALES
 // =============================================================================
 
+/// `ProyectoTransversal` mantiene `cursoId @unique` (relacion double-side con
+/// `Curso.transversalId @unique`). La asimetria deliberada permite seeders e2e
+/// que crean primero el transversal y despues el curso (D-S8-A2, §5.110).
+/// Consolidacion diferida al Slice 11/12 (rediseno cursos cerrados).
 model ProyectoTransversal {
   id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   cursoId               String   @unique @map("curso_id") @db.Uuid
@@ -990,6 +1009,7 @@ model IntentoTransversal {
   transversalId         String                   @map("transversal_id") @db.Uuid
   colaboradorId         String                   @map("colaborador_id") @db.Uuid
   fecha                 DateTime                 @default(now()) @db.Timestamptz(6)
+  fechaFinalizacion     DateTime?                @map("fecha_finalizacion") @db.Timestamptz(6)
   nota                  Decimal?                 @db.Decimal(5, 2)
   aprobado              Boolean?
   repoOArtefacto        Json                     @default("{}") @map("repo_o_artefacto") @db.JsonB
@@ -1049,17 +1069,20 @@ model RubricaEntrevistaIA {
 }
 
 model IntentoEntrevistaIA {
-  id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  entrevistaIaId         String   @map("entrevista_ia_id") @db.Uuid
-  colaboradorId          String   @map("colaborador_id") @db.Uuid
-  fecha                  DateTime @default(now()) @db.Timestamptz(6)
-  notaGlobal             Decimal  @map("nota_global") @db.Decimal(5, 2)
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entrevistaIaId         String                   @map("entrevista_ia_id") @db.Uuid
+  colaboradorId          String                   @map("colaborador_id") @db.Uuid
+  fecha                  DateTime                 @default(now()) @db.Timestamptz(6)
+  fechaFinalizacion      DateTime?                @map("fecha_finalizacion") @db.Timestamptz(6)
+  estado                 IntentoEntrevistaIaEstado @default(EN_PROGRESO)
+  notaGlobal             Decimal                  @map("nota_global") @db.Decimal(5, 2)
   aprobado               Boolean
-  transcripcionOLog      Json     @default("{}") @map("transcripcion_o_log") @db.JsonB
-  rubricaSnapshot        Json     @default("{}") @map("rubrica_snapshot") @db.JsonB
-  notaAjustadaAdmin      Decimal? @map("nota_ajustada_admin") @db.Decimal(5, 2)
-  anulado                Boolean  @default(false)
-  motivoAjusteOAnulacion String?  @map("motivo_ajuste_o_anulacion")
+  transcripcionOLog      Json                     @default("{}") @map("transcripcion_o_log") @db.JsonB
+  rubricaSnapshot        Json                     @default("{}") @map("rubrica_snapshot") @db.JsonB
+  seccionesBaseSnapshot  Json?                    @map("secciones_base_snapshot") @db.JsonB
+  notaAjustadaAdmin      Decimal?                 @map("nota_ajustada_admin") @db.Decimal(5, 2)
+  anulado                Boolean                  @default(false)
+  motivoAjusteOAnulacion String?                  @map("motivo_ajuste_o_anulacion")
 
   entrevistaIA  EntrevistaIA                     @relation(fields: [entrevistaIaId], references: [id], onDelete: Restrict)
   colaborador   Colaborador                      @relation(fields: [colaboradorId], references: [id], onDelete: Restrict)
@@ -1067,6 +1090,7 @@ model IntentoEntrevistaIA {
   seccionesBase IntentoEntrevistaIASeccionBase[]
 
   @@index([entrevistaIaId, colaboradorId, fecha(sort: Desc)], map: "idx_intentos_eia_colab")
+  @@index([estado], map: "idx_intentos_entrevista_ia_estado")
   @@map("intentos_entrevista_ia")
 }
 

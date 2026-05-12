@@ -296,6 +296,9 @@ export class NotaSkillService {
       return []
     }
     const areaId = skill.areaId
+    // §5.119: leemos `estado` directo de la columna dedicada (cierre P8c).
+    // El orden privilegia `fechaFinalizacion` (evento real); fallback a `fecha`
+    // cuando aun no se finalizo.
     const intentos = await tx.intentoEntrevistaIA.findMany({
       where: {
         entrevistaIaId: input.entrevistaIaId,
@@ -304,27 +307,26 @@ export class NotaSkillService {
       },
       select: {
         id: true,
+        estado: true,
         anulado: true,
         aprobado: true,
         notaGlobal: true,
         notaAjustadaAdmin: true,
         fecha: true,
+        fechaFinalizacion: true,
         notasPorArea: {
           where: { areaId },
           select: { nota: true },
         },
       },
-      orderBy: { fecha: "asc" },
+      orderBy: [{ fechaFinalizacion: { sort: "asc", nulls: "last" } }, { fecha: "asc" }],
     })
     return intentos.map((i): IntentoEntrevistaVigenteCandidato => {
       const filaArea = i.notasPorArea[0]
       const notaArea = filaArea ? Number(filaArea.nota.toString()) : null
       return {
         id: i.id,
-        // P8c — distinguimos FINALIZADO vs EN_PROGRESO por presencia de filas
-        // en `intentos_entrevista_ia_notas_area` (decision emergente
-        // D-EMERG-P8c-3: schema actual carece de columna `estado`).
-        estado: i.notasPorArea.length > 0 ? "FINALIZADO" : "EN_PROGRESO",
+        estado: i.estado,
         anulado: i.anulado,
         aprobado: i.aprobado,
         notaGlobal: i.notaGlobal,
@@ -350,6 +352,9 @@ export class NotaSkillService {
     if (!transversalEtiquetado) {
       return []
     }
+    // §5.118: politica "ultimo aprobado" debe ordenar por `fechaFinalizacion`
+    // (evento real) y solo caer a `fecha` (creacion) como desempate cuando la
+    // finalizacion aun no se persistio (intentos viejos o EN_EVALUACION).
     return await tx.intentoTransversal.findMany({
       where: {
         transversalId: input.cursoTransversalId,
@@ -363,8 +368,9 @@ export class NotaSkillService {
         aprobado: true,
         notaGlobal: true,
         fecha: true,
+        fechaFinalizacion: true,
       },
-      orderBy: { fecha: "asc" },
+      orderBy: [{ fechaFinalizacion: { sort: "asc", nulls: "last" } }, { fecha: "asc" }],
     })
   }
 }

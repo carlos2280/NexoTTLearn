@@ -55,6 +55,12 @@ const EVALUACION_ETA_MS = 2000
 
 type CapaKey = "tests" | "cualitativa" | "comprension"
 
+export interface CargarCapaResult {
+  readonly response: IntentoTransversalAdminResponse
+  readonly replay: boolean
+  readonly capa: CapaKey
+}
+
 interface AsignacionResuelta {
   readonly id: string
   readonly colaboradorId: string
@@ -459,7 +465,7 @@ export class TransversalService {
     readonly body: CargarCapaTestsInput
     readonly idempotencyKey: string
     readonly usuario: SesionUsuario
-  }): Promise<IntentoTransversalAdminResponse> {
+  }): Promise<CargarCapaResult> {
     return this.cargarCapaGenerico({
       capa: "tests",
       scope: IDEMPOTENCY_SCOPE_CAPA_TESTS,
@@ -476,7 +482,7 @@ export class TransversalService {
     readonly body: CargarCapaCualitativaInput
     readonly idempotencyKey: string
     readonly usuario: SesionUsuario
-  }): Promise<IntentoTransversalAdminResponse> {
+  }): Promise<CargarCapaResult> {
     return this.cargarCapaGenerico({
       capa: "cualitativa",
       scope: IDEMPOTENCY_SCOPE_CAPA_CUALITATIVA,
@@ -493,7 +499,7 @@ export class TransversalService {
     readonly body: CargarCapaComprensionInput
     readonly idempotencyKey: string
     readonly usuario: SesionUsuario
-  }): Promise<IntentoTransversalAdminResponse> {
+  }): Promise<CargarCapaResult> {
     return this.cargarCapaGenerico({
       capa: "comprension",
       scope: IDEMPOTENCY_SCOPE_CAPA_COMPRENSION,
@@ -513,7 +519,7 @@ export class TransversalService {
     readonly detalle: Record<string, unknown>
     readonly idempotencyKey: string
     readonly usuario: SesionUsuario
-  }): Promise<IntentoTransversalAdminResponse> {
+  }): Promise<CargarCapaResult> {
     const ejecucion = await this.idempotency.runOnce<IntentoTransversalAdminResponse>({
       scope: input.scope,
       key: input.idempotencyKey,
@@ -542,7 +548,7 @@ export class TransversalService {
         return { status: HTTP_OK, body: toIntentoAdmin(actualizado) }
       },
     })
-    return ejecucion.body
+    return { response: ejecucion.body, replay: ejecucion.replay, capa: input.capa }
   }
 
   // =========================================================================
@@ -643,12 +649,15 @@ export class TransversalService {
 
     await this.prisma.$transaction(async (tx) => {
       // M1 race-safe: solo transiciona si sigue en EVALUADO + no anulado.
+      // §5.118: persistimos `fechaFinalizacion` para que la politica "ultimo
+      // aprobado" (D-S8-C5) ordene por el evento real, no por fecha de creacion.
       const r = await tx.intentoTransversal.updateMany({
         where: { id: input.intentoId, estado: "EVALUADO", anulado: false },
         data: {
           estado: "FINALIZADO",
           notaGlobal: new Prisma.Decimal(notaGlobal),
           aprobado,
+          fechaFinalizacion: new Date(),
         },
       })
       if (r.count === 0) {

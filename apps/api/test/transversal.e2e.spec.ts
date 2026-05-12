@@ -172,12 +172,27 @@ describe.runIf(RUN_E2E)("transversal e2e (Slice 8 P8a)", () => {
       await prisma.cursoSkillExigida.deleteMany({ where: { cursoId: { in: cursoIdsPrev } } })
       await prisma.cursoAreaExigida.deleteMany({ where: { cursoId: { in: cursoIdsPrev } } })
       await prisma.cursoModuloHabilitado.deleteMany({ where: { cursoId: { in: cursoIdsPrev } } })
+      // §5.120 — log_cambios_curso impide borrar el curso si tiene historial.
+      await prisma.logCambioCurso.deleteMany({ where: { cursoId: { in: cursoIdsPrev } } })
+      // §5.120 — proyectos_transversales ANTES de cursos (FK pt.curso_id -> cursos.id).
+      for (const c of cursosPrev) {
+        if (c.transversalId !== null) {
+          await prisma.proyectoTransversal.deleteMany({ where: { id: c.transversalId } })
+        }
+      }
       await prisma.curso.deleteMany({ where: { id: { in: cursoIdsPrev } } })
     }
-    for (const c of cursosPrev) {
-      if (c.transversalId !== null) {
-        await prisma.proyectoTransversal.deleteMany({ where: { id: c.transversalId } })
-      }
+    // §5.120 — notas_skill/historico apuntan a skill; limpiar antes de skill.
+    const skillsPrev = await prisma.skill.findMany({
+      where: { etiquetaVisible: { contains: PREFIX } },
+      select: { id: true },
+    })
+    const skillIdsPrev = skillsPrev.map((s) => s.id)
+    if (skillIdsPrev.length > 0) {
+      await prisma.historicoNotaSkill.deleteMany({
+        where: { notaSkill: { skillId: { in: skillIdsPrev } } },
+      })
+      await prisma.notaSkill.deleteMany({ where: { skillId: { in: skillIdsPrev } } })
     }
     await prisma.skill.deleteMany({ where: { etiquetaVisible: { contains: PREFIX } } })
     await prisma.area.deleteMany({ where: { nombre: { contains: PREFIX } } })
@@ -185,7 +200,13 @@ describe.runIf(RUN_E2E)("transversal e2e (Slice 8 P8a)", () => {
     await prisma.activityLog.deleteMany({
       where: {
         accion: {
-          in: ["INTENTO_TRANSVERSAL_CREADO", "TRANSVERSAL_SKILLS_ACTUALIZADAS"],
+          in: [
+            "INTENTO_TRANSVERSAL_CREADO",
+            "INTENTO_TRANSVERSAL_FINALIZADO",
+            "INTENTO_TRANSVERSAL_ANULADO",
+            "INTENTO_TRANSVERSAL_CAPA_CARGADA",
+            "TRANSVERSAL_SKILLS_ACTUALIZADAS",
+          ],
         },
       },
     })
@@ -296,13 +317,24 @@ describe.runIf(RUN_E2E)("transversal e2e (Slice 8 P8a)", () => {
 
   afterAll(async () => {
     try {
+      // §5.120 — Orden FK cleanup: hijos primero, luego ProyectoTransversal,
+      // luego Curso. La FK fisica `proyectos_transversales.curso_id` -> `cursos.id`
+      // impide borrar el curso mientras existan filas en transversal que lo
+      // apunten. `cursos.transversal_id` -> `proyectos_transversales.id` se
+      // resuelve con `ON DELETE SET NULL` declarado en el schema.
       await prisma.intentoTransversal.deleteMany({ where: { transversalId } })
       await prisma.transversalSkill.deleteMany({ where: { transversalId } })
       await prisma.idempotencyKey.deleteMany({ where: { scope: "intento-transversal" } })
       await prisma.activityLog.deleteMany({
         where: {
           accion: {
-            in: ["INTENTO_TRANSVERSAL_CREADO", "TRANSVERSAL_SKILLS_ACTUALIZADAS"],
+            in: [
+              "INTENTO_TRANSVERSAL_CREADO",
+              "INTENTO_TRANSVERSAL_FINALIZADO",
+              "INTENTO_TRANSVERSAL_ANULADO",
+              "INTENTO_TRANSVERSAL_CAPA_CARGADA",
+              "TRANSVERSAL_SKILLS_ACTUALIZADAS",
+            ],
           },
         },
       })
@@ -310,8 +342,24 @@ describe.runIf(RUN_E2E)("transversal e2e (Slice 8 P8a)", () => {
       await prisma.cursoSkillExigida.deleteMany({ where: { cursoId } })
       await prisma.cursoAreaExigida.deleteMany({ where: { cursoId } })
       await prisma.cursoModuloHabilitado.deleteMany({ where: { cursoId } })
-      await prisma.curso.deleteMany({ where: { id: cursoId } })
+      // §5.120 — log_cambios_curso impide borrar el curso (FK no aditiva).
+      await prisma.logCambioCurso.deleteMany({ where: { cursoId } })
+      // Romper la relacion `proyectos_transversales.curso_id` ANTES de borrar el
+      // curso; despues el curso queda sin FK colgante y se puede borrar.
       await prisma.proyectoTransversal.deleteMany({ where: { id: transversalId } })
+      await prisma.curso.deleteMany({ where: { id: cursoId } })
+      // §5.120 — notas_skill apuntan a skill via FK Restrict.
+      const skillsActuales = await prisma.skill.findMany({
+        where: { etiquetaVisible: { contains: PREFIX } },
+        select: { id: true },
+      })
+      const skillIds = skillsActuales.map((s) => s.id)
+      if (skillIds.length > 0) {
+        await prisma.historicoNotaSkill.deleteMany({
+          where: { notaSkill: { skillId: { in: skillIds } } },
+        })
+        await prisma.notaSkill.deleteMany({ where: { skillId: { in: skillIds } } })
+      }
       await prisma.skill.deleteMany({ where: { etiquetaVisible: { contains: PREFIX } } })
       await prisma.area.deleteMany({ where: { nombre: { contains: PREFIX } } })
 

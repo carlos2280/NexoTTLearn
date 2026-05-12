@@ -45,17 +45,25 @@ export function parsearTranscripcionInterna(value: Prisma.JsonValue): Transcripc
 }
 
 /**
- * Determina el estado externo del intento a partir de las columnas relacionales
- * + el estado interno persistido en `transcripcionOLog`. D-EMERG-P8c-3.
+ * Determina el estado externo del intento. FIX-P8-cierre §5.119: ahora la SoT
+ * es la columna dedicada `intento.estado`; el bloque legacy (anulado + JSONB)
+ * persiste como fallback defensivo para intentos creados antes de la migracion
+ * `20260517000000_slice_8_cierre_aditivos` (el backfill ya cubre filas en
+ * produccion; este fallback se mantiene solo por simetria de proyectos
+ * down-grade y desaparece cuando se elimine la duplicidad JSONB).
  */
 export function derivarEstado(
-  intento: Pick<IntentoEntrevistaSeleccionado, "anulado" | "notasPorArea">,
+  intento: Pick<IntentoEntrevistaSeleccionado, "anulado" | "estado" | "notasPorArea">,
   interna: TranscripcionInterna,
 ): "EN_PROGRESO" | "FINALIZADO" | "ANULADO" {
-  if (intento.anulado) {
+  if (intento.estado === "ANULADO" || intento.anulado) {
     return "ANULADO"
   }
-  if (interna.estado === "FINALIZADO" || intento.notasPorArea.length > 0) {
+  if (
+    intento.estado === "FINALIZADO" ||
+    interna.estado === "FINALIZADO" ||
+    intento.notasPorArea.length > 0
+  ) {
     return "FINALIZADO"
   }
   return "EN_PROGRESO"

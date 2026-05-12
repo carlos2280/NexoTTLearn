@@ -289,15 +289,21 @@ export class EntrevistaIaService {
         entrevistaIaId,
       },
       ejecutor: async (tx) => {
+        // §5.119: SoT del estado/snapshot pasa a columnas dedicadas. Mantenemos
+        // la escritura espejada en `transcripcionOLog` como sombra durante la
+        // transicion (consumida por `parsearTranscripcionInterna` para flujo
+        // de turnos).
         const intento = await tx.intentoEntrevistaIA.create({
           data: {
             entrevistaIaId,
             colaboradorId,
+            estado: "EN_PROGRESO",
             notaGlobal: new Prisma.Decimal(0),
             aprobado: false,
             anulado: false,
             transcripcionOLog: interna as unknown as Prisma.InputJsonValue,
             rubricaSnapshot: rubricaSnapshot as unknown as Prisma.InputJsonValue,
+            seccionesBaseSnapshot: seccionesBaseSnapshot as unknown as Prisma.InputJsonValue,
           },
           select: { id: true },
         })
@@ -458,9 +464,13 @@ export class EntrevistaIaService {
     const skillsAfectadas = Array.from(new Set(skillsPorArea.map((s) => s.id)))
 
     await this.prisma.$transaction(async (tx) => {
+      // §5.119: persistimos `estado=FINALIZADO` + `fechaFinalizacion` en columnas
+      // dedicadas. `transcripcionOLog` queda como sombra para la lectura legacy.
       await tx.intentoEntrevistaIA.update({
         where: { id: input.intentoId },
         data: {
+          estado: "FINALIZADO",
+          fechaFinalizacion: new Date(),
           notaGlobal: new Prisma.Decimal(resultado.notaGlobal),
           aprobado,
           transcripcionOLog: internaFinal as unknown as Prisma.InputJsonValue,
@@ -668,10 +678,12 @@ export class EntrevistaIaService {
             message: "El intento ya esta anulado.",
           })
         }
+        // §5.119: marcamos `estado=ANULADO` simetrico al transversal P8b.
         const r = await tx.intentoEntrevistaIA.updateMany({
           where: { id: input.intentoId, anulado: false },
           data: {
             anulado: true,
+            estado: "ANULADO",
             motivoAjusteOAnulacion: input.motivo,
           },
         })
@@ -833,17 +845,17 @@ export class EntrevistaIaService {
   }
 
   private async intentoEnCurso(colaboradorId: string, entrevistaIaId: string): Promise<boolean> {
-    const candidatos = await this.prisma.intentoEntrevistaIA.findMany({
-      where: { colaboradorId, entrevistaIaId, anulado: false },
-      select: { id: true, transcripcionOLog: true, notasPorArea: { take: 1 } },
+    // §5.119: lectura por columna dedicada `estado`. La duplicidad JSONB queda
+    // solo para flujo de turnos.
+    const enCurso = await this.prisma.intentoEntrevistaIA.count({
+      where: {
+        colaboradorId,
+        entrevistaIaId,
+        anulado: false,
+        estado: "EN_PROGRESO",
+      },
     })
-    return candidatos.some((c) => {
-      if (c.notasPorArea.length > 0) {
-        return false
-      }
-      const interna = parsearTranscripcionInterna(c.transcripcionOLog)
-      return interna.estado === "EN_PROGRESO"
-    })
+    return enCurso > 0
   }
 
   private async planEstaCompleto(asignacionId: string): Promise<boolean> {

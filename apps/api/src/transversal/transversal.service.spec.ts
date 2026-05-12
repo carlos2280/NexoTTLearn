@@ -552,7 +552,10 @@ describe("E7. POST /intentos-transversal/:id/capas/tests (P8b)", () => {
       data: { estado?: string; notaCapaTests?: Prisma.Decimal }
     }
     expect(updateArgs.data.estado).toBe("EVALUADO")
-    expect(r.estado).toBe("EVALUADO")
+    expect(r.response.estado).toBe("EVALUADO")
+    // FIX-P8-cierre §5.116: cargarCapa* devuelve `{ response, replay, capa }`.
+    expect(r.capa).toBe("tests")
+    expect(r.replay).toBe(false)
   })
 })
 

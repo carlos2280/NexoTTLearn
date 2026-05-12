@@ -209,59 +209,99 @@ export class TransversalController {
   @Post("intentos-transversal/:intentoId/capas/tests")
   @Roles(RolUsuario.ADMIN)
   @HttpCode(HttpStatus.OK)
-  cargarCapaTests(
+  async cargarCapaTests(
     @Param("intentoId", ParseUUIDPipe) intentoId: string,
     @Body(new ZodValidationPipe(cargarCapaTestsSchema)) body: CargarCapaTestsInput,
     @IdempotencyKey() idempotencyKey: string | undefined,
     @CurrentUser() usuario: SesionUsuario | undefined,
+    @Req() req: Request,
   ): Promise<IntentoTransversalAdminResponse> {
     const sesion = this.requireUsuario(usuario)
     const key = requireIdempotencyKeyUuid(idempotencyKey)
-    return this.transversal.cargarCapaTests({
+    const resultado = await this.transversal.cargarCapaTests({
       intentoId,
       body,
       idempotencyKey: key,
       usuario: sesion,
     })
+    await this.registrarAuditCapa(resultado, intentoId, sesion, req)
+    return resultado.response
   }
 
   // E8
   @Post("intentos-transversal/:intentoId/capas/cualitativa")
   @Roles(RolUsuario.ADMIN)
   @HttpCode(HttpStatus.OK)
-  cargarCapaCualitativa(
+  async cargarCapaCualitativa(
     @Param("intentoId", ParseUUIDPipe) intentoId: string,
     @Body(new ZodValidationPipe(cargarCapaCualitativaSchema)) body: CargarCapaCualitativaInput,
     @IdempotencyKey() idempotencyKey: string | undefined,
     @CurrentUser() usuario: SesionUsuario | undefined,
+    @Req() req: Request,
   ): Promise<IntentoTransversalAdminResponse> {
     const sesion = this.requireUsuario(usuario)
     const key = requireIdempotencyKeyUuid(idempotencyKey)
-    return this.transversal.cargarCapaCualitativa({
+    const resultado = await this.transversal.cargarCapaCualitativa({
       intentoId,
       body,
       idempotencyKey: key,
       usuario: sesion,
     })
+    await this.registrarAuditCapa(resultado, intentoId, sesion, req)
+    return resultado.response
   }
 
   // E9
   @Post("intentos-transversal/:intentoId/capas/comprension")
   @Roles(RolUsuario.ADMIN)
   @HttpCode(HttpStatus.OK)
-  cargarCapaComprension(
+  async cargarCapaComprension(
     @Param("intentoId", ParseUUIDPipe) intentoId: string,
     @Body(new ZodValidationPipe(cargarCapaComprensionSchema)) body: CargarCapaComprensionInput,
     @IdempotencyKey() idempotencyKey: string | undefined,
     @CurrentUser() usuario: SesionUsuario | undefined,
+    @Req() req: Request,
   ): Promise<IntentoTransversalAdminResponse> {
     const sesion = this.requireUsuario(usuario)
     const key = requireIdempotencyKeyUuid(idempotencyKey)
-    return this.transversal.cargarCapaComprension({
+    const resultado = await this.transversal.cargarCapaComprension({
       intentoId,
       body,
       idempotencyKey: key,
       usuario: sesion,
+    })
+    await this.registrarAuditCapa(resultado, intentoId, sesion, req)
+    return resultado.response
+  }
+
+  /**
+   * §5.116 — Audit `INTENTO_TRANSVERSAL_CAPA_CARGADA` para E7/E8/E9. Se registra
+   * FUERA del TX (D-AUDIT-1) y NUNCA en replay idempotente (D-AUDIT-2). El
+   * metadata SOLO contiene IDs + capa — sin contenido evaluable (R-S8-10).
+   */
+  private async registrarAuditCapa(
+    resultado: {
+      readonly response: IntentoTransversalAdminResponse
+      readonly replay: boolean
+      readonly capa: "tests" | "cualitativa" | "comprension"
+    },
+    intentoId: string,
+    sesion: SesionUsuario,
+    req: Request,
+  ): Promise<void> {
+    if (resultado.replay) {
+      return
+    }
+    await this.auditLog.record({
+      usuarioId: sesion.usuarioId,
+      accion: AccionAuditoria.INTENTO_TRANSVERSAL_CAPA_CARGADA,
+      exito: true,
+      recursoTipo: "intento_transversal",
+      recursoId: intentoId,
+      metadata: {
+        capa: resultado.capa.toUpperCase(),
+      },
+      ...extractContextoHttp(req),
     })
   }
 

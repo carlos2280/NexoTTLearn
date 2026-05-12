@@ -320,6 +320,8 @@ describe("NotaSkillService.recalcularConFuentes con entrevista IA (D-S8-D5, D33)
         findMany: vi.fn().mockResolvedValue([
           {
             id: "e1",
+            // FIX-P8-cierre §5.119: el motor filtra ahora por columna `estado`.
+            estado: opciones.anulado === true ? "ANULADO" : "FINALIZADO",
             anulado: opciones.anulado ?? false,
             aprobado: true,
             notaGlobal: new Prisma.Decimal(75),
@@ -328,6 +330,7 @@ describe("NotaSkillService.recalcularConFuentes con entrevista IA (D-S8-D5, D33)
                 ? null
                 : new Prisma.Decimal(opciones.notaAjustadaAdmin),
             fecha: new Date("2026-05-01"),
+            fechaFinalizacion: opciones.anulado === true ? null : new Date("2026-05-01T10:00:00Z"),
             notasPorArea:
               opciones.notaArea === null || opciones.notaArea === undefined
                 ? []
@@ -431,11 +434,13 @@ describe("NotaSkillService.recalcularConFuentes con entrevista IA (D-S8-D5, D33)
         findMany: vi.fn().mockResolvedValue([
           {
             id: "e1",
+            estado: "FINALIZADO",
             anulado: false,
             aprobado: true,
             notaGlobal: new Prisma.Decimal(100),
             notaAjustadaAdmin: null,
             fecha: new Date("2026-05-02"),
+            fechaFinalizacion: new Date("2026-05-02T10:00:00Z"),
             notasPorArea: [{ nota: new Prisma.Decimal(100) }],
           },
         ]),
@@ -452,5 +457,43 @@ describe("NotaSkillService.recalcularConFuentes con entrevista IA (D-S8-D5, D33)
     })
     // 0.7*80 + 0.2*90 + 0.1*100 = 56 + 18 + 10 = 84
     expect(r.notaActual).toBe(84)
+  })
+})
+
+describe("NotaSkillService - orderBy fechaFinalizacion (§5.118 FIX-P8-cierre)", () => {
+  const svc = new NotaSkillService()
+
+  it("intentos transversales se ordenan por fechaFinalizacion ASC NULLS LAST, fecha ASC", async () => {
+    const findMany = vi.fn().mockResolvedValue([])
+    const tx = {
+      curso: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          pesoBloques: new Prisma.Decimal(70),
+          pesoTransversal: new Prisma.Decimal(20),
+          pesoEntrevista: new Prisma.Decimal(10),
+          transversalId: TRANSVERSAL_ID,
+          entrevistaIaId: null,
+        }),
+      },
+      intentoBloque: { findMany: vi.fn().mockResolvedValue([]) },
+      transversalSkill: {
+        findFirst: vi.fn().mockResolvedValue({ transversalId: TRANSVERSAL_ID }),
+      },
+      intentoTransversal: { findMany },
+      notaSkill: { upsert: vi.fn().mockResolvedValue({ id: "ns-1" }) },
+      historicoNotaSkill: { create: vi.fn().mockResolvedValue({}) },
+    }
+    await svc.recalcularConFuentes(tx as never, {
+      colaboradorId: COLAB_ID,
+      skillId: SKILL_ID,
+      cursoId: CURSO_ID,
+      origen: OrigenNotaSkill.TRANSVERSAL,
+      referencia: { evento: "FINALIZADO" },
+    })
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ fechaFinalizacion: { sort: "asc", nulls: "last" } }, { fecha: "asc" }],
+      }),
+    )
   })
 })

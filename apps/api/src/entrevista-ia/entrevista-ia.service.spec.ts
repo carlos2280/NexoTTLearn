@@ -263,13 +263,10 @@ describe("E13 GET disponibilidad", () => {
 
   it("INTENTO_EN_CURSO si existe uno EN_PROGRESO", async () => {
     const { service, prisma } = buildService()
-    prisma.intentoEntrevistaIA.findMany.mockResolvedValue([
-      {
-        id: "i1",
-        transcripcionOLog: { estado: "EN_PROGRESO", turnos: [] },
-        notasPorArea: [],
-      },
-    ])
+    // §5.119: el detector consulta `count({ where: { estado: 'EN_PROGRESO', ... } })`.
+    prisma.intentoEntrevistaIA.count.mockImplementation((args: { where?: { estado?: string } }) =>
+      Promise.resolve(args.where?.estado === "EN_PROGRESO" ? 1 : 0),
+    )
     const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN_SESION)
     expect(r.disponible).toBe(false)
     expect(r.razon).toBe("INTENTO_EN_CURSO")
@@ -370,13 +367,12 @@ describe("E14 POST crear intento (snapshot + idempotency)", () => {
 
   it("INTENTO_EN_CURSO si hay otro EN_PROGRESO", async () => {
     const { service, prisma } = setupCrearIntentoHappy()
-    prisma.intentoEntrevistaIA.findMany.mockResolvedValue([
-      {
-        id: "i1",
-        transcripcionOLog: { estado: "EN_PROGRESO", turnos: [] },
-        notasPorArea: [],
-      },
-    ])
+    // FIX-P8-cierre §5.119: `intentoEnCurso` ahora hace `count({ where: { estado:
+    // 'EN_PROGRESO', ... } })`. Diferenciamos del count del rate-limit por la
+    // forma del where.
+    prisma.intentoEntrevistaIA.count.mockImplementation((args: { where?: { estado?: string } }) =>
+      Promise.resolve(args.where?.estado === "EN_PROGRESO" ? 1 : 0),
+    )
     await expect(
       service.crearIntento({
         asignacionId: ASIGNACION_ID,
@@ -409,6 +405,23 @@ describe("E14 POST crear intento (snapshot + idempotency)", () => {
     expect(r.intentoId).toBe(INTENTO_ID)
     expect(r.primeraPregunta).toBe("¿Mock pregunta 1?")
     expect(ai.iniciarEntrevista).toHaveBeenCalledOnce()
+  })
+
+  it("FIX-P8-cierre §5.119: persiste estado=EN_PROGRESO en columna dedicada (no solo JSONB)", async () => {
+    const { service, prisma } = setupCrearIntentoHappy()
+    await service.crearIntento({
+      asignacionId: ASIGNACION_ID,
+      idempotencyKey: "key-1",
+      usuario: PART_SESION,
+    })
+    expect(prisma.intentoEntrevistaIA.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          estado: "EN_PROGRESO",
+          seccionesBaseSnapshot: expect.anything(),
+        }),
+      }),
+    )
   })
 })
 

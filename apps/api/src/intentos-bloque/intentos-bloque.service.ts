@@ -26,6 +26,7 @@ import { Paginated, buildPaginatedResponse, resolvePaginacion } from "../common/
 import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
+import { NotaSkillService } from "../nota-skill/nota-skill.service"
 import {
   calcularNotaQuiz,
   parsearContenidoQuiz,
@@ -81,6 +82,7 @@ export class IntentosBloqueService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly idempotency: IdempotencyService,
+    private readonly notaSkill: NotaSkillService,
   ) {}
 
   // =========================================================================
@@ -249,13 +251,17 @@ export class IntentosBloqueService {
           nuevoIntentoId: intento.id,
           nuevoIntentoNota: calculo.nota,
         })
-        await this.recalcularNotaSkill(tx, {
+        await this.notaSkill.recalcularConFuentes(tx, {
           colaboradorId,
           skillId: bloque.skillQueMideId as string,
-          intentoIdReferencia: intento.id,
-          bloqueId: bloque.id,
-          version: bloque.version,
-          motivo: null,
+          cursoId: curso.id,
+          origen: OrigenNotaSkill.BLOQUE,
+          referencia: {
+            intentoBloqueId: intento.id,
+            bloqueId: bloque.id,
+            version: bloque.version,
+            evento: "CREADO",
+          },
         })
         await this.transicionarAsignacionSiCorresponde(tx, {
           asignacionId: asignacion.id,
@@ -382,6 +388,7 @@ export class IntentosBloqueService {
         id: true,
         colaboradorId: true,
         bloqueId: true,
+        cursoId: true,
         esMejorIntento: true,
         estaInvalidado: true,
         bloque: { select: { skillQueMideId: true, version: true } },
@@ -425,13 +432,17 @@ export class IntentosBloqueService {
           })
         }
         if (intentoPrev.bloque.skillQueMideId !== null) {
-          await this.recalcularNotaSkill(tx, {
+          await this.notaSkill.recalcularConFuentes(tx, {
             colaboradorId: intentoPrev.colaboradorId,
             skillId: intentoPrev.bloque.skillQueMideId,
-            intentoIdReferencia: intentoPrev.id,
-            bloqueId: intentoPrev.bloqueId,
-            version: intentoPrev.bloque.version,
-            motivo: "INVALIDACION",
+            cursoId: intentoPrev.cursoId,
+            origen: OrigenNotaSkill.BLOQUE,
+            referencia: {
+              intentoBloqueId: intentoPrev.id,
+              bloqueId: intentoPrev.bloqueId,
+              version: intentoPrev.bloque.version,
+              evento: "INVALIDADO",
+            },
           })
         }
       }
@@ -541,73 +552,6 @@ export class IntentosBloqueService {
     }
     // Si la nueva nota no supera la actual, el nuevo intento se queda con
     // `esMejorIntento=false` (estado inicial del INSERT).
-  }
-
-  private async recalcularNotaSkill(
-    tx: PrismaTx,
-    input: {
-      readonly colaboradorId: string
-      readonly skillId: string
-      readonly intentoIdReferencia: string
-      readonly bloqueId: string
-      readonly version: number
-      readonly motivo: string | null
-    },
-  ): Promise<void> {
-    const mejores = await tx.intentoBloque.findMany({
-      where: {
-        colaboradorId: input.colaboradorId,
-        bloque: { skillQueMideId: input.skillId },
-        esMejorIntento: true,
-        estaInvalidado: false,
-      },
-      select: { nota: true },
-    })
-    const promedio =
-      mejores.length === 0
-        ? null
-        : Math.round(
-            (mejores.reduce((acc, m) => acc + Number(m.nota.toString()), 0) / mejores.length) * 100,
-          ) / 100
-    const origenActual = {
-      tipo: "BLOQUE",
-      skillId: input.skillId,
-      intentosVigentes: mejores.length,
-    } satisfies Prisma.InputJsonObject
-
-    const notaSkill = await tx.notaSkill.upsert({
-      where: {
-        // biome-ignore lint/style/useNamingConvention: clave compuesta generada por Prisma para @@unique.
-        colaboradorId_skillId: { colaboradorId: input.colaboradorId, skillId: input.skillId },
-      },
-      create: {
-        colaboradorId: input.colaboradorId,
-        skillId: input.skillId,
-        notaActual: promedio === null ? null : new Prisma.Decimal(promedio),
-        origenActual: origenActual as unknown as Prisma.InputJsonValue,
-      },
-      update: {
-        notaActual: promedio === null ? null : new Prisma.Decimal(promedio),
-        origenActual: origenActual as unknown as Prisma.InputJsonValue,
-      },
-      select: { id: true },
-    })
-
-    const referencia = {
-      intentoId: input.intentoIdReferencia,
-      bloqueId: input.bloqueId,
-      version: input.version,
-      ...(input.motivo === null ? {} : { motivo: input.motivo }),
-    } satisfies Prisma.InputJsonObject
-
-    await tx.historicoNotaSkill.create({
-      data: {
-        notaSkillId: notaSkill.id,
-        valor: promedio === null ? null : new Prisma.Decimal(promedio),
-        origen: OrigenNotaSkill.BLOQUE,
-        referencia: referencia as unknown as Prisma.InputJsonValue,
-      },
-    })
   }
 
   private async transicionarAsignacionSiCorresponde(

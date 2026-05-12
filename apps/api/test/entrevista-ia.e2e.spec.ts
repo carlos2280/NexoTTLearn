@@ -416,27 +416,6 @@ describe.runIf(RUN_E2E)("entrevista-ia e2e (Slice 8 P8c)", () => {
     expect(res.body.maxPorHora).toBe(5)
   })
 
-  /**
-   * Crea un intento EN_PROGRESO y lo deja finalizado para liberar el
-   * "INTENTO_EN_CURSO" para los tests posteriores. Devuelve el intentoId.
-   */
-  async function crearYFinalizarIntento(): Promise<string> {
-    const c = await agentePart
-      .post(`/api/v1/asignaciones/${asignacionPartId}/intentos-entrevista-ia`)
-      .set("X-XSRF-TOKEN", csrfPart)
-      .set("Idempotency-Key", randomUUID())
-      .send({})
-    if (c.status !== 201) {
-      throw new Error(`No se pudo crear intento (${c.status}): ${JSON.stringify(c.body)}`)
-    }
-    const id = c.body.intentoId as string
-    await agentePart
-      .post(`/api/v1/intentos-entrevista-ia/${id}/finalizar`)
-      .set("X-XSRF-TOKEN", csrfPart)
-      .send({})
-    return id
-  }
-
   it("E14 POST crear intento happy: devuelve intentoId + primeraPregunta", async () => {
     const key = randomUUID()
     const res = await agentePart
