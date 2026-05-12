@@ -1,11 +1,13 @@
+import { useCasosRevision } from "@/features/admin/dashboard/hooks/use-casos-revision"
 import { Badge } from "@/shared/components/ui/badge"
 import { Button } from "@/shared/components/ui/button"
 import { Card } from "@/shared/components/ui/card"
 import { Section } from "@/shared/components/ui/section"
+import { RUTAS } from "@/shared/constants/rutas"
 import { DUR, EASE } from "@/shared/lib/motion"
 import { motion, useReducedMotion } from "framer-motion"
 import { ArrowUpRight, Clock3 } from "lucide-react"
-import { MOCK_CASOS } from "../inicio.mock"
+import { Link } from "react-router-dom"
 import type { CasoRevision, PrioridadCaso } from "../inicio.types"
 
 const ETIQUETA_PRIORIDAD: Record<PrioridadCaso, string> = {
@@ -73,7 +75,18 @@ function FilaCaso({ caso, indice }: { readonly caso: CasoRevision; readonly indi
   )
 }
 
+function EstadoVacio() {
+  return (
+    <div className="flex flex-col items-center gap-1 px-6 py-10 text-center">
+      <p className="text-body text-text-secondary">Sin casos pendientes.</p>
+      <p className="text-caption text-text-tertiary">Nada vence pronto.</p>
+    </div>
+  )
+}
+
 export function CentroRevision() {
+  const { casos, isLoading } = useCasosRevision()
+
   return (
     <Section
       id="centro-revision"
@@ -81,17 +94,27 @@ export function CentroRevision() {
       titulo="Centro de revisión"
       descripcion="Lo que está a punto de vencer o requiere que alguien decida."
       accion={
-        <Button variant="ghost" size="sm">
-          Ver todo
+        <Button variant="ghost" size="sm" asChild={true}>
+          <Link to={RUTAS.admin.cursos}>Ver todo</Link>
         </Button>
       }
     >
       <Card tono="plano" densidad="none">
-        <ul className="flex flex-col divide-y divide-border p-2">
-          {MOCK_CASOS.map((caso, i) => (
-            <FilaCaso key={caso.id} caso={caso} indice={i} />
-          ))}
-        </ul>
+        {isLoading ? (
+          <div className="flex flex-col gap-2 p-4">
+            {Array.from({ length: 3 }, (_, i) => (
+              <div key={`skeleton-${i + 1}`} className="h-14 animate-pulse rounded-md bg-subtle" />
+            ))}
+          </div>
+        ) : casos.length === 0 ? (
+          <EstadoVacio />
+        ) : (
+          <ul className="flex flex-col divide-y divide-border p-2">
+            {casos.map((caso, i) => (
+              <FilaCaso key={caso.id} caso={caso} indice={i} />
+            ))}
+          </ul>
+        )}
       </Card>
     </Section>
   )

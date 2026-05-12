@@ -17,7 +17,7 @@ export function CursoDetallePanel({ tab, curso, nombreCliente }: CursoDetallePan
     return <CursoDetalleResumen curso={curso} nombreCliente={nombreCliente} />
   }
   if (tab === "asignados") {
-    return <AsignacionesVista cursoId={curso.id} />
+    return <AsignacionesVista cursoId={curso.id} nombreCurso={curso.titulo} />
   }
   if (tab === "estructura") {
     return (

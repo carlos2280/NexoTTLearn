@@ -1,4 +1,5 @@
 import { useListarAsignaciones } from "@/features/asignaciones/hooks/use-listar-asignaciones"
+import { BandaEvaluacionInicial } from "@/features/evaluacion-inicial/components/banda-evaluacion-inicial"
 import { Button } from "@/shared/components/ui/button"
 import { DataTable } from "@/shared/components/ui/data-table"
 import { MenuAcciones } from "@/shared/components/ui/menu-acciones"
@@ -31,9 +32,10 @@ function etiquetaTab(t: TabRol): string {
 
 interface Props {
   readonly cursoId: string
+  readonly nombreCurso?: string
 }
 
-export function AsignacionesVista({ cursoId }: Props) {
+export function AsignacionesVista({ cursoId, nombreCurso }: Props) {
   const [rolTab, setRolTab] = useState<TabRol>("TODOS")
   const [busqueda, setBusqueda] = useState("")
   const [page, setPage] = useState(1)
@@ -60,6 +62,8 @@ export function AsignacionesVista({ cursoId }: Props) {
 
   return (
     <div className="flex flex-col gap-5">
+      <BandaEvaluacionInicial cursoId={cursoId} nombreCurso={nombreCurso ?? "este curso"} />
+
       <Tabs<TabRol>
         items={ORDEN_TABS.map((id) => ({ id, etiqueta: etiquetaTab(id) }))}
         activa={rolTab}

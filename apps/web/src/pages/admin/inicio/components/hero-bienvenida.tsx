@@ -3,7 +3,6 @@ import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
 import { useRelojVivo } from "@/shared/hooks/use-reloj-vivo"
 import { DUR, EASE } from "@/shared/lib/motion"
 import { motion, useReducedMotion } from "framer-motion"
-import { PulsoDelDia } from "./pulso-del-dia"
 
 export function HeroBienvenida() {
   const { data: usuario } = useUsuarioActual()
@@ -16,7 +15,7 @@ export function HeroBienvenida() {
     : { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } }
 
   return (
-    <header className="grid grid-cols-1 items-center gap-8 lg:grid-cols-[1.4fr_1fr] lg:gap-12">
+    <header className="flex flex-col gap-6">
       <div className="flex flex-col gap-6">
         <motion.div
           initial={variantes.initial}
@@ -53,8 +52,6 @@ export function HeroBienvenida() {
           Tu equipo está <span className="text-accent">aprendiendo</span>.
         </motion.p>
       </div>
-
-      <PulsoDelDia valor={87} descripcion="El sistema respira tranquilo." />
     </header>
   )
 }

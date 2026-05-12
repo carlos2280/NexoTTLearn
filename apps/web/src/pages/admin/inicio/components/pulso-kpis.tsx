@@ -1,9 +1,9 @@
+import { useKpisCursos } from "@/features/admin/dashboard/hooks/use-kpis-cursos"
 import { Card } from "@/shared/components/ui/card"
 import { Sparkline } from "@/shared/components/ui/sparkline"
 import { DUR, EASE } from "@/shared/lib/motion"
 import { motion, useReducedMotion } from "framer-motion"
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react"
-import { MOCK_KPIS } from "../inicio.mock"
 import type { KpiPulso, TonoKpi } from "../inicio.types"
 
 const TONO_DELTA: Record<"sube" | "baja" | "estable", TonoKpi> = {
@@ -81,14 +81,18 @@ function PulsoKpiCard({ kpi, indice }: { readonly kpi: KpiPulso; readonly indice
 }
 
 export function PulsoKpis() {
+  const { kpis, isLoading } = useKpisCursos()
+
   return (
     <section
       aria-label="Pulso del sistema"
       className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
     >
-      {MOCK_KPIS.map((kpi, i) => (
-        <PulsoKpiCard key={kpi.id} kpi={kpi} indice={i} />
-      ))}
+      {isLoading
+        ? Array.from({ length: 4 }, (_, i) => (
+            <Card key={`skeleton-${i + 1}`} tono="plano" className="h-[148px] animate-pulse" />
+          ))
+        : kpis.map((kpi, i) => <PulsoKpiCard key={kpi.id} kpi={kpi} indice={i} />)}
     </section>
   )
 }

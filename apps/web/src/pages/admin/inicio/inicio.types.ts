@@ -25,16 +25,6 @@ export interface CasoRevision {
   readonly responsable: string
 }
 
-export interface CursoEnMarcha {
-  readonly id: string
-  readonly titulo: string
-  readonly cliente: string
-  readonly avance: number
-  readonly participantes: number
-  readonly responsables: readonly string[]
-  readonly proximoHito: string
-}
-
 export type TipoEvento = "publicacion" | "matricula" | "evaluacion" | "sistema" | "alerta"
 
 export interface EventoPulso {

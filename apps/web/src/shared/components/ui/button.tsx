@@ -79,8 +79,14 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       aria-busy={isLoading || undefined}
       {...rest}
     >
-      {isLoading ? <Spinner /> : null}
-      {children}
+      {asChild ? (
+        children
+      ) : (
+        <>
+          {isLoading ? <Spinner /> : null}
+          {children}
+        </>
+      )}
     </Comp>
   )
 })
