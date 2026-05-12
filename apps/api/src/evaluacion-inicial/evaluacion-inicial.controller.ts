@@ -246,9 +246,9 @@ export class EvaluacionInicialController {
       })
     }
 
-    // TODO(S10): emitir notificacion EXCEL_CARGADO (admin, no silenciable)
+    // TODO(S11): emitir notificacion EXCEL_CARGADO (admin, no silenciable)
     // y PLANES_DESACTUALIZADOS si planesMarcadosDesactualizados > 0
-    // — pendiente NotificacionesModule del Slice 10 (D88).
+    // — fuera del alcance MVP (P10c solo cablea triggers participante).
 
     return ejecucion.body
   }

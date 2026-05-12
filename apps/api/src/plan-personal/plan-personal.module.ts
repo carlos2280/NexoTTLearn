@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common"
 import { PrismaModule } from "../common/prisma/prisma.module"
+import { NotificacionesModule } from "../notificaciones/notificaciones.module"
 import { PlanPersonalController } from "./plan-personal.controller"
 import { PlanPersonalService } from "./plan-personal.service"
 
@@ -8,9 +9,12 @@ import { PlanPersonalService } from "./plan-personal.service"
  * calculo + recalculo. El service `PlanPersonalService` se exporta para que
  * `AsignacionesModule` pueda inyectarlo y cerrar los TODO(S7) de Slice 6
  * (D-S7-B4: calcular plan en creacion y conversion a asignado).
+ *
+ * P10c: importa `NotificacionesModule` para inyectar `NotificacionesService`
+ * en los triggers `calcularExplicito`, `recalcular` y `ajustarPlan`.
  */
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, NotificacionesModule],
   controllers: [PlanPersonalController],
   providers: [PlanPersonalService],
   exports: [PlanPersonalService],

@@ -1,10 +1,17 @@
+import { ConfigService } from "@nestjs/config"
 import { CanalNotif, EstadoEmpleado, TipoEventoNotif } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AuditLogService } from "../common/audit/audit-log.service"
 import { PrismaService } from "../common/prisma/prisma.service"
+import { AppEnv } from "../config/env.validation"
 import { EnvioArgs, EnvioResultado, IEmailProvider } from "./email/email-provider.interface"
 import { NotificacionesService } from "./notificaciones.service"
-import { catalogoTipoEvento } from "./tipo-evento.constants"
+
+function buildConfigMock(): ConfigService<AppEnv, true> {
+  return {
+    get: vi.fn().mockReturnValue("https://app.nexott.test"),
+  } as unknown as ConfigService<AppEnv, true>
+}
 
 interface PrismaMock {
   usuario: { findUnique: ReturnType<typeof vi.fn> }
@@ -91,7 +98,12 @@ describe("NotificacionesService.crear", () => {
   beforeEach(() => {
     prisma = buildPrismaMock()
     email = new StubEmailProvider()
-    service = new NotificacionesService(prisma as unknown as PrismaService, email, buildAuditMock())
+    service = new NotificacionesService(
+      prisma as unknown as PrismaService,
+      email,
+      buildAuditMock(),
+      buildConfigMock(),
+    )
   })
 
   it("no-op cuando el usuario es EX_EMPLEADO (§19.3 punto 5)", async () => {
@@ -156,10 +168,12 @@ describe("NotificacionesService.crear", () => {
     })
 
     expect(prisma.preferenciaNotificacion.findUnique).not.toHaveBeenCalled()
-    expect(resultado).toEqual({
+    // RESULTADO_CIERRE tiene plantilla activa en P10c, por eso el envio email
+    // se intenta y (con el mock que responde enviado:true) se anade el canal CORREO.
+    expect(resultado).toMatchObject({
       creada: true,
       notificacionId: NOTIF_ID,
-      canalesEnviados: [CanalNotif.IN_APP],
+      canalesEnviados: [CanalNotif.IN_APP, CanalNotif.CORREO],
     })
     const createCall = prisma.notificacion.create.mock.calls[0]?.[0] as {
       data: { esCritico: boolean }
@@ -167,7 +181,7 @@ describe("NotificacionesService.crear", () => {
     expect(createCall.data.esCritico).toBe(true)
   })
 
-  it("crea IN_APP solo cuando no hay plantilla disponible para el tipo (P10a default)", async () => {
+  it("crea IN_APP solo cuando el tipo no tiene plantilla registrada (S11 default)", async () => {
     prisma.usuario.findUnique.mockResolvedValue({
       id: USUARIO_ID,
       colaborador: { email: "u@nexott.app", estadoEmpleado: EstadoEmpleado.ACTIVO },
@@ -178,8 +192,8 @@ describe("NotificacionesService.crear", () => {
 
     const resultado = await service.crear({
       usuarioId: USUARIO_ID,
-      tipo: TipoEventoNotif.PLAN_RECALCULADO,
-      payload: { planId: "p", asignacionId: "a", cursoTitulo: "Curso" },
+      tipo: TipoEventoNotif.PLANES_DESACTUALIZADOS,
+      payload: {},
     })
 
     expect(resultado).toEqual({
@@ -191,96 +205,104 @@ describe("NotificacionesService.crear", () => {
     expect(prisma.notificacionCanal.create).toHaveBeenCalledTimes(1)
   })
 
-  it("persiste error_correo cuando el provider devuelve fallo en un tipo con plantilla", async () => {
-    const spy = vi.spyOn(catalogoTipoEvento, "tienePlantilla").mockReturnValue(true)
-    try {
-      prisma.usuario.findUnique.mockResolvedValue({
-        id: USUARIO_ID,
-        colaborador: { email: "u@nexott.app", estadoEmpleado: EstadoEmpleado.ACTIVO },
-      })
-      prisma.preferenciaNotificacion.findUnique.mockResolvedValue(null)
-      prisma.notificacion.create.mockResolvedValue({ id: NOTIF_ID })
-      prisma.notificacionCanal.create.mockResolvedValue({})
-      prisma.notificacion.update.mockResolvedValue({ id: NOTIF_ID })
-      email.programar({
-        enviado: false,
-        motivo: "error-resend",
-        detalle: "Resend down",
-      })
+  it("PLAN_RECALCULADO con plantilla activa + envio exitoso registra CORREO", async () => {
+    prisma.usuario.findUnique.mockResolvedValue({
+      id: USUARIO_ID,
+      colaborador: { email: "u@nexott.app", estadoEmpleado: EstadoEmpleado.ACTIVO },
+    })
+    prisma.preferenciaNotificacion.findUnique.mockResolvedValue(null)
+    prisma.notificacion.create.mockResolvedValue({ id: NOTIF_ID })
+    prisma.notificacionCanal.create.mockResolvedValue({})
+    email.programar({ enviado: true })
 
-      const resultado = await service.crear({
-        usuarioId: USUARIO_ID,
-        tipo: TipoEventoNotif.PLAN_RECALCULADO,
-        payload: { planId: "p", asignacionId: "a", cursoTitulo: "Curso" },
-      })
+    const resultado = await service.crear({
+      usuarioId: USUARIO_ID,
+      tipo: TipoEventoNotif.PLAN_RECALCULADO,
+      payload: { planId: "p", asignacionId: "a", cursoTitulo: "Curso Z" },
+    })
 
-      expect(resultado).toMatchObject({ creada: true, canalesEnviados: [CanalNotif.IN_APP] })
-      expect(email.llamadas).toHaveLength(1)
-      expect(prisma.notificacion.update).toHaveBeenCalledWith({
-        where: { id: NOTIF_ID },
-        data: { errorCorreo: "Resend down" },
-      })
-    } finally {
-      spy.mockRestore()
-    }
+    expect(resultado).toMatchObject({
+      creada: true,
+      canalesEnviados: [CanalNotif.IN_APP, CanalNotif.CORREO],
+    })
+    expect(email.llamadas).toHaveLength(1)
+    expect(email.llamadas[0]?.subject).toBe("Tu plan personal en NexoTT Learn ha sido actualizado")
+    expect(email.llamadas[0]?.html).toContain("Curso Z")
+    expect(prisma.notificacionCanal.create).toHaveBeenCalledTimes(2)
+    expect(prisma.notificacion.update).not.toHaveBeenCalled()
   })
 
-  it("registra canal CORREO cuando el envio email es exitoso (modo AUTOMATICO)", async () => {
-    const spy = vi.spyOn(catalogoTipoEvento, "tienePlantilla").mockReturnValue(true)
-    try {
-      prisma.usuario.findUnique.mockResolvedValue({
-        id: USUARIO_ID,
-        colaborador: { email: "u@nexott.app", estadoEmpleado: EstadoEmpleado.ACTIVO },
-      })
-      prisma.preferenciaNotificacion.findUnique.mockResolvedValue(null)
-      prisma.notificacion.create.mockResolvedValue({ id: NOTIF_ID })
-      prisma.notificacionCanal.create.mockResolvedValue({})
-      email.programar({ enviado: true })
+  it("provider devuelve error -> persiste error_correo y solo IN_APP en canales", async () => {
+    prisma.usuario.findUnique.mockResolvedValue({
+      id: USUARIO_ID,
+      colaborador: { email: "u@nexott.app", estadoEmpleado: EstadoEmpleado.ACTIVO },
+    })
+    prisma.preferenciaNotificacion.findUnique.mockResolvedValue(null)
+    prisma.notificacion.create.mockResolvedValue({ id: NOTIF_ID })
+    prisma.notificacionCanal.create.mockResolvedValue({})
+    prisma.notificacion.update.mockResolvedValue({ id: NOTIF_ID })
+    email.programar({
+      enviado: false,
+      motivo: "error-resend",
+      detalle: "Resend down",
+    })
 
-      const resultado = await service.crear({
-        usuarioId: USUARIO_ID,
-        tipo: TipoEventoNotif.PLAN_RECALCULADO,
-        payload: { planId: "p", asignacionId: "a", cursoTitulo: "Curso" },
-      })
+    const resultado = await service.crear({
+      usuarioId: USUARIO_ID,
+      tipo: TipoEventoNotif.PLAN_RECALCULADO,
+      payload: { planId: "p", asignacionId: "a", cursoTitulo: "Curso" },
+    })
 
-      expect(resultado).toMatchObject({
-        creada: true,
-        canalesEnviados: [CanalNotif.IN_APP, CanalNotif.CORREO],
-      })
-      expect(prisma.notificacionCanal.create).toHaveBeenCalledTimes(2)
-      expect(prisma.notificacion.update).not.toHaveBeenCalled()
-    } finally {
-      spy.mockRestore()
-    }
+    expect(resultado).toMatchObject({ creada: true, canalesEnviados: [CanalNotif.IN_APP] })
+    expect(email.llamadas).toHaveLength(1)
+    expect(prisma.notificacion.update).toHaveBeenCalledWith({
+      where: { id: NOTIF_ID },
+      data: { errorCorreo: "Resend down" },
+    })
   })
 
-  it("modo MANUAL (flag-deshabilitado) registra error_correo y no anade canal CORREO", async () => {
-    const spy = vi.spyOn(catalogoTipoEvento, "tienePlantilla").mockReturnValue(true)
-    try {
-      prisma.usuario.findUnique.mockResolvedValue({
-        id: USUARIO_ID,
-        colaborador: { email: "u@nexott.app", estadoEmpleado: EstadoEmpleado.ACTIVO },
-      })
-      prisma.preferenciaNotificacion.findUnique.mockResolvedValue(null)
-      prisma.notificacion.create.mockResolvedValue({ id: NOTIF_ID })
-      prisma.notificacionCanal.create.mockResolvedValue({})
-      prisma.notificacion.update.mockResolvedValue({ id: NOTIF_ID })
-      email.programar({ enviado: false, motivo: "flag-deshabilitado" })
+  it("modo MANUAL (flag-deshabilitado) persiste error_correo sin canal CORREO", async () => {
+    prisma.usuario.findUnique.mockResolvedValue({
+      id: USUARIO_ID,
+      colaborador: { email: "u@nexott.app", estadoEmpleado: EstadoEmpleado.ACTIVO },
+    })
+    prisma.preferenciaNotificacion.findUnique.mockResolvedValue(null)
+    prisma.notificacion.create.mockResolvedValue({ id: NOTIF_ID })
+    prisma.notificacionCanal.create.mockResolvedValue({})
+    prisma.notificacion.update.mockResolvedValue({ id: NOTIF_ID })
+    email.programar({ enviado: false, motivo: "flag-deshabilitado" })
 
-      const resultado = await service.crear({
-        usuarioId: USUARIO_ID,
-        tipo: TipoEventoNotif.PLAN_RECALCULADO,
-        payload: { planId: "p", asignacionId: "a", cursoTitulo: "Curso" },
-      })
+    const resultado = await service.crear({
+      usuarioId: USUARIO_ID,
+      tipo: TipoEventoNotif.PLAN_RECALCULADO,
+      payload: { planId: "p", asignacionId: "a", cursoTitulo: "Curso" },
+    })
 
-      expect(resultado).toMatchObject({ creada: true, canalesEnviados: [CanalNotif.IN_APP] })
-      expect(prisma.notificacion.update).toHaveBeenCalledWith({
-        where: { id: NOTIF_ID },
-        data: { errorCorreo: "flag-deshabilitado" },
-      })
-    } finally {
-      spy.mockRestore()
-    }
+    expect(resultado).toMatchObject({ creada: true, canalesEnviados: [CanalNotif.IN_APP] })
+    expect(prisma.notificacion.update).toHaveBeenCalledWith({
+      where: { id: NOTIF_ID },
+      data: { errorCorreo: "flag-deshabilitado" },
+    })
+  })
+
+  it("payload invalido para el shape de la plantilla -> no envia email pero crea IN_APP", async () => {
+    prisma.usuario.findUnique.mockResolvedValue({
+      id: USUARIO_ID,
+      colaborador: { email: "u@nexott.app", estadoEmpleado: EstadoEmpleado.ACTIVO },
+    })
+    prisma.preferenciaNotificacion.findUnique.mockResolvedValue(null)
+    prisma.notificacion.create.mockResolvedValue({ id: NOTIF_ID })
+    prisma.notificacionCanal.create.mockResolvedValue({})
+
+    const resultado = await service.crear({
+      usuarioId: USUARIO_ID,
+      tipo: TipoEventoNotif.PLAN_RECALCULADO,
+      payload: { planId: "p", asignacionId: "a" },
+    })
+
+    expect(resultado).toMatchObject({ creada: true, canalesEnviados: [CanalNotif.IN_APP] })
+    expect(email.llamadas).toHaveLength(0)
+    expect(prisma.notificacion.update).not.toHaveBeenCalled()
   })
 
   it("no consulta preferencias para tipos criticos (corto-circuito de §19.3 punto 1)", async () => {
@@ -315,7 +337,12 @@ function buildService(): {
   const prisma = buildPrismaMock()
   const email = new StubEmailProvider()
   const audit = buildAuditMock()
-  const service = new NotificacionesService(prisma as unknown as PrismaService, email, audit)
+  const service = new NotificacionesService(
+    prisma as unknown as PrismaService,
+    email,
+    audit,
+    buildConfigMock(),
+  )
   return { prisma, audit, service }
 }
 

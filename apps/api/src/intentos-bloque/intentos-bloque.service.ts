@@ -273,7 +273,7 @@ export class IntentosBloqueService {
           where: { id: intento.id },
           select: SELECT_INTENTO_FIELDS,
         })
-        // TODO(S10): emitir notificacion ... (no se emite nada en P7b — D-S7-D3).
+        // TODO(S11): emitir notificacion ... (no se emite nada en P7b — D-S7-D3).
         return { status: HTTP_CREATED, body: toIntentoResponse(intentoFinal) }
       },
     })

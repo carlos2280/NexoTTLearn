@@ -24,11 +24,13 @@ import {
   type RazonItemPlan as PrismaRazonItemPlan,
   RolAsignacion,
   RolUsuario,
+  TipoEventoNotif,
 } from "@prisma/client"
 import { AuditLogService } from "../common/audit/audit-log.service"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
+import { NotificacionesService } from "../notificaciones/notificaciones.service"
 import {
   type ResultadoCalculo,
   calcularAvance,
@@ -74,6 +76,7 @@ export class PlanPersonalService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
+    private readonly notificaciones: NotificacionesService,
   ) {}
 
   /**
@@ -145,7 +148,7 @@ export class PlanPersonalService {
         },
       })
     }
-    return await this.prisma.$transaction(async (tx) => {
+    const respuesta = await this.prisma.$transaction(async (tx) => {
       await this.calcularInterno({ asignacionId, tx, fallarSiExiste: true })
       return (await this.obtenerPlanInterno(
         tx,
@@ -153,6 +156,10 @@ export class PlanPersonalService {
         RolUsuario.ADMIN,
       )) as PlanResponseAdmin
     })
+    // D-AUDIT-2 / R-S10-2: la notificacion se emite FUERA del TX. Si falla,
+    // se loggea sin propagar al admin (el plan ya esta calculado y persistido).
+    await this.notificarPlanRecalculado(asignacionId, respuesta.planId)
+    return respuesta
   }
 
   /**
@@ -160,7 +167,8 @@ export class PlanPersonalService {
    * Reemplaza items + actualiza snapshot + `estaDesactualizado=false`.
    * Audit `PLAN_RECALCULADO` se registra fuera del TX (D-AUDIT-1) con
    * metadata estructural sin texto crudo del motivo (D-S7-D4).
-   * TODO(S10): emitir notificacion PLAN_RECALCULADO al participante.
+   * P10c (D-S10-C9): emite notificacion PLAN_RECALCULADO al participante
+   * tras el commit (best-effort fuera del TX).
    */
   async recalcular(
     asignacionId: string,
@@ -214,6 +222,7 @@ export class PlanPersonalService {
         motivoLength: motivo.trim().length,
       },
     })
+    await this.notificarPlanRecalculado(asignacionId, planExistente.id)
     return respuesta
   }
 
@@ -255,7 +264,8 @@ export class PlanPersonalService {
    * `PATCH /plan/ajustes` — ADMIN. Aplica un ajuste manual (AGREGAR / QUITAR /
    * CAMBIAR_CARACTER / EXIMIR). El motivo es obligatorio (controller + guard).
    * Audit `PLAN_AJUSTADO_MANUALMENTE` fuera del TX (D-S7-D4) sin texto crudo.
-   * TODO(S10): emitir notificacion PLAN_AJUSTADO_MANUALMENTE al participante.
+   * P10c (D-S10-C9): emite notificacion PLAN_RECALCULADO (reinterpretacion
+   * §5.106 de PLAN_AJUSTADO_MANUALMENTE) al participante tras el audit.
    */
   async ajustarPlan(
     asignacionId: string,
@@ -320,6 +330,8 @@ export class PlanPersonalService {
       recursoId: planId,
       metadata: this.metadataAuditAjuste(plan.id, asignacionId, dto, motivo),
     })
+
+    await this.notificarPlanRecalculado(asignacionId, planId)
 
     return (await this.obtenerPlanInterno(
       this.prisma,
@@ -456,8 +468,10 @@ export class PlanPersonalService {
    * `POST /asignaciones/:id/secciones/:seccionId/apertura` — ADMIN o propio.
    * Idempotente: segundo POST devuelve `yaEstaba=true` sin tocar la fila.
    * NO audit log (D-S7-D4): la fila `AperturaSeccion` es el audit funcional.
-   * TODO(S10): si la seccion no tiene bloques evaluables, esto podria marcar
-   * el plan como desactualizado si el avance llega a 100% (emitir notif).
+   * Deuda §5.123 (FIX-P10-cierre): la apertura de una seccion sin bloques
+   * evaluables podria completar el plan; falta logica que detecte ese caso
+   * para emitir PLAN_RECALCULADO. P10c NO emite aqui — la apertura es
+   * informativa y no recalcula el plan en el flujo actual.
    */
   async registrarApertura(
     asignacionId: string,
@@ -1014,6 +1028,46 @@ export class PlanPersonalService {
       return { ...base, skillId: dto.skillId }
     }
     return { ...base, seccionId: dto.seccionId }
+  }
+
+  /**
+   * Trigger PLAN_RECALCULADO (D-S10-C9). Emite la notificacion al usuario
+   * destinatario derivado de la asignacion (NUNCA del body — A01). Captura
+   * cualquier error y lo loggea sin propagarlo: el flujo origen ya hizo
+   * commit y el caller no debe ver fallos de notificacion (R-S10-2 / B7).
+   */
+  private async notificarPlanRecalculado(asignacionId: string, planId: string): Promise<void> {
+    try {
+      const asignacion = await this.prisma.asignacionCurso.findUnique({
+        where: { id: asignacionId },
+        select: {
+          curso: { select: { titulo: true } },
+          colaborador: { select: { usuario: { select: { id: true } } } },
+        },
+      })
+      const usuarioId = asignacion?.colaborador?.usuario?.id
+      const cursoTitulo = asignacion?.curso?.titulo
+      if (!(usuarioId && cursoTitulo)) {
+        this.logger.warn(
+          `notif | plan-recalculado omitida | asignacion=${asignacionId} | motivo=sin-usuario-o-curso`,
+        )
+        return
+      }
+      await this.notificaciones.crear({
+        usuarioId,
+        tipo: TipoEventoNotif.PLAN_RECALCULADO,
+        payload: {
+          planId,
+          asignacionId,
+          cursoTitulo,
+        },
+      })
+    } catch (error) {
+      const detalle = error instanceof Error ? error.message : String(error)
+      this.logger.warn(
+        `notif | fallo | tipo=PLAN_RECALCULADO | asignacion=${asignacionId} | error=${detalle}`,
+      )
+    }
   }
 }
 

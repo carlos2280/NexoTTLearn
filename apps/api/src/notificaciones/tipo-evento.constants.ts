@@ -1,4 +1,5 @@
 import { TipoEventoNotif } from "@prisma/client"
+import { PLANTILLAS } from "./email/plantillas"
 
 /**
  * Constantes del catalogo D88 — autoridad en codigo (no en BD).
@@ -60,18 +61,15 @@ export const AUDIENCIA_POR_TIPO: ReadonlyMap<TipoEventoNotif, AudienciaTipo> = n
 /**
  * Tipos con plantilla HTML/text disponible.
  *
- * En P10a el enum BD admite los 13 tipos D88 pero **ninguno** dispara plantilla
- * real: el set esta vacio y `tienePlantilla()` siempre devuelve `false`. P10c
- * pasa a `true` los tipos `PLAN_RECALCULADO` y `RESULTADO_CIERRE` cuando las
- * plantillas concretas existan.
+ * Fuente unica de verdad: el registro `PLANTILLAS` en `email/plantillas/index.ts`.
+ * En P10c se activan `PLAN_RECALCULADO` y `RESULTADO_CIERRE`; los demas tipos
+ * D88 entraran cuando sus plantillas se implementen (TODO(S11)).
  *
  * Se expone como funcion (no como objeto literal) para poder mockearla en tests
- * sin mutar global state — `vi.spyOn(tipoEventoModule, 'tienePlantilla')`.
+ * sin mutar global state — `vi.spyOn(catalogoTipoEvento, 'tienePlantilla')`.
  */
-const TIPOS_CON_PLANTILLA: ReadonlySet<TipoEventoNotif> = new Set<TipoEventoNotif>([])
-
 function tienePlantilla(tipo: TipoEventoNotif): boolean {
-  return TIPOS_CON_PLANTILLA.has(tipo)
+  return PLANTILLAS.has(tipo)
 }
 
 export function esTipoCritico(tipo: TipoEventoNotif): boolean {

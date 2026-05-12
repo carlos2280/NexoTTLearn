@@ -16,8 +16,27 @@ import { AuditLogService } from "../common/audit/audit-log.service"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
 import type { SesionUsuario } from "../common/types/sesion.types"
+import { NotificacionesService } from "../notificaciones/notificaciones.service"
 import { calcularAvance, calcularPlan, toPlanResponse } from "./plan-personal.helpers"
 import { PlanPersonalService } from "./plan-personal.service"
+
+interface NotificacionesSpy {
+  readonly crear: ReturnType<typeof vi.fn>
+}
+
+function buildNotificacionesMock(
+  override?: Partial<{ crear: ReturnType<typeof vi.fn> }>,
+): NotificacionesSpy {
+  return {
+    crear:
+      override?.crear ??
+      vi.fn().mockResolvedValue({
+        creada: true,
+        notificacionId: "n0000000-0000-0000-0000-000000000000",
+        canalesEnviados: ["IN_APP"],
+      }),
+  }
+}
 
 const ASIGNACION_ID = "a0000000-0000-0000-0000-000000000001"
 const CURSO_ID = "c0000000-0000-0000-0000-000000000001"
@@ -148,17 +167,24 @@ function buildPrismaMock(): MockPrisma {
 let prisma: MockPrisma
 let service: PlanPersonalService
 let moduleRef: TestingModule
+let notificaciones: NotificacionesSpy
 
 beforeEach(async () => {
   prisma = buildPrismaMock()
+  notificaciones = buildNotificacionesMock()
+  const notifSpy = notificaciones
   moduleRef = await Test.createTestingModule({
     providers: [
       {
         provide: PlanPersonalService,
         useFactory: (p: PrismaService) =>
-          new PlanPersonalService(p, {
-            record: vi.fn().mockResolvedValue(undefined),
-          } as unknown as AuditLogService),
+          new PlanPersonalService(
+            p,
+            {
+              record: vi.fn().mockResolvedValue(undefined),
+            } as unknown as AuditLogService,
+            notifSpy as unknown as NotificacionesService,
+          ),
         inject: [PrismaService],
       },
       { provide: PrismaService, useValue: prisma },
@@ -1015,5 +1041,173 @@ describe("PlanPersonalService.registrarApertura (P7c)", () => {
     ).rejects.toMatchObject({
       response: { code: apiErrorCodes.conflictAsignacionCerrada },
     })
+  })
+})
+
+// =============================================================================
+// P10c — Cableado de triggers PLAN_RECALCULADO (D-S10-C9).
+// =============================================================================
+
+const USUARIO_PARTICIPANTE = "9000000c-0000-0000-0000-000000000003"
+
+function configurarPlanRecalculadoMock(): void {
+  prisma.asignacionCurso.findUnique.mockImplementation(
+    (args: { select?: Record<string, unknown> }) => {
+      if (args.select && "curso" in args.select && "colaborador" in args.select) {
+        return Promise.resolve({
+          curso: { titulo: "Curso de prueba" },
+          colaborador: { usuario: { id: USUARIO_PARTICIPANTE } },
+        })
+      }
+      return Promise.resolve({ id: ASIGNACION_ID, rol: RolAsignacion.ASIGNADO })
+    },
+  )
+}
+
+function configurarRecalcularHappyPath(): void {
+  prisma.planEstudio.findUnique
+    .mockResolvedValueOnce({ id: "plan-existente" })
+    .mockResolvedValueOnce({ id: "plan-existente" })
+    .mockResolvedValueOnce({
+      id: "plan-existente",
+      asignacionId: ASIGNACION_ID,
+      fechaCalculo: new Date(),
+      fichaSnapshot: {
+        fechaCalculo: new Date().toISOString(),
+        versionSnapshot: 1,
+        skillsConsideradas: [],
+      },
+      estaDesactualizado: false,
+    })
+  prisma.asignacionCurso.findUniqueOrThrow
+    .mockResolvedValueOnce({
+      id: ASIGNACION_ID,
+      cursoId: CURSO_ID,
+      colaboradorId: COLABORADOR_ID,
+    })
+    .mockResolvedValueOnce({ colaboradorId: COLABORADOR_ID })
+  prisma.curso.findUniqueOrThrow.mockResolvedValue({ id: CURSO_ID, umbralNoCumple: 10 })
+  prisma.planEstudio.update.mockResolvedValue({ id: "plan-existente" })
+}
+
+describe("PlanPersonalService.recalcular -> notificacion PLAN_RECALCULADO", () => {
+  it("invoca notificaciones.crear con payload tipado tras el commit", async () => {
+    configurarPlanRecalculadoMock()
+    configurarRecalcularHappyPath()
+
+    await service.recalcular(ASIGNACION_ID, AUTOR_USUARIO_ID, "motivo")
+
+    expect(notificaciones.crear).toHaveBeenCalledTimes(1)
+    expect(notificaciones.crear).toHaveBeenCalledWith({
+      usuarioId: USUARIO_PARTICIPANTE,
+      tipo: "PLAN_RECALCULADO",
+      payload: {
+        planId: "plan-existente",
+        asignacionId: ASIGNACION_ID,
+        cursoTitulo: "Curso de prueba",
+      },
+    })
+  })
+
+  it("error en notificaciones.crear NO propaga al caller (best-effort)", async () => {
+    configurarPlanRecalculadoMock()
+    configurarRecalcularHappyPath()
+    notificaciones.crear.mockRejectedValueOnce(new Error("boom"))
+
+    await expect(
+      service.recalcular(ASIGNACION_ID, AUTOR_USUARIO_ID, "motivo"),
+    ).resolves.toBeDefined()
+  })
+})
+
+describe("PlanPersonalService.calcularExplicito -> notificacion PLAN_RECALCULADO", () => {
+  it("invoca notificaciones.crear con planId del plan recien creado", async () => {
+    prisma.asignacionCurso.findUnique
+      .mockResolvedValueOnce({ id: ASIGNACION_ID, rol: RolAsignacion.ASIGNADO })
+      .mockResolvedValueOnce({
+        curso: { titulo: "Curso de prueba" },
+        colaborador: { usuario: { id: USUARIO_PARTICIPANTE } },
+      })
+    prisma.planEstudio.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "plan-nuevo",
+        asignacionId: ASIGNACION_ID,
+        fechaCalculo: new Date(),
+        fichaSnapshot: {
+          fechaCalculo: new Date().toISOString(),
+          versionSnapshot: 1,
+          skillsConsideradas: [],
+        },
+        estaDesactualizado: false,
+      })
+    prisma.asignacionCurso.findUniqueOrThrow
+      .mockResolvedValueOnce({
+        id: ASIGNACION_ID,
+        cursoId: CURSO_ID,
+        colaboradorId: COLABORADOR_ID,
+      })
+      .mockResolvedValueOnce({ colaboradorId: COLABORADOR_ID })
+    prisma.curso.findUniqueOrThrow.mockResolvedValue({ id: CURSO_ID, umbralNoCumple: 10 })
+    prisma.planEstudio.create.mockResolvedValue({ id: "plan-nuevo" })
+
+    await service.calcularExplicito(ASIGNACION_ID)
+
+    expect(notificaciones.crear).toHaveBeenCalledTimes(1)
+    expect(notificaciones.crear).toHaveBeenCalledWith({
+      usuarioId: USUARIO_PARTICIPANTE,
+      tipo: "PLAN_RECALCULADO",
+      payload: expect.objectContaining({
+        planId: "plan-nuevo",
+        asignacionId: ASIGNACION_ID,
+      }) as Record<string, unknown>,
+    })
+  })
+})
+
+describe("PlanPersonalService.ajustarPlan -> notificacion PLAN_RECALCULADO", () => {
+  it("invoca notificaciones.crear tras audit log (D-S10-C9 reinterpretacion §5.106)", async () => {
+    prisma.planEstudio.findUnique
+      .mockResolvedValueOnce({
+        id: "plan-existente",
+        asignacion: { cursoId: CURSO_ID, rol: RolAsignacion.ASIGNADO },
+      })
+      .mockResolvedValueOnce({
+        id: "plan-existente",
+        asignacionId: ASIGNACION_ID,
+        fechaCalculo: new Date(),
+        fichaSnapshot: {
+          fechaCalculo: new Date().toISOString(),
+          versionSnapshot: 1,
+          skillsConsideradas: [],
+        },
+        estaDesactualizado: false,
+      })
+    prisma.cursoModuloHabilitado.findFirst.mockResolvedValue({ moduloId: MODULO_ID_1 })
+    prisma.seccion.findUnique.mockResolvedValue({ moduloId: MODULO_ID_1 })
+    prisma.itemPlan.findUnique.mockResolvedValue(null)
+    // notificarPlanRecalculado: findUnique con shape curso+colaborador.
+    prisma.asignacionCurso.findUnique.mockResolvedValueOnce({
+      curso: { titulo: "Curso de prueba" },
+      colaborador: { usuario: { id: USUARIO_PARTICIPANTE } },
+    })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
+    prisma.itemPlan.findMany.mockResolvedValue([])
+    prisma.seccion.findMany.mockResolvedValue([])
+
+    await service.ajustarPlan(
+      ASIGNACION_ID,
+      { accion: "AGREGAR", seccionId: SECCION_ID_1, caracter: "OBLIGATORIA" },
+      AUTOR_USUARIO_ID,
+      "motivo",
+    )
+
+    expect(notificaciones.crear).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usuarioId: USUARIO_PARTICIPANTE,
+        tipo: "PLAN_RECALCULADO",
+      }),
+    )
   })
 })

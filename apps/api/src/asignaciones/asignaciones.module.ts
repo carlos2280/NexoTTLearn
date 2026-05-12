@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common"
 import { PrismaModule } from "../common/prisma/prisma.module"
+import { NotificacionesModule } from "../notificaciones/notificaciones.module"
 import { PlanPersonalModule } from "../plan-personal/plan-personal.module"
 import { AsignacionesController } from "./asignaciones.controller"
 import { AsignacionesService } from "./asignaciones.service"
@@ -11,9 +12,12 @@ import { AsignacionesService } from "./asignaciones.service"
  *
  * Importa PrismaModule explicitamente. AuditLogModule esta marcado @Global
  * en `common/audit/audit-log.module.ts`, no se reimporta aqui.
+ *
+ * P10c: importa `NotificacionesModule` para inyectar `NotificacionesService`
+ * en el trigger `cerrarCaso` (RESULTADO_CIERRE).
  */
 @Module({
-  imports: [PrismaModule, PlanPersonalModule],
+  imports: [PrismaModule, PlanPersonalModule, NotificacionesModule],
   controllers: [AsignacionesController],
   providers: [AsignacionesService],
   exports: [AsignacionesService],

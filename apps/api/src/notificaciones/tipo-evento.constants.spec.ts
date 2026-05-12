@@ -39,10 +39,14 @@ describe("tipo-evento.constants", () => {
     expect(AUDIENCIA_POR_TIPO.get(TipoEventoNotif.EXCEL_CARGADO)).toBe("admin")
   })
 
-  it("catalogoTipoEvento.tienePlantilla devuelve false para los 13 tipos en P10a", () => {
+  it("catalogoTipoEvento.tienePlantilla devuelve true solo para los tipos activados en P10c", () => {
+    const conPlantilla: ReadonlySet<TipoEventoNotif> = new Set<TipoEventoNotif>([
+      TipoEventoNotif.PLAN_RECALCULADO,
+      TipoEventoNotif.RESULTADO_CIERRE,
+    ])
     const valoresEnum = Object.values(TipoEventoNotif)
     for (const tipo of valoresEnum) {
-      expect(catalogoTipoEvento.tienePlantilla(tipo)).toBe(false)
+      expect(catalogoTipoEvento.tienePlantilla(tipo)).toBe(conPlantilla.has(tipo))
     }
   })
 })

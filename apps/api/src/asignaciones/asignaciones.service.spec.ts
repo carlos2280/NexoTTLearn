@@ -7,8 +7,23 @@ import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
+import { NotificacionesService } from "../notificaciones/notificaciones.service"
 import { PlanPersonalService } from "../plan-personal/plan-personal.service"
 import { AsignacionesService } from "./asignaciones.service"
+
+interface NotificacionesSpy {
+  readonly crear: ReturnType<typeof vi.fn>
+}
+
+function buildNotificacionesMock(): NotificacionesSpy {
+  return {
+    crear: vi.fn().mockResolvedValue({
+      creada: true,
+      notificacionId: "n-mock",
+      canalesEnviados: ["IN_APP"],
+    }),
+  }
+}
 
 interface MockPrisma {
   asignacionCurso: {
@@ -144,6 +159,7 @@ let prisma: MockPrisma
 let idempotency: MockIdempotency
 let service: AsignacionesService
 let moduleRef: TestingModule
+let notificaciones: NotificacionesSpy
 
 const planPersonalMock = {
   calcularSiAsignado: vi.fn(async () => {
@@ -154,18 +170,25 @@ const planPersonalMock = {
 beforeEach(async () => {
   prisma = buildPrismaMock()
   idempotency = buildIdempotencyMock(prisma)
+  notificaciones = buildNotificacionesMock()
+  const notifSpy = notificaciones
   planPersonalMock.calcularSiAsignado.mockClear()
   moduleRef = await Test.createTestingModule({
     providers: [
       {
         provide: AsignacionesService,
-        useFactory: (p: PrismaService, i: IdempotencyService, pp: PlanPersonalService) =>
-          new AsignacionesService(p, i, pp),
-        inject: [PrismaService, IdempotencyService, PlanPersonalService],
+        useFactory: (
+          p: PrismaService,
+          i: IdempotencyService,
+          pp: PlanPersonalService,
+          n: NotificacionesService,
+        ) => new AsignacionesService(p, i, pp, n),
+        inject: [PrismaService, IdempotencyService, PlanPersonalService, NotificacionesService],
       },
       { provide: PrismaService, useValue: prisma },
       { provide: IdempotencyService, useValue: idempotency },
       { provide: PlanPersonalService, useValue: planPersonalMock },
+      { provide: NotificacionesService, useValue: notifSpy },
     ],
   }).compile()
   service = moduleRef.get(AsignacionesService)
@@ -846,6 +869,138 @@ describe("AsignacionesService.cerrarCaso", () => {
       autorUsuarioId: ADMIN_ID,
     })
     expect(res.nuevo).toBe(false)
+    // P10c: replay no reemite la notif.
+    expect(notificaciones.crear).not.toHaveBeenCalled()
+  })
+
+  // ===========================================================================
+  // P10c — cableado del trigger RESULTADO_CIERRE (D-S10-C9).
+  // ===========================================================================
+
+  function configurarFindUniqueParaNotif(): void {
+    prisma.asignacionCurso.findUnique.mockImplementation(
+      (args: { select?: Record<string, unknown> }) => {
+        if (args.select && "curso" in args.select && "colaborador" in args.select) {
+          return Promise.resolve({
+            curso: { titulo: "Curso de prueba" },
+            colaborador: { usuario: { id: PARTICIPANTE_ID } },
+          })
+        }
+        return Promise.resolve({
+          id: ASIGNACION_ID,
+          rol: RolAsignacion.ASIGNADO,
+          estadoAsignado: "LISTO",
+          estadoVoluntario: null,
+        })
+      },
+    )
+  }
+
+  it("ASIGNADO APTO: emite RESULTADO_CIERRE con payload tipado tras runOnce", async () => {
+    configurarFindUniqueParaNotif()
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({ estadoAsignado: "APTO" }),
+    )
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+
+    await service.cerrarCaso({
+      asignacionId: ASIGNACION_ID,
+      bodyRaw: { resultado: "APTO" },
+      motivo: null,
+      idempotencyKey: idempKey,
+      autorUsuarioId: ADMIN_ID,
+    })
+
+    expect(notificaciones.crear).toHaveBeenCalledWith({
+      usuarioId: PARTICIPANTE_ID,
+      tipo: "RESULTADO_CIERRE",
+      payload: {
+        asignacionId: ASIGNACION_ID,
+        cursoTitulo: "Curso de prueba",
+        resultado: "APTO",
+      },
+    })
+  })
+
+  it("ASIGNADO NO_APTO: emite RESULTADO_CIERRE con resultado=NO_APTO", async () => {
+    configurarFindUniqueParaNotif()
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({ estadoAsignado: "NO_APTO" }),
+    )
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+
+    await service.cerrarCaso({
+      asignacionId: ASIGNACION_ID,
+      bodyRaw: { resultado: "NO_APTO" },
+      motivo: null,
+      idempotencyKey: idempKey,
+      autorUsuarioId: ADMIN_ID,
+    })
+
+    expect(notificaciones.crear).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: expect.objectContaining({ resultado: "NO_APTO" }) }),
+    )
+  })
+
+  it("VOLUNTARIO: emite RESULTADO_CIERRE con resultado=COMPLETADO", async () => {
+    prisma.asignacionCurso.findUnique.mockImplementation(
+      (args: { select?: Record<string, unknown> }) => {
+        if (args.select && "curso" in args.select && "colaborador" in args.select) {
+          return Promise.resolve({
+            curso: { titulo: "Curso de prueba" },
+            colaborador: { usuario: { id: PARTICIPANTE_ID } },
+          })
+        }
+        return Promise.resolve({
+          id: ASIGNACION_ID,
+          rol: RolAsignacion.VOLUNTARIO,
+          estadoAsignado: null,
+          estadoVoluntario: "EN_PROGRESO",
+        })
+      },
+    )
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({
+        rol: RolAsignacion.VOLUNTARIO,
+        estadoAsignado: null,
+        estadoVoluntario: "COMPLETADO",
+      }),
+    )
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+
+    await service.cerrarCaso({
+      asignacionId: ASIGNACION_ID,
+      bodyRaw: {},
+      motivo: null,
+      idempotencyKey: idempKey,
+      autorUsuarioId: ADMIN_ID,
+    })
+
+    expect(notificaciones.crear).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: expect.objectContaining({ resultado: "COMPLETADO" }) }),
+    )
+  })
+
+  it("error en notificaciones.crear NO propaga al admin (best-effort)", async () => {
+    configurarFindUniqueParaNotif()
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({ estadoAsignado: "APTO" }),
+    )
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+    notificaciones.crear.mockRejectedValueOnce(new Error("notif down"))
+
+    const res = await service.cerrarCaso({
+      asignacionId: ASIGNACION_ID,
+      bodyRaw: { resultado: "APTO" },
+      motivo: null,
+      idempotencyKey: idempKey,
+      autorUsuarioId: ADMIN_ID,
+    })
+    expect(res.nuevo).toBe(true)
   })
 })
 

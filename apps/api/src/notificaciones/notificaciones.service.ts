@@ -6,6 +6,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from "@nestjs/common"
+import { ConfigService } from "@nestjs/config"
 import { PatchPreferenciasNotificacionInput } from "@nexott-learn/shared-types"
 import { AccionAuditoria, CanalNotif, Prisma, TipoEventoNotif } from "@prisma/client"
 import { AuditLogService } from "../common/audit/audit-log.service"
@@ -13,8 +14,10 @@ import { ContextoHttpAuditoria } from "../common/audit/audit-log.types"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { Paginated, buildPaginatedResponse, resolvePaginacion } from "../common/http/paginated"
 import { PrismaService } from "../common/prisma/prisma.service"
+import { AppEnv } from "../config/env.validation"
 import { IEmailProvider } from "./email/email-provider.interface"
 import { EMAIL_PROVIDER } from "./email/email-provider.token"
+import { construirPlantilla } from "./email/plantillas"
 import {
   CrearNotificacionInput,
   CrearNotificacionResultado,
@@ -28,7 +31,7 @@ import { TIPOS_CRITICOS, catalogoTipoEvento } from "./tipo-evento.constants"
 /**
  * Servicio orquestador de notificaciones (D-S10-B6).
  *
- * Punto unico de entrada para todos los triggers TODO(S10). Encapsula las
+ * Punto unico de entrada para todos los triggers Slice 10. Encapsula las
  * reglas §19.3:
  *  - EX_EMPLEADO no recibe nada (punto 5).
  *  - Tipos criticos ignoran preferencias silenciadas (punto 1).
@@ -46,6 +49,7 @@ export class NotificacionesService {
     private readonly prisma: PrismaService,
     @Inject(EMAIL_PROVIDER) private readonly emailProvider: IEmailProvider,
     private readonly auditLog: AuditLogService,
+    private readonly config: ConfigService<AppEnv, true>,
   ) {}
 
   async crear(input: CrearNotificacionInput): Promise<CrearNotificacionResultado> {
@@ -105,6 +109,7 @@ export class NotificacionesService {
         notificacionId,
         usuario.colaborador.email,
         input.tipo,
+        input.payload,
         canalesEnviados,
       )
     } else {
@@ -119,21 +124,32 @@ export class NotificacionesService {
   /**
    * Intenta el envio por email fuera de la transaccion principal. Cualquier
    * error queda en `notificaciones.error_correo` (truncado por el provider)
-   * y no rompe el flujo del trigger origen.
+   * y no rompe el flujo del trigger origen (R-S10-2 / B7).
+   *
+   * P10c: construye subject + html + text desde la plantilla registrada en
+   * `email/plantillas/index.ts`. Si el tipo no tiene plantilla o el payload
+   * persistido no cumple su shape, se loggea un warn y no se intenta envio
+   * (defense in depth — `tienePlantilla()` ya filtra por tipo en el caller).
    */
   private async intentarEnvioEmail(
     notificacionId: string,
     destinatario: string,
     tipo: TipoEventoNotif,
+    payload: Prisma.InputJsonObject,
     canalesAcc: CanalNotif[],
   ): Promise<void> {
-    // En P10a no hay plantillas activas (PLANTILLA_DISPONIBLE_POR_TIPO es false
-    // para los 13 tipos); cuando P10c las habilite, las construye y delega aqui.
+    const appBaseUrl = this.config.get("APP_BASE_URL", { infer: true })
+    const plantilla = construirPlantilla(tipo, payload as Prisma.JsonValue, { appBaseUrl })
+    if (!plantilla) {
+      this.logger.warn(`notif | payload-invalido | tipo=${tipo} | notificacionId=${notificacionId}`)
+      return
+    }
+
     const resultado = await this.emailProvider.enviar({
       to: destinatario,
-      subject: `[NexoTT Learn] ${tipo}`,
-      html: "",
-      text: "",
+      subject: plantilla.subject,
+      html: plantilla.html,
+      text: plantilla.text,
     })
 
     if (resultado.enviado) {

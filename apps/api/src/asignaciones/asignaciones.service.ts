@@ -25,12 +25,14 @@ import {
   cerrarCasoAsignadoSchema,
   cerrarCasoVoluntarioSchema,
 } from "@nexott-learn/shared-types"
-import { EstadoCurso, Prisma, RolAsignacion, RolUsuario } from "@prisma/client"
+import { EstadoCurso, Prisma, RolAsignacion, RolUsuario, TipoEventoNotif } from "@prisma/client"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { buildPaginatedResponse, resolvePaginacion } from "../common/http/paginated"
 import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
+import { NotificacionesService } from "../notificaciones/notificaciones.service"
+import { ResultadoCierre } from "../notificaciones/payload/resultado-cierre.payload"
 import { PlanPersonalService } from "../plan-personal/plan-personal.service"
 import {
   HISTORICO_LITERAL_ASIGNADO_ASIGNADO,
@@ -87,6 +89,7 @@ export class AsignacionesService {
     private readonly prisma: PrismaService,
     private readonly idempotency: IdempotencyService,
     private readonly planPersonal: PlanPersonalService,
+    private readonly notificaciones: NotificacionesService,
   ) {}
 
   async listarPorCurso(
@@ -264,8 +267,10 @@ export class AsignacionesService {
         // el service del plan lo loguea y no aborta el alta; el admin puede
         // recalcular manualmente (POST /plan/recalcular).
         await this.planPersonal.calcularSiAsignado(row.id)
-        // TODO(S10): emitir notificacion ASIGNACION_CURSO al colaborador (D-AS-13, D88).
-        // TODO(S10): emitir notificacion PLAN_CALCULADO al participante (D-S7-D3).
+        // TODO(S11): emitir notificacion ASIGNACION_CURSO al colaborador (D-AS-13, D88).
+        // TODO(S11): emitir notificacion PLAN_CALCULADO al participante (D-S7-D3).
+        //  -- nota P10c: el calculo del plan no llama a calcularExplicito/recalcular,
+        //     usa calcularSiAsignado interno; el trigger debe cablearse aqui en S11.
       } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
           // Race: otro admin asigno el mismo colaborador en paralelo. Lo
@@ -345,7 +350,7 @@ export class AsignacionesService {
       // Calcular plan personal en el mismo TX (D-S7-B4). El voluntario
       // promovido pasa a ASIGNADO y obtiene plan calculado desde cero.
       await this.planPersonal.calcularSiAsignado(asignacionId, tx)
-      // TODO(S10): emitir notificacion PLAN_CALCULADO al participante (D-S7-D3).
+      // TODO(S11): emitir notificacion PLAN_CALCULADO al participante (D-S7-D3).
       return toAsignacion(row)
     })
   }
@@ -454,7 +459,7 @@ export class AsignacionesService {
         },
         select: SELECT_ASIGNACION_FIELDS,
       })
-      // TODO(S10): emitir notificacion ASIGNACION_CURSO al participante (D-AS-13, D88).
+      // TODO(S11): emitir notificacion ASIGNACION_CURSO al participante (D-AS-13, D88).
       return toAsignacion(row)
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -662,7 +667,7 @@ export class AsignacionesService {
         where: { id: asignacionId },
         select: SELECT_ASIGNACION_FIELDS,
       })
-      // TODO(S10): emitir notificacion COLABORADOR_LISTO al admin del curso (D88).
+      // TODO(S11): emitir notificacion COLABORADOR_LISTO al admin del curso (D88).
       return toAsignacion(row)
     })
   }
@@ -801,10 +806,19 @@ export class AsignacionesService {
           where: { id: input.asignacionId },
           select: SELECT_ASIGNACION_FIELDS,
         })
-        // TODO(S10): emitir notificacion RESULTADO_CIERRE al colaborador (D88).
         return { status: HTTP_OK, body: toAsignacion(row) }
       },
     })
+
+    if (!ejecucion.replay) {
+      // D-AUDIT-2 / R-S10-2: notificacion FUERA del runOnce. Si la accion fue
+      // un replay idempotente, NO se reemite. RESULTADO_CIERRE es critico
+      // (D-S10-C2) — el guard EX_EMPLEADO se aplica en el service de notif.
+      const resultadoNotif: ResultadoCierre = esAsignado
+        ? (parsed.data as CerrarCasoAsignadoRequest).resultado
+        : "COMPLETADO"
+      await this.notificarResultadoCierre(input.asignacionId, resultadoNotif)
+    }
 
     return { asignacion: ejecucion.body, nuevo: !ejecucion.replay }
   }
@@ -923,8 +937,8 @@ export class AsignacionesService {
           where: { asignacionId: input.asignacionId },
           data: { estaDesactualizado: true },
         })
-        // TODO(S10): emitir notificacion CASO_REABIERTO al colaborador (D88).
-        // TODO(S10): emitir notificacion PLAN_DESACTUALIZADO al admin (D-S7-D3).
+        // TODO(S11): emitir notificacion CASO_REABIERTO al colaborador (D88).
+        // TODO(S11): emitir notificacion PLAN_DESACTUALIZADO al admin (D-S7-D3).
         return { status: HTTP_OK, body: toAsignacion(row) }
       },
     })
@@ -1157,5 +1171,47 @@ export class AsignacionesService {
       }
     }
     return where
+  }
+
+  /**
+   * Trigger RESULTADO_CIERRE (D-S10-C9, §19.3.1). Tipo critico — no silenciable.
+   * Identidad del destinatario derivada de la asignacion (NUNCA del body).
+   * Cualquier error se loggea sin propagar al admin (R-S10-2 / B7).
+   */
+  private async notificarResultadoCierre(
+    asignacionId: string,
+    resultado: ResultadoCierre,
+  ): Promise<void> {
+    try {
+      const asignacion = await this.prisma.asignacionCurso.findUnique({
+        where: { id: asignacionId },
+        select: {
+          curso: { select: { titulo: true } },
+          colaborador: { select: { usuario: { select: { id: true } } } },
+        },
+      })
+      const usuarioId = asignacion?.colaborador?.usuario?.id
+      const cursoTitulo = asignacion?.curso?.titulo
+      if (!(usuarioId && cursoTitulo)) {
+        this.logger.warn(
+          `notif | resultado-cierre omitida | asignacion=${asignacionId} | motivo=sin-usuario-o-curso`,
+        )
+        return
+      }
+      await this.notificaciones.crear({
+        usuarioId,
+        tipo: TipoEventoNotif.RESULTADO_CIERRE,
+        payload: {
+          asignacionId,
+          cursoTitulo,
+          resultado,
+        },
+      })
+    } catch (error) {
+      const detalle = error instanceof Error ? error.message : String(error)
+      this.logger.warn(
+        `notif | fallo | tipo=RESULTADO_CIERRE | asignacion=${asignacionId} | error=${detalle}`,
+      )
+    }
   }
 }
