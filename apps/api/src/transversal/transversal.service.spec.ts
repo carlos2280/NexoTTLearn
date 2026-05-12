@@ -12,6 +12,7 @@ import { apiErrorCodes } from "../common/errors/api-error.codes"
 import type { IdempotencyService } from "../common/idempotency/idempotency.service"
 import type { PrismaService } from "../common/prisma/prisma.service"
 import type { SesionUsuario } from "../common/types/sesion.types"
+import type { NotaSkillService } from "../nota-skill/nota-skill.service"
 import type { JobEvaluacionTransversalService } from "./job-evaluacion-transversal.service"
 import { TransversalService } from "./transversal.service"
 
@@ -38,6 +39,8 @@ interface PrismaMock {
     findMany: ReturnType<typeof vi.fn>
     count: ReturnType<typeof vi.fn>
     create: ReturnType<typeof vi.fn>
+    update: ReturnType<typeof vi.fn>
+    updateMany: ReturnType<typeof vi.fn>
   }
   transversalSkill: {
     deleteMany: ReturnType<typeof vi.fn>
@@ -62,6 +65,8 @@ function buildPrismaMock(): PrismaMock {
       findMany: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
       create: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     transversalSkill: {
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
@@ -121,6 +126,11 @@ function configurarAsignacion(
 let prisma: PrismaMock
 let idempotency: { runOnce: ReturnType<typeof vi.fn> }
 let job: { dispatch: ReturnType<typeof vi.fn> }
+let notaSkill: {
+  recalcularConFuentes: ReturnType<typeof vi.fn>
+  obtenerIntentoTransversalVigente: ReturnType<typeof vi.fn>
+  calcularNotaActualSkill: ReturnType<typeof vi.fn>
+}
 let service: TransversalService
 
 beforeEach(() => {
@@ -134,9 +144,15 @@ beforeEach(() => {
     ),
   }
   job = { dispatch: vi.fn() }
+  notaSkill = {
+    recalcularConFuentes: vi.fn(async () => ({ notaActual: 80 })),
+    obtenerIntentoTransversalVigente: vi.fn(() => null),
+    calcularNotaActualSkill: vi.fn(() => 80),
+  }
   service = new TransversalService(
     prisma as unknown as PrismaService,
     idempotency as unknown as IdempotencyService,
+    notaSkill as unknown as NotaSkillService,
     job as unknown as JobEvaluacionTransversalService,
   )
 })
@@ -417,5 +433,282 @@ describe("E2. POST skills transversal", () => {
     expect(r.transversalId).toBe(TRANSVERSAL_ID)
     expect(r.skillsActualizadas).toEqual([SKILL_ID])
     expect(r.intentosRecalculados).toBe(2)
+  })
+})
+
+// =============================================================================
+// P8b — capas + finalizar + anular
+// =============================================================================
+
+describe("E7. POST /intentos-transversal/:id/capas/tests (P8b)", () => {
+  function intentoBase(
+    overrides: Partial<{
+      estado: string
+      anulado: boolean
+      capaTestsActiva: boolean
+      notaCualitativa: number | null
+      notaComprension: number | null
+    }> = {},
+  ) {
+    return {
+      id: INTENTO_ID,
+      estado: overrides.estado ?? "EN_EVALUACION",
+      anulado: overrides.anulado ?? false,
+      notaCapaTests: null,
+      notaCapaCualitativa:
+        overrides.notaCualitativa === undefined
+          ? null
+          : overrides.notaCualitativa === null
+            ? null
+            : new Prisma.Decimal(overrides.notaCualitativa),
+      notaCapaComprension:
+        overrides.notaComprension === undefined
+          ? null
+          : overrides.notaComprension === null
+            ? null
+            : new Prisma.Decimal(overrides.notaComprension),
+      evaluacionesCapas: {},
+      transversal: {
+        capaTestsActiva: overrides.capaTestsActiva ?? true,
+        capaCualitativaActiva: true,
+        capaComprensionActiva: true,
+      },
+    }
+  }
+
+  it("404 si el intento no existe", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce(null)
+    await expect(
+      service.cargarCapaTests({
+        intentoId: INTENTO_ID,
+        body: { nota: 70, detalle: { fuente: "ci" } },
+        idempotencyKey: IDEMPOTENCY_KEY,
+        usuario: ADMIN,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException)
+  })
+
+  it("409 si estado FINALIZADO (conflictIntentoTransversalNoEditable)", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce(
+      intentoBase({ estado: "FINALIZADO" }),
+    )
+    await expect(
+      service.cargarCapaTests({
+        intentoId: INTENTO_ID,
+        body: { nota: 70, detalle: {} },
+        idempotencyKey: IDEMPOTENCY_KEY,
+        usuario: ADMIN,
+      }),
+    ).rejects.toMatchObject({
+      response: { code: apiErrorCodes.conflictIntentoTransversalNoEditable },
+    })
+  })
+
+  it("409 conflictCapaInactiva si capa tests desactivada", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce(
+      intentoBase({ capaTestsActiva: false }),
+    )
+    await expect(
+      service.cargarCapaTests({
+        intentoId: INTENTO_ID,
+        body: { nota: 70, detalle: {} },
+        idempotencyKey: IDEMPOTENCY_KEY,
+        usuario: ADMIN,
+      }),
+    ).rejects.toMatchObject({
+      response: { code: apiErrorCodes.conflictCapaInactiva },
+    })
+  })
+
+  it("persiste nota y transita a EVALUADO si era la 3a capa", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce(
+      intentoBase({ notaCualitativa: 80, notaComprension: 70 }),
+    )
+    prisma.intentoTransversal.update.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      transversalId: TRANSVERSAL_ID,
+      colaboradorId: COLABORADOR_ID,
+      fecha: new Date(),
+      estado: "EVALUADO",
+      anulado: false,
+      motivoAnulacion: null,
+      repoUrl: REPO_URL,
+      repoOArtefacto: { tipo: "URL_GIT", url: REPO_URL },
+      comentarioColaborador: null,
+      notaCapaTests: new Prisma.Decimal(75),
+      notaCapaCualitativa: new Prisma.Decimal(80),
+      notaCapaComprension: new Prisma.Decimal(70),
+      notaGlobal: null,
+      aprobado: false,
+    })
+    const r = await service.cargarCapaTests({
+      intentoId: INTENTO_ID,
+      body: { nota: 75, detalle: { fuente: "ci" } },
+      idempotencyKey: IDEMPOTENCY_KEY,
+      usuario: ADMIN,
+    })
+    expect(prisma.intentoTransversal.update).toHaveBeenCalledOnce()
+    const updateArgs = prisma.intentoTransversal.update.mock.calls[0]?.[0] as {
+      data: { estado?: string; notaCapaTests?: Prisma.Decimal }
+    }
+    expect(updateArgs.data.estado).toBe("EVALUADO")
+    expect(r.estado).toBe("EVALUADO")
+  })
+})
+
+describe("E10. POST /intentos-transversal/:id/finalizar (P8b)", () => {
+  it("404 si el intento no existe", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce(null)
+    await expect(
+      service.finalizar({ intentoId: INTENTO_ID, usuario: ADMIN }),
+    ).rejects.toBeInstanceOf(NotFoundException)
+  })
+
+  it("409 si estado != EVALUADO", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      transversalId: TRANSVERSAL_ID,
+      colaboradorId: COLABORADOR_ID,
+      estado: "EN_EVALUACION",
+      anulado: false,
+      notaCapaTests: null,
+      notaCapaCualitativa: null,
+      notaCapaComprension: null,
+      transversal: {
+        cursoId: CURSO_ID,
+        umbralAprobacion: new Prisma.Decimal(70),
+        pesoCapaTests: new Prisma.Decimal(40),
+        pesoCapaCualitativa: new Prisma.Decimal(30),
+        pesoCapaComprension: new Prisma.Decimal(30),
+        capaTestsActiva: true,
+        capaCualitativaActiva: true,
+        capaComprensionActiva: true,
+        skills: [],
+      },
+    })
+    await expect(
+      service.finalizar({ intentoId: INTENTO_ID, usuario: ADMIN }),
+    ).rejects.toMatchObject({
+      response: { code: apiErrorCodes.conflictIntentoTransversalNoEvaluado },
+    })
+  })
+
+  it("calcula nota global, marca aprobado y replica a skills etiquetadas", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      transversalId: TRANSVERSAL_ID,
+      colaboradorId: COLABORADOR_ID,
+      estado: "EVALUADO",
+      anulado: false,
+      notaCapaTests: new Prisma.Decimal(80),
+      notaCapaCualitativa: new Prisma.Decimal(70),
+      notaCapaComprension: new Prisma.Decimal(90),
+      transversal: {
+        cursoId: CURSO_ID,
+        umbralAprobacion: new Prisma.Decimal(70),
+        pesoCapaTests: new Prisma.Decimal(40),
+        pesoCapaCualitativa: new Prisma.Decimal(30),
+        pesoCapaComprension: new Prisma.Decimal(30),
+        capaTestsActiva: true,
+        capaCualitativaActiva: true,
+        capaComprensionActiva: true,
+        skills: [{ skillId: SKILL_ID }, { skillId: "skill-2" }],
+      },
+    })
+    prisma.intentoTransversal.updateMany.mockResolvedValueOnce({ count: 1 })
+
+    const r = await service.finalizar({ intentoId: INTENTO_ID, usuario: ADMIN })
+
+    // 0.4*80 + 0.3*70 + 0.3*90 = 80
+    expect(r.notaGlobal).toBe(80)
+    expect(r.aprobado).toBe(true)
+    expect(r.skillsActualizadas).toEqual([SKILL_ID, "skill-2"])
+    expect(notaSkill.recalcularConFuentes).toHaveBeenCalledTimes(2)
+  })
+
+  it("409 conflictIntentoTransversalYaAnulado si anulado=true", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      transversalId: TRANSVERSAL_ID,
+      colaboradorId: COLABORADOR_ID,
+      estado: "FINALIZADO",
+      anulado: true,
+      notaCapaTests: new Prisma.Decimal(80),
+      notaCapaCualitativa: new Prisma.Decimal(70),
+      notaCapaComprension: new Prisma.Decimal(90),
+      transversal: {
+        cursoId: CURSO_ID,
+        umbralAprobacion: new Prisma.Decimal(70),
+        pesoCapaTests: new Prisma.Decimal(40),
+        pesoCapaCualitativa: new Prisma.Decimal(30),
+        pesoCapaComprension: new Prisma.Decimal(30),
+        capaTestsActiva: true,
+        capaCualitativaActiva: true,
+        capaComprensionActiva: true,
+        skills: [],
+      },
+    })
+    await expect(
+      service.finalizar({ intentoId: INTENTO_ID, usuario: ADMIN }),
+    ).rejects.toMatchObject({
+      response: { code: apiErrorCodes.conflictIntentoTransversalYaAnulado },
+    })
+  })
+})
+
+describe("E11. POST /intentos-transversal/:id/anular (P8b)", () => {
+  it("404 si el intento no existe", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce(null)
+    await expect(
+      service.anular({
+        intentoId: INTENTO_ID,
+        motivo: "duplicado",
+        idempotencyKey: IDEMPOTENCY_KEY,
+        usuario: ADMIN,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException)
+  })
+
+  it("409 conflictIntentoTransversalYaAnulado si ya anulado", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      transversalId: TRANSVERSAL_ID,
+      colaboradorId: COLABORADOR_ID,
+      estado: "ANULADO",
+      anulado: true,
+      transversal: { cursoId: CURSO_ID, skills: [] },
+    })
+    await expect(
+      service.anular({
+        intentoId: INTENTO_ID,
+        motivo: "motivo de prueba",
+        idempotencyKey: IDEMPOTENCY_KEY,
+        usuario: ADMIN,
+      }),
+    ).rejects.toMatchObject({
+      response: { code: apiErrorCodes.conflictIntentoTransversalYaAnulado },
+    })
+  })
+
+  it("anula + recalcula skills etiquetadas + responde con skillsRecalculadas", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      transversalId: TRANSVERSAL_ID,
+      colaboradorId: COLABORADOR_ID,
+      estado: "FINALIZADO",
+      anulado: false,
+      transversal: { cursoId: CURSO_ID, skills: [{ skillId: SKILL_ID }] },
+    })
+    prisma.intentoTransversal.updateMany.mockResolvedValueOnce({ count: 1 })
+    const r = await service.anular({
+      intentoId: INTENTO_ID,
+      motivo: "duplicado por error",
+      idempotencyKey: IDEMPOTENCY_KEY,
+      usuario: ADMIN,
+    })
+    expect(r.response.anulado).toBe(true)
+    expect(r.response.skillsRecalculadas).toEqual([SKILL_ID])
+    expect(notaSkill.recalcularConFuentes).toHaveBeenCalledOnce()
+    expect(r.replay).toBe(false)
   })
 })

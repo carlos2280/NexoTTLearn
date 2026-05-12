@@ -1,8 +1,8 @@
-import { Prisma } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AiService } from "../common/ai/ai.service"
 import type { PrismaService } from "../common/prisma/prisma.service"
 import { JobEvaluacionTransversalService } from "./job-evaluacion-transversal.service"
+import type { TransversalService } from "./transversal.service"
 
 const INTENTO_ID_BASE = "10000000-0000-0000-0000-00000000000"
 const REPO_URL = "https://github.com/foo/bar"
@@ -10,15 +10,18 @@ const REPO_URL = "https://github.com/foo/bar"
 interface PrismaMock {
   readonly intentoTransversal: {
     readonly findUnique: ReturnType<typeof vi.fn>
-    readonly update: ReturnType<typeof vi.fn>
   }
 }
 
 function buildPrismaMock(): PrismaMock {
   return {
     intentoTransversal: {
-      findUnique: vi.fn().mockResolvedValue({ repoUrl: REPO_URL, estado: "EN_EVALUACION" }),
-      update: vi.fn().mockResolvedValue({}),
+      findUnique: vi.fn().mockResolvedValue({
+        repoUrl: REPO_URL,
+        estado: "EN_EVALUACION",
+        colaboradorId: "f0000000-0000-0000-0000-000000000001",
+        transversal: { capaTestsActiva: true },
+      }),
     },
   }
 }
@@ -43,38 +46,65 @@ function buildAi(): AiService {
   } as unknown as AiService
 }
 
+function buildTransversalServiceMock(): {
+  readonly mock: TransversalService
+  readonly cargarCapaTests: ReturnType<typeof vi.fn>
+  readonly cargarCapaCualitativa: ReturnType<typeof vi.fn>
+  readonly cargarCapaComprension: ReturnType<typeof vi.fn>
+} {
+  const cargarCapaTests = vi.fn().mockResolvedValue({})
+  const cargarCapaCualitativa = vi.fn().mockResolvedValue({})
+  const cargarCapaComprension = vi.fn().mockResolvedValue({})
+  return {
+    mock: {
+      cargarCapaTests,
+      cargarCapaCualitativa,
+      cargarCapaComprension,
+    } as unknown as TransversalService,
+    cargarCapaTests,
+    cargarCapaCualitativa,
+    cargarCapaComprension,
+  }
+}
+
 async function flushHasta(ms: number): Promise<void> {
   await vi.advanceTimersByTimeAsync(ms)
 }
 
-describe("JobEvaluacionTransversalService (P8a)", () => {
+describe("JobEvaluacionTransversalService (P8a + P8b)", () => {
   let prisma: PrismaMock
   let ai: AiService
+  let transversal: ReturnType<typeof buildTransversalServiceMock>
   let job: JobEvaluacionTransversalService
 
   beforeEach(() => {
     vi.useFakeTimers()
     prisma = buildPrismaMock()
     ai = buildAi()
-    job = new JobEvaluacionTransversalService(prisma as unknown as PrismaService, ai)
+    transversal = buildTransversalServiceMock()
+    job = new JobEvaluacionTransversalService(
+      prisma as unknown as PrismaService,
+      ai,
+      transversal.mock,
+    )
   })
 
-  it("dispatch persiste las 3 notas y pasa a EVALUADO", async () => {
+  it("dispatch invoca AiService y carga las 3 capas via transversalService", async () => {
     job.dispatch(`${INTENTO_ID_BASE}1`)
     await flushHasta(2100)
     expect(ai.evaluarRepoCualitativo).toHaveBeenCalledOnce()
-    expect(prisma.intentoTransversal.update).toHaveBeenCalledOnce()
-    const args = prisma.intentoTransversal.update.mock.calls[0]?.[0] as {
-      data: {
-        notaCapaTests: Prisma.Decimal
-        notaCapaCualitativa: Prisma.Decimal
-        notaCapaComprension: Prisma.Decimal | null
-        estado: string
-      }
+    expect(transversal.cargarCapaTests).toHaveBeenCalledOnce()
+    expect(transversal.cargarCapaCualitativa).toHaveBeenCalledOnce()
+    const args = transversal.cargarCapaCualitativa.mock.calls[0]?.[0] as {
+      body: { nota: number; detalle: { confianza: string } }
+      idempotencyKey: string
     }
-    expect(args.data.estado).toBe("EVALUADO")
-    expect(args.data.notaCapaCualitativa.toString()).toBe("80")
-    expect(args.data.notaCapaComprension?.toString()).toBe("72")
+    expect(args.body.nota).toBe(80)
+    expect(args.body.detalle.confianza).toBe("ALTA")
+    expect(args.idempotencyKey).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    )
+    expect(transversal.cargarCapaComprension).toHaveBeenCalledOnce()
   })
 
   it("dispatch del mismo intentoId varias veces solo procesa una vez", async () => {
@@ -92,8 +122,7 @@ describe("JobEvaluacionTransversalService (P8a)", () => {
     expect(job.estadoCola.enCurso).toBe(10)
     expect(job.estadoCola.pendientes).toBe(2)
     await flushHasta(2100)
-    // Tras la primera tanda los 10 slots liberan y los 2 pendientes se procesan.
     await flushHasta(2100)
-    expect(prisma.intentoTransversal.update).toHaveBeenCalledTimes(12)
+    expect(transversal.cargarCapaCualitativa).toHaveBeenCalledTimes(12)
   })
 })

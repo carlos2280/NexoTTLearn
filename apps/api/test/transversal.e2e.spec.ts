@@ -530,4 +530,163 @@ describe.runIf(RUN_E2E)("transversal e2e (Slice 8 P8a)", () => {
     const body = res.body as { data: unknown[]; meta: { total: number } }
     expect(body.meta.total).toBeGreaterThanOrEqual(1)
   })
+
+  // ===========================================================================
+  // P8b — capas + finalizar + anular
+  // ===========================================================================
+
+  async function crearIntentoEnEvaluacion(): Promise<string> {
+    const key = randomUUID()
+    const res = await agentePart
+      .post(`/api/v1/asignaciones/${asignacionPartId}/intentos-transversal`)
+      .set("X-XSRF-TOKEN", csrfPart)
+      .set("Idempotency-Key", key)
+      .send({
+        repoOArtefacto: { tipo: "URL_GIT", url: `https://github.com/foo/p8b-${key}` },
+      })
+    expect(res.status).toBe(201)
+    return (res.body as { intentoId: string }).intentoId
+  }
+
+  it("E7 POST capa tests — admin carga nota con Idempotency-Key OK", async () => {
+    const intentoId = await crearIntentoEnEvaluacion()
+    const res = await agenteAdmin
+      .post(`/api/v1/intentos-transversal/${intentoId}/capas/tests`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .set("Idempotency-Key", randomUUID())
+      .send({ nota: 75, detalle: { fuente: "ci-externo", suite: "vitest" } })
+    expect(res.status).toBe(200)
+    const body = res.body as { notaCapaTests: number }
+    expect(body.notaCapaTests).toBe(75)
+  })
+
+  it("E8 POST capa cualitativa — body con shape estricto", async () => {
+    const intentoId = await crearIntentoEnEvaluacion()
+    const res = await agenteAdmin
+      .post(`/api/v1/intentos-transversal/${intentoId}/capas/cualitativa`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .set("Idempotency-Key", randomUUID())
+      .send({ nota: 82, detalle: { comentario: "ok", confianza: "ALTA" } })
+    expect(res.status).toBe(200)
+  })
+
+  it("E9 POST capa comprension — y tras 3 capas el intento transita a EVALUADO", async () => {
+    const intentoId = await crearIntentoEnEvaluacion()
+    await agenteAdmin
+      .post(`/api/v1/intentos-transversal/${intentoId}/capas/tests`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .set("Idempotency-Key", randomUUID())
+      .send({ nota: 70, detalle: {} })
+    await agenteAdmin
+      .post(`/api/v1/intentos-transversal/${intentoId}/capas/cualitativa`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .set("Idempotency-Key", randomUUID())
+      .send({ nota: 80, detalle: { comentario: "x", confianza: "MEDIA" } })
+    const r = await agenteAdmin
+      .post(`/api/v1/intentos-transversal/${intentoId}/capas/comprension`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .set("Idempotency-Key", randomUUID())
+      .send({
+        nota: 90,
+        detalle: { transcripcion: [{ rol: "ASISTENTE", mensaje: "Q?" }] },
+      })
+    expect(r.status).toBe(200)
+    const intentoActualizado = await prisma.intentoTransversal.findUnique({
+      where: { id: intentoId },
+      select: { estado: true },
+    })
+    expect(intentoActualizado?.estado).toBe("EVALUADO")
+  })
+
+  it("E10 POST finalizar -> 200 con notaGlobal, aprobado, skills + audit", async () => {
+    const intentoId = await crearIntentoEnEvaluacion()
+    // Cargar las 3 capas para llegar a EVALUADO.
+    await agenteAdmin
+      .post(`/api/v1/intentos-transversal/${intentoId}/capas/tests`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .set("Idempotency-Key", randomUUID())
+      .send({ nota: 80, detalle: {} })
+    await agenteAdmin
+      .post(`/api/v1/intentos-transversal/${intentoId}/capas/cualitativa`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .set("Idempotency-Key", randomUUID())
+      .send({ nota: 70, detalle: { comentario: "x", confianza: "ALTA" } })
+    await agenteAdmin
+      .post(`/api/v1/intentos-transversal/${intentoId}/capas/comprension`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .set("Idempotency-Key", randomUUID())
+      .send({ nota: 90, detalle: { transcripcion: [] } })
+
+    const res = await agenteAdmin
+      .post(`/api/v1/intentos-transversal/${intentoId}/finalizar`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .send({})
+    expect(res.status).toBe(200)
+    const body = res.body as { notaGlobal: number; aprobado: boolean }
+    expect(body.notaGlobal).toBe(80) // 0.4*80 + 0.3*70 + 0.3*90 = 80
+    expect(body.aprobado).toBe(true)
+    const audit = await prisma.activityLog.findFirst({
+      where: { accion: "INTENTO_TRANSVERSAL_FINALIZADO", recursoId: intentoId },
+      select: { id: true },
+    })
+    expect(audit).not.toBeNull()
+  })
+
+  it("E11 POST anular sin X-Motivo -> 422", async () => {
+    const intentoId = await crearIntentoEnEvaluacion()
+    const res = await agenteAdmin
+      .post(`/api/v1/intentos-transversal/${intentoId}/anular`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .set("Idempotency-Key", randomUUID())
+      .send({})
+    expect(res.status).toBe(422)
+    expect((res.body as { code?: string }).code).toBe("MOTIVO_REQUERIDO")
+  })
+
+  it("E11 POST anular happy path -> intento queda anulado + audit", async () => {
+    const intentoId = await crearIntentoEnEvaluacion()
+    const res = await agenteAdmin
+      .post(`/api/v1/intentos-transversal/${intentoId}/anular`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .set("X-Motivo", "duplicado por error")
+      .set("Idempotency-Key", randomUUID())
+      .send({})
+    expect(res.status).toBe(200)
+    const body = res.body as { anulado: boolean }
+    expect(body.anulado).toBe(true)
+    const fila = await prisma.intentoTransversal.findUnique({
+      where: { id: intentoId },
+      select: { anulado: true, estado: true, motivoAnulacion: true },
+    })
+    expect(fila?.anulado).toBe(true)
+    expect(fila?.estado).toBe("ANULADO")
+    expect(fila?.motivoAnulacion).toBe("duplicado por error")
+    const audit = await prisma.activityLog.findFirst({
+      where: { accion: "INTENTO_TRANSVERSAL_ANULADO", recursoId: intentoId },
+      select: { id: true },
+    })
+    expect(audit).not.toBeNull()
+  })
+
+  it("E11 POST anular replay con misma Idempotency-Key -> NO duplica anulacion ni audit", async () => {
+    const intentoId = await crearIntentoEnEvaluacion()
+    const key = randomUUID()
+    await agenteAdmin
+      .post(`/api/v1/intentos-transversal/${intentoId}/anular`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .set("X-Motivo", "replay test")
+      .set("Idempotency-Key", key)
+      .send({})
+    const segundo = await agenteAdmin
+      .post(`/api/v1/intentos-transversal/${intentoId}/anular`)
+      .set("X-XSRF-TOKEN", csrfAdmin)
+      .set("X-Motivo", "replay test")
+      .set("Idempotency-Key", key)
+      .send({})
+    expect(segundo.status).toBe(200)
+    const audits = await prisma.activityLog.count({
+      where: { accion: "INTENTO_TRANSVERSAL_ANULADO", recursoId: intentoId },
+    })
+    expect(audits).toBe(1)
+  })
 })

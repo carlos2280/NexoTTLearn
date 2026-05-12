@@ -14,17 +14,29 @@ import {
 } from "@nestjs/common"
 import { Throttle } from "@nestjs/throttler"
 import {
+  AnularTransversalBodyInput,
+  AnularTransversalResponse,
+  CargarCapaComprensionInput,
+  CargarCapaCualitativaInput,
+  CargarCapaTestsInput,
   CrearIntentoTransversalInput,
   CrearIntentoTransversalResponse,
   DisponibilidadTransversalResponse,
   EditarSkillsTransversalInput,
   EditarSkillsTransversalResponse,
+  FinalizarTransversalBodyInput,
+  FinalizarTransversalResponse,
   IntentoTransversalAdminResponse,
   IntentoTransversalParticipanteResponse,
   ListarIntentosTransversalQuery,
   TransversalResponse,
+  anularTransversalBodySchema,
+  cargarCapaComprensionSchema,
+  cargarCapaCualitativaSchema,
+  cargarCapaTestsSchema,
   crearIntentoTransversalSchema,
   editarSkillsTransversalSchema,
+  finalizarTransversalBodySchema,
   listarIntentosTransversalQuerySchema,
 } from "@nexott-learn/shared-types"
 import { AccionAuditoria, EstadoCurso, RolUsuario } from "@prisma/client"
@@ -34,6 +46,7 @@ import { extractContextoHttp } from "../common/audit/extract-contexto"
 import { CurrentUser } from "../common/decorators/current-user.decorator"
 import { IdempotencyKey } from "../common/decorators/idempotency-key.decorator"
 import { Motivo } from "../common/decorators/motivo.decorator"
+import { RequiereMotivo } from "../common/decorators/requiere-motivo.decorator"
 import { Roles } from "../common/decorators/roles.decorator"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { Paginated } from "../common/http/paginated"
@@ -190,6 +203,140 @@ export class TransversalController {
       query,
       usuario: this.requireUsuario(usuario),
     })
+  }
+
+  // E7
+  @Post("intentos-transversal/:intentoId/capas/tests")
+  @Roles(RolUsuario.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  cargarCapaTests(
+    @Param("intentoId", ParseUUIDPipe) intentoId: string,
+    @Body(new ZodValidationPipe(cargarCapaTestsSchema)) body: CargarCapaTestsInput,
+    @IdempotencyKey() idempotencyKey: string | undefined,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<IntentoTransversalAdminResponse> {
+    const sesion = this.requireUsuario(usuario)
+    const key = requireIdempotencyKeyUuid(idempotencyKey)
+    return this.transversal.cargarCapaTests({
+      intentoId,
+      body,
+      idempotencyKey: key,
+      usuario: sesion,
+    })
+  }
+
+  // E8
+  @Post("intentos-transversal/:intentoId/capas/cualitativa")
+  @Roles(RolUsuario.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  cargarCapaCualitativa(
+    @Param("intentoId", ParseUUIDPipe) intentoId: string,
+    @Body(new ZodValidationPipe(cargarCapaCualitativaSchema)) body: CargarCapaCualitativaInput,
+    @IdempotencyKey() idempotencyKey: string | undefined,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<IntentoTransversalAdminResponse> {
+    const sesion = this.requireUsuario(usuario)
+    const key = requireIdempotencyKeyUuid(idempotencyKey)
+    return this.transversal.cargarCapaCualitativa({
+      intentoId,
+      body,
+      idempotencyKey: key,
+      usuario: sesion,
+    })
+  }
+
+  // E9
+  @Post("intentos-transversal/:intentoId/capas/comprension")
+  @Roles(RolUsuario.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  cargarCapaComprension(
+    @Param("intentoId", ParseUUIDPipe) intentoId: string,
+    @Body(new ZodValidationPipe(cargarCapaComprensionSchema)) body: CargarCapaComprensionInput,
+    @IdempotencyKey() idempotencyKey: string | undefined,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<IntentoTransversalAdminResponse> {
+    const sesion = this.requireUsuario(usuario)
+    const key = requireIdempotencyKeyUuid(idempotencyKey)
+    return this.transversal.cargarCapaComprension({
+      intentoId,
+      body,
+      idempotencyKey: key,
+      usuario: sesion,
+    })
+  }
+
+  // E10
+  @Post("intentos-transversal/:intentoId/finalizar")
+  @Roles(RolUsuario.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async finalizar(
+    @Param("intentoId", ParseUUIDPipe) intentoId: string,
+    @Body(new ZodValidationPipe(finalizarTransversalBodySchema))
+    _body: FinalizarTransversalBodyInput,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+    @Req() req: Request,
+  ): Promise<FinalizarTransversalResponse> {
+    const sesion = this.requireUsuario(usuario)
+    const resultado = await this.transversal.finalizar({ intentoId, usuario: sesion })
+    await this.auditLog.record({
+      usuarioId: sesion.usuarioId,
+      accion: AccionAuditoria.INTENTO_TRANSVERSAL_FINALIZADO,
+      exito: true,
+      recursoTipo: "intento_transversal",
+      recursoId: resultado.intentoId,
+      metadata: {
+        notaGlobal: resultado.notaGlobal,
+        aprobado: resultado.aprobado,
+        skillsActualizadas: resultado.skillsActualizadas.length,
+      },
+      ...extractContextoHttp(req),
+    })
+    return resultado
+  }
+
+  // E11
+  @Post("intentos-transversal/:intentoId/anular")
+  @Roles(RolUsuario.ADMIN)
+  @RequiereMotivo()
+  @HttpCode(HttpStatus.OK)
+  async anular(
+    @Param("intentoId", ParseUUIDPipe) intentoId: string,
+    @Body(new ZodValidationPipe(anularTransversalBodySchema)) _body: AnularTransversalBodyInput,
+    @Motivo() motivo: string | undefined,
+    @IdempotencyKey() idempotencyKey: string | undefined,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+    @Req() req: Request,
+  ): Promise<AnularTransversalResponse> {
+    const sesion = this.requireUsuario(usuario)
+    const key = requireIdempotencyKeyUuid(idempotencyKey)
+    if (typeof motivo !== "string" || motivo.length === 0) {
+      // El guard global ya devuelve 422; defensa en profundidad.
+      throw new UnprocessableEntityException({
+        code: apiErrorCodes.motivoRequerido,
+        message: "X-Motivo es obligatorio para anular un intento transversal.",
+      })
+    }
+    const { response, replay } = await this.transversal.anular({
+      intentoId,
+      motivo,
+      idempotencyKey: key,
+      usuario: sesion,
+    })
+    if (!replay) {
+      await this.auditLog.record({
+        usuarioId: sesion.usuarioId,
+        accion: AccionAuditoria.INTENTO_TRANSVERSAL_ANULADO,
+        exito: true,
+        recursoTipo: "intento_transversal",
+        recursoId: response.intentoId,
+        metadata: {
+          motivoLength: motivo.length,
+          skillsRecalculadas: response.skillsRecalculadas.length,
+        },
+        ...extractContextoHttp(req),
+      })
+    }
+    return response
   }
 
   private requireUsuario(usuario: SesionUsuario | undefined): SesionUsuario {

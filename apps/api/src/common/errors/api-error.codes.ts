@@ -146,6 +146,18 @@ export const apiErrorCodes = {
   conflictCursoEstadoInvalido: "CONFLICT_CURSO_ESTADO_INVALIDO",
   conflictAsignacionEstadoInvalido: "CONFLICT_ASIGNACION_ESTADO_INVALIDO",
   conflictSkillsTransversalInvalidas: "CONFLICT_SKILLS_TRANSVERSAL_INVALIDAS",
+  // Transversal P8b (D-S8-B7, D-S8-C4, D-S8-C7).
+  conflictIntentoTransversalNoEditable: "CONFLICT_INTENTO_TRANSVERSAL_NO_EDITABLE",
+  conflictIntentoTransversalNoEvaluado: "CONFLICT_INTENTO_TRANSVERSAL_NO_EVALUADO",
+  conflictIntentoTransversalYaAnulado: "CONFLICT_INTENTO_TRANSVERSAL_YA_ANULADO",
+  conflictCapaInactiva: "CONFLICT_CAPA_INACTIVA",
+  puntajesFaltantes: "PUNTAJES_FALTANTES",
+  // Integracion IA P8b (D-S8-B7, R-S8-2, R-S8-6, R-S8-10).
+  iaTemporalmenteSaturada: "IA_TEMPORALMENTE_SATURADA",
+  iaNoDisponible: "IA_NO_DISPONIBLE",
+  iaCredencialesInvalidas: "IA_CREDENCIALES_INVALIDAS",
+  iaRespuestaMalformada: "IA_RESPUESTA_MALFORMADA",
+  repoNoAccesible: "REPO_NO_ACCESIBLE",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]

@@ -314,7 +314,7 @@ export type {
   ListarIntentosCursoBloqueQuery,
 } from "./intentos-bloque"
 
-// Transversal — Slice 8 P8a (D-S8-A1..F2).
+// Transversal — Slice 8 P8a + P8b (D-S8-A1..F2, D-S8-B7, D-S8-C4..C7).
 export {
   estadoIntentoTransversalSchema,
   razonDisponibilidadTransversalSchema,
@@ -329,6 +329,13 @@ export {
   crearIntentoTransversalSchema,
   editarSkillsTransversalSchema,
   editarSkillsTransversalResponseSchema,
+  cargarCapaTestsSchema,
+  cargarCapaCualitativaSchema,
+  cargarCapaComprensionSchema,
+  finalizarTransversalBodySchema,
+  anularTransversalBodySchema,
+  finalizarTransversalResponseSchema,
+  anularTransversalResponseSchema,
 } from "./transversal"
 export type {
   EstadoIntentoTransversal,
@@ -344,4 +351,11 @@ export type {
   CrearIntentoTransversalInput,
   EditarSkillsTransversalInput,
   EditarSkillsTransversalResponse,
+  CargarCapaTestsInput,
+  CargarCapaCualitativaInput,
+  CargarCapaComprensionInput,
+  FinalizarTransversalBodyInput,
+  AnularTransversalBodyInput,
+  FinalizarTransversalResponse,
+  AnularTransversalResponse,
 } from "./transversal"
