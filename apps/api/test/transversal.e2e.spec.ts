@@ -380,14 +380,14 @@ describe.runIf(RUN_E2E)("transversal e2e (Slice 8 P8a)", () => {
     expect(audit).not.toBeNull()
   })
 
-  it("POST skills sin X-Motivo en curso ACTIVO -> 500/400/422 segun guard inline", async () => {
+  it("POST skills sin X-Motivo en curso ACTIVO -> 422 MOTIVO_REQUERIDO", async () => {
     const res = await agenteAdmin
       .post(`/api/v1/cursos/${cursoId}/transversal/skills`)
       .set("X-XSRF-TOKEN", csrfAdmin)
       .send({ skillIds: [skillId] })
-    // El controller lanza MOTIVO_REQUERIDO. Aceptamos 4xx/5xx pero el body
-    // debe traer el code.
-    expect(res.status).toBeGreaterThanOrEqual(400)
+    // Patron canonico del repo (motivo.guard.ts) — 422 UnprocessableEntity con
+    // body.code === "MOTIVO_REQUERIDO".
+    expect(res.status).toBe(422)
     const body = res.body as { code?: string }
     expect(body.code).toBe("MOTIVO_REQUERIDO")
   })

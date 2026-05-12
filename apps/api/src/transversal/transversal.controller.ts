@@ -10,6 +10,7 @@ import {
   Post,
   Query,
   Req,
+  UnprocessableEntityException,
 } from "@nestjs/common"
 import { Throttle } from "@nestjs/throttler"
 import {
@@ -97,7 +98,7 @@ export class TransversalController {
     const requiereMotivo = cursoActivo?.estado === EstadoCurso.ACTIVO
     const motivoTrim = motivo?.trim() ?? ""
     if (requiereMotivo && motivoTrim.length === 0) {
-      throw new InternalServerErrorException({
+      throw new UnprocessableEntityException({
         code: apiErrorCodes.motivoRequerido,
         message: "X-Motivo es obligatorio cuando el curso esta ACTIVO.",
       })
