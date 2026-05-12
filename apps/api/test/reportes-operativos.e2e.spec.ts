@@ -307,4 +307,97 @@ describe.runIf(RUN_E2E)("reportes operativos e2e (P11b)", () => {
     // Zod schema rechaza format=csv antes de llegar al cinturon del controller -> 400 INVALID_QUERY.
     expect(res.body.code).toBe("INVALID_QUERY")
   })
+
+  it("FIX-P11b-avance §5.128 — porcentajeAvance refleja el motor real cuando hay plan + intento aprobado", async () => {
+    // Setup local: skill + modulo habilitado + seccion + bloque evaluable +
+    // plan con item OBLIGATORIO + intento mejor-vigente aprobado.
+    const area = await prisma.area.upsert({
+      where: { nombre: "reportes-avance-p11b-area" },
+      update: {},
+      create: { nombre: "reportes-avance-p11b-area" },
+      select: { id: true },
+    })
+    const skill = await prisma.skill.upsert({
+      where: { etiquetaVisible: "reportes-avance-p11b-skill" },
+      update: {},
+      create: {
+        etiquetaVisible: "reportes-avance-p11b-skill",
+        areaId: area.id,
+        estado: "ACTIVA",
+      },
+      select: { id: true },
+    })
+    const modulo = await prisma.modulo.create({
+      data: { titulo: "Mod reportes avance" },
+      select: { id: true },
+    })
+    const seccion = await prisma.seccion.create({
+      data: { moduloId: modulo.id, titulo: "Sec reportes avance", orden: 1 },
+      select: { id: true },
+    })
+    const bloque = await prisma.bloque.create({
+      data: {
+        seccionId: seccion.id,
+        orden: 1,
+        tipo: "QUIZ",
+        esEvaluable: true,
+        skillQueMideId: skill.id,
+        contenido: {},
+        version: 1,
+      },
+      select: { id: true },
+    })
+    await prisma.cursoModuloHabilitado.create({
+      data: { cursoId, moduloId: modulo.id },
+    })
+    const plan = await prisma.planEstudio.create({
+      data: { asignacionId },
+      select: { id: true },
+    })
+    await prisma.itemPlan.create({
+      data: {
+        planId: plan.id,
+        moduloId: modulo.id,
+        seccionId: seccion.id,
+        caracter: "OBLIGATORIA",
+        razon: "SKILL_FALTANTE",
+      },
+    })
+    await prisma.intentoBloque.create({
+      data: {
+        colaboradorId,
+        bloqueId: bloque.id,
+        skillId: skill.id,
+        cursoId,
+        nota: 85,
+        esMejorIntento: true,
+        estaInvalidado: false,
+        respuestas: {},
+        versionBloque: 1,
+      },
+    })
+
+    try {
+      const res = await agenteAdmin
+        .get(`/api/v1/reportes/avance-curso?cursoId=${cursoId}`)
+        .expect(200)
+      const fila = res.body.data.find(
+        (f: { asignacionId: string }) => f.asignacionId === asignacionId,
+      )
+      expect(fila).toBeDefined()
+      // 1 obligatoria con su unico bloque aprobado (nota=85 > umbral 70) -> 100%.
+      expect(fila.porcentajeAvance).toBe(100)
+    } finally {
+      // Limpieza local para no contaminar otros e2e que comparten el harness.
+      await prisma.intentoBloque.deleteMany({ where: { bloqueId: bloque.id } })
+      await prisma.itemPlan.deleteMany({ where: { planId: plan.id } })
+      await prisma.planEstudio.deleteMany({ where: { id: plan.id } })
+      await prisma.cursoModuloHabilitado.deleteMany({
+        where: { cursoId, moduloId: modulo.id },
+      })
+      await prisma.bloque.deleteMany({ where: { id: bloque.id } })
+      await prisma.seccion.deleteMany({ where: { id: seccion.id } })
+      await prisma.modulo.deleteMany({ where: { id: modulo.id } })
+    }
+  })
 })

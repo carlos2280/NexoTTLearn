@@ -1279,3 +1279,64 @@ describe("PlanPersonalService.ajustarPlan -> notificacion PLAN_RECALCULADO", () 
     )
   })
 })
+
+describe("PlanPersonalService.obtenerPorcentajeAvance (FIX-P11b-avance §5.128)", () => {
+  it("sin plan -> 0 sin lanzar (no consulta items ni secciones)", async () => {
+    prisma.planEstudio.findUnique.mockResolvedValueOnce(null)
+
+    const porcentaje = await service.obtenerPorcentajeAvance(ASIGNACION_ID)
+
+    expect(porcentaje).toBe(0)
+    expect(prisma.itemPlan.findMany).not.toHaveBeenCalled()
+    expect(prisma.seccion.findMany).not.toHaveBeenCalled()
+  })
+
+  it("plan sin items obligatorios -> 0 (mismo criterio que planEstaCompleto)", async () => {
+    prisma.planEstudio.findUnique.mockResolvedValueOnce({ id: "plan-1" })
+    prisma.itemPlan.findMany.mockResolvedValueOnce([])
+
+    const porcentaje = await service.obtenerPorcentajeAvance(ASIGNACION_ID)
+
+    expect(porcentaje).toBe(0)
+    expect(prisma.seccion.findMany).not.toHaveBeenCalled()
+  })
+
+  it("plan con 2 obligatorias y 1 completada -> 50", async () => {
+    prisma.planEstudio.findUnique.mockResolvedValueOnce({ id: "plan-1" })
+    prisma.itemPlan.findMany.mockResolvedValueOnce([
+      { seccionId: SECCION_ID_1 },
+      { seccionId: SECCION_ID_2 },
+    ])
+    prisma.seccion.findMany.mockResolvedValueOnce([
+      { id: SECCION_ID_1, bloques: [{ id: "b1" }] },
+      { id: SECCION_ID_2, bloques: [{ id: "b2" }] },
+    ])
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValueOnce({
+      colaboradorId: COLABORADOR_ID,
+    })
+    // Solo b1 supera el umbral del motor (UMBRAL_BLOQUE_DEFAULT) -> 1/2 = 50%.
+    prisma.intentoBloque.findMany.mockResolvedValueOnce([
+      { bloqueId: "b1", nota: new Prisma.Decimal(80) },
+    ])
+    prisma.aperturaSeccion.findMany.mockResolvedValueOnce([])
+
+    const porcentaje = await service.obtenerPorcentajeAvance(ASIGNACION_ID)
+
+    expect(porcentaje).toBe(50)
+  })
+
+  it("plan con 1 obligatoria sin bloques pero con apertura -> 100", async () => {
+    prisma.planEstudio.findUnique.mockResolvedValueOnce({ id: "plan-1" })
+    prisma.itemPlan.findMany.mockResolvedValueOnce([{ seccionId: SECCION_ID_1 }])
+    prisma.seccion.findMany.mockResolvedValueOnce([{ id: SECCION_ID_1, bloques: [] }])
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValueOnce({
+      colaboradorId: COLABORADOR_ID,
+    })
+    prisma.intentoBloque.findMany.mockResolvedValueOnce([])
+    prisma.aperturaSeccion.findMany.mockResolvedValueOnce([{ seccionId: SECCION_ID_1 }])
+
+    const porcentaje = await service.obtenerPorcentajeAvance(ASIGNACION_ID)
+
+    expect(porcentaje).toBe(100)
+  })
+})

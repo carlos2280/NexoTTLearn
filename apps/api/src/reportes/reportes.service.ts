@@ -25,6 +25,7 @@ import { Prisma } from "@prisma/client"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { type Paginated, buildPaginatedResponse, resolvePaginacion } from "../common/http/paginated"
 import { PrismaService } from "../common/prisma/prisma.service"
+import { PlanPersonalService } from "../plan-personal/plan-personal.service"
 import {
   ALERTA_INTENTO_INVALIDADO_DIAS,
   ALERTA_SIN_ACTIVIDAD_DIAS,
@@ -55,7 +56,10 @@ const MS_DIA = 86_400_000
 export class ReportesService {
   private readonly logger = new Logger(ReportesService.name)
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly planPersonalService: PlanPersonalService,
+  ) {}
 
   // -------------------------------------------------------------------------
   // E1 — GET /reportes/avance-curso
@@ -122,6 +126,14 @@ export class ReportesService {
 
     const invalidadosSet = new Set(invalidadosRecientes.map((r) => r.colaboradorId))
 
+    // §5.128 (FIX-P11b-avance): calculo en paralelo del % real reusando el
+    // motor de plan-personal. Cada entrada del map es independiente y la
+    // cardinalidad esta acotada por la pagina (`take` ya aplicado).
+    const porcentajes = await Promise.all(
+      asignaciones.map((a) => this.planPersonalService.obtenerPorcentajeAvance(a.id)),
+    )
+    const porcentajePorAsignacion = new Map(asignaciones.map((a, i) => [a.id, porcentajes[i] ?? 0]))
+
     const filas: FilaAvanceCurso[] = asignaciones.map((asig) => {
       const ultimoIntento = maxFechaDeMaps(
         [ultimosBloque, ultimosTransversal, ultimosEntrevista],
@@ -148,7 +160,7 @@ export class ReportesService {
           email: asig.colaborador.email,
         },
         estado: asig.estadoAsignado ?? asig.estadoVoluntario ?? "DESCONOCIDO",
-        porcentajeAvance: 0,
+        porcentajeAvance: porcentajePorAsignacion.get(asig.id) ?? 0,
         alertas,
       }
     })

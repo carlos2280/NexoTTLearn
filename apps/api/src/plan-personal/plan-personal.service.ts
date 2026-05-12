@@ -1049,6 +1049,54 @@ export class PlanPersonalService {
   }
 
   /**
+   * §5.128 (FIX-P11b-avance): expone el porcentaje 0-100 del plan vigente de
+   * la asignacion reutilizando el motor `obtenerAvance` (D-S7-B6). Pensado
+   * para consumo desde `ReportesService.avanceCursoActual` — por eso no
+   * lanza si la asignacion aun no tiene `PlanEstudio` (caso ASIGNADO antes
+   * de `calcularExplicito` o VOLUNTARIO sin plan): devuelve 0. Tambien
+   * devuelve 0 si el plan no tiene items obligatorios (mismo criterio
+   * defensivo que `planEstaCompleto`: no hay metrica significativa).
+   */
+  async obtenerPorcentajeAvance(asignacionId: string): Promise<number> {
+    const plan = await this.prisma.planEstudio.findUnique({
+      where: { asignacionId },
+      select: { id: true },
+    })
+    if (!plan) {
+      return 0
+    }
+    const items = await this.prisma.itemPlan.findMany({
+      where: { planId: plan.id, caracter: "OBLIGATORIA" },
+      select: { seccionId: true },
+    })
+    if (items.length === 0) {
+      return 0
+    }
+    const secciones = await this.prisma.seccion.findMany({
+      where: { id: { in: items.map((i) => i.seccionId) } },
+      select: {
+        id: true,
+        bloques: {
+          where: { estado: "ACTIVO", esEvaluable: true },
+          select: { id: true },
+        },
+      },
+    })
+    const asignacion = await this.prisma.asignacionCurso.findUniqueOrThrow({
+      where: { id: asignacionId },
+      select: { colaboradorId: true },
+    })
+    const { avancePlan } = await this.obtenerAvance(
+      this.prisma,
+      asignacionId,
+      asignacion.colaboradorId,
+      items,
+      secciones,
+    )
+    return avancePlan.porcentaje
+  }
+
+  /**
    * §5.123: comprueba si la asignacion tiene un plan al 100%. Reutiliza el
    * motor `obtenerAvance` para no duplicar la regla de "seccion completada"
    * (D-S7-B6). Retorna `planId` si esta completo, `null` si no hay plan o

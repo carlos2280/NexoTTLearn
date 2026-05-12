@@ -2,6 +2,7 @@ import { NotFoundException, UnprocessableEntityException } from "@nestjs/common"
 import { Prisma } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { PrismaService } from "../common/prisma/prisma.service"
+import { PlanPersonalService } from "../plan-personal/plan-personal.service"
 import { ReportesService } from "./reportes.service"
 import { ALERTA_SIN_ACTIVIDAD_DIAS } from "./reportes.types"
 
@@ -32,6 +33,21 @@ interface PrismaMock {
   logCambioCurso: { findMany: ReturnType<typeof vi.fn> }
   historicoEstadoAsignacion: { findMany: ReturnType<typeof vi.fn> }
   $transaction: ReturnType<typeof vi.fn>
+}
+
+interface PlanServiceMock {
+  obtenerPorcentajeAvance: ReturnType<typeof vi.fn>
+}
+
+function buildPlanServiceMock(): PlanServiceMock {
+  return { obtenerPorcentajeAvance: vi.fn().mockResolvedValue(0) }
+}
+
+function buildService(prisma: PrismaMock, planService: PlanServiceMock): ReportesService {
+  return new ReportesService(
+    prisma as unknown as PrismaService,
+    planService as unknown as PlanPersonalService,
+  )
 }
 
 function buildPrismaMock(): PrismaMock {
@@ -67,7 +83,10 @@ function buildPrismaMock(): PrismaMock {
 const CURSO_ID = "11111111-1111-1111-1111-111111111111"
 const COLAB_ID = "22222222-2222-2222-2222-222222222222"
 const COLAB_ID_2 = "33333333-3333-3333-3333-333333333333"
+const COLAB_ID_3 = "55555555-5555-5555-5555-555555555555"
 const ASIG_ID = "44444444-4444-4444-4444-444444444444"
+const ASIG_ID_2 = "44444444-4444-4444-4444-555555555555"
+const ASIG_ID_3 = "44444444-4444-4444-4444-666666666666"
 const SKILL_ID = "66666666-6666-6666-6666-666666666666"
 
 function dec(value: number): Prisma.Decimal {
@@ -76,11 +95,13 @@ function dec(value: number): Prisma.Decimal {
 
 describe("ReportesService.obtenerAvanceCurso (vista=ACTUAL)", () => {
   let prisma: PrismaMock
+  let planService: PlanServiceMock
   let service: ReportesService
 
   beforeEach(() => {
     prisma = buildPrismaMock()
-    service = new ReportesService(prisma as unknown as PrismaService)
+    planService = buildPlanServiceMock()
+    service = buildService(prisma, planService)
   })
 
   it("colaborador sin intentos -> alerta SIN_ACTIVIDAD_7_DIAS + asignado sin plan -> PLAN_NO_CALCULADO", async () => {
@@ -118,6 +139,9 @@ describe("ReportesService.obtenerAvanceCurso (vista=ACTUAL)", () => {
       expect.arrayContaining(["SIN_ACTIVIDAD_7_DIAS", "PLAN_NO_CALCULADO"]),
     )
     expect(fila.estado).toBe("EN_PROGRESO")
+    // Sin plan: el wrapper resuelve 0 sin invocar al motor (FIX-P11b-avance).
+    expect(fila.porcentajeAvance).toBe(0)
+    expect(planService.obtenerPorcentajeAvance).toHaveBeenCalledWith(ASIG_ID)
   })
 
   it("plan desactualizado + intento invalidado reciente -> 2 alertas concretas", async () => {
@@ -140,6 +164,7 @@ describe("ReportesService.obtenerAvanceCurso (vista=ACTUAL)", () => {
     prisma.intentoTransversal.groupBy.mockResolvedValueOnce([])
     prisma.intentoEntrevistaIA.groupBy.mockResolvedValueOnce([])
     prisma.intentoBloque.findMany.mockResolvedValueOnce([{ colaboradorId: COLAB_ID }])
+    planService.obtenerPorcentajeAvance.mockResolvedValueOnce(42.5)
 
     const result = await service.obtenerAvanceCurso({
       cursoId: CURSO_ID,
@@ -154,6 +179,7 @@ describe("ReportesService.obtenerAvanceCurso (vista=ACTUAL)", () => {
       throw new Error("fila esperada FilaAvanceCurso")
     }
     expect(fila.alertas).toEqual(["PLAN_DESACTUALIZADO", "INTENTO_INVALIDADO_RECIENTE"])
+    expect(fila.porcentajeAvance).toBe(42.5)
   })
 
   it("colaborador limpio (intento reciente + plan vigente) -> 0 alertas", async () => {
@@ -176,6 +202,7 @@ describe("ReportesService.obtenerAvanceCurso (vista=ACTUAL)", () => {
     prisma.intentoTransversal.groupBy.mockResolvedValueOnce([])
     prisma.intentoEntrevistaIA.groupBy.mockResolvedValueOnce([])
     prisma.intentoBloque.findMany.mockResolvedValueOnce([])
+    planService.obtenerPorcentajeAvance.mockResolvedValueOnce(100)
 
     const result = await service.obtenerAvanceCurso({
       cursoId: CURSO_ID,
@@ -190,6 +217,7 @@ describe("ReportesService.obtenerAvanceCurso (vista=ACTUAL)", () => {
       throw new Error("fila esperada FilaAvanceCurso")
     }
     expect(fila.alertas).toEqual([])
+    expect(fila.porcentajeAvance).toBe(100)
   })
 
   it("SIN_ACTIVIDAD_7_DIAS dispara cuando el ultimo intento supera la ventana", async () => {
@@ -228,15 +256,97 @@ describe("ReportesService.obtenerAvanceCurso (vista=ACTUAL)", () => {
     expect(fila.alertas).toEqual(["SIN_ACTIVIDAD_7_DIAS"])
     expect(fila.estado).toBe("EN_PROGRESO")
   })
+
+  it("FIX-P11b-avance: cada asignacion recibe su propio porcentaje (no comparten)", async () => {
+    prisma.asignacionCurso.findMany.mockResolvedValueOnce([
+      {
+        id: ASIG_ID,
+        rol: "ASIGNADO",
+        estadoAsignado: "EN_PROGRESO",
+        estadoVoluntario: null,
+        colaboradorId: COLAB_ID,
+        colaborador: { id: COLAB_ID, nombre: "Ana", email: "ana@test" },
+        plan: { id: "p1", estaDesactualizado: false },
+      },
+      {
+        id: ASIG_ID_2,
+        rol: "ASIGNADO",
+        estadoAsignado: "EN_PROGRESO",
+        estadoVoluntario: null,
+        colaboradorId: COLAB_ID_2,
+        colaborador: { id: COLAB_ID_2, nombre: "Beto", email: "b@test" },
+        plan: { id: "p2", estaDesactualizado: false },
+      },
+      {
+        id: ASIG_ID_3,
+        rol: "ASIGNADO",
+        estadoAsignado: "LISTO",
+        estadoVoluntario: null,
+        colaboradorId: COLAB_ID_3,
+        colaborador: { id: COLAB_ID_3, nombre: "Carla", email: "c@test" },
+        plan: { id: "p3", estaDesactualizado: false },
+      },
+    ])
+    prisma.asignacionCurso.count.mockResolvedValueOnce(3)
+    prisma.intentoBloque.groupBy.mockResolvedValueOnce([])
+    prisma.intentoTransversal.groupBy.mockResolvedValueOnce([])
+    prisma.intentoEntrevistaIA.groupBy.mockResolvedValueOnce([])
+    prisma.intentoBloque.findMany.mockResolvedValueOnce([])
+    // Una resolucion distinta por cada asignacion en el orden del findMany.
+    planService.obtenerPorcentajeAvance
+      .mockResolvedValueOnce(15.5)
+      .mockResolvedValueOnce(60)
+      .mockResolvedValueOnce(100)
+
+    const result = await service.obtenerAvanceCurso({
+      cursoId: CURSO_ID,
+      vista: "ACTUAL",
+      page: 1,
+      pageSize: 20,
+      format: "json",
+    })
+
+    expect(result.data).toHaveLength(3)
+    const filas = result.data.filter(
+      (fila): fila is Extract<typeof fila, { porcentajeAvance: number }> =>
+        "porcentajeAvance" in fila,
+    )
+    const porId = new Map(filas.map((fila) => [fila.asignacionId, fila]))
+    expect(porId.get(ASIG_ID)?.porcentajeAvance).toBe(15.5)
+    expect(porId.get(ASIG_ID_2)?.porcentajeAvance).toBe(60)
+    expect(porId.get(ASIG_ID_3)?.porcentajeAvance).toBe(100)
+    expect(planService.obtenerPorcentajeAvance).toHaveBeenCalledTimes(3)
+    expect(planService.obtenerPorcentajeAvance).toHaveBeenNthCalledWith(1, ASIG_ID)
+    expect(planService.obtenerPorcentajeAvance).toHaveBeenNthCalledWith(2, ASIG_ID_2)
+    expect(planService.obtenerPorcentajeAvance).toHaveBeenNthCalledWith(3, ASIG_ID_3)
+  })
+
+  it("FIX-P11b-avance: sin asignaciones no invoca al motor de avance", async () => {
+    prisma.asignacionCurso.findMany.mockResolvedValueOnce([])
+    prisma.asignacionCurso.count.mockResolvedValueOnce(0)
+
+    const result = await service.obtenerAvanceCurso({
+      cursoId: CURSO_ID,
+      vista: "ACTUAL",
+      page: 1,
+      pageSize: 20,
+      format: "json",
+    })
+
+    expect(result.data).toHaveLength(0)
+    expect(planService.obtenerPorcentajeAvance).not.toHaveBeenCalled()
+  })
 })
 
 describe("ReportesService.obtenerAvanceCurso (vista=FOTOGRAFIA_CIERRE)", () => {
   let prisma: PrismaMock
+  let planService: PlanServiceMock
   let service: ReportesService
 
   beforeEach(() => {
     prisma = buildPrismaMock()
-    service = new ReportesService(prisma as unknown as PrismaService)
+    planService = buildPlanServiceMock()
+    service = buildService(prisma, planService)
   })
 
   it("reconstruye filas desde snapshot v1 valido", async () => {
@@ -305,11 +415,13 @@ describe("ReportesService.obtenerAvanceCurso (vista=FOTOGRAFIA_CIERRE)", () => {
 
 describe("ReportesService.obtenerAvanceCurso (vista=HISTORICO)", () => {
   let prisma: PrismaMock
+  let planService: PlanServiceMock
   let service: ReportesService
 
   beforeEach(() => {
     prisma = buildPrismaMock()
-    service = new ReportesService(prisma as unknown as PrismaService)
+    planService = buildPlanServiceMock()
+    service = buildService(prisma, planService)
   })
 
   it("mezcla log_cambios_curso + historico_estados_asignacion ordenado DESC", async () => {
@@ -357,11 +469,13 @@ describe("ReportesService.obtenerAvanceCurso (vista=HISTORICO)", () => {
 
 describe("ReportesService.obtenerDetalleColaborador", () => {
   let prisma: PrismaMock
+  let planService: PlanServiceMock
   let service: ReportesService
 
   beforeEach(() => {
     prisma = buildPrismaMock()
-    service = new ReportesService(prisma as unknown as PrismaService)
+    planService = buildPlanServiceMock()
+    service = buildService(prisma, planService)
   })
 
   it("404 si la asignacion no existe", async () => {
@@ -425,11 +539,13 @@ describe("ReportesService.obtenerDetalleColaborador", () => {
 
 describe("ReportesService.obtenerBrechasDetectadas", () => {
   let prisma: PrismaMock
+  let planService: PlanServiceMock
   let service: ReportesService
 
   beforeEach(() => {
     prisma = buildPrismaMock()
-    service = new ReportesService(prisma as unknown as PrismaService)
+    planService = buildPlanServiceMock()
+    service = buildService(prisma, planService)
   })
 
   it("clasifica notas vs umbrales por skill (no_cumple/cerca/cumple)", async () => {
@@ -505,11 +621,13 @@ describe("ReportesService.obtenerBrechasDetectadas", () => {
 
 describe("ReportesService.obtenerCentroRevision", () => {
   let prisma: PrismaMock
+  let planService: PlanServiceMock
   let service: ReportesService
 
   beforeEach(() => {
     prisma = buildPrismaMock()
-    service = new ReportesService(prisma as unknown as PrismaService)
+    planService = buildPlanServiceMock()
+    service = buildService(prisma, planService)
   })
 
   it("tipo=TRANSVERSAL: 1 fila por capa pendiente", async () => {
