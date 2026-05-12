@@ -1449,3 +1449,235 @@ describe("AsignacionesService.obtenerHistoricoEstados", () => {
     )
   })
 })
+
+// =============================================================================
+// P11.5a — Triggers ASIGNACION_CURSO + CASO_REABIERTO (D-S11.5-A1, D-S11.5-A2)
+// =============================================================================
+
+describe("AsignacionesService P11.5a — ASIGNACION_CURSO en crearBatch", () => {
+  beforeEach(() => {
+    prisma.curso.findUnique.mockResolvedValue({ id: CURSO_ID, estado: EstadoCurso.ACTIVO })
+  })
+
+  function configurarFindUniqueParaNotifAsignacion(): void {
+    prisma.asignacionCurso.findUnique.mockImplementation(
+      (args: { select?: Record<string, unknown> }) => {
+        if (args.select && "curso" in args.select && "colaborador" in args.select) {
+          return Promise.resolve({
+            curso: { id: CURSO_ID, titulo: "Curso para notif" },
+            colaborador: { usuario: { id: PARTICIPANTE_ID } },
+          })
+        }
+        return Promise.resolve(null)
+      },
+    )
+  }
+
+  it("emite ASIGNACION_CURSO por cada asignacion efectivamente creada (broadcast 1-a-1)", async () => {
+    const idOk1 = "44444444-4444-4444-4444-444444444401"
+    const idOk2 = "44444444-4444-4444-4444-444444444402"
+    prisma.colaborador.findMany.mockResolvedValue([
+      { id: idOk1, estadoEmpleado: "ACTIVO" },
+      { id: idOk2, estadoEmpleado: "ACTIVO" },
+    ])
+    prisma.asignacionCurso.findMany.mockResolvedValue([])
+    prisma.asignacionCurso.create.mockImplementation((args: { data: { colaboradorId: string } }) =>
+      Promise.resolve(asignacionRow({ colaboradorId: args.data.colaboradorId })),
+    )
+    configurarFindUniqueParaNotifAsignacion()
+
+    await service.crearBatch(CURSO_ID, { colaboradorIds: [idOk1, idOk2] })
+
+    expect(notificaciones.crear).toHaveBeenCalledTimes(2)
+    expect(notificaciones.crear).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tipo: "ASIGNACION_CURSO",
+        usuarioId: PARTICIPANTE_ID,
+        payload: expect.objectContaining({
+          asignacionId: ASIGNACION_ID,
+          cursoId: CURSO_ID,
+          cursoTitulo: "Curso para notif",
+        }),
+      }),
+    )
+  })
+
+  it("NO emite ASIGNACION_CURSO para colaboradores ya inscritos (rechazadas por YA_INSCRITO)", async () => {
+    const idYa = "44444444-4444-4444-4444-444444444410"
+    prisma.colaborador.findMany.mockResolvedValue([{ id: idYa, estadoEmpleado: "ACTIVO" }])
+    prisma.asignacionCurso.findMany.mockResolvedValue([{ colaboradorId: idYa }])
+    configurarFindUniqueParaNotifAsignacion()
+
+    const r = await service.crearBatch(CURSO_ID, { colaboradorIds: [idYa] })
+    expect(r.creadas).toHaveLength(0)
+    expect(r.rechazadas).toEqual([{ colaboradorId: idYa, motivo: "YA_INSCRITO" }])
+    expect(notificaciones.crear).not.toHaveBeenCalled()
+  })
+
+  it("NO emite ASIGNACION_CURSO para race P2002 (rebote YA_INSCRITO)", async () => {
+    const idRace = "44444444-4444-4444-4444-444444444420"
+    prisma.colaborador.findMany.mockResolvedValue([{ id: idRace, estadoEmpleado: "ACTIVO" }])
+    prisma.asignacionCurso.findMany.mockResolvedValue([])
+    prisma.asignacionCurso.create.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError("dup", {
+        code: "P2002",
+        clientVersion: "test",
+      }),
+    )
+    configurarFindUniqueParaNotifAsignacion()
+
+    const r = await service.crearBatch(CURSO_ID, { colaboradorIds: [idRace] })
+    expect(r.creadas).toHaveLength(0)
+    expect(r.rechazadas).toEqual([{ colaboradorId: idRace, motivo: "YA_INSCRITO" }])
+    expect(notificaciones.crear).not.toHaveBeenCalled()
+  })
+
+  it("error en notificaciones.crear NO propaga al admin (best-effort)", async () => {
+    const idOk = "44444444-4444-4444-4444-444444444430"
+    prisma.colaborador.findMany.mockResolvedValue([{ id: idOk, estadoEmpleado: "ACTIVO" }])
+    prisma.asignacionCurso.findMany.mockResolvedValue([])
+    prisma.asignacionCurso.create.mockResolvedValue(asignacionRow({ colaboradorId: idOk }))
+    configurarFindUniqueParaNotifAsignacion()
+    notificaciones.crear.mockRejectedValueOnce(new Error("notif down"))
+
+    const r = await service.crearBatch(CURSO_ID, { colaboradorIds: [idOk] })
+    expect(r.creadas).toHaveLength(1)
+  })
+})
+
+describe("AsignacionesService P11.5a — ASIGNACION_CURSO en autoInscribir", () => {
+  function configurarFindUniqueParaNotifAsignacion(): void {
+    prisma.asignacionCurso.findUnique.mockImplementation(
+      (args: { select?: Record<string, unknown> }) => {
+        if (args.select && "curso" in args.select && "colaborador" in args.select) {
+          return Promise.resolve({
+            curso: { id: CURSO_ID, titulo: "Curso para notif" },
+            colaborador: { usuario: { id: PARTICIPANTE_ID } },
+          })
+        }
+        return Promise.resolve(null)
+      },
+    )
+  }
+
+  it("emite ASIGNACION_CURSO POST-exito del flujo voluntario", async () => {
+    prisma.usuario.findUnique.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
+    prisma.curso.findUnique.mockResolvedValue({
+      id: CURSO_ID,
+      estado: EstadoCurso.ACTIVO,
+      toggleVoluntarios: true,
+    })
+    prisma.asignacionCurso.create.mockResolvedValue(
+      asignacionRow({
+        rol: RolAsignacion.VOLUNTARIO,
+        estadoAsignado: null,
+        estadoVoluntario: "INSCRITO",
+        origenVoluntario: "INICIATIVA",
+        resultadoEntrevistaCliente: null,
+      }),
+    )
+    configurarFindUniqueParaNotifAsignacion()
+
+    await service.autoInscribir(CURSO_ID, { origenVoluntario: "INICIATIVA" }, PARTICIPANTE)
+
+    expect(notificaciones.crear).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tipo: "ASIGNACION_CURSO",
+        usuarioId: PARTICIPANTE_ID,
+        payload: expect.objectContaining({
+          asignacionId: ASIGNACION_ID,
+          cursoId: CURSO_ID,
+          cursoTitulo: "Curso para notif",
+        }),
+      }),
+    )
+  })
+})
+
+describe("AsignacionesService P11.5a — CASO_REABIERTO en reabrirCaso", () => {
+  const idempKey = "55555555-5555-5555-5555-555555555555"
+
+  function configurarFindUniqueParaNotifReabierto(): void {
+    prisma.asignacionCurso.findUnique.mockImplementation(
+      (args: { select?: Record<string, unknown> }) => {
+        if (args.select && "curso" in args.select && "colaborador" in args.select) {
+          return Promise.resolve({
+            curso: { id: CURSO_ID, titulo: "Curso reabierto" },
+            colaborador: { usuario: { id: PARTICIPANTE_ID } },
+          })
+        }
+        return Promise.resolve({
+          id: ASIGNACION_ID,
+          rol: RolAsignacion.ASIGNADO,
+          estadoAsignado: "APTO",
+          estadoVoluntario: null,
+        })
+      },
+    )
+  }
+
+  it("emite CASO_REABIERTO POST-exito sin replay con motivo en payload", async () => {
+    configurarFindUniqueParaNotifReabierto()
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({ estadoAsignado: "EN_PROGRESO" }),
+    )
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+
+    await service.reabrirCaso({
+      asignacionId: ASIGNACION_ID,
+      motivo: "Cliente solicito revisar entrega",
+      idempotencyKey: idempKey,
+      autorUsuarioId: ADMIN_ID,
+    })
+
+    expect(notificaciones.crear).toHaveBeenCalledWith({
+      usuarioId: PARTICIPANTE_ID,
+      tipo: "CASO_REABIERTO",
+      payload: {
+        asignacionId: ASIGNACION_ID,
+        cursoId: CURSO_ID,
+        cursoTitulo: "Curso reabierto",
+        motivo: "Cliente solicito revisar entrega",
+      },
+    })
+  })
+
+  it("NO emite CASO_REABIERTO en replay (idempotencia post-cache)", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: "EN_PROGRESO",
+      estadoVoluntario: null,
+    })
+    const cached = { id: ASIGNACION_ID, estadoAsignado: "EN_PROGRESO" } as unknown as Asignacion
+    idempotency.runOnce.mockResolvedValueOnce({ status: 200, body: cached, replay: true })
+
+    const res = await service.reabrirCaso({
+      asignacionId: ASIGNACION_ID,
+      motivo: "reintento idempotente",
+      idempotencyKey: idempKey,
+      autorUsuarioId: ADMIN_ID,
+    })
+    expect(res.nuevo).toBe(false)
+    expect(notificaciones.crear).not.toHaveBeenCalled()
+  })
+
+  it("error en notificaciones.crear NO propaga al admin (best-effort)", async () => {
+    configurarFindUniqueParaNotifReabierto()
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({ estadoAsignado: "EN_PROGRESO" }),
+    )
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+    notificaciones.crear.mockRejectedValueOnce(new Error("notif down"))
+
+    const res = await service.reabrirCaso({
+      asignacionId: ASIGNACION_ID,
+      motivo: "x",
+      idempotencyKey: idempKey,
+      autorUsuarioId: ADMIN_ID,
+    })
+    expect(res.nuevo).toBe(true)
+  })
+})

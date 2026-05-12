@@ -267,7 +267,11 @@ export class AsignacionesService {
         // el service del plan lo loguea y no aborta el alta; el admin puede
         // recalcular manualmente (POST /plan/recalcular).
         await this.planPersonal.calcularSiAsignado(row.id)
-        // TODO(S11): emitir notificacion ASIGNACION_CURSO al colaborador (D-AS-13, D88).
+        // (S11.5) emitido via notificarAsignacionCurso (D-S11.5-A1, D88) —
+        // broadcast 1-a-1 solo para las efectivamente creadas (no para las
+        // que rebotaron por race P2002 -> YA_INSCRITO). Best-effort: errores
+        // no propagan al admin (R-S11.5-2).
+        await this.notificarAsignacionCurso(row.id)
         // TODO(S11): emitir notificacion PLAN_CALCULADO al participante (D-S7-D3).
         //  -- nota P10c: el calculo del plan no llama a calcularExplicito/recalcular,
         //     usa calcularSiAsignado interno; el trigger debe cablearse aqui en S11.
@@ -459,7 +463,10 @@ export class AsignacionesService {
         },
         select: SELECT_ASIGNACION_FIELDS,
       })
-      // TODO(S11): emitir notificacion ASIGNACION_CURSO al participante (D-AS-13, D88).
+      // (S11.5) emitido via notificarAsignacionCurso (D-S11.5-A1, D88) tras el
+      // exito del flujo voluntario. Best-effort: errores no propagan al
+      // participante (R-S11.5-2).
+      await this.notificarAsignacionCurso(row.id)
       return toAsignacion(row)
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -937,11 +944,19 @@ export class AsignacionesService {
           where: { asignacionId: input.asignacionId },
           data: { estaDesactualizado: true },
         })
-        // TODO(S11): emitir notificacion CASO_REABIERTO al colaborador (D88).
+        // (S11.5) emitido via notificarCasoReabierto FUERA del runOnce — ver
+        // bloque post-ejecucion (D-AUDIT-2 / R-S11.5-1).
         // TODO(S11): emitir notificacion PLAN_DESACTUALIZADO al admin (D-S7-D3).
         return { status: HTTP_OK, body: toAsignacion(row) }
       },
     })
+
+    if (!ejecucion.replay) {
+      // D-AUDIT-2 / R-S11.5-1: notificacion FUERA del runOnce. Si la accion
+      // fue un replay idempotente, NO se reemite. CASO_REABIERTO es critico
+      // (D-S11.5-A2) — el guard EX_EMPLEADO se aplica en el service de notif.
+      await this.notificarCasoReabierto(input.asignacionId, input.motivo)
+    }
 
     return { asignacion: ejecucion.body, nuevo: !ejecucion.replay }
   }
@@ -1211,6 +1226,95 @@ export class AsignacionesService {
       const detalle = error instanceof Error ? error.message : String(error)
       this.logger.warn(
         `notif | fallo | tipo=RESULTADO_CIERRE | asignacion=${asignacionId} | error=${detalle}`,
+      )
+    }
+  }
+
+  /**
+   * Trigger ASIGNACION_CURSO (D-S11.5-A1, §19.3). Tipo critico — no silenciable.
+   * Identidad del destinatario derivada de la asignacion (NUNCA del body — A01).
+   * Cualquier error se loggea sin propagar al admin (R-S10-2 / R-S11.5-2).
+   *
+   * Se invoca:
+   *  - en `crearAsignacionesAdmin` por cada asignacion efectivamente creada
+   *    (no para las que rebotaron por P2002 race -> YA_INSCRITO).
+   *  - en `autoInscribir` tras crear el row VOLUNTARIO con exito.
+   */
+  private async notificarAsignacionCurso(asignacionId: string): Promise<void> {
+    try {
+      const asignacion = await this.prisma.asignacionCurso.findUnique({
+        where: { id: asignacionId },
+        select: {
+          curso: { select: { id: true, titulo: true } },
+          colaborador: { select: { usuario: { select: { id: true } } } },
+        },
+      })
+      const usuarioId = asignacion?.colaborador?.usuario?.id
+      const cursoId = asignacion?.curso?.id
+      const cursoTitulo = asignacion?.curso?.titulo
+      if (!(usuarioId && cursoId && cursoTitulo)) {
+        this.logger.warn(
+          `notif | asignacion-curso omitida | asignacion=${asignacionId} | motivo=sin-usuario-o-curso`,
+        )
+        return
+      }
+      await this.notificaciones.crear({
+        usuarioId,
+        tipo: TipoEventoNotif.ASIGNACION_CURSO,
+        payload: {
+          asignacionId,
+          cursoId,
+          cursoTitulo,
+        },
+      })
+    } catch (error) {
+      const detalle = error instanceof Error ? error.message : String(error)
+      this.logger.warn(
+        `notif | fallo | tipo=ASIGNACION_CURSO | asignacion=${asignacionId} | error=${detalle}`,
+      )
+    }
+  }
+
+  /**
+   * Trigger CASO_REABIERTO (D-S11.5-A2, §19.3). Tipo critico — no silenciable.
+   * El motivo viene del header `X-Motivo` validado por `@RequiereMotivo()` en
+   * el controller y se incluye en el payload para que el colaborador entienda
+   * el porque del cambio. Cualquier error se loggea sin propagar al admin
+   * (R-S10-2 / R-S11.5-2). Se invoca FUERA del `runOnce` y solo cuando
+   * `!ejecucion.replay` (D-AUDIT-2 / R-S11.5-1).
+   */
+  private async notificarCasoReabierto(asignacionId: string, motivo: string): Promise<void> {
+    try {
+      const asignacion = await this.prisma.asignacionCurso.findUnique({
+        where: { id: asignacionId },
+        select: {
+          curso: { select: { id: true, titulo: true } },
+          colaborador: { select: { usuario: { select: { id: true } } } },
+        },
+      })
+      const usuarioId = asignacion?.colaborador?.usuario?.id
+      const cursoId = asignacion?.curso?.id
+      const cursoTitulo = asignacion?.curso?.titulo
+      if (!(usuarioId && cursoId && cursoTitulo)) {
+        this.logger.warn(
+          `notif | caso-reabierto omitida | asignacion=${asignacionId} | motivo=sin-usuario-o-curso`,
+        )
+        return
+      }
+      await this.notificaciones.crear({
+        usuarioId,
+        tipo: TipoEventoNotif.CASO_REABIERTO,
+        payload: {
+          asignacionId,
+          cursoId,
+          cursoTitulo,
+          motivo,
+        },
+      })
+    } catch (error) {
+      const detalle = error instanceof Error ? error.message : String(error)
+      this.logger.warn(
+        `notif | fallo | tipo=CASO_REABIERTO | asignacion=${asignacionId} | error=${detalle}`,
       )
     }
   }

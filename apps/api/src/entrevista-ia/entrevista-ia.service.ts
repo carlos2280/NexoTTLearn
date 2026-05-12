@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common"
 import {
@@ -17,7 +18,7 @@ import {
   IntentoEntrevistaIaParticipanteResponse,
   ListarIntentosEntrevistaIaQuery,
 } from "@nexott-learn/shared-types"
-import { OrigenNotaSkill, Prisma, RolUsuario } from "@prisma/client"
+import { OrigenNotaSkill, Prisma, RolUsuario, TipoEventoNotif } from "@prisma/client"
 import { AiService } from "../common/ai/ai.service"
 import { TurnoTranscripcion } from "../common/ai/ai.types"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
@@ -26,6 +27,7 @@ import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
 import { NotaSkillService } from "../nota-skill/nota-skill.service"
+import { NotificacionesService } from "../notificaciones/notificaciones.service"
 import {
   IntentoEntrevistaSeleccionado,
   SELECT_INTENTO_ENTREVISTA_FIELDS,
@@ -60,11 +62,14 @@ const RATE_LIMIT_MAX = 5
  */
 @Injectable()
 export class EntrevistaIaService {
+  private readonly logger = new Logger(EntrevistaIaService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly idempotency: IdempotencyService,
     private readonly ai: AiService,
     private readonly notaSkill: NotaSkillService,
+    private readonly notificaciones: NotificacionesService,
   ) {}
 
   // ===========================================================================
@@ -279,6 +284,14 @@ export class EntrevistaIaService {
     const entrevistaIaId = asignacion.curso.entrevistaIaId
     const colaboradorId = asignacion.colaboradorId
 
+    // (S11.5 R-S11.5-1) Idempotencia inter-intentos para
+    // ENTREVISTA_IA_DISPONIBLE: contamos intentos PREVIOS al create. Si era 0,
+    // este sera el primer intento del colaborador en esta entrevista IA y
+    // emitiremos la notif POST-commit. Cualquier intento posterior NO re-emite.
+    const intentosPrevios = await this.prisma.intentoEntrevistaIA.count({
+      where: { entrevistaIaId, colaboradorId },
+    })
+
     const ejecucion = await this.idempotency.runOnce<CrearIntentoEntrevistaIaResponse>({
       scope: IDEMPOTENCY_SCOPE_INTENTO_CREAR,
       key: input.idempotencyKey,
@@ -326,6 +339,13 @@ export class EntrevistaIaService {
         }
       },
     })
+
+    if (!ejecucion.replay && intentosPrevios === 0) {
+      // (S11.5) emitido via notificarEntrevistaIaDisponible (D-S11.5-A4, D42)
+      // solo si era el primer intento del colaborador en esta entrevista IA.
+      // FUERA del runOnce (R-S11.5-1). Tipo silenciable.
+      await this.notificarEntrevistaIaDisponible(ejecucion.body.intentoId, input.asignacionId)
+    }
 
     return ejecucion.body
   }
@@ -982,5 +1002,51 @@ export class EntrevistaIaService {
       .filter((i) => seccionesAbiertas.has(i.seccionId))
       .map((i) => i.seccion)
     return construirSnapshotSeccionesBase(seccionesRecorridas)
+  }
+
+  /**
+   * Trigger ENTREVISTA_IA_DISPONIBLE (D-S11.5-A4, D42, §19.3). Tipo silenciable.
+   * Identidad del destinatario derivada de la asignacion (NUNCA del body — A01).
+   * Cualquier error se loggea sin propagar al participante (R-S11.5-2). Helper
+   * se invoca FUERA del `runOnce` y solo cuando era el primer intento del
+   * colaborador en esta entrevista IA (R-S11.5-1).
+   */
+  private async notificarEntrevistaIaDisponible(
+    intentoEntrevistaIaId: string,
+    asignacionId: string,
+  ): Promise<void> {
+    try {
+      const asignacion = await this.prisma.asignacionCurso.findUnique({
+        where: { id: asignacionId },
+        select: {
+          curso: { select: { id: true, titulo: true } },
+          colaborador: { select: { usuario: { select: { id: true } } } },
+        },
+      })
+      const usuarioId = asignacion?.colaborador?.usuario?.id
+      const cursoId = asignacion?.curso?.id
+      const cursoTitulo = asignacion?.curso?.titulo
+      if (!(usuarioId && cursoId && cursoTitulo)) {
+        this.logger.warn(
+          `notif | entrevista-ia-disponible omitida | asignacion=${asignacionId} | motivo=sin-usuario-o-curso`,
+        )
+        return
+      }
+      await this.notificaciones.crear({
+        usuarioId,
+        tipo: TipoEventoNotif.ENTREVISTA_IA_DISPONIBLE,
+        payload: {
+          asignacionId,
+          cursoId,
+          cursoTitulo,
+          intentoEntrevistaIaId,
+        },
+      })
+    } catch (error) {
+      const detalle = error instanceof Error ? error.message : String(error)
+      this.logger.warn(
+        `notif | fallo | tipo=ENTREVISTA_IA_DISPONIBLE | asignacion=${asignacionId} | error=${detalle}`,
+      )
+    }
   }
 }

@@ -2,6 +2,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   UnprocessableEntityException,
   forwardRef,
@@ -31,6 +32,7 @@ import {
   Prisma,
   RolAsignacion,
   RolUsuario,
+  TipoEventoNotif,
 } from "@prisma/client"
 import { evaluarCondicionesListo } from "../asignaciones/asignaciones.helpers"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
@@ -39,6 +41,7 @@ import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
 import { NotaSkillService } from "../nota-skill/nota-skill.service"
+import { NotificacionesService } from "../notificaciones/notificaciones.service"
 import { PUNTAJES_FALTANTES_ERROR, calcularNotaTransversal } from "./calcular-nota-transversal"
 import { JobEvaluacionTransversalService } from "./job-evaluacion-transversal.service"
 import { toIntentoAdmin, toIntentoParticipante } from "./transversal.helpers"
@@ -93,12 +96,15 @@ interface AsignacionResuelta {
  */
 @Injectable()
 export class TransversalService {
+  private readonly logger = new Logger(TransversalService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly idempotency: IdempotencyService,
     private readonly notaSkill: NotaSkillService,
     @Inject(forwardRef(() => JobEvaluacionTransversalService))
     private readonly job: JobEvaluacionTransversalService,
+    private readonly notificaciones: NotificacionesService,
   ) {}
 
   // =========================================================================
@@ -334,6 +340,14 @@ export class TransversalService {
     const repoUrl = input.body.repoOArtefacto.url
     const comentario = input.body.comentarioColaborador ?? null
 
+    // (S11.5 R-S11.5-1) Idempotencia inter-intentos para TRANSVERSAL_DISPONIBLE:
+    // contamos intentos PREVIOS al create. Si era 0, este sera el primer
+    // intento del colaborador en este transversal y emitiremos la notif
+    // POST-commit. Cualquier intento posterior NO re-emite.
+    const intentosPrevios = await this.prisma.intentoTransversal.count({
+      where: { transversalId, colaboradorId: asignacion.colaboradorId },
+    })
+
     const ejecucion = await this.idempotency.runOnce<CrearIntentoTransversalResponse>({
       scope: IDEMPOTENCY_SCOPE_INTENTO,
       key: input.idempotencyKey,
@@ -376,6 +390,12 @@ export class TransversalService {
     if (!ejecucion.replay) {
       // Dispatch fuera de la TX (R-S8-4: cola en memoria, fire-and-forget).
       this.job.dispatch(ejecucion.body.intentoId)
+      // (S11.5) emitido via notificarTransversalDisponible (D-S11.5-A3, D42)
+      // solo si era el primer intento del colaborador en este transversal.
+      // FUERA del runOnce (R-S11.5-1). Tipo silenciable.
+      if (intentosPrevios === 0) {
+        await this.notificarTransversalDisponible(ejecucion.body.intentoId, input.asignacionId)
+      }
     }
 
     return ejecucion.body
@@ -909,6 +929,52 @@ export class TransversalService {
       asignacion.estadoVoluntario === EstadoVoluntario.EN_PROGRESO ||
       asignacion.estadoVoluntario === EstadoVoluntario.LISTO
     )
+  }
+
+  /**
+   * Trigger TRANSVERSAL_DISPONIBLE (D-S11.5-A3, D42, §19.3). Tipo silenciable.
+   * Identidad del destinatario derivada de la asignacion (NUNCA del body — A01).
+   * Cualquier error se loggea sin propagar al participante (R-S11.5-2). Helper
+   * se invoca FUERA del `runOnce` y solo cuando era el primer intento del
+   * colaborador en este transversal (R-S11.5-1).
+   */
+  private async notificarTransversalDisponible(
+    intentoTransversalId: string,
+    asignacionId: string,
+  ): Promise<void> {
+    try {
+      const asignacion = await this.prisma.asignacionCurso.findUnique({
+        where: { id: asignacionId },
+        select: {
+          curso: { select: { id: true, titulo: true } },
+          colaborador: { select: { usuario: { select: { id: true } } } },
+        },
+      })
+      const usuarioId = asignacion?.colaborador?.usuario?.id
+      const cursoId = asignacion?.curso?.id
+      const cursoTitulo = asignacion?.curso?.titulo
+      if (!(usuarioId && cursoId && cursoTitulo)) {
+        this.logger.warn(
+          `notif | transversal-disponible omitida | asignacion=${asignacionId} | motivo=sin-usuario-o-curso`,
+        )
+        return
+      }
+      await this.notificaciones.crear({
+        usuarioId,
+        tipo: TipoEventoNotif.TRANSVERSAL_DISPONIBLE,
+        payload: {
+          asignacionId,
+          cursoId,
+          cursoTitulo,
+          intentoTransversalId,
+        },
+      })
+    } catch (error) {
+      const detalle = error instanceof Error ? error.message : String(error)
+      this.logger.warn(
+        `notif | fallo | tipo=TRANSVERSAL_DISPONIBLE | asignacion=${asignacionId} | error=${detalle}`,
+      )
+    }
   }
 }
 

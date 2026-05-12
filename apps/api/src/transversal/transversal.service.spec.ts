@@ -13,6 +13,7 @@ import type { IdempotencyService } from "../common/idempotency/idempotency.servi
 import type { PrismaService } from "../common/prisma/prisma.service"
 import type { SesionUsuario } from "../common/types/sesion.types"
 import type { NotaSkillService } from "../nota-skill/nota-skill.service"
+import { NotificacionesService } from "../notificaciones/notificaciones.service"
 import type { JobEvaluacionTransversalService } from "./job-evaluacion-transversal.service"
 import { TransversalService } from "./transversal.service"
 
@@ -131,6 +132,7 @@ let notaSkill: {
   obtenerIntentoTransversalVigente: ReturnType<typeof vi.fn>
   calcularNotaActualSkill: ReturnType<typeof vi.fn>
 }
+let notificaciones: { crear: ReturnType<typeof vi.fn> }
 let service: TransversalService
 
 beforeEach(() => {
@@ -149,11 +151,19 @@ beforeEach(() => {
     obtenerIntentoTransversalVigente: vi.fn(() => null),
     calcularNotaActualSkill: vi.fn(() => 80),
   }
+  notificaciones = {
+    crear: vi.fn().mockResolvedValue({
+      creada: true,
+      notificacionId: "n-mock",
+      canalesEnviados: ["IN_APP"],
+    }),
+  }
   service = new TransversalService(
     prisma as unknown as PrismaService,
     idempotency as unknown as IdempotencyService,
     notaSkill as unknown as NotaSkillService,
     job as unknown as JobEvaluacionTransversalService,
+    notificaciones as unknown as NotificacionesService,
   )
 })
 
@@ -713,5 +723,132 @@ describe("E11. POST /intentos-transversal/:id/anular (P8b)", () => {
     expect(r.response.skillsRecalculadas).toEqual([SKILL_ID])
     expect(notaSkill.recalcularConFuentes).toHaveBeenCalledOnce()
     expect(r.replay).toBe(false)
+  })
+})
+
+// ===========================================================================
+// P11.5a — Trigger TRANSVERSAL_DISPONIBLE (D-S11.5-A3, D42)
+// ===========================================================================
+
+describe("TransversalService P11.5a — TRANSVERSAL_DISPONIBLE en crearIntento", () => {
+  function configurarFindUniqueCombinado(): void {
+    prisma.asignacionCurso.findUnique.mockImplementation(
+      (args: { select?: Record<string, unknown> }) => {
+        if (args.select && "curso" in args.select && "colaborador" in args.select) {
+          // findUnique del helper notificarTransversalDisponible.
+          return Promise.resolve({
+            curso: { id: CURSO_ID, titulo: "Curso transversal" },
+            colaborador: { usuario: { id: USUARIO_ID } },
+          })
+        }
+        // findUnique de resolverAsignacionConCurso.
+        return Promise.resolve({
+          id: ASIGNACION_ID,
+          colaboradorId: COLABORADOR_ID,
+          cursoId: CURSO_ID,
+          rol: RolAsignacion.ASIGNADO,
+          estadoAsignado: EstadoAsignado.EN_PROGRESO,
+          estadoVoluntario: null,
+          curso: {
+            id: CURSO_ID,
+            estado: EstadoCurso.ACTIVO,
+            desbloqueo: DesbloqueoCurso.SIEMPRE,
+            fechaDesbloqueo: null,
+            transversalId: TRANSVERSAL_ID,
+            entrevistaIaId: null,
+          },
+        })
+      },
+    )
+    prisma.usuario.findUnique.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
+  }
+
+  it("emite TRANSVERSAL_DISPONIBLE en el primer intento del colaborador (intentosPrevios=0)", async () => {
+    configurarFindUniqueCombinado()
+    prisma.intentoTransversal.count.mockResolvedValueOnce(0)
+    prisma.intentoTransversal.create.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      fecha: new Date("2026-05-11T10:00:00Z"),
+    })
+
+    await service.crearIntento({
+      asignacionId: ASIGNACION_ID,
+      body: { repoOArtefacto: { tipo: "URL_GIT", url: REPO_URL } },
+      idempotencyKey: IDEMPOTENCY_KEY,
+      usuario: ADMIN,
+    })
+
+    expect(notificaciones.crear).toHaveBeenCalledWith({
+      usuarioId: USUARIO_ID,
+      tipo: "TRANSVERSAL_DISPONIBLE",
+      payload: {
+        asignacionId: ASIGNACION_ID,
+        cursoId: CURSO_ID,
+        cursoTitulo: "Curso transversal",
+        intentoTransversalId: INTENTO_ID,
+      },
+    })
+  })
+
+  it("NO emite TRANSVERSAL_DISPONIBLE en intentos posteriores (intentosPrevios>0)", async () => {
+    configurarFindUniqueCombinado()
+    prisma.intentoTransversal.count.mockResolvedValueOnce(2)
+    prisma.intentoTransversal.create.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      fecha: new Date("2026-05-11T10:00:00Z"),
+    })
+
+    await service.crearIntento({
+      asignacionId: ASIGNACION_ID,
+      body: { repoOArtefacto: { tipo: "URL_GIT", url: REPO_URL } },
+      idempotencyKey: IDEMPOTENCY_KEY,
+      usuario: ADMIN,
+    })
+
+    expect(notificaciones.crear).not.toHaveBeenCalled()
+  })
+
+  it("consulta count de intentos previos (idempotencia inter-intentos)", async () => {
+    configurarFindUniqueCombinado()
+    prisma.intentoTransversal.count.mockResolvedValueOnce(0)
+    prisma.intentoTransversal.create.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      fecha: new Date("2026-05-11T10:00:00Z"),
+    })
+
+    await service.crearIntento({
+      asignacionId: ASIGNACION_ID,
+      body: { repoOArtefacto: { tipo: "URL_GIT", url: REPO_URL } },
+      idempotencyKey: IDEMPOTENCY_KEY,
+      usuario: ADMIN,
+    })
+
+    expect(prisma.intentoTransversal.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          transversalId: TRANSVERSAL_ID,
+          colaboradorId: COLABORADOR_ID,
+        }),
+      }),
+    )
+  })
+
+  it("error en notificaciones.crear NO propaga al participante (best-effort)", async () => {
+    configurarFindUniqueCombinado()
+    prisma.intentoTransversal.count.mockResolvedValueOnce(0)
+    prisma.intentoTransversal.create.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      fecha: new Date("2026-05-11T10:00:00Z"),
+    })
+    notificaciones.crear.mockRejectedValueOnce(new Error("notif down"))
+
+    await expect(
+      service.crearIntento({
+        asignacionId: ASIGNACION_ID,
+        body: { repoOArtefacto: { tipo: "URL_GIT", url: REPO_URL } },
+        idempotencyKey: IDEMPOTENCY_KEY,
+        usuario: ADMIN,
+      }),
+    ).resolves.toMatchObject({ intentoId: INTENTO_ID })
   })
 })

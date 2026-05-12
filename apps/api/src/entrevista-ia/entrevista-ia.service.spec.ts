@@ -6,6 +6,7 @@ import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
 import { NotaSkillService } from "../nota-skill/nota-skill.service"
+import { NotificacionesService } from "../notificaciones/notificaciones.service"
 import { EntrevistaIaService } from "./entrevista-ia.service"
 
 /**
@@ -148,24 +149,41 @@ function buildNotaSkillMock(): NotaSkillService {
   } as unknown as NotaSkillService
 }
 
+interface NotificacionesSpy {
+  readonly crear: ReturnType<typeof vi.fn>
+}
+
+function buildNotificacionesMock(): NotificacionesSpy {
+  return {
+    crear: vi.fn().mockResolvedValue({
+      creada: true,
+      notificacionId: "n-mock",
+      canalesEnviados: ["IN_APP"],
+    }),
+  }
+}
+
 function buildService(): {
   service: EntrevistaIaService
   prisma: MockPrisma
   ai: AiService
   idempotency: IdempotencyService
   notaSkill: NotaSkillService
+  notificaciones: NotificacionesSpy
 } {
   const prisma = buildPrismaMock()
   const ai = buildAiMock()
   const idempotency = buildIdempotencyMock(prisma)
   const notaSkill = buildNotaSkillMock()
+  const notificaciones = buildNotificacionesMock()
   const service = new EntrevistaIaService(
     prisma as unknown as PrismaService,
     idempotency,
     ai,
     notaSkill,
+    notificaciones as unknown as NotificacionesService,
   )
-  return { service, prisma, ai, idempotency, notaSkill }
+  return { service, prisma, ai, idempotency, notaSkill, notificaciones }
 }
 
 const ENTREVISTA_DEF_MOCK = {
@@ -294,8 +312,9 @@ describe("E14 POST crear intento (snapshot + idempotency)", () => {
     service: EntrevistaIaService
     prisma: MockPrisma
     ai: AiService
+    notificaciones: NotificacionesSpy
   } {
-    const { service, prisma, ai } = buildService()
+    const { service, prisma, ai, notificaciones } = buildService()
     prisma.entrevistaIA.findUniqueOrThrow.mockResolvedValue({
       umbralAprobacion: new Prisma.Decimal(70),
       filosofia: "PREPARACION",
@@ -323,7 +342,7 @@ describe("E14 POST crear intento (snapshot + idempotency)", () => {
     })
     prisma.aperturaSeccion.findMany.mockResolvedValue([{ seccionId: seccionUuid }])
     prisma.intentoEntrevistaIA.create.mockResolvedValue({ id: INTENTO_ID })
-    return { service, prisma, ai }
+    return { service, prisma, ai, notificaciones }
   }
 
   it("ADMIN no puede crear intentos (solo PARTICIPANTE)", async () => {
@@ -683,5 +702,153 @@ describe("Visibilidad PARTICIPANTE ajeno -> 404 (D-AS-9)", () => {
       colaboradorId: "otro-colaborador",
     })
     await expect(service.obtenerIntento(INTENTO_ID, PART_SESION)).rejects.toThrow(NotFoundException)
+  })
+})
+
+// =============================================================================
+// P11.5a — Trigger ENTREVISTA_IA_DISPONIBLE (D-S11.5-A4, D42)
+// =============================================================================
+
+describe("EntrevistaIaService P11.5a — ENTREVISTA_IA_DISPONIBLE en crearIntento", () => {
+  function setupCrearIntento(): {
+    service: EntrevistaIaService
+    prisma: MockPrisma
+    notificaciones: NotificacionesSpy
+  } {
+    const { service, prisma, notificaciones } = buildService()
+    prisma.entrevistaIA.findUniqueOrThrow.mockResolvedValue({
+      umbralAprobacion: new Prisma.Decimal(70),
+      filosofia: "PREPARACION",
+      profundidad: "SEMI_SENIOR",
+      duracionMinutos: 30,
+      tono: "CONVERSACIONAL",
+      rubrica: [{ areaId: AREA_ID, peso: new Prisma.Decimal(100) }],
+    })
+    const seccionUuid = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    const bloqueUuid = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    prisma.planEstudio.findUnique.mockResolvedValue({
+      id: "plan-1",
+      items: [
+        {
+          seccionId: seccionUuid,
+          seccion: {
+            id: seccionUuid,
+            titulo: "S1",
+            modulo: { titulo: "M1" },
+            skills: [],
+            bloques: [{ id: bloqueUuid, tipo: "PARRAFO", contenido: { titulo: "t1" } }],
+          },
+        },
+      ],
+    })
+    prisma.aperturaSeccion.findMany.mockResolvedValue([{ seccionId: seccionUuid }])
+    prisma.intentoEntrevistaIA.create.mockResolvedValue({ id: INTENTO_ID })
+
+    // Mock combinado del findUnique de asignacionCurso:
+    //  - el `resolverAsignacion` necesita { id, colaboradorId, curso: { id, entrevistaIaId } }
+    //  - el helper notificarEntrevistaIaDisponible necesita { curso: { id, titulo }, colaborador: { usuario: { id } } }
+    prisma.asignacionCurso.findUnique.mockImplementation(
+      (args: { select?: Record<string, unknown> }) => {
+        if (args.select && "colaborador" in args.select) {
+          return Promise.resolve({
+            curso: { id: CURSO_ID, titulo: "Curso entrevista" },
+            colaborador: { usuario: { id: USER_PART_ID } },
+          })
+        }
+        return Promise.resolve({
+          id: ASIGNACION_ID,
+          colaboradorId: COLABORADOR_ID,
+          curso: { id: CURSO_ID, entrevistaIaId: ENTREVISTA_IA_ID },
+        })
+      },
+    )
+    return { service, prisma, notificaciones }
+  }
+
+  it("emite ENTREVISTA_IA_DISPONIBLE en el primer intento del colaborador (intentosPrevios=0)", async () => {
+    const { service, prisma, notificaciones } = setupCrearIntento()
+    prisma.intentoEntrevistaIA.count.mockResolvedValue(0)
+
+    await service.crearIntento({
+      asignacionId: ASIGNACION_ID,
+      idempotencyKey: "uuid-key-p1",
+      usuario: PART_SESION,
+    })
+
+    expect(notificaciones.crear).toHaveBeenCalledWith({
+      usuarioId: USER_PART_ID,
+      tipo: "ENTREVISTA_IA_DISPONIBLE",
+      payload: {
+        asignacionId: ASIGNACION_ID,
+        cursoId: CURSO_ID,
+        cursoTitulo: "Curso entrevista",
+        intentoEntrevistaIaId: INTENTO_ID,
+      },
+    })
+  })
+
+  it("NO emite ENTREVISTA_IA_DISPONIBLE en intentos posteriores (intentosPrevios>0)", async () => {
+    const { service, prisma, notificaciones } = setupCrearIntento()
+    // El count del rate-limit (intentos hora) usa where con timestamps; el de
+    // pre-create (idempotencia inter-intentos) usa where con
+    // {entrevistaIaId, colaboradorId} sin estado/fecha. Diferenciamos:
+    prisma.intentoEntrevistaIA.count.mockImplementation(
+      (args: { where?: { estado?: string; fecha?: unknown } }) => {
+        if (args.where?.estado === "EN_PROGRESO") {
+          return Promise.resolve(0)
+        }
+        if (args.where?.fecha !== undefined) {
+          return Promise.resolve(0)
+        }
+        // El que cuenta intentos previos (sin estado ni fecha) — devolvemos 2.
+        return Promise.resolve(2)
+      },
+    )
+
+    await service.crearIntento({
+      asignacionId: ASIGNACION_ID,
+      idempotencyKey: "uuid-key-p2",
+      usuario: PART_SESION,
+    })
+
+    expect(notificaciones.crear).not.toHaveBeenCalled()
+  })
+
+  it("consulta count de intentos previos (idempotencia inter-intentos)", async () => {
+    const { service, prisma } = setupCrearIntento()
+    prisma.intentoEntrevistaIA.count.mockResolvedValue(0)
+
+    await service.crearIntento({
+      asignacionId: ASIGNACION_ID,
+      idempotencyKey: "uuid-key-p3",
+      usuario: PART_SESION,
+    })
+
+    // Verificamos que el count se invoco al menos una vez con el filtro
+    // (entrevistaIaId, colaboradorId).
+    const llamadasIdempotencia = prisma.intentoEntrevistaIA.count.mock.calls.filter(
+      (c: unknown[]) => {
+        const arg = c[0] as { where?: { entrevistaIaId?: string; colaboradorId?: string } }
+        return (
+          arg.where?.entrevistaIaId === ENTREVISTA_IA_ID &&
+          arg.where?.colaboradorId === COLABORADOR_ID
+        )
+      },
+    )
+    expect(llamadasIdempotencia.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it("error en notificaciones.crear NO propaga al participante (best-effort)", async () => {
+    const { service, prisma, notificaciones } = setupCrearIntento()
+    prisma.intentoEntrevistaIA.count.mockResolvedValue(0)
+    notificaciones.crear.mockRejectedValueOnce(new Error("notif down"))
+
+    await expect(
+      service.crearIntento({
+        asignacionId: ASIGNACION_ID,
+        idempotencyKey: "uuid-key-p4",
+        usuario: PART_SESION,
+      }),
+    ).resolves.toMatchObject({ intentoId: INTENTO_ID })
   })
 })
