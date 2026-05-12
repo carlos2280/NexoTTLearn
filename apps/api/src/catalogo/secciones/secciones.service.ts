@@ -214,7 +214,7 @@ export class SeccionesService {
       return actual
     }
     camposCambiados.push("titulo")
-    return tx.seccion.update({
+    return await tx.seccion.update({
       where: { id: seccionId },
       data: { titulo: input.titulo },
       select: SELECT_SECCION_FIELDS,

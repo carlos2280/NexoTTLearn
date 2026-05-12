@@ -16,6 +16,7 @@ import {
 import { z } from "zod"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
+import { UMBRAL_BLOQUE_DEFAULT } from "../plan-personal/plan-personal.constants"
 
 const idempotencyKeyUuidSchema = z.string().uuid()
 
@@ -118,8 +119,6 @@ interface CursoEvaluacionListo {
   readonly transversalId: string | null
   readonly entrevistaIaId: string | null
 }
-
-const UMBRAL_BLOQUE_DEFAULT_LISTO = 70
 
 export async function evaluarCondicionesListo(
   prisma: PrismaService,
@@ -242,7 +241,7 @@ async function calcularPlanCompleto(prisma: PrismaService, asignacionId: string)
     }
     const todosCumplen = bloques.every((b) => {
       const nota = intentoPorBloque.get(b.id)
-      return nota !== undefined && nota >= UMBRAL_BLOQUE_DEFAULT_LISTO
+      return nota !== undefined && nota >= UMBRAL_BLOQUE_DEFAULT
     })
     if (!todosCumplen) {
       return false

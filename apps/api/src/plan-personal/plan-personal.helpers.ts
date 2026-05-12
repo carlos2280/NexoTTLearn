@@ -26,6 +26,7 @@ import type {
   SkillSnapshotItem,
 } from "@nexott-learn/shared-types"
 import { CaracterItemPlan, Prisma, RazonItemPlan, RolUsuario } from "@prisma/client"
+import { UMBRAL_BLOQUE_DEFAULT } from "./plan-personal.constants"
 import type {
   AvancePlan,
   AvanceSeccion,
@@ -35,12 +36,6 @@ import type {
 
 const PORCENTAJE_TOTAL = 100
 const PRECISION_PORCENTAJE = 2
-/**
- * Umbral default de aprobacion de un bloque cuando el schema aun no expone
- * el campo explicito. P7b llegara con `Bloque.umbralAprobacion` real (D-S7-C2)
- * y este default deja de aplicarse.
- */
-const UMBRAL_BLOQUE_DEFAULT = 70
 
 const ORIGEN_NOTA_VALORES = [
   "ENTREVISTA_INICIAL",

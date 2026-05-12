@@ -102,9 +102,9 @@ export class StorageService {
     }
 
     if (tx) {
-      return ejecutor(tx)
+      return await ejecutor(tx)
     }
-    return this.prisma.$transaction(ejecutor)
+    return await this.prisma.$transaction(ejecutor)
   }
 
   async leer(archivoId: string): Promise<LeerArchivoResult> {

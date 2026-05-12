@@ -301,6 +301,13 @@ export class PlanPersonalService {
         case "EXIMIR":
           await this.aplicarEximir(tx, planId, cursoId, dto.skillId)
           break
+        default: {
+          // Exhaustiveness check: si en el futuro se agrega otra accion a
+          // `AccionAjustePlan` sin actualizar este switch, TS marca aqui un
+          // error de compilacion (cierre §5.105 — FIX-P7-cierre).
+          const _exhaustive: never = dto
+          throw new Error(`Caso de ajuste no soportado: ${String(_exhaustive)}`)
+        }
       }
       await this.registrarAjuste(tx, planId, dto, autorUsuarioId, motivo)
     })
@@ -1038,6 +1045,13 @@ function mapAccionPrisma(accion: AjustarPlanInput["accion"]): AccionAjustePlan {
       return AccionAjustePlan.EXIMIR
     case "CAMBIAR_CARACTER":
       return AccionAjustePlan.CAMBIAR_CARACTER
+    default: {
+      // Exhaustiveness check: si `AccionAjustePlan` agrega otro valor sin
+      // actualizar este mapper, TS marca aqui un error de compilacion
+      // (cierre §5.105 — FIX-P7-cierre).
+      const _exhaustive: never = accion
+      throw new Error(`Accion de ajuste no mapeable: ${String(_exhaustive)}`)
+    }
   }
 }
 

@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { booleanQuerySchema } from "../catalogo/paginacion"
 
 /**
  * Shapes de respuesta del dominio intentos-bloque (Slice 7 P7b).
@@ -26,10 +27,7 @@ export const listarIntentosBloqueQuerySchema = z
   .object({
     page: z.coerce.number().int().min(1).default(1),
     pageSize: z.coerce.number().int().min(1).max(100).default(20),
-    incluirInvalidados: z
-      .union([z.boolean(), z.literal("true"), z.literal("false")])
-      .transform((v) => v === true || v === "true")
-      .default(false),
+    incluirInvalidados: booleanQuerySchema(),
   })
   .strict()
 
@@ -40,10 +38,7 @@ export const listarIntentosCursoBloqueQuerySchema = z
     page: z.coerce.number().int().min(1).default(1),
     pageSize: z.coerce.number().int().min(1).max(100).default(20),
     colaboradorId: z.string().uuid().optional(),
-    incluirInvalidados: z
-      .union([z.boolean(), z.literal("true"), z.literal("false")])
-      .transform((v) => v === true || v === "true")
-      .default(false),
+    incluirInvalidados: booleanQuerySchema(),
   })
   .strict()
 

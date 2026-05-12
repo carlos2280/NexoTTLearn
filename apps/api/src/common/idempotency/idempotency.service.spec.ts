@@ -16,10 +16,12 @@ interface IdempotencyRow {
 function buildPrismaMock(store: Map<string, IdempotencyRow>) {
   const tx = {
     idempotencyKey: {
+      // biome-ignore lint/suspicious/useAwait: mock impl que devuelve un valor sincrono; `async` mantiene la firma `Promise<>` de `Prisma.Delegate.findUnique`.
       findUnique: vi.fn().mockImplementation(async ({ where }) => {
         const compoundKey = `${where.scope_key_usuarioId.scope}|${where.scope_key_usuarioId.key}|${where.scope_key_usuarioId.usuarioId}`
         return store.get(compoundKey) ?? null
       }),
+      // biome-ignore lint/suspicious/useAwait: idem — mock impl de `Prisma.Delegate.create`.
       create: vi.fn().mockImplementation(async ({ data }) => {
         const compoundKey = `${data.scope}|${data.key}|${data.usuarioId}`
         store.set(compoundKey, {

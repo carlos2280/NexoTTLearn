@@ -245,6 +245,12 @@ describe.runIf(RUN_E2E)("asignaciones resultado + historico e2e (P6c)", () => {
       },
       select: { id: true },
     })
+    // FIX-P7-cierre: plan vacio para que `evaluarCondicionesListo` pase
+    // (`items.length===0` => `planCompleto=true` vacuamente).
+    await prisma.planEstudio.create({
+      data: { asignacionId: row.id, estaDesactualizado: false },
+      select: { id: true },
+    })
     return row.id
   }
 

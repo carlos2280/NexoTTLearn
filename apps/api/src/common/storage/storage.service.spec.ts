@@ -38,6 +38,7 @@ function buildPrismaMock(): { prisma: PrismaMock; store: Map<string, MockArchivo
   let seq = 0
   const prisma: PrismaMock = {
     archivo: {
+      // biome-ignore lint/suspicious/useAwait: mock impl sincrono que respeta la firma `Promise<>` de `Prisma.Delegate.create`.
       create: vi.fn().mockImplementation(async ({ data }) => {
         seq += 1
         const id = `archivo-${seq}`
@@ -51,6 +52,7 @@ function buildPrismaMock(): { prisma: PrismaMock; store: Map<string, MockArchivo
         store.set(id, record)
         return { id }
       }),
+      // biome-ignore lint/suspicious/useAwait: idem — mock impl de `Prisma.Delegate.update`.
       update: vi.fn().mockImplementation(async ({ where, data }) => {
         const rec = store.get(where.id)
         if (!rec) {
@@ -61,6 +63,7 @@ function buildPrismaMock(): { prisma: PrismaMock; store: Map<string, MockArchivo
         }
         return { id: rec.id }
       }),
+      // biome-ignore lint/suspicious/useAwait: idem — mock impl de `Prisma.Delegate.findUnique`.
       findUnique: vi.fn().mockImplementation(async ({ where }) => {
         const rec = store.get(where.id)
         if (!rec) {
@@ -74,6 +77,7 @@ function buildPrismaMock(): { prisma: PrismaMock; store: Map<string, MockArchivo
           tamanioBytes: rec.tamanioBytes,
         }
       }),
+      // biome-ignore lint/suspicious/useAwait: idem — mock impl de `Prisma.Delegate.delete`.
       delete: vi.fn().mockImplementation(async ({ where }) => {
         store.delete(where.id)
         return { id: where.id }

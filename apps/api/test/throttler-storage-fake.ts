@@ -21,6 +21,7 @@ interface ThrottlerStorageRecord {
 export class ThrottlerStorageFake implements ThrottlerStorage {
   private readonly buckets = new Map<string, { hits: number; expiresAt: number }>()
 
+  // biome-ignore lint/suspicious/useAwait: implementa `ThrottlerStorage.increment` que el contrato declara como `Promise<>`; el storage en memoria no necesita await pero la firma es obligatoria.
   async increment(
     key: string,
     ttl: number,

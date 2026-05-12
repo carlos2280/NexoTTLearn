@@ -26,7 +26,7 @@ export class MeController {
   @Roles(RolUsuario.PARTICIPANTE, RolUsuario.ADMIN)
   async obtenerMiFicha(@CurrentUser() usuario: SesionUsuario | undefined): Promise<FichaResponse> {
     const sesion = this.requireUsuario(usuario)
-    return this.fichaService.obtenerFichaDeUsuario(sesion.usuarioId, sesion)
+    return await this.fichaService.obtenerFichaDeUsuario(sesion.usuarioId, sesion)
   }
 
   private requireUsuario(usuario: SesionUsuario | undefined): SesionUsuario {

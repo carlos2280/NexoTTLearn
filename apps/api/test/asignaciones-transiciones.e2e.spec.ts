@@ -275,6 +275,14 @@ describe.runIf(RUN_E2E)("asignaciones transiciones e2e (P6b)", () => {
       },
       select: { id: true },
     })
+    // FIX-P7-cierre: Slice 7 cambio `evaluarCondicionesListo` para exigir plan
+    // completo (D-AS-10). Estos cursos de fixture no tienen modulos/skills, asi
+    // que sembramos un PlanEstudio vacio (0 items obligatorios) — el helper
+    // resuelve `planCompleto=true` vacuamente cuando `items.length===0`.
+    await prisma.planEstudio.create({
+      data: { asignacionId: row.id, estaDesactualizado: false },
+      select: { id: true },
+    })
     return row.id
   }
 

@@ -21,7 +21,7 @@ export { mfaDisableSchema } from "./auth/mfa-disable.schema"
 export type { MfaDisableInput } from "./auth/mfa-disable.schema"
 
 // Catalogo P2 — schemas y tipos de respuesta para los 6 recursos del catalogo formativo.
-export { paginacionQuerySchema } from "./catalogo/paginacion"
+export { paginacionQuerySchema, booleanQuerySchema } from "./catalogo/paginacion"
 export type { PaginacionQuery, Paginated } from "./catalogo/paginacion"
 export { listarAreasQuerySchema } from "./catalogo/areas/listar-areas.schema"
 export type { ListarAreasQuery } from "./catalogo/areas/listar-areas.schema"
