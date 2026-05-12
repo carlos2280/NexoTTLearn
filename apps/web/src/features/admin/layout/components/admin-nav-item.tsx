@@ -26,12 +26,12 @@ export function AdminNavItem({ item, colapsado }: AdminNavItemProps) {
       aria-label={colapsado ? item.etiqueta : undefined}
       className={({ isActive }) =>
         cn(
-          "flex items-center rounded-md py-2 text-body-sm transition-colors",
+          "relative flex items-center rounded-md py-2 text-body-sm transition-colors duration-fast ease-default",
           "focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2",
           colapsado ? "justify-center px-2" : "gap-3 px-3",
           isActive
-            ? "bg-accent-soft font-medium text-accent-on-soft"
-            : "text-text-secondary hover:bg-subtle hover:text-text-primary",
+            ? "font-medium text-text-primary before:absolute before:top-1.5 before:bottom-1.5 before:-left-1 before:w-0.5 before:rounded-pill before:bg-accent before:content-['']"
+            : "text-text-secondary hover:bg-surface hover:text-text-primary",
         )
       }
     >

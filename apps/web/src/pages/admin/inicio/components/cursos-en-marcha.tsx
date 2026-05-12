@@ -4,6 +4,7 @@ import { Button } from "@/shared/components/ui/button"
 import { Card } from "@/shared/components/ui/card"
 import { ProgressRing } from "@/shared/components/ui/progress-ring"
 import { Section } from "@/shared/components/ui/section"
+import { DUR, EASE } from "@/shared/lib/motion"
 import { motion, useReducedMotion } from "framer-motion"
 import { CalendarClock } from "lucide-react"
 import { MOCK_CURSOS } from "../inicio.mock"
@@ -49,9 +50,9 @@ function TarjetaCurso({
     <motion.div
       initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: DUR.storytelling, delay, ease: EASE.default }}
     >
-      <Card tono="elevado" interactiva={true} className="flex h-full flex-col gap-5" asChild={true}>
+      <Card tono="plano" interactiva={true} className="flex h-full flex-col gap-5" asChild={true}>
         <article>
           <header className="flex items-start gap-4">
             <ProgressRing

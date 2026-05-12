@@ -1,5 +1,6 @@
 import { Card } from "@/shared/components/ui/card"
 import { Sparkline } from "@/shared/components/ui/sparkline"
+import { DUR, EASE } from "@/shared/lib/motion"
 import { motion, useReducedMotion } from "framer-motion"
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react"
 import { MOCK_KPIS } from "../inicio.mock"
@@ -41,9 +42,9 @@ function PulsoKpiCard({ kpi, indice }: { readonly kpi: KpiPulso; readonly indice
     <motion.div
       initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, delay, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: DUR.slow, delay, ease: EASE.default }}
     >
-      <Card tono="elevado" className="flex h-full flex-col gap-4">
+      <Card tono="plano" className="flex h-full flex-col gap-4">
         <div className="flex items-start justify-between gap-2">
           <span className="flex items-center gap-2 text-text-secondary">
             <Icono className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />

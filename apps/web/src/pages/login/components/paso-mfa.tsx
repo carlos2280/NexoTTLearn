@@ -48,9 +48,7 @@ export function PasoMfa({ challenge, onExito, onReiniciar }: PasoMfaProps) {
         <h2 className="text-h1 text-text-primary">
           Solo tú<span className="text-accent">.</span>
         </h2>
-        <p className="text-body text-text-secondary">
-          Ingresa el código de 6 dígitos de tu app autenticadora.
-        </p>
+        <p className="text-body text-text-secondary">Código de tu app autenticadora.</p>
       </header>
 
       {apiError ? (

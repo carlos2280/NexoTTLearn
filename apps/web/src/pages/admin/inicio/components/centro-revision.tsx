@@ -2,6 +2,7 @@ import { Badge } from "@/shared/components/ui/badge"
 import { Button } from "@/shared/components/ui/button"
 import { Card } from "@/shared/components/ui/card"
 import { Section } from "@/shared/components/ui/section"
+import { DUR, EASE } from "@/shared/lib/motion"
 import { motion, useReducedMotion } from "framer-motion"
 import { ArrowUpRight, Clock3 } from "lucide-react"
 import { MOCK_CASOS } from "../inicio.mock"
@@ -27,7 +28,7 @@ function FilaCaso({ caso, indice }: { readonly caso: CasoRevision; readonly indi
     <motion.li
       initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: DUR.page, delay, ease: EASE.default }}
       className="group"
     >
       <button

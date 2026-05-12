@@ -7,10 +7,8 @@ import { Field } from "@/shared/components/ui/field"
 import { Input } from "@/shared/components/ui/input"
 import { useMutation } from "@tanstack/react-query"
 import { motion, useReducedMotion } from "framer-motion"
-import { ArrowRight } from "lucide-react"
 import { type FormEvent, useState } from "react"
 import { z } from "zod"
-import { SaludoContextual } from "./saludo-contextual"
 
 const schema = z.object({
   email: z.string().min(1, "Ingresa tu email").email("Ingresa un email válido"),
@@ -69,16 +67,10 @@ export function PasoCredenciales({ onExito }: PasoCredencialesProps) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-7" noValidate={true}>
-      <motion.header {...motionProps(0)} className="flex flex-col gap-2">
-        <p className="nx-eyebrow text-text-tertiary">
-          <SaludoContextual />
-        </p>
+      <motion.header {...motionProps(0)}>
         <h2 className="text-h1 text-text-primary">
-          Sigamos preparándote<span className="text-accent">.</span>
+          Bienvenido<span className="text-accent">.</span>
         </h2>
-        <p className="text-body text-text-secondary">
-          La próxima entrevista se gana hoy. Identifícate para retomar tu plan.
-        </p>
       </motion.header>
 
       {apiError ? (
@@ -99,7 +91,6 @@ export function PasoCredenciales({ onExito }: PasoCredencialesProps) {
               type="email"
               autoComplete="email"
               autoFocus={true}
-              placeholder="tu.nombre@nexott.local"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={mutation.isPending}
@@ -125,14 +116,10 @@ export function PasoCredenciales({ onExito }: PasoCredencialesProps) {
         </Field>
       </motion.div>
 
-      <motion.div {...motionProps(3)} className="flex flex-col gap-3 pt-1">
+      <motion.div {...motionProps(3)} className="pt-1">
         <Button type="submit" fullWidth={true} isLoading={mutation.isPending}>
-          <span>Retomar preparación</span>
-          {mutation.isPending ? null : <ArrowRight className="h-4 w-4" aria-hidden="true" />}
+          Ingresar
         </Button>
-        <p className="text-center text-caption text-text-tertiary">
-          ¿Sin acceso? Tu administrador regenera la contraseña en minutos.
-        </p>
       </motion.div>
     </form>
   )

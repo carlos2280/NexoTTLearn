@@ -1,5 +1,6 @@
 import { Card } from "@/shared/components/ui/card"
 import { Section } from "@/shared/components/ui/section"
+import { DUR, EASE } from "@/shared/lib/motion"
 import { motion, useReducedMotion } from "framer-motion"
 import { Bell, CheckCircle2, GraduationCap, type LucideIcon, Sparkles, Users } from "lucide-react"
 import { MOCK_PULSO } from "../inicio.mock"
@@ -30,7 +31,7 @@ function FilaEvento({ evento, indice }: { readonly evento: EventoPulso; readonly
     <motion.li
       initial={reduceMotion ? { opacity: 1 } : { opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.35, delay, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: DUR.page, delay, ease: EASE.default }}
       className="flex items-start gap-3 px-3 py-3"
     >
       <span

@@ -68,9 +68,7 @@ export function PasoCambiarPassword({ onExito }: PasoCambiarPasswordProps) {
         <h2 className="text-h2 text-text-primary">
           Define tu contraseña<span className="text-accent">.</span>
         </h2>
-        <p className="text-body text-text-secondary">
-          Es la llave a tu ficha de skills. Que sea fuerte y solo tuya.
-        </p>
+        <p className="text-body text-text-secondary">Es la llave a tu ficha de skills.</p>
       </header>
 
       {apiError ? <Banner tone="danger">{apiError.message}</Banner> : null}

@@ -54,6 +54,7 @@
   --color-success: #16a34a;
   --color-success-soft: #dcfce7;
   --color-success-on-soft: #15803d;
+  --color-success-rgb: 22 163 74;
   --color-warning: #d97706;
   --color-warning-soft: #fef3c7;
   --color-warning-on-soft: #b45309;
@@ -73,6 +74,115 @@
   --color-atmos-aviso-privacidad: #f3e8ff;
   --color-atmos-bienvenida: #fff1e6;
   --color-atmos-despedida: #fef3c7;
+
+  /* ---------- Gradientes atmosféricos por paso ----------
+     Dos radiales sutiles sobre el color sólido del paso. Aportan
+     profundidad sin gritar. Bienvenida/despedida llevan más intensidad
+     porque son momentos emocionales; el resto son casi imperceptibles. */
+  --gradient-atmos-credenciales: radial-gradient(
+      ellipse 80% 60% at 18% 22%,
+      rgb(var(--color-accent-rgb) / 0.08),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 82% 80%,
+      rgb(var(--color-accent-rgb) / 0.05),
+      transparent 70%
+    );
+
+  --gradient-atmos-mfa: radial-gradient(
+      ellipse 75% 55% at 25% 28%,
+      rgb(var(--color-accent-rgb) / 0.1),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 65% 45% at 78% 76%,
+      rgb(var(--color-accent-rgb) / 0.06),
+      transparent 70%
+    );
+
+  --gradient-atmos-cambiar-password: radial-gradient(
+      ellipse 80% 55% at 28% 30%,
+      rgb(var(--color-success-rgb) / 0.08),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 72% 74%,
+      rgb(var(--color-success-rgb) / 0.05),
+      transparent 70%
+    );
+
+  --gradient-atmos-aviso-privacidad: radial-gradient(
+      ellipse 75% 55% at 22% 25%,
+      rgb(var(--color-accent-rgb) / 0.07),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 65% 50% at 80% 80%,
+      rgb(var(--color-glow-rgb) / 0.05),
+      transparent 70%
+    );
+
+  --gradient-atmos-bienvenida: radial-gradient(
+      circle at 35% 55%,
+      rgb(var(--color-warmth-rgb) / 0.32),
+      transparent 55%
+    ),
+    radial-gradient(
+      circle at 70% 70%,
+      rgb(var(--color-glow-rgb) / 0.22),
+      transparent 55%
+    );
+
+  --gradient-atmos-despedida: radial-gradient(
+      circle at 50% 60%,
+      rgb(var(--color-warmth-rgb) / 0.38),
+      transparent 60%
+    ),
+    radial-gradient(
+      circle at 75% 30%,
+      rgb(var(--color-glow-rgb) / 0.16),
+      transparent 55%
+    );
+
+  /* ---------- Gradiente atmosférico global del admin ----------
+     Aplicado al main scrollable. Presente, no invisible: el panel
+     no es papel pálido sino un espacio vivo. Tres capas:
+     1) índigo intenso arriba-derecha (energía)
+     2) glow rosa-coral abajo-izquierda (calidez)
+     3) ámbar muy tenue en el centro (luz cálida)
+     Combinados sobre canvas, generan un fondo que invita a quedarse. */
+  --gradient-admin-canvas: radial-gradient(
+      ellipse 60% 50% at 100% 0%,
+      rgb(var(--color-accent-rgb) / 0.16),
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 65% 55% at 0% 100%,
+      rgb(var(--color-glow-rgb) / 0.14),
+      transparent 65%
+    ),
+    radial-gradient(
+      ellipse 70% 60% at 50% 50%,
+      rgb(var(--color-warmth-rgb) / 0.05),
+      transparent 70%
+    );
+
+  /* ---------- Gradiente para la card "Pulso del día" (firma del hero) ----------
+     Acento → glow → ámbar suave en diagonal. Da energía sin gritar. */
+  --gradient-pulso-card: linear-gradient(
+    135deg,
+    rgb(var(--color-accent-rgb) / 0.92) 0%,
+    rgb(var(--color-glow-rgb) / 0.78) 60%,
+    rgb(var(--color-warmth-rgb) / 0.62) 100%
+  );
+
+  /* ---------- Gradiente sutil para cards con personalidad (KPI hero, etc.) ---------- */
+  --gradient-card-acento: linear-gradient(
+    135deg,
+    rgb(var(--color-accent-rgb) / 0.08) 0%,
+    rgb(var(--color-glow-rgb) / 0.06) 100%
+  );
 
   /* ---------- Radius ---------- */
   --radius-sm: 4px;

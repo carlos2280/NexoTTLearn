@@ -1,4 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
+import { DUR, EASE } from "@/shared/lib/motion"
 import { LoginShell } from "./components/login-shell"
 import { PasoAvisoPrivacidad } from "./components/paso-aviso-privacidad"
 import { PasoBienvenida } from "./components/paso-bienvenida"
@@ -24,8 +25,8 @@ export function LoginPage() {
       }
 
   const transition = {
-    duration: 0.55,
-    ease: [0.16, 1, 0.3, 1] as [number, number, number, number],
+    duration: DUR.storytelling,
+    ease: EASE.default,
   }
 
   return (
