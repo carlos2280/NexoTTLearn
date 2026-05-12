@@ -316,8 +316,21 @@ enum AccionAuditoria {
   PLAN_RECALCULADO
   PLAN_AJUSTADO_MANUALMENTE
   INTENTO_BLOQUE_INVALIDADO
+  INTENTO_TRANSVERSAL_CREADO
+  INTENTO_TRANSVERSAL_FINALIZADO
+  INTENTO_TRANSVERSAL_ANULADO
+  TRANSVERSAL_SKILLS_ACTUALIZADAS
 
   @@map("accion_auditoria_enum")
+}
+
+enum EstadoIntentoTransversal {
+  EN_EVALUACION
+  EVALUADO
+  FINALIZADO
+  ANULADO
+
+  @@map("estado_intento_transversal_enum")
 }
 
 enum ArchivoTipo {
@@ -969,19 +982,31 @@ model TransversalSkill {
 }
 
 model IntentoTransversal {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  transversalId     String   @map("transversal_id") @db.Uuid
-  colaboradorId     String   @map("colaborador_id") @db.Uuid
-  fecha             DateTime @default(now()) @db.Timestamptz(6)
-  nota              Decimal  @db.Decimal(5, 2)
-  aprobado          Boolean
-  repoOArtefacto    Json     @default("{}") @map("repo_o_artefacto") @db.JsonB
-  evaluacionesCapas Json     @default("{}") @map("evaluaciones_capas") @db.JsonB
+  id                    String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  transversalId         String                   @map("transversal_id") @db.Uuid
+  colaboradorId         String                   @map("colaborador_id") @db.Uuid
+  fecha                 DateTime                 @default(now()) @db.Timestamptz(6)
+  nota                  Decimal?                 @db.Decimal(5, 2)
+  aprobado              Boolean?
+  repoOArtefacto        Json                     @default("{}") @map("repo_o_artefacto") @db.JsonB
+  evaluacionesCapas     Json                     @default("{}") @map("evaluaciones_capas") @db.JsonB
+  anulado               Boolean                  @default(false)
+  motivoAnulacion       String?                  @map("motivo_anulacion")
+  estado                EstadoIntentoTransversal @default(EN_EVALUACION)
+  repoUrl               String?                  @map("repo_url")
+  comentarioColaborador String?                  @map("comentario_colaborador")
+  notaCapaTests         Decimal?                 @map("nota_capa_tests") @db.Decimal(5, 2)
+  notaCapaCualitativa   Decimal?                 @map("nota_capa_cualitativa") @db.Decimal(5, 2)
+  notaCapaComprension   Decimal?                 @map("nota_capa_comprension") @db.Decimal(5, 2)
+  notaGlobal            Decimal?                 @map("nota_global") @db.Decimal(5, 2)
 
   transversal ProyectoTransversal @relation(fields: [transversalId], references: [id], onDelete: Restrict)
   colaborador Colaborador         @relation(fields: [colaboradorId], references: [id], onDelete: Restrict)
 
   @@index([transversalId, colaboradorId, fecha(sort: Desc)], map: "idx_intentos_trans_colab")
+  @@index([estado], map: "idx_intentos_transversal_estado_no_anulado")
+  @@index([transversalId], map: "idx_intentos_transversal_transversal_id")
+  @@index([colaboradorId], map: "idx_intentos_transversal_colaborador_id")
   @@map("intentos_transversal")
 }
 

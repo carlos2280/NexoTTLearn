@@ -88,6 +88,32 @@ const envSchema = z
       .regex(/^[0-9a-fA-F]+$/, "SECRETS_ENCRYPTION_KEY debe ser hex"),
     // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
     STORAGE_ROOT: z.string().min(1).default("apps/api/storage"),
+    // ---------------------------------------------------------------------
+    // AI provider (Slice 8 P8a — D-S8-B2). Mock por defecto: Vitest jamas
+    // toca la nube. ClaudeProvider se activa en P8b cuando AI_PROVIDER=claude
+    // y consume AI_API_KEY (obligatoria en ese caso — refine cruzado abajo).
+    // ---------------------------------------------------------------------
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    AI_PROVIDER: z.enum(["claude", "mock"]).default("mock"),
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    AI_API_KEY: z.string().min(1).optional(),
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    AI_MODEL_JUNIOR: z.string().default("claude-haiku-4-5-20251001"),
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    AI_MODEL_SEMI_SENIOR: z.string().default("claude-sonnet-4-6"),
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    AI_MODEL_SENIOR: z.string().default("claude-opus-4-7"),
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    AI_MODEL_OVERRIDE: z.string().optional(),
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    AI_MAX_TOKENS: z.coerce.number().int().positive().default(4096),
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    AI_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    AI_ENABLE_PROMPT_CACHING: z
+      .string()
+      .default("true")
+      .transform((value) => value.toLowerCase() === "true"),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV !== "production") {
@@ -129,6 +155,17 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ["STORAGE_ROOT"],
         message: `${motivo} (got: "${data.STORAGE_ROOT}")`,
+      })
+    }
+  })
+  .superRefine((data, ctx) => {
+    // AI provider — el modo `claude` exige AI_API_KEY presente en cualquier
+    // entorno (no solo prod). Falla al arranque si falta. (D-S8-B2)
+    if (data.AI_PROVIDER === "claude" && (!data.AI_API_KEY || data.AI_API_KEY.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["AI_API_KEY"],
+        message: "AI_API_KEY es obligatoria cuando AI_PROVIDER=claude",
       })
     }
   })

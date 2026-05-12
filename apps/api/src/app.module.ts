@@ -7,6 +7,7 @@ import { AsignacionesModule } from "./asignaciones/asignaciones.module"
 import { AuthModule } from "./auth/auth.module"
 import { CatalogoModule } from "./catalogo/catalogo.module"
 import { ColaboradoresModule } from "./colaboradores/colaboradores.module"
+import { AiModule } from "./common/ai/ai.module"
 import { AuditLogModule } from "./common/audit/audit-log.module"
 import { PrismaExceptionFilter } from "./common/filters/prisma-exception.filter"
 import { CsrfGuard } from "./common/guards/csrf.guard"
@@ -23,6 +24,7 @@ import { EvaluacionInicialModule } from "./evaluacion-inicial/evaluacion-inicial
 import { HealthModule } from "./health/health.module"
 import { IntentosBloqueModule } from "./intentos-bloque/intentos-bloque.module"
 import { PlanPersonalModule } from "./plan-personal/plan-personal.module"
+import { TransversalModule } from "./transversal/transversal.module"
 
 /**
  * Modulo raiz.
@@ -62,6 +64,7 @@ import { PlanPersonalModule } from "./plan-personal/plan-personal.module"
     AuditLogModule,
     StorageModule,
     IdempotencyModule,
+    AiModule,
     HealthModule,
     AuthModule,
     CatalogoModule,
@@ -71,6 +74,7 @@ import { PlanPersonalModule } from "./plan-personal/plan-personal.module"
     EvaluacionInicialModule,
     PlanPersonalModule,
     IntentosBloqueModule,
+    TransversalModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: SesionGuard },

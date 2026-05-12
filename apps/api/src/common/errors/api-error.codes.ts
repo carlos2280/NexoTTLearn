@@ -139,6 +139,13 @@ export const apiErrorCodes = {
   tipoBloqueNoSoportadoMvp: "TIPO_BLOQUE_NO_SOPORTADO_MVP",
   conflictIntentoYaInvalidado: "CONFLICT_INTENTO_YA_INVALIDADO",
   contenidoBloqueInvalido: "CONTENIDO_BLOQUE_INVALIDO",
+  // Transversal P8a (D-S8-A1..F2).
+  transversalNoEncontrado: "TRANSVERSAL_NO_ENCONTRADO",
+  intentoTransversalNoEncontrado: "INTENTO_TRANSVERSAL_NO_ENCONTRADO",
+  conflictTransversalNoDisponible: "CONFLICT_TRANSVERSAL_NO_DISPONIBLE",
+  conflictCursoEstadoInvalido: "CONFLICT_CURSO_ESTADO_INVALIDO",
+  conflictAsignacionEstadoInvalido: "CONFLICT_ASIGNACION_ESTADO_INVALIDO",
+  conflictSkillsTransversalInvalidas: "CONFLICT_SKILLS_TRANSVERSAL_INVALIDAS",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]
