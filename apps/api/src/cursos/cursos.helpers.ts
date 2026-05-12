@@ -1,6 +1,25 @@
-import { UnprocessableEntityException } from "@nestjs/common"
+import { BadRequestException, UnprocessableEntityException } from "@nestjs/common"
 import { DesbloqueoCurso, Prisma } from "@prisma/client"
+import { z } from "zod"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
+
+const idempotencyKeyUuidSchema = z.string().uuid()
+
+/**
+ * Valida el header `Idempotency-Key` requerido por `cerrar` y
+ * `deshacer-cierre` del modulo cursos. Lanza
+ * `BadRequestException(idempotencyKeyRequerida)` si falta o no es UUID v4.
+ * Patron heredado de `asignaciones.helpers.requireIdempotencyKeyUuid`.
+ */
+export function requireIdempotencyKeyUuid(headerValue: string | undefined): string {
+  if (headerValue === undefined || !idempotencyKeyUuidSchema.safeParse(headerValue).success) {
+    throw new BadRequestException({
+      code: apiErrorCodes.idempotencyKeyRequerida,
+      message: "El header Idempotency-Key es obligatorio y debe ser un UUID v4.",
+    })
+  }
+  return headerValue
+}
 
 /**
  * Contextos posibles del codigo unificado `VALIDACION_PESO_NO_SUMA_100`

@@ -11,6 +11,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
 } from "@nestjs/common"
 import {
   ActualizarAreasCursoInput,
@@ -21,6 +22,7 @@ import {
   ActualizarSkillsExigidasCursoInput,
   ActualizarTransversalCursoInput,
   ActualizarUmbralesLogroCursoInput,
+  CerrarCursoInput,
   CrearCursoInput,
   CursoConfiguracionResponse,
   CursoDetalle,
@@ -39,24 +41,33 @@ import {
   actualizarSkillsExigidasCursoSchema,
   actualizarTransversalCursoSchema,
   actualizarUmbralesLogroCursoSchema,
+  cerrarCursoSchema,
   crearCursoSchema,
   duplicarCursoSchema,
   listarCursosQuerySchema,
   listarLogCambiosQuerySchema,
 } from "@nexott-learn/shared-types"
-import { RolUsuario } from "@prisma/client"
+import { AccionAuditoria, RolUsuario } from "@prisma/client"
+import { Request } from "express"
+import { AuditLogService } from "../common/audit/audit-log.service"
+import { extractContextoHttp } from "../common/audit/extract-contexto"
 import { CurrentUser } from "../common/decorators/current-user.decorator"
+import { IdempotencyKey } from "../common/decorators/idempotency-key.decorator"
 import { Motivo } from "../common/decorators/motivo.decorator"
 import { RequiereMotivo } from "../common/decorators/requiere-motivo.decorator"
 import { Roles } from "../common/decorators/roles.decorator"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { ZodValidationPipe } from "../common/pipes/zod-validation.pipe"
 import { SesionUsuario } from "../common/types/sesion.types"
+import { requireIdempotencyKeyUuid } from "./cursos.helpers"
 import { CursosService } from "./cursos.service"
 
 @Controller("cursos")
 export class CursosController {
-  constructor(private readonly cursosService: CursosService) {}
+  constructor(
+    private readonly cursosService: CursosService,
+    private readonly auditLog: AuditLogService,
+  ) {}
 
   @Get()
   @Roles(RolUsuario.ADMIN, RolUsuario.PARTICIPANTE)
@@ -113,6 +124,89 @@ export class CursosController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async eliminar(@Param("cursoId", ParseUUIDPipe) cursoId: string): Promise<void> {
     await this.cursosService.eliminar(cursoId)
+  }
+
+  /**
+   * P11a — Cierre del curso (D-S11-A1..A10). ACTIVO -> CERRADO. Idempotencia
+   * obligatoria (`Idempotency-Key` UUID v4). `X-Motivo` obligatorio (sensible).
+   * RESULTADO_CIERRE emitido FUERA TX best-effort (R-S10-2). Audit
+   * `CURSO_CERRADO` solo en el primer ejecutar (no en replay, D-AUDIT-2).
+   */
+  @Post(":cursoId/cerrar")
+  @Roles(RolUsuario.ADMIN)
+  @RequiereMotivo()
+  @HttpCode(HttpStatus.OK)
+  async cerrar(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+    @Body(new ZodValidationPipe(cerrarCursoSchema)) input: CerrarCursoInput,
+    @IdempotencyKey() idempotencyKey: string | undefined,
+    @Motivo() motivo: string | undefined,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+    @Req() req: Request,
+  ): Promise<CursoDetalle> {
+    const sesion = this.requireUsuario(usuario)
+    const key = requireIdempotencyKeyUuid(idempotencyKey)
+    const resultado = await this.cursosService.cerrarCurso({
+      cursoId,
+      body: input,
+      motivo: motivo ?? "",
+      idempotencyKey: key,
+      autorUsuarioId: sesion.usuarioId,
+    })
+
+    if (resultado.nuevo) {
+      await this.auditLog.record({
+        usuarioId: sesion.usuarioId,
+        accion: AccionAuditoria.CURSO_CERRADO,
+        exito: true,
+        recursoTipo: "curso",
+        recursoId: cursoId,
+        metadata: {
+          decisionesAplicadas: input.decisionPorAsignacion.length,
+        },
+        ...extractContextoHttp(req),
+      })
+      await this.cursosService.notificarResultadoCierreCurso(resultado.notificaciones)
+    }
+    return resultado.curso
+  }
+
+  /**
+   * P11a — Deshacer cierre (D-S11-A4, D-S11-A5). CERRADO -> ACTIVO dentro de
+   * la ventana 7 dias. Marca la fotografia `descartada=true`. Idempotencia y
+   * motivo obligatorios.
+   */
+  @Post(":cursoId/deshacer-cierre")
+  @Roles(RolUsuario.ADMIN)
+  @RequiereMotivo()
+  @HttpCode(HttpStatus.OK)
+  async deshacerCierre(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+    @IdempotencyKey() idempotencyKey: string | undefined,
+    @Motivo() motivo: string | undefined,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+    @Req() req: Request,
+  ): Promise<CursoDetalle> {
+    const sesion = this.requireUsuario(usuario)
+    const key = requireIdempotencyKeyUuid(idempotencyKey)
+    const resultado = await this.cursosService.deshacerCierre({
+      cursoId,
+      motivo: motivo ?? "",
+      idempotencyKey: key,
+      autorUsuarioId: sesion.usuarioId,
+    })
+
+    if (resultado.nuevo) {
+      await this.auditLog.record({
+        usuarioId: sesion.usuarioId,
+        accion: AccionAuditoria.CURSO_CIERRE_DESHECHO,
+        exito: true,
+        recursoTipo: "curso",
+        recursoId: cursoId,
+        ...extractContextoHttp(req),
+      })
+    }
+    return resultado.curso
   }
 
   @Post(":cursoId/archivar")

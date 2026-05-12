@@ -17,6 +17,7 @@ import {
   ActualizarSkillsExigidasCursoInput,
   ActualizarTransversalCursoInput,
   ActualizarUmbralesLogroCursoInput,
+  CerrarCursoInput,
   CrearCursoInput,
   CursoConfiguracionResponse,
   CursoDetalle,
@@ -30,11 +31,26 @@ import {
   SkillSinCobertura,
   UmbralesLogroValores,
 } from "@nexott-learn/shared-types"
-import { AccionLogCurso, EstadoCurso, EstadoModulo, Prisma, RolUsuario } from "@prisma/client"
+import {
+  AccionLogCurso,
+  EstadoCurso,
+  EstadoModulo,
+  Prisma,
+  RolAsignacion,
+  RolUsuario,
+} from "@prisma/client"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { buildPaginatedResponse, resolvePaginacion } from "../common/http/paginated"
+import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
+import { NotificacionesService } from "../notificaciones/notificaciones.service"
+import {
+  type AccionCierre,
+  type NotaSkillSnapshot,
+  type ResultadoFinal,
+  calcularResultadoFinal,
+} from "./calcular-resultado-final"
 import {
   type CursoPublicacionSnapshot,
   calcularDiffComposite,
@@ -464,11 +480,23 @@ function resolverFechas(input: ResolverFechasInput, actual?: ResolverFechasActua
   return { fechaInicio, fechaDeadline, fechaDesbloqueo }
 }
 
+/** Scope para `IdempotencyService.runOnce` al cerrar y deshacer cierre de curso. */
+const IDEMPOTENCY_SCOPE_CERRAR_CURSO = "cursos.cerrar"
+const IDEMPOTENCY_SCOPE_DESHACER_CIERRE = "cursos.deshacer-cierre"
+
+/** Ventana D-S11-A5 para `POST /cursos/:id/deshacer-cierre`. */
+const VENTANA_DESHACER_DIAS = 7
+const MS_POR_DIA = 24 * 60 * 60 * 1000
+
 @Injectable()
 export class CursosService {
   private readonly logger = new Logger(CursosService.name)
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly idempotency: IdempotencyService,
+    private readonly notificaciones: NotificacionesService,
+  ) {}
 
   /**
    * D-CUR-13: ADMIN ve todo (con `incluirArchivados` explicito); PARTICIPANTE
@@ -1011,6 +1039,530 @@ export class CursosService {
         code: apiErrorCodes.clienteNoEncontrado,
         message: "Cliente destino no encontrado.",
       })
+    }
+  }
+
+  /**
+   * `POST /api/v1/cursos/:cursoId/cerrar` (D-S11-A1..A10).
+   *
+   * ACTIVO -> CERRADO con cascada por asignacion segun
+   * `decisionPorAsignacion`. Idempotente con `Idempotency-Key` (replay
+   * devuelve el `CursoDetalle` cacheado SIN reemitir RESULTADO_CIERRE).
+   *
+   * DENTRO de la transaccion (R-S11-1 / R-S11-2 / D-S11-A3):
+   *  1. UPDATE estado curso a CERRADO + fechaCierre = now().
+   *  2. Por cada asignacion afectada: recalcula `resultadoFinal` con el
+   *     helper puro + UPDATE asignacion + INSERT historico apuntando al
+   *     `logCambioCursoId` recien creado.
+   *  3. INSERT `log_cambios_curso accion=CIERRE`.
+   *  4. INSERT `cursos_fotografia_cierre` (snapshot oficial — cierra
+   *     brecha 7.E5.2).
+   *
+   * FUERA de la transaccion (R-S10-2 / D-AUDIT-2):
+   *  - Audit `CURSO_CERRADO`.
+   *  - Notificacion `RESULTADO_CIERRE` por cada asignacion que recibio
+   *     decision distinta de MANTENER_PENDIENTE (best-effort).
+   */
+  async cerrarCurso(input: {
+    readonly cursoId: string
+    readonly body: CerrarCursoInput
+    readonly motivo: string
+    readonly idempotencyKey: string
+    readonly autorUsuarioId: string
+  }): Promise<{
+    curso: CursoDetalle
+    nuevo: boolean
+    notificaciones: readonly NotificacionPendienteCierre[]
+  }> {
+    const decisiones = new Map<string, AccionCierre>(
+      input.body.decisionPorAsignacion.map((d: { asignacionId: string; accion: AccionCierre }) => [
+        d.asignacionId,
+        d.accion,
+      ]),
+    )
+
+    const ejecucion = await this.idempotency.runOnce<CierreResultadoCache>({
+      scope: IDEMPOTENCY_SCOPE_CERRAR_CURSO,
+      key: input.idempotencyKey,
+      usuarioId: input.autorUsuarioId,
+      requestPayload: { cursoId: input.cursoId, body: input.body },
+      ejecutor: async (tx) => {
+        const cursoSnapshot = await this.leerCursoParaCerrar(tx, input.cursoId)
+        const asignaciones = await this.leerAsignacionesParaCerrar(tx, input.cursoId)
+        this.validarDecisionesCompletas(asignaciones, decisiones)
+
+        const fechaCierre = new Date()
+
+        const { count } = await tx.curso.updateMany({
+          where: { id: input.cursoId, estado: EstadoCurso.ACTIVO },
+          data: { estado: EstadoCurso.CERRADO, fechaCierre },
+        })
+        if (count === 0) {
+          throw new ConflictException({
+            code: apiErrorCodes.conflictCursoNoActivo,
+            message: "El curso cambio de estado durante la operacion.",
+          })
+        }
+
+        const logCierre = await tx.logCambioCurso.create({
+          data: {
+            cursoId: input.cursoId,
+            autorUsuarioId: input.autorUsuarioId,
+            accion: AccionLogCurso.CIERRE,
+            motivo: input.motivo,
+            previewImpacto: {
+              fechaCierre: fechaCierre.toISOString(),
+            } satisfies Prisma.InputJsonValue,
+          },
+          select: { id: true },
+        })
+
+        const decisionesAplicadas = await this.aplicarDecisionesACada(
+          tx,
+          asignaciones,
+          decisiones,
+          cursoSnapshot,
+          input.autorUsuarioId,
+          input.motivo,
+          fechaCierre,
+          logCierre.id,
+        )
+
+        const snapshot = construirSnapshotCierre({
+          curso: cursoSnapshot,
+          asignaciones,
+          decisionesAplicadas,
+          fechaCierre,
+          motivo: input.motivo,
+          autorAdminId: input.autorUsuarioId,
+        })
+
+        await tx.cursoFotografiaCierre.create({
+          data: {
+            cursoId: input.cursoId,
+            fechaCierre,
+            snapshot: snapshot as unknown as Prisma.InputJsonValue,
+            versionSnapshot: 1,
+            descartada: false,
+          },
+        })
+
+        const detalle = await tx.curso.findUniqueOrThrow({
+          where: { id: input.cursoId },
+          select: SELECT_CURSO_DETALLE_FIELDS,
+        })
+
+        const pendientesNotif: NotificacionPendienteCierre[] = decisionesAplicadas
+          .filter((d) => d.resultadoFinal !== null)
+          .map((d) => ({
+            asignacionId: d.asignacionId,
+            resultadoNotif: mapearResultadoNotif(d.resultadoFinal as ResultadoFinal),
+          }))
+
+        return {
+          status: HTTP_OK_CIERRE,
+          body: { detalle: toCursoDetalle(detalle), pendientesNotif },
+        }
+      },
+    })
+
+    return {
+      curso: ejecucion.body.detalle,
+      nuevo: !ejecucion.replay,
+      notificaciones: ejecucion.replay ? [] : ejecucion.body.pendientesNotif,
+    }
+  }
+
+  /**
+   * `POST /api/v1/cursos/:cursoId/deshacer-cierre` (D-S11-A4 / A5 / R-S11-2).
+   *
+   * Revierte ACTIVO el curso si esta dentro de la ventana 7 dias desde el
+   * cierre. Marca la fotografia `descartada=true`. Revierte SOLO las
+   * asignaciones que cambiaron en el cierre que se deshace (identificadas
+   * por `logCambioCursoId` del historico). No toca notas posteriores.
+   */
+  async deshacerCierre(input: {
+    readonly cursoId: string
+    readonly motivo: string
+    readonly idempotencyKey: string
+    readonly autorUsuarioId: string
+  }): Promise<{ curso: CursoDetalle; nuevo: boolean }> {
+    const ejecucion = await this.idempotency.runOnce<{ detalle: CursoDetalle }>({
+      scope: IDEMPOTENCY_SCOPE_DESHACER_CIERRE,
+      key: input.idempotencyKey,
+      usuarioId: input.autorUsuarioId,
+      requestPayload: { cursoId: input.cursoId },
+      ejecutor: async (tx) => {
+        const curso = await tx.curso.findUnique({
+          where: { id: input.cursoId },
+          select: { id: true, estado: true, fechaCierre: true },
+        })
+        if (!curso) {
+          throw new NotFoundException({
+            code: apiErrorCodes.cursoNoEncontrado,
+            message: "Curso no encontrado.",
+          })
+        }
+        if (curso.estado !== EstadoCurso.CERRADO) {
+          throw new ConflictException({
+            code: apiErrorCodes.conflictCursoNoCerrado,
+            message: "Solo se puede deshacer el cierre de un curso CERRADO.",
+            details: { estado: curso.estado },
+          })
+        }
+        const fechaCierre = curso.fechaCierre
+        if (
+          !fechaCierre ||
+          Date.now() - fechaCierre.getTime() > VENTANA_DESHACER_DIAS * MS_POR_DIA
+        ) {
+          throw new ConflictException({
+            code: apiErrorCodes.conflictCursoFueraVentana7Dias,
+            message: `El curso esta fuera de la ventana de ${VENTANA_DESHACER_DIAS} dias para deshacer el cierre.`,
+          })
+        }
+
+        const ultimoCierre = await tx.logCambioCurso.findFirst({
+          where: { cursoId: input.cursoId, accion: AccionLogCurso.CIERRE },
+          orderBy: { fecha: "desc" },
+          select: { id: true },
+        })
+        if (!ultimoCierre) {
+          throw new ConflictException({
+            code: apiErrorCodes.conflictCursoNoCerrado,
+            message: "No hay log de cierre asociado al curso.",
+          })
+        }
+
+        const { count } = await tx.curso.updateMany({
+          where: { id: input.cursoId, estado: EstadoCurso.CERRADO },
+          data: { estado: EstadoCurso.ACTIVO, fechaCierre: null },
+        })
+        if (count === 0) {
+          throw new ConflictException({
+            code: apiErrorCodes.conflictCursoNoCerrado,
+            message: "El curso cambio de estado durante la operacion.",
+          })
+        }
+
+        const historicos = await tx.historicoEstadoAsignacion.findMany({
+          where: { logCambioCursoId: ultimoCierre.id },
+          select: {
+            asignacionId: true,
+            estadoAnterior: true,
+            estadoNuevo: true,
+            asignacion: { select: { id: true, rol: true } },
+          },
+        })
+
+        const logDeshacer = await tx.logCambioCurso.create({
+          data: {
+            cursoId: input.cursoId,
+            autorUsuarioId: input.autorUsuarioId,
+            accion: AccionLogCurso.DESHACER_CIERRE,
+            motivo: input.motivo,
+            previewImpacto: {
+              logCambioCursoCierreId: ultimoCierre.id,
+              asignacionesRevertidas: historicos.length,
+            } satisfies Prisma.InputJsonValue,
+          },
+          select: { id: true },
+        })
+
+        for (const h of historicos) {
+          await this.revertirAsignacionParaDeshacer(
+            tx,
+            h.asignacion.id,
+            h.asignacion.rol,
+            h.estadoAnterior,
+            input.autorUsuarioId,
+            input.motivo,
+            logDeshacer.id,
+          )
+        }
+
+        await tx.cursoFotografiaCierre.updateMany({
+          where: { cursoId: input.cursoId, descartada: false },
+          data: { descartada: true, descartadaAt: new Date() },
+        })
+
+        const detalle = await tx.curso.findUniqueOrThrow({
+          where: { id: input.cursoId },
+          select: SELECT_CURSO_DETALLE_FIELDS,
+        })
+        return { status: HTTP_OK_CIERRE, body: { detalle: toCursoDetalle(detalle) } }
+      },
+    })
+
+    return { curso: ejecucion.body.detalle, nuevo: !ejecucion.replay }
+  }
+
+  private async leerCursoParaCerrar(
+    tx: Prisma.TransactionClient,
+    cursoId: string,
+  ): Promise<CursoSnapshotCierre> {
+    const curso = await tx.curso.findUnique({
+      where: { id: cursoId },
+      select: {
+        id: true,
+        titulo: true,
+        clienteId: true,
+        estado: true,
+        fechaInicio: true,
+        fechaDeadline: true,
+        umbralesLogro: true,
+        pesoBloques: true,
+        pesoTransversal: true,
+        pesoEntrevista: true,
+        transversalId: true,
+        entrevistaIaId: true,
+        areasExigidas: {
+          select: { areaId: true, peso: true, puntajeObjetivo: true },
+        },
+        skillsExigidas: {
+          select: { skillId: true, notaMinima: true, skill: { select: { etiquetaVisible: true } } },
+        },
+        modulosHabilitados: { select: { moduloId: true } },
+      },
+    })
+    if (!curso) {
+      throw new NotFoundException({
+        code: apiErrorCodes.cursoNoEncontrado,
+        message: "Curso no encontrado.",
+      })
+    }
+    if (curso.estado !== EstadoCurso.ACTIVO) {
+      throw new ConflictException({
+        code: apiErrorCodes.conflictCursoNoActivo,
+        message: "Solo se puede cerrar un curso en estado ACTIVO.",
+        details: { estado: curso.estado },
+      })
+    }
+    return curso
+  }
+
+  private async leerAsignacionesParaCerrar(
+    tx: Prisma.TransactionClient,
+    cursoId: string,
+  ): Promise<readonly AsignacionCierreRow[]> {
+    return tx.asignacionCurso.findMany({
+      where: { cursoId },
+      select: {
+        id: true,
+        rol: true,
+        estadoAsignado: true,
+        estadoVoluntario: true,
+        colaboradorId: true,
+        colaborador: {
+          select: {
+            id: true,
+            nombre: true,
+            email: true,
+          },
+        },
+      },
+    })
+  }
+
+  private validarDecisionesCompletas(
+    asignaciones: readonly AsignacionCierreRow[],
+    decisiones: ReadonlyMap<string, AccionCierre>,
+  ): void {
+    const faltantes = asignaciones
+      .filter((a) => esEnProgreso(a) && !decisiones.has(a.id))
+      .map((a) => a.id)
+    if (faltantes.length > 0) {
+      throw new UnprocessableEntityException({
+        code: apiErrorCodes.validacionDecisionFaltante,
+        message: "Faltan decisiones para una o mas asignaciones EN_PROGRESO.",
+        details: { asignacionesFaltantes: faltantes },
+      })
+    }
+  }
+
+  private async aplicarDecisionesACada(
+    tx: Prisma.TransactionClient,
+    asignaciones: readonly AsignacionCierreRow[],
+    decisiones: ReadonlyMap<string, AccionCierre>,
+    cursoSnapshot: CursoSnapshotCierre,
+    autorUsuarioId: string,
+    motivo: string,
+    fechaCierre: Date,
+    logCambioCursoId: string,
+  ): Promise<readonly DecisionAplicada[]> {
+    const aplicadas: DecisionAplicada[] = []
+    const notasPorColaborador = await this.leerNotasSkillsExigidas(tx, cursoSnapshot, asignaciones)
+
+    for (const asig of asignaciones) {
+      const accion = decisiones.get(asig.id)
+      if (!accion) {
+        continue
+      }
+      const notas = mapearNotasSkillSnapshot(
+        cursoSnapshot,
+        notasPorColaborador.get(asig.colaboradorId) ?? new Map(),
+      )
+      const resultado = calcularResultadoFinal({ rol: asig.rol, accion, notasSkills: notas })
+      if (resultado === null) {
+        aplicadas.push({
+          asignacionId: asig.id,
+          accion,
+          resultadoFinal: null,
+          notas,
+        })
+        continue
+      }
+      const estadoAnterior = literalEstadoAsignacion(asig)
+      const estadoNuevo = resultado
+      if (asig.rol === RolAsignacion.ASIGNADO) {
+        await tx.asignacionCurso.updateMany({
+          where: { id: asig.id },
+          data: {
+            estadoAsignado:
+              estadoNuevo as Prisma.AsignacionCursoUpdateManyMutationInput["estadoAsignado"],
+            fechaCierre,
+          },
+        })
+      } else {
+        const estadoVol = resultado === "COMPLETADO" ? "COMPLETADO" : "RETIRADO"
+        await tx.asignacionCurso.updateMany({
+          where: { id: asig.id },
+          data: {
+            estadoVoluntario: estadoVol,
+            fechaCierre,
+          },
+        })
+      }
+      await tx.historicoEstadoAsignacion.create({
+        data: {
+          asignacionId: asig.id,
+          estadoAnterior,
+          estadoNuevo,
+          motivo,
+          autorUsuarioId,
+          logCambioCursoId,
+        },
+      })
+      aplicadas.push({
+        asignacionId: asig.id,
+        accion,
+        resultadoFinal: resultado,
+        notas,
+      })
+    }
+    return aplicadas
+  }
+
+  private async leerNotasSkillsExigidas(
+    tx: Prisma.TransactionClient,
+    cursoSnapshot: CursoSnapshotCierre,
+    asignaciones: readonly AsignacionCierreRow[],
+  ): Promise<Map<string, Map<string, number | null>>> {
+    const skillIds = cursoSnapshot.skillsExigidas.map((s) => s.skillId)
+    const colaboradorIds = asignaciones.map((a) => a.colaboradorId)
+    if (skillIds.length === 0 || colaboradorIds.length === 0) {
+      return new Map()
+    }
+    const filas = await tx.notaSkill.findMany({
+      where: {
+        colaboradorId: { in: colaboradorIds },
+        skillId: { in: skillIds },
+      },
+      select: { colaboradorId: true, skillId: true, notaActual: true },
+    })
+    const out = new Map<string, Map<string, number | null>>()
+    for (const colaboradorId of colaboradorIds) {
+      out.set(colaboradorId, new Map())
+    }
+    for (const f of filas) {
+      const sub = out.get(f.colaboradorId)
+      if (sub) {
+        sub.set(f.skillId, f.notaActual === null ? null : Number(f.notaActual))
+      }
+    }
+    return out
+  }
+
+  private async revertirAsignacionParaDeshacer(
+    tx: Prisma.TransactionClient,
+    asignacionId: string,
+    rol: RolAsignacion,
+    estadoAnterior: string,
+    autorUsuarioId: string,
+    motivo: string,
+    logCambioCursoId: string,
+  ): Promise<void> {
+    if (rol === RolAsignacion.ASIGNADO) {
+      await tx.asignacionCurso.updateMany({
+        where: { id: asignacionId },
+        data: {
+          estadoAsignado:
+            estadoAnterior as Prisma.AsignacionCursoUpdateManyMutationInput["estadoAsignado"],
+          fechaCierre: null,
+        },
+      })
+    } else {
+      await tx.asignacionCurso.updateMany({
+        where: { id: asignacionId },
+        data: {
+          estadoVoluntario:
+            estadoAnterior as Prisma.AsignacionCursoUpdateManyMutationInput["estadoVoluntario"],
+          fechaCierre: null,
+        },
+      })
+    }
+    await tx.historicoEstadoAsignacion.create({
+      data: {
+        asignacionId,
+        estadoAnterior: rol === RolAsignacion.ASIGNADO ? "APTO_NO_APTO" : "COMPLETADO",
+        estadoNuevo: estadoAnterior,
+        motivo,
+        autorUsuarioId,
+        logCambioCursoId,
+      },
+    })
+  }
+
+  /**
+   * Best-effort: notifica `RESULTADO_CIERRE` por cada asignacion que recibio
+   * decision con resultado != null. R-S10-2 / B7: errores se loggean sin
+   * propagar al admin.
+   */
+  async notificarResultadoCierreCurso(
+    pendientes: readonly NotificacionPendienteCierre[],
+  ): Promise<void> {
+    for (const p of pendientes) {
+      try {
+        const asignacion = await this.prisma.asignacionCurso.findUnique({
+          where: { id: p.asignacionId },
+          select: {
+            curso: { select: { titulo: true } },
+            colaborador: { select: { usuario: { select: { id: true } } } },
+          },
+        })
+        const usuarioId = asignacion?.colaborador?.usuario?.id
+        const cursoTitulo = asignacion?.curso?.titulo
+        if (!(usuarioId && cursoTitulo)) {
+          this.logger.warn(
+            `notif | resultado-cierre omitida | asignacion=${p.asignacionId} | motivo=sin-usuario-o-curso`,
+          )
+          continue
+        }
+        await this.notificaciones.crear({
+          usuarioId,
+          // biome-ignore lint/style/useNamingConvention: identificador del enum Prisma.
+          tipo: "RESULTADO_CIERRE",
+          payload: {
+            asignacionId: p.asignacionId,
+            cursoTitulo,
+            resultado: p.resultadoNotif,
+          },
+        })
+      } catch (error) {
+        const detalle = error instanceof Error ? error.message : String(error)
+        this.logger.warn(
+          `notif | fallo | tipo=RESULTADO_CIERRE | asignacion=${p.asignacionId} | error=${detalle}`,
+        )
+      }
     }
   }
 
@@ -2078,6 +2630,168 @@ function construirDataUpdateEntrevistaIa(
     data.tono = input.tono
   }
   return data
+}
+
+/** Status devuelto por `runOnce.ejecutor` al cerrar/deshacer. */
+const HTTP_OK_CIERRE = 200
+
+interface AsignacionCierreRow {
+  readonly id: string
+  readonly rol: RolAsignacion
+  readonly estadoAsignado: string | null
+  readonly estadoVoluntario: string | null
+  readonly colaboradorId: string
+  readonly colaborador: {
+    readonly id: string
+    readonly nombre: string
+    readonly email: string
+  }
+}
+
+interface CursoSnapshotCierre {
+  readonly id: string
+  readonly titulo: string
+  readonly clienteId: string
+  readonly estado: EstadoCurso
+  readonly fechaInicio: Date
+  readonly fechaDeadline: Date
+  readonly umbralesLogro: Prisma.JsonValue | null
+  readonly pesoBloques: Prisma.Decimal
+  readonly pesoTransversal: Prisma.Decimal
+  readonly pesoEntrevista: Prisma.Decimal
+  readonly transversalId: string | null
+  readonly entrevistaIaId: string | null
+  readonly areasExigidas: readonly {
+    readonly areaId: string
+    readonly peso: Prisma.Decimal
+    readonly puntajeObjetivo: Prisma.Decimal
+  }[]
+  readonly skillsExigidas: readonly {
+    readonly skillId: string
+    readonly notaMinima: Prisma.Decimal
+    readonly skill: { readonly etiquetaVisible: string }
+  }[]
+  readonly modulosHabilitados: readonly { readonly moduloId: string }[]
+}
+
+interface DecisionAplicada {
+  readonly asignacionId: string
+  readonly accion: AccionCierre
+  readonly resultadoFinal: ResultadoFinal | null
+  readonly notas: readonly NotaSkillSnapshot[]
+}
+
+export interface NotificacionPendienteCierre {
+  readonly asignacionId: string
+  readonly resultadoNotif: "APTO" | "NO_APTO" | "COMPLETADO" | "RETIRADO"
+}
+
+interface CierreResultadoCache {
+  readonly detalle: CursoDetalle
+  readonly pendientesNotif: readonly NotificacionPendienteCierre[]
+}
+
+function esEnProgreso(asignacion: AsignacionCierreRow): boolean {
+  if (asignacion.rol === RolAsignacion.ASIGNADO) {
+    return asignacion.estadoAsignado === "EN_PROGRESO"
+  }
+  return asignacion.estadoVoluntario === "EN_PROGRESO"
+}
+
+function literalEstadoAsignacion(asignacion: AsignacionCierreRow): string {
+  if (asignacion.rol === RolAsignacion.ASIGNADO) {
+    return asignacion.estadoAsignado ?? "DESCONOCIDO"
+  }
+  return asignacion.estadoVoluntario ?? "DESCONOCIDO"
+}
+
+function mapearNotasSkillSnapshot(
+  cursoSnapshot: CursoSnapshotCierre,
+  notas: ReadonlyMap<string, number | null>,
+): readonly NotaSkillSnapshot[] {
+  return cursoSnapshot.skillsExigidas.map((s) => ({
+    skillId: s.skillId,
+    // D-S11-A6: las skills exigidas del curso se consideran OBLIGATORIAS para
+    // el calculo APTO/NO_APTO (D44). La distincion OBLIGATORIA/OPCIONAL a
+    // nivel de skill exigida no existe en el modelo Curso (es del plan).
+    caracter: "OBLIGATORIA",
+    notaActual: notas.has(s.skillId) ? (notas.get(s.skillId) ?? null) : null,
+    umbralCumple: Number(s.notaMinima),
+  }))
+}
+
+function mapearResultadoNotif(
+  resultado: ResultadoFinal,
+): "APTO" | "NO_APTO" | "COMPLETADO" | "RETIRADO" {
+  return resultado
+}
+
+function construirSnapshotCierre(input: {
+  readonly curso: CursoSnapshotCierre
+  readonly asignaciones: readonly AsignacionCierreRow[]
+  readonly decisionesAplicadas: readonly DecisionAplicada[]
+  readonly fechaCierre: Date
+  readonly motivo: string
+  readonly autorAdminId: string
+}): Record<string, unknown> {
+  const aplicadasPorAsignacion = new Map<string, DecisionAplicada>(
+    input.decisionesAplicadas.map((d) => [d.asignacionId, d]),
+  )
+  return {
+    versionSnapshot: 1,
+    fechaCierre: input.fechaCierre.toISOString(),
+    motivo: input.motivo,
+    autorAdminId: input.autorAdminId,
+    curso: {
+      id: input.curso.id,
+      titulo: input.curso.titulo,
+      clienteId: input.curso.clienteId,
+      fechaInicio: input.curso.fechaInicio.toISOString().slice(0, 10),
+      fechaDeadline: input.curso.fechaDeadline.toISOString().slice(0, 10),
+      configuracion: {
+        areas: input.curso.areasExigidas.map((a) => ({
+          areaId: a.areaId,
+          peso: Number(a.peso),
+          puntajeObjetivo: Number(a.puntajeObjetivo),
+        })),
+        skillsExigidas: input.curso.skillsExigidas.map((s) => ({
+          skillId: s.skillId,
+          etiquetaVisible: s.skill.etiquetaVisible,
+          notaMinima: Number(s.notaMinima),
+        })),
+        modulosHabilitados: input.curso.modulosHabilitados.map((m) => m.moduloId),
+        pesos: {
+          bloques: Number(input.curso.pesoBloques),
+          transversal: Number(input.curso.pesoTransversal),
+          entrevista: Number(input.curso.pesoEntrevista),
+        },
+        umbralesLogro: input.curso.umbralesLogro,
+        transversalActivo: input.curso.transversalId !== null,
+        entrevistaIaActiva: input.curso.entrevistaIaId !== null,
+      },
+    },
+    asignaciones: input.asignaciones.map((a) => {
+      const aplicada = aplicadasPorAsignacion.get(a.id)
+      return {
+        asignacionId: a.id,
+        colaborador: {
+          id: a.colaborador.id,
+          nombre: a.colaborador.nombre,
+          email: a.colaborador.email,
+        },
+        rol: a.rol,
+        decisionAplicada: aplicada?.accion ?? null,
+        resultadoFinal: aplicada?.resultadoFinal ?? null,
+        estadoPrevio: a.rol === RolAsignacion.ASIGNADO ? a.estadoAsignado : a.estadoVoluntario,
+        notasPorSkill:
+          aplicada?.notas.map((n) => ({
+            skillId: n.skillId,
+            notaActual: n.notaActual,
+            umbralCumple: n.umbralCumple,
+          })) ?? [],
+      }
+    }),
+  }
 }
 
 /**

@@ -326,6 +326,8 @@ enum AccionAuditoria {
   INTENTO_ENTREVISTA_IA_AJUSTADO
   INTENTO_ENTREVISTA_IA_ANULADO
   PREFERENCIA_NOTIFICACION_ACTUALIZADA
+  CURSO_CERRADO
+  CURSO_CIERRE_DESHECHO
 
   @@map("accion_auditoria_enum")
 }
@@ -576,11 +578,25 @@ model Curso {
   intentosBloque     IntentoBloque[]
   previewsEvalInicial PreviewEvaluacionInicial[] @relation("PreviewEvalInicial_Curso")
   cargasEvalInicial   CargaEvaluacionInicial[]   @relation("CargaEvalInicial_Curso")
+  fotografiaCierre   CursoFotografiaCierre?
 
   @@index([clienteId], map: "idx_cursos_cliente")
   @@index([estado], map: "idx_cursos_estado")
   @@index([fechaDeadline], map: "idx_cursos_deadline")
   @@map("cursos")
+}
+
+model CursoFotografiaCierre {
+  cursoId         String    @id @map("curso_id") @db.Uuid
+  fechaCierre     DateTime  @map("fecha_cierre") @db.Timestamptz(6)
+  snapshot        Json      @db.JsonB
+  versionSnapshot Int       @default(1) @map("version_snapshot")
+  descartada      Boolean   @default(false)
+  descartadaAt    DateTime? @map("descartada_at") @db.Timestamptz(6)
+
+  curso Curso @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+
+  @@map("cursos_fotografia_cierre")
 }
 
 model CursoAreaExigida {
@@ -631,6 +647,7 @@ model LogCambioCurso {
 
   curso        Curso   @relation(fields: [cursoId], references: [id], onDelete: Restrict)
   autorUsuario Usuario @relation("LogCambioCurso_Autor", fields: [autorUsuarioId], references: [id], onDelete: Restrict)
+  historicosAsignacion HistoricoEstadoAsignacion[]
 
   @@index([cursoId, fecha(sort: Desc)], map: "idx_log_cambios_curso")
   @@map("log_cambios_curso")
@@ -858,18 +875,21 @@ model AsignacionCurso {
 }
 
 model HistoricoEstadoAsignacion {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  asignacionId   String   @map("asignacion_id") @db.Uuid
-  fecha          DateTime @default(now()) @db.Timestamptz(6)
-  estadoAnterior String   @map("estado_anterior")
-  estadoNuevo    String   @map("estado_nuevo")
-  motivo         String?
-  autorUsuarioId String   @map("autor_usuario_id") @db.Uuid
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  asignacionId      String   @map("asignacion_id") @db.Uuid
+  fecha             DateTime @default(now()) @db.Timestamptz(6)
+  estadoAnterior    String   @map("estado_anterior")
+  estadoNuevo       String   @map("estado_nuevo")
+  motivo            String?
+  autorUsuarioId    String   @map("autor_usuario_id") @db.Uuid
+  logCambioCursoId  String?  @map("log_cambio_curso_id") @db.Uuid
 
   asignacion   AsignacionCurso @relation(fields: [asignacionId], references: [id], onDelete: Cascade)
   autorUsuario Usuario         @relation("HistEstadoAsig_Autor", fields: [autorUsuarioId], references: [id], onDelete: Restrict)
+  logCambioCurso LogCambioCurso? @relation(fields: [logCambioCursoId], references: [id], onDelete: SetNull)
 
   @@index([asignacionId, fecha(sort: Desc)])
+  @@index([logCambioCursoId], map: "idx_historico_log_cambio_curso_rel")
   @@map("historico_estados_asignacion")
 }
 

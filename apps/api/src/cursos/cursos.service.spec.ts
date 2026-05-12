@@ -15,8 +15,10 @@ import {
 import { Prisma } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
+import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
+import { NotificacionesService } from "../notificaciones/notificaciones.service"
 import { CursosService } from "./cursos.service"
 
 interface MockPrisma {
@@ -211,7 +213,13 @@ beforeEach(async () => {
     providers: [
       {
         provide: CursosService,
-        useFactory: (p: PrismaService) => new CursosService(p),
+        useFactory: (p: PrismaService) =>
+          new CursosService(
+            p,
+            // Stubs minimos para los specs heredados que no ejercitan P11a.
+            idempotencyStub as unknown as IdempotencyService,
+            notificacionesStub as unknown as NotificacionesService,
+          ),
         inject: [PrismaService],
       },
       { provide: PrismaService, useValue: prisma },
@@ -219,6 +227,14 @@ beforeEach(async () => {
   }).compile()
   service = moduleRef.get(CursosService)
 })
+
+const idempotencyStub = {
+  runOnce: vi.fn(),
+}
+
+const notificacionesStub = {
+  crear: vi.fn(),
+}
 
 describe("CursosService.listar", () => {
   const baseQuery = {

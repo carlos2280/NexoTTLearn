@@ -1,4 +1,5 @@
 import { Prisma, TipoEventoNotif } from "@prisma/client"
+import { CursoDeadlinePayload, esCursoDeadlinePayload } from "../../payload/curso-deadline.payload"
 import {
   PlanRecalculadoPayload,
   esPlanRecalculadoPayload,
@@ -7,6 +8,7 @@ import {
   ResultadoCierrePayload,
   esResultadoCierrePayload,
 } from "../../payload/resultado-cierre.payload"
+import { construirCursoDeadline } from "./curso-deadline.template"
 import {
   PlantillaContexto,
   PlantillaResultado,
@@ -43,12 +45,18 @@ const ENTRY_RESULTADO_CIERRE: PlantillaEntry<ResultadoCierrePayload> = {
   construir: construirResultadoCierre,
 }
 
+const ENTRY_CURSO_DEADLINE: PlantillaEntry<CursoDeadlinePayload> = {
+  esPayloadValido: esCursoDeadlinePayload,
+  construir: construirCursoDeadline,
+}
+
 export const PLANTILLAS: ReadonlyMap<TipoEventoNotif, PlantillaEntry<unknown>> = new Map<
   TipoEventoNotif,
   PlantillaEntry<unknown>
 >([
   [TipoEventoNotif.PLAN_RECALCULADO, ENTRY_PLAN_RECALCULADO as PlantillaEntry<unknown>],
   [TipoEventoNotif.RESULTADO_CIERRE, ENTRY_RESULTADO_CIERRE as PlantillaEntry<unknown>],
+  [TipoEventoNotif.CURSO_DEADLINE, ENTRY_CURSO_DEADLINE as PlantillaEntry<unknown>],
 ])
 
 /**

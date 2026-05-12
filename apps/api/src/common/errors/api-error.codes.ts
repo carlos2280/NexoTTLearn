@@ -174,6 +174,9 @@ export const apiErrorCodes = {
   notificacionNoEncontrada: "NOTIFICACION_NO_ENCONTRADA",
   validacionTipoCriticoNoSilenciable: "VALIDACION_TIPO_CRITICO_NO_SILENCIABLE",
   validacionTipoEnSilenciarYDesilenciar: "VALIDACION_TIPO_EN_SILENCIAR_Y_DESILENCIAR",
+  // Cierre curso P11a (D-S11-A2..A5).
+  validacionDecisionFaltante: "VALIDACION_DECISION_FALTANTE",
+  conflictCursoFueraVentana7Dias: "CONFLICT_CURSO_FUERA_VENTANA_7_DIAS",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]

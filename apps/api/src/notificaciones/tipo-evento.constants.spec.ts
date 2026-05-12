@@ -39,10 +39,12 @@ describe("tipo-evento.constants", () => {
     expect(AUDIENCIA_POR_TIPO.get(TipoEventoNotif.EXCEL_CARGADO)).toBe("admin")
   })
 
-  it("catalogoTipoEvento.tienePlantilla devuelve true solo para los tipos activados en P10c", () => {
+  it("catalogoTipoEvento.tienePlantilla devuelve true solo para los tipos con plantilla activa (P10c + P11a)", () => {
+    // P11a anade `CURSO_DEADLINE` al registro PLANTILLAS (D-S11-A9, D-S11-C10).
     const conPlantilla: ReadonlySet<TipoEventoNotif> = new Set<TipoEventoNotif>([
       TipoEventoNotif.PLAN_RECALCULADO,
       TipoEventoNotif.RESULTADO_CIERRE,
+      TipoEventoNotif.CURSO_DEADLINE,
     ])
     const valoresEnum = Object.values(TipoEventoNotif)
     for (const tipo of valoresEnum) {

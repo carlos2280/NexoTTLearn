@@ -133,6 +133,19 @@ const envSchema = z
         "NOTIF_PURGA_CRON debe ser una expresion cron con * 0-9 - , / o espacios",
       )
       .default("0 3 * * *"),
+    // ---------------------------------------------------------------------
+    // Cierre / fotografia (Slice 11 P11a — D-S11-A9, R-S11-11).
+    //   CURSO_DEADLINE_CRON — expresion cron 5 campos para CursoDeadlineCron.
+    //                         Hora del servidor (UTC por defecto). Default 08:00.
+    // ---------------------------------------------------------------------
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    CURSO_DEADLINE_CRON: z
+      .string()
+      .regex(
+        /^[*0-9\-,/\s]+$/,
+        "CURSO_DEADLINE_CRON debe ser una expresion cron con * 0-9 - , / o espacios",
+      )
+      .default("0 8 * * *"),
     // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
     APP_BASE_URL: z.string().url().default("http://localhost:4000"),
   })

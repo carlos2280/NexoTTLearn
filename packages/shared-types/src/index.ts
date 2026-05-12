@@ -136,6 +136,14 @@ export { listarCursosQuerySchema } from "./cursos/listar-cursos.query.schema"
 export type { ListarCursosQuery } from "./cursos/listar-cursos.query.schema"
 export { duplicarCursoSchema } from "./cursos/duplicar-curso.schema"
 export type { DuplicarCursoInput } from "./cursos/duplicar-curso.schema"
+export {
+  accionCierreAsignacionSchema,
+  cerrarCursoSchema,
+} from "./cursos/cerrar-curso.schema"
+export type {
+  AccionCierreAsignacion,
+  CerrarCursoInput,
+} from "./cursos/cerrar-curso.schema"
 export { listarLogCambiosQuerySchema } from "./cursos/log-cambios.query.schema"
 export type { ListarLogCambiosQuery } from "./cursos/log-cambios.query.schema"
 
