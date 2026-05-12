@@ -62,6 +62,34 @@ export class NotaSkillService {
   }
 
   /**
+   * Politica "ultimo aprobado" para entrevistas IA (D-S8-D6 / §11.5). Simetrico
+   * a `obtenerIntentoTransversalVigente`; trabaja sobre `IntentoEntrevistaVigenteCandidato`
+   * que incluye `notaAjustadaAdmin` para que el motor sepa si priorizarla.
+   */
+  obtenerIntentoEntrevistaVigente<T extends IntentoEntrevistaVigenteCandidato>(
+    intentos: readonly T[],
+  ): T | null {
+    const noAnulados = intentos.filter((i) => !i.anulado && i.estado === "FINALIZADO")
+    if (noAnulados.length === 0) {
+      return null
+    }
+    const ultimo = noAnulados[noAnulados.length - 1]
+    if (ultimo === undefined) {
+      return null
+    }
+    if (ultimo.aprobado === true) {
+      return ultimo
+    }
+    for (let i = noAnulados.length - 2; i >= 0; i -= 1) {
+      const candidato = noAnulados[i]
+      if (candidato !== undefined && candidato.aprobado === true) {
+        return candidato
+      }
+    }
+    return null
+  }
+
+  /**
    * Aplica D33 (70/20/10) con redistribucion D35 cuando alguna fuente es null.
    * Pesos vienen del curso (`Curso.pesoBloques`, `pesoTransversal`,
    * `pesoEntrevista`); las fuentes en null se omiten y los pesos vivos se
@@ -150,8 +178,13 @@ export class NotaSkillService {
       }
     }
 
-    // Entrevista IA queda en P8c — siempre null en P8b.
-    const notaEntrevista: number | null = null
+    // P8c — politica "ultimo aprobado" sobre intentos de entrevista IA con
+    // prioridad a `notaAjustadaAdmin` sobre `notaGlobal` cuando existe (D-S8-D5).
+    const notaEntrevista = await this.calcularAporteEntrevista(tx, {
+      colaboradorId: input.colaboradorId,
+      skillId: input.skillId,
+      entrevistaIaId: curso.entrevistaIaId,
+    })
 
     const notaActual = this.calcularNotaActualSkill(
       { bloques: notaBloques, transversal: notaTransversal, entrevista: notaEntrevista },
@@ -209,6 +242,99 @@ export class NotaSkillService {
    * orden requerido por D-S8-C5. Si la skill no esta etiquetada al
    * transversal, devuelve lista vacia.
    */
+  /**
+   * Aporte D33 para entrevista IA (P8c). Retorna null si el curso no tiene
+   * entrevista IA, si no hay intento vigente o si no hay nota persistida.
+   * Si existe `notaAjustadaAdmin`, gana sobre la nota del area (D-S8-D5).
+   */
+  private async calcularAporteEntrevista(
+    tx: PrismaTx,
+    input: {
+      readonly colaboradorId: string
+      readonly skillId: string
+      readonly entrevistaIaId: string | null
+    },
+  ): Promise<number | null> {
+    if (input.entrevistaIaId === null) {
+      return null
+    }
+    const intentos = await this.cargarIntentosEntrevistaIaPorSkill(tx, {
+      colaboradorId: input.colaboradorId,
+      skillId: input.skillId,
+      entrevistaIaId: input.entrevistaIaId,
+    })
+    const vigente = this.obtenerIntentoEntrevistaVigente(intentos)
+    if (!vigente) {
+      return null
+    }
+    if (vigente.notaAjustadaAdmin !== null) {
+      return Number(vigente.notaAjustadaAdmin.toString())
+    }
+    return vigente.notaAreaPorSkill
+  }
+
+  /**
+   * Carga los intentos de entrevista IA del colaborador y, para cada uno, busca
+   * la nota correspondiente al area que contiene la skill (heredada D39).
+   * Devuelve los candidatos ordenados ASC por fecha, listos para
+   * `obtenerIntentoEntrevistaVigente`. La nota del area se redondea a 2 decimales
+   * fuera del Decimal interno (parida con cargarIntentosTransversalPorSkill).
+   */
+  private async cargarIntentosEntrevistaIaPorSkill(
+    tx: PrismaTx,
+    input: {
+      readonly colaboradorId: string
+      readonly skillId: string
+      readonly entrevistaIaId: string
+    },
+  ): Promise<readonly IntentoEntrevistaVigenteCandidato[]> {
+    const skill = await tx.skill.findUnique({
+      where: { id: input.skillId },
+      select: { areaId: true },
+    })
+    if (!skill) {
+      return []
+    }
+    const areaId = skill.areaId
+    const intentos = await tx.intentoEntrevistaIA.findMany({
+      where: {
+        entrevistaIaId: input.entrevistaIaId,
+        colaboradorId: input.colaboradorId,
+        anulado: false,
+      },
+      select: {
+        id: true,
+        anulado: true,
+        aprobado: true,
+        notaGlobal: true,
+        notaAjustadaAdmin: true,
+        fecha: true,
+        notasPorArea: {
+          where: { areaId },
+          select: { nota: true },
+        },
+      },
+      orderBy: { fecha: "asc" },
+    })
+    return intentos.map((i): IntentoEntrevistaVigenteCandidato => {
+      const filaArea = i.notasPorArea[0]
+      const notaArea = filaArea ? Number(filaArea.nota.toString()) : null
+      return {
+        id: i.id,
+        // P8c — distinguimos FINALIZADO vs EN_PROGRESO por presencia de filas
+        // en `intentos_entrevista_ia_notas_area` (decision emergente
+        // D-EMERG-P8c-3: schema actual carece de columna `estado`).
+        estado: i.notasPorArea.length > 0 ? "FINALIZADO" : "EN_PROGRESO",
+        anulado: i.anulado,
+        aprobado: i.aprobado,
+        notaGlobal: i.notaGlobal,
+        notaAjustadaAdmin: i.notaAjustadaAdmin,
+        notaAreaPorSkill: notaArea,
+        fecha: i.fecha,
+      }
+    })
+  }
+
   private async cargarIntentosTransversalPorSkill(
     tx: PrismaTx,
     input: {
@@ -249,6 +375,23 @@ export interface IntentoVigenteCandidato {
   readonly anulado: boolean
   readonly aprobado: boolean | null
   readonly notaGlobal: Prisma.Decimal | null
+  readonly fecha: Date
+}
+
+/**
+ * Candidato para la politica "ultimo aprobado" en entrevistas IA (P8c). Se
+ * diferencia de `IntentoVigenteCandidato` porque incluye `notaAjustadaAdmin`
+ * (prioritaria sobre la nota del area D-S8-D5) y `notaAreaPorSkill` (nota
+ * heredada D39 del area que contiene la skill bajo recalculo).
+ */
+export interface IntentoEntrevistaVigenteCandidato {
+  readonly id: string
+  readonly estado: string
+  readonly anulado: boolean
+  readonly aprobado: boolean | null
+  readonly notaGlobal: Prisma.Decimal | null
+  readonly notaAjustadaAdmin: Prisma.Decimal | null
+  readonly notaAreaPorSkill: number | null
   readonly fecha: Date
 }
 

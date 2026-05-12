@@ -12,16 +12,26 @@ import { AppEnv } from "../../../config/env.validation"
 import { apiErrorCodes } from "../../errors/api-error.codes"
 import {
   AiRespuestaEstructurada,
+  CalcularNotasFinalEntrevistaInput,
+  CalcularNotasFinalEntrevistaOutput,
   EvaluarRepoCualitativoInput,
   EvaluarRepoCualitativoOutput,
+  IniciarEntrevistaInput,
+  IniciarEntrevistaOutput,
   MantenerTurnoComprensionInput,
   MantenerTurnoComprensionOutput,
+  MantenerTurnoEntrevistaIaInput,
+  MantenerTurnoEntrevistaIaOutput,
   MantenerTurnoEntrevistaInput,
   MantenerTurnoEntrevistaOutput,
   aiRespuestaEstructuradaSchema,
+  iniciarEntrevistaResponseSchema,
+  notasFinalEntrevistaSchema,
+  turnoEntrevistaResponseSchema,
 } from "../ai.types"
 import { construirMensajesComprension } from "../prompts/comprension.prompt"
 import { construirMensajesCualitativa } from "../prompts/cualitativa.prompt"
+import { construirMensajesEntrevista } from "../prompts/entrevista-ia.prompt"
 import { IAiProvider } from "./ai-provider.interface"
 
 /**
@@ -108,14 +118,83 @@ export class ClaudeProvider implements IAiProvider {
     }
   }
 
-  // biome-ignore lint/suspicious/useAwait: la rama entrevista IA queda en P8c.
+  // biome-ignore lint/suspicious/useAwait: la rama entrevista IA legacy queda obsoleta — usar iniciar/turno/cierre.
   async mantenerTurnoEntrevista(
     _input: MantenerTurnoEntrevistaInput,
   ): Promise<MantenerTurnoEntrevistaOutput> {
     throw new InternalServerErrorException({
       code: apiErrorCodes.iaNoDisponible,
-      message: "Entrevista IA queda en P8c — no disponible en P8b.",
+      message: "Use iniciarEntrevista / mantenerTurnoEntrevistaIa / calcularNotasFinalEntrevista.",
     })
+  }
+
+  // -------------------------------------------------------------------------
+  // P8c — Entrevista IA final (D-S8-D1, D-S8-D4)
+  // -------------------------------------------------------------------------
+
+  async iniciarEntrevista(input: IniciarEntrevistaInput): Promise<IniciarEntrevistaOutput> {
+    const mensajes = construirMensajesEntrevista({
+      modo: "iniciar",
+      profundidad: input.profundidad,
+      rubricaSnapshot: input.rubricaSnapshot,
+      seccionesBaseSnapshot: input.seccionesBaseSnapshot,
+    })
+    const modelo = this.resolverModelo(input.profundidad)
+    const respuesta = await this.invocarClaudeRaw(modelo, mensajes.system, mensajes.user)
+    const parsed = iniciarEntrevistaResponseSchema.safeParse(respuesta)
+    if (!parsed.success) {
+      throw new BadRequestException({
+        code: apiErrorCodes.iaRespuestaMalformada,
+        message: "IA devolvio shape inesperado al iniciar entrevista.",
+      })
+    }
+    return { primeraPregunta: parsed.data.primeraPregunta }
+  }
+
+  async mantenerTurnoEntrevistaIa(
+    input: MantenerTurnoEntrevistaIaInput,
+  ): Promise<MantenerTurnoEntrevistaIaOutput> {
+    const mensajes = construirMensajesEntrevista({
+      modo: "turno",
+      profundidad: input.profundidad,
+      rubricaSnapshot: input.rubricaSnapshot,
+      seccionesBaseSnapshot: input.seccionesBaseSnapshot,
+      transcripcion: input.transcripcion,
+    })
+    const modelo = this.resolverModelo(input.profundidad)
+    const respuesta = await this.invocarClaudeRaw(modelo, mensajes.system, mensajes.user)
+    const parsed = turnoEntrevistaResponseSchema.safeParse(respuesta)
+    if (!parsed.success) {
+      throw new BadRequestException({
+        code: apiErrorCodes.iaRespuestaMalformada,
+        message: "IA devolvio shape inesperado en turno entrevista.",
+      })
+    }
+    return { respuestaIa: parsed.data.respuestaIa, finalizado: parsed.data.finalizado }
+  }
+
+  async calcularNotasFinalEntrevista(
+    input: CalcularNotasFinalEntrevistaInput,
+  ): Promise<CalcularNotasFinalEntrevistaOutput> {
+    const mensajes = construirMensajesEntrevista({
+      modo: "cierre",
+      profundidad: input.profundidad,
+      rubricaSnapshot: input.rubricaSnapshot,
+      transcripcion: input.transcripcion,
+    })
+    const modelo = this.resolverModelo(input.profundidad)
+    const respuesta = await this.invocarClaudeRaw(modelo, mensajes.system, mensajes.user)
+    const parsed = notasFinalEntrevistaSchema.safeParse(respuesta)
+    if (!parsed.success) {
+      throw new BadRequestException({
+        code: apiErrorCodes.iaRespuestaMalformada,
+        message: "IA devolvio shape inesperado al calcular notas finales.",
+      })
+    }
+    return {
+      notaGlobal: parsed.data.notaGlobal,
+      notasPorArea: parsed.data.notasPorArea,
+    }
   }
 
   /**
@@ -232,6 +311,88 @@ export class ClaudeProvider implements IAiProvider {
       `Claude OK model=${respuesta.model} tokens_in=${usage.input_tokens} tokens_out=${usage.output_tokens} cache_read=${usage.cache_read_input_tokens ?? 0} cache_creation=${usage.cache_creation_input_tokens ?? 0} latency_ms=${Date.now() - inicio}`,
     )
     return this.parsearRespuesta(respuesta.content)
+  }
+
+  /**
+   * Variante de `invocarClaude` que devuelve el JSON crudo (sin imponer el
+   * schema `aiRespuestaEstructuradaSchema`). Los metodos P8c validan despues
+   * con su propio schema Zod dedicado (D-S8-D4). Reutiliza el mismo wrapper
+   * de errores/backoff/log.
+   */
+  private async invocarClaudeRaw(
+    modelo: string,
+    system: ReturnType<typeof construirMensajesCualitativa>["system"],
+    user: string,
+  ): Promise<unknown> {
+    const inicio = Date.now()
+    const intentos: readonly number[] = [0, BACKOFF_MS_PRIMERO, BACKOFF_MS_SEGUNDO]
+    let ultimoServerError: unknown = null
+
+    for (const espera of intentos) {
+      if (espera > 0) {
+        await this.esperar(espera)
+      }
+      try {
+        return await this.intentarLlamadaRaw(modelo, system, user, inicio)
+      } catch (error: unknown) {
+        const reintentable = this.manejarErrorClaude(error, inicio)
+        if (!reintentable) {
+          throw error
+        }
+        ultimoServerError = error
+      }
+    }
+
+    this.logger.error(
+      `Claude no disponible tras reintentos latency_ms=${Date.now() - inicio} detalle=${ultimoServerError instanceof Error ? ultimoServerError.message : "desconocido"}`,
+    )
+    throw new ServiceUnavailableException({
+      code: apiErrorCodes.iaNoDisponible,
+      message: "IA no disponible tras reintentos.",
+    })
+  }
+
+  private async intentarLlamadaRaw(
+    modelo: string,
+    system: ReturnType<typeof construirMensajesCualitativa>["system"],
+    user: string,
+    inicio: number,
+  ): Promise<unknown> {
+    const respuesta = await this.client.messages.create({
+      model: modelo,
+      // biome-ignore lint/style/useNamingConvention: parametro del SDK Anthropic.
+      max_tokens: this.maxTokens,
+      system,
+      messages: [{ role: "user", content: user }],
+    })
+    const usage = respuesta.usage
+    this.logger.log(
+      `Claude OK model=${respuesta.model} tokens_in=${usage.input_tokens} tokens_out=${usage.output_tokens} cache_read=${usage.cache_read_input_tokens ?? 0} cache_creation=${usage.cache_creation_input_tokens ?? 0} latency_ms=${Date.now() - inicio}`,
+    )
+    return this.parsearRespuestaCrudo(respuesta.content)
+  }
+
+  private parsearRespuestaCrudo(content: Anthropic.Messages.Message["content"]): unknown {
+    const textoCompleto = content
+      .filter((c): c is Anthropic.Messages.TextBlock => c.type === "text")
+      .map((c) => c.text)
+      .join("\n")
+      .trim()
+    if (textoCompleto.length === 0) {
+      throw new BadRequestException({
+        code: apiErrorCodes.iaRespuestaMalformada,
+        message: "IA devolvio respuesta vacia.",
+      })
+    }
+    const jsonExtraido = this.extraerJsonEnvuelto(textoCompleto)
+    try {
+      return JSON.parse(jsonExtraido)
+    } catch {
+      throw new BadRequestException({
+        code: apiErrorCodes.iaRespuestaMalformada,
+        message: "IA devolvio JSON invalido.",
+      })
+    }
   }
 
   /**

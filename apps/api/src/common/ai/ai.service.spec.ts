@@ -27,6 +27,15 @@ function buildProvider(): IAiProvider {
       respuestaIa: "x",
       finalizado: false,
     }),
+    iniciarEntrevista: vi.fn().mockResolvedValue({ primeraPregunta: "p1" }),
+    mantenerTurnoEntrevistaIa: vi.fn().mockResolvedValue({
+      respuestaIa: "r",
+      finalizado: false,
+    }),
+    calcularNotasFinalEntrevista: vi.fn().mockResolvedValue({
+      notaGlobal: 75,
+      notasPorArea: [],
+    }),
   }
 }
 

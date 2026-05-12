@@ -2,10 +2,16 @@ import { Inject, Injectable } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
 import { AppEnv } from "../../config/env.validation"
 import {
+  CalcularNotasFinalEntrevistaInput,
+  CalcularNotasFinalEntrevistaOutput,
   EvaluarRepoCualitativoInput,
   EvaluarRepoCualitativoOutput,
+  IniciarEntrevistaInput,
+  IniciarEntrevistaOutput,
   MantenerTurnoComprensionInput,
   MantenerTurnoComprensionOutput,
+  MantenerTurnoEntrevistaIaInput,
+  MantenerTurnoEntrevistaIaOutput,
   MantenerTurnoEntrevistaInput,
   MantenerTurnoEntrevistaOutput,
   ProfundidadEntrevistaIa,
@@ -70,5 +76,25 @@ export class AiService {
     input: MantenerTurnoEntrevistaInput,
   ): Promise<MantenerTurnoEntrevistaOutput> {
     return this.provider.mantenerTurnoEntrevista(input)
+  }
+
+  // ---------------------------------------------------------------------------
+  // P8c — Entrevista IA final (D-S8-D1, D-S8-D4)
+  // ---------------------------------------------------------------------------
+
+  iniciarEntrevista(input: IniciarEntrevistaInput): Promise<IniciarEntrevistaOutput> {
+    return this.provider.iniciarEntrevista(input)
+  }
+
+  mantenerTurnoEntrevistaIa(
+    input: MantenerTurnoEntrevistaIaInput,
+  ): Promise<MantenerTurnoEntrevistaIaOutput> {
+    return this.provider.mantenerTurnoEntrevistaIa(input)
+  }
+
+  calcularNotasFinalEntrevista(
+    input: CalcularNotasFinalEntrevistaInput,
+  ): Promise<CalcularNotasFinalEntrevistaOutput> {
+    return this.provider.calcularNotasFinalEntrevista(input)
   }
 }

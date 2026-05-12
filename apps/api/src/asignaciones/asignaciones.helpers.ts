@@ -126,16 +126,38 @@ export async function evaluarCondicionesListo(
   curso: CursoEvaluacionListo,
 ): Promise<ResultadoEvaluacionListo> {
   const planCompleto = await calcularPlanCompleto(prisma, asignacionId)
-  // En S6 los placeholders solo emiten `NO_APLICA` o `TODO_*`. Los valores
-  // `APROBADO`/`NO_APROBADO` se reservan para cuando S8 y S9 conecten el
-  // calculo real (D-AS-10).
-  const transversal: ResultadoEvaluacionListo["transversal"] =
-    curso.transversalId === null ? "NO_APLICA" : "TODO_S8"
-  const entrevistaIA: ResultadoEvaluacionListo["entrevistaIA"] =
-    curso.entrevistaIaId === null ? "NO_APLICA" : "TODO_S9"
 
-  const transversalBloquea = transversal !== "NO_APLICA"
-  const entrevistaBloquea = entrevistaIA !== "NO_APLICA"
+  // P8c (D-S8-F1) — cierra TODO_S8 / TODO_S9.
+  // Resolvemos solo el colaborador del intento; el cursoId no es necesario
+  // para las queries de aptitud (los intentos llevan FK a transversalId /
+  // entrevistaIaId, no a cursoId).
+  const asignacion = await prisma.asignacionCurso.findUnique({
+    where: { id: asignacionId },
+    select: { colaboradorId: true },
+  })
+
+  let transversal: ResultadoEvaluacionListo["transversal"] = "NO_APLICA"
+  if (curso.transversalId !== null && asignacion) {
+    transversal = (await transversalAprobado(prisma, {
+      colaboradorId: asignacion.colaboradorId,
+      transversalId: curso.transversalId,
+    }))
+      ? "APROBADO"
+      : "NO_APROBADO"
+  }
+
+  let entrevistaIA: ResultadoEvaluacionListo["entrevistaIA"] = "NO_APLICA"
+  if (curso.entrevistaIaId !== null && asignacion) {
+    entrevistaIA = (await entrevistaIaAprobada(prisma, {
+      colaboradorId: asignacion.colaboradorId,
+      entrevistaIaId: curso.entrevistaIaId,
+    }))
+      ? "APROBADO"
+      : "NO_APROBADO"
+  }
+
+  const transversalBloquea = transversal === "NO_APROBADO"
+  const entrevistaBloquea = entrevistaIA === "NO_APROBADO"
 
   const faltantes: CondicionesListoFaltante[] = []
   if (!planCompleto) {
@@ -164,6 +186,75 @@ export async function evaluarCondicionesListo(
     entrevistaIA,
     faltantes,
   }
+}
+
+/**
+ * D-S8-F1 — comprueba si existe un intento transversal vigente APROBADO para
+ * el colaborador segun politica "ultimo aprobado" (D-S8-C5). Si la skill no
+ * etiqueta al transversal, igual cuenta si `aprobado=true`.
+ */
+async function transversalAprobado(
+  prisma: PrismaService,
+  input: {
+    readonly colaboradorId: string
+    readonly transversalId: string
+  },
+): Promise<boolean> {
+  const intentos = await prisma.intentoTransversal.findMany({
+    where: {
+      transversalId: input.transversalId,
+      colaboradorId: input.colaboradorId,
+      anulado: false,
+      estado: "FINALIZADO",
+    },
+    select: { aprobado: true, fecha: true },
+    orderBy: { fecha: "asc" },
+  })
+  if (intentos.length === 0) {
+    return false
+  }
+  const ultimo = intentos[intentos.length - 1]
+  if (ultimo?.aprobado === true) {
+    return true
+  }
+  return intentos.some((i) => i.aprobado === true)
+}
+
+/**
+ * D-S8-F1 — analogo para entrevista IA. Considera `notaAjustadaAdmin` si
+ * existe (D-S8-D5). Un intento se considera FINALIZADO cuando tiene al menos
+ * una fila en `intentos_entrevista_ia_notas_area` (decision emergente
+ * D-EMERG-P8c-3: el schema actual no tiene columna `estado`).
+ */
+async function entrevistaIaAprobada(
+  prisma: PrismaService,
+  input: {
+    readonly colaboradorId: string
+    readonly entrevistaIaId: string
+  },
+): Promise<boolean> {
+  const intentos = await prisma.intentoEntrevistaIA.findMany({
+    where: {
+      entrevistaIaId: input.entrevistaIaId,
+      colaboradorId: input.colaboradorId,
+      anulado: false,
+    },
+    select: {
+      aprobado: true,
+      fecha: true,
+      notasPorArea: { select: { intentoId: true }, take: 1 },
+    },
+    orderBy: { fecha: "asc" },
+  })
+  const finalizados = intentos.filter((i) => i.notasPorArea.length > 0)
+  if (finalizados.length === 0) {
+    return false
+  }
+  const ultimo = finalizados[finalizados.length - 1]
+  if (ultimo?.aprobado === true) {
+    return true
+  }
+  return finalizados.some((i) => i.aprobado === true)
 }
 
 async function calcularPlanCompleto(prisma: PrismaService, asignacionId: string): Promise<boolean> {

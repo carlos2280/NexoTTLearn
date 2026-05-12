@@ -1,9 +1,15 @@
 import { Injectable } from "@nestjs/common"
 import {
+  CalcularNotasFinalEntrevistaInput,
+  CalcularNotasFinalEntrevistaOutput,
   EvaluarRepoCualitativoInput,
   EvaluarRepoCualitativoOutput,
+  IniciarEntrevistaInput,
+  IniciarEntrevistaOutput,
   MantenerTurnoComprensionInput,
   MantenerTurnoComprensionOutput,
+  MantenerTurnoEntrevistaIaInput,
+  MantenerTurnoEntrevistaIaOutput,
   MantenerTurnoEntrevistaInput,
   MantenerTurnoEntrevistaOutput,
 } from "../ai.types"
@@ -71,4 +77,74 @@ export class MockAiProvider implements IAiProvider {
       finalizado: esUltimoTurno,
     }
   }
+
+  // -------------------------------------------------------------------------
+  // P8c — entrevista IA final (D-S8-D1, D-S8-D4)
+  // -------------------------------------------------------------------------
+
+  private static readonly NOTA_ENTREVISTA_IA_GLOBAL_MOCK = 75
+  private static readonly NOTA_ENTREVISTA_IA_AREA_MOCK = 75
+  // Numero de turnos del colaborador tras el que la IA cierra (incluye iniciar
+  // como turno 0). Permite tests deterministas: turno 1..2 -> pregunta;
+  // turno >=3 -> finalizado=true.
+  private static readonly TURNOS_ENTREVISTA_IA_MAX = 3
+
+  // biome-ignore lint/suspicious/useAwait: cumple la interfaz async sin esperar I/O.
+  async iniciarEntrevista(_input: IniciarEntrevistaInput): Promise<IniciarEntrevistaOutput> {
+    return { primeraPregunta: "¿Mock pregunta 1?" }
+  }
+
+  mantenerTurnoEntrevistaIa(
+    input: MantenerTurnoEntrevistaIaInput,
+  ): Promise<MantenerTurnoEntrevistaIaOutput> {
+    // Contamos los turnos del colaborador. La transcripcion incluye el
+    // primer mensaje del asistente (la primera pregunta) y luego pares.
+    const turnosColaborador = input.transcripcion.filter((t) => t.rol === "COLABORADOR").length
+    if (turnosColaborador >= MockAiProvider.TURNOS_ENTREVISTA_IA_MAX) {
+      return Promise.resolve({
+        respuestaIa: "mock cierre — gracias por participar",
+        finalizado: true,
+      })
+    }
+    return Promise.resolve({
+      respuestaIa: `mock pregunta ${turnosColaborador + 1}`,
+      finalizado: false,
+    })
+  }
+
+  calcularNotasFinalEntrevista(
+    input: CalcularNotasFinalEntrevistaInput,
+  ): Promise<CalcularNotasFinalEntrevistaOutput> {
+    // Lee la rubrica snapshot para producir una nota por cada area declarada.
+    const areas = obtenerAreasDeRubrica(input.rubricaSnapshot)
+    const notasPorArea = areas.map((areaId) => ({
+      areaId,
+      nota: MockAiProvider.NOTA_ENTREVISTA_IA_AREA_MOCK,
+    }))
+    return Promise.resolve({
+      notaGlobal: MockAiProvider.NOTA_ENTREVISTA_IA_GLOBAL_MOCK,
+      notasPorArea,
+    })
+  }
+}
+
+/**
+ * Extrae los `areaId` declarados en la rubrica snapshot. Tolerante a forma
+ * legacy: si la rubrica viene vacia o invalida, devuelve lista vacia (el
+ * caller debe aplicar la regla de redistribucion D35).
+ */
+function obtenerAreasDeRubrica(rubricaSnapshot: Record<string, unknown>): string[] {
+  const areas = rubricaSnapshot.areas
+  if (!Array.isArray(areas)) {
+    return []
+  }
+  return areas
+    .map((a) => {
+      if (a !== null && typeof a === "object" && "areaId" in a) {
+        const v = (a as Record<string, unknown>).areaId
+        return typeof v === "string" ? v : null
+      }
+      return null
+    })
+    .filter((v): v is string => v !== null)
 }

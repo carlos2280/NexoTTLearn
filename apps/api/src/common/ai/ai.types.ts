@@ -91,3 +91,87 @@ export interface MantenerTurnoEntrevistaOutput {
   readonly respuestaIa: string
   readonly finalizado: boolean
 }
+
+/**
+ * Entrada del flujo P8c entrevista IA — se reutiliza para los 3 metodos
+ * (iniciar, mantener turno, calcular notas final). Mantiene el snapshot de la
+ * rubrica y secciones base congelado al iniciar el intento (R-S8-3).
+ */
+export interface TurnoTranscripcion {
+  readonly rol: "ASISTENTE" | "COLABORADOR"
+  readonly mensaje: string
+  readonly timestamp: string
+}
+
+export interface IniciarEntrevistaInput {
+  readonly rubricaSnapshot: Record<string, unknown>
+  readonly seccionesBaseSnapshot: Record<string, unknown>
+  readonly profundidad: ProfundidadEntrevistaIa
+}
+
+export interface IniciarEntrevistaOutput {
+  readonly primeraPregunta: string
+}
+
+export interface MantenerTurnoEntrevistaIaInput {
+  readonly transcripcion: readonly TurnoTranscripcion[]
+  readonly rubricaSnapshot: Record<string, unknown>
+  readonly seccionesBaseSnapshot: Record<string, unknown>
+  readonly profundidad: ProfundidadEntrevistaIa
+}
+
+export interface MantenerTurnoEntrevistaIaOutput {
+  readonly respuestaIa: string
+  readonly finalizado: boolean
+}
+
+export interface CalcularNotasFinalEntrevistaInput {
+  readonly transcripcion: readonly TurnoTranscripcion[]
+  readonly rubricaSnapshot: Record<string, unknown>
+  readonly profundidad: ProfundidadEntrevistaIa
+}
+
+export interface CalcularNotasFinalEntrevistaOutput {
+  readonly notaGlobal: number
+  readonly notasPorArea: readonly { readonly areaId: string; readonly nota: number }[]
+}
+
+/**
+ * Schemas Zod para validar la respuesta JSON estructurada que el modelo entrega
+ * en cada metodo P8c. Cualquier desvio del shape ⇒ `BadRequestException`
+ * `iaRespuestaMalformada` aguas arriba (defensa en profundidad — D-S8-B7).
+ */
+export const turnoEntrevistaResponseSchema = z
+  .object({
+    respuestaIa: z.string().min(1).max(8000),
+    finalizado: z.boolean(),
+  })
+  .strict()
+
+export type TurnoEntrevistaResponse = z.infer<typeof turnoEntrevistaResponseSchema>
+
+export const iniciarEntrevistaResponseSchema = z
+  .object({
+    primeraPregunta: z.string().min(1).max(2000),
+  })
+  .strict()
+
+export type IniciarEntrevistaResponse = z.infer<typeof iniciarEntrevistaResponseSchema>
+
+export const notasFinalEntrevistaSchema = z
+  .object({
+    notaGlobal: z.number().min(0).max(100),
+    notasPorArea: z
+      .array(
+        z
+          .object({
+            areaId: z.string().uuid(),
+            nota: z.number().min(0).max(100),
+          })
+          .strict(),
+      )
+      .min(1),
+  })
+  .strict()
+
+export type NotasFinalEntrevistaResponse = z.infer<typeof notasFinalEntrevistaSchema>

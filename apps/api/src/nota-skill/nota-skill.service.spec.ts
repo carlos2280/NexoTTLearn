@@ -221,3 +221,236 @@ describe("NotaSkillService.recalcularConFuentes - integracion con tx (D-S8-C6)",
     expect(r.notaActual).toBe(80)
   })
 })
+
+// =============================================================================
+// P8c — obtenerIntentoEntrevistaVigente + recalculo con entrevista IA
+// =============================================================================
+
+const ENTREVISTA_IA_ID = "e1111111-1111-1111-1111-111111111111"
+
+interface IntentoEntrevistaMock {
+  id: string
+  estado: string
+  anulado: boolean
+  aprobado: boolean | null
+  notaGlobal: Prisma.Decimal | null
+  notaAjustadaAdmin: Prisma.Decimal | null
+  notaAreaPorSkill: number | null
+  fecha: Date
+}
+
+function makeIntentoEntrevista(
+  id: string,
+  fecha: Date,
+  o: {
+    anulado?: boolean
+    aprobado?: boolean | null
+    notaGlobal?: number | null
+    notaAjustadaAdmin?: number | null
+    notaArea?: number | null
+  } = {},
+): IntentoEntrevistaMock {
+  return {
+    id,
+    estado: "FINALIZADO",
+    anulado: o.anulado ?? false,
+    aprobado: o.aprobado ?? true,
+    notaGlobal:
+      o.notaGlobal === null || o.notaGlobal === undefined ? null : new Prisma.Decimal(o.notaGlobal),
+    notaAjustadaAdmin:
+      o.notaAjustadaAdmin === null || o.notaAjustadaAdmin === undefined
+        ? null
+        : new Prisma.Decimal(o.notaAjustadaAdmin),
+    notaAreaPorSkill: o.notaArea ?? null,
+    fecha,
+  }
+}
+
+describe("NotaSkillService - obtenerIntentoEntrevistaVigente (P8c)", () => {
+  const svc = new NotaSkillService()
+
+  it("filtra anulados y devuelve el ultimo aprobado", () => {
+    const intentos = [
+      makeIntentoEntrevista("a", new Date("2026-05-01"), { aprobado: true, notaArea: 80 }),
+      makeIntentoEntrevista("b", new Date("2026-05-02"), { anulado: true, notaArea: 90 }),
+    ]
+    const vigente = svc.obtenerIntentoEntrevistaVigente(intentos)
+    expect(vigente?.id).toBe("a")
+  })
+
+  it("ultimo no aprobado -> usa anterior aprobado", () => {
+    const intentos = [
+      makeIntentoEntrevista("a", new Date("2026-05-01"), { aprobado: true, notaArea: 80 }),
+      makeIntentoEntrevista("b", new Date("2026-05-02"), { aprobado: false, notaArea: 40 }),
+    ]
+    expect(svc.obtenerIntentoEntrevistaVigente(intentos)?.id).toBe("a")
+  })
+
+  it("ningun aprobado -> null", () => {
+    const intentos = [makeIntentoEntrevista("a", new Date("2026-05-01"), { aprobado: false })]
+    expect(svc.obtenerIntentoEntrevistaVigente(intentos)).toBeNull()
+  })
+})
+
+describe("NotaSkillService.recalcularConFuentes con entrevista IA (D-S8-D5, D33)", () => {
+  const svc = new NotaSkillService()
+
+  function buildTxConEntrevista(opciones: {
+    notaArea?: number | null
+    notaAjustadaAdmin?: number | null
+    anulado?: boolean
+  }) {
+    return {
+      curso: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          pesoBloques: new Prisma.Decimal(70),
+          pesoTransversal: new Prisma.Decimal(20),
+          pesoEntrevista: new Prisma.Decimal(10),
+          transversalId: null,
+          entrevistaIaId: ENTREVISTA_IA_ID,
+        }),
+      },
+      intentoBloque: {
+        findMany: vi.fn().mockResolvedValue([{ nota: new Prisma.Decimal(80) }]),
+      },
+      skill: {
+        findUnique: vi.fn().mockResolvedValue({ areaId: "a1111111-1111-1111-1111-111111111111" }),
+      },
+      intentoEntrevistaIA: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "e1",
+            anulado: opciones.anulado ?? false,
+            aprobado: true,
+            notaGlobal: new Prisma.Decimal(75),
+            notaAjustadaAdmin:
+              opciones.notaAjustadaAdmin === null || opciones.notaAjustadaAdmin === undefined
+                ? null
+                : new Prisma.Decimal(opciones.notaAjustadaAdmin),
+            fecha: new Date("2026-05-01"),
+            notasPorArea:
+              opciones.notaArea === null || opciones.notaArea === undefined
+                ? []
+                : [{ nota: new Prisma.Decimal(opciones.notaArea) }],
+          },
+        ]),
+      },
+      notaSkill: { upsert: vi.fn().mockResolvedValue({ id: "ns-1" }) },
+      historicoNotaSkill: { create: vi.fn().mockResolvedValue({}) },
+    }
+  }
+
+  it("D33 con 2 fuentes (bloques + entrevista) reescala pesos correctamente", async () => {
+    const tx = buildTxConEntrevista({ notaArea: 90 })
+    const r = await svc.recalcularConFuentes(tx as never, {
+      colaboradorId: COLAB_ID,
+      skillId: SKILL_ID,
+      cursoId: CURSO_ID,
+      origen: OrigenNotaSkill.ENTREVISTA_IA,
+      referencia: { evento: "FINALIZADO" },
+    })
+    // pesos vivos: bloques=70 + entrevista=10 -> 80
+    // 70/80 * 80 + 10/80 * 90 = 70 + 11.25 = 81.25
+    expect(r.notaActual).toBe(81.25)
+  })
+
+  it("notaAjustadaAdmin gana sobre la nota del area (D-S8-D5)", async () => {
+    const tx = buildTxConEntrevista({ notaArea: 50, notaAjustadaAdmin: 100 })
+    const r = await svc.recalcularConFuentes(tx as never, {
+      colaboradorId: COLAB_ID,
+      skillId: SKILL_ID,
+      cursoId: CURSO_ID,
+      origen: OrigenNotaSkill.ENTREVISTA_IA,
+      referencia: { evento: "AJUSTADO", motivoLength: 12 },
+    })
+    // 70/80 * 80 + 10/80 * 100 = 70 + 12.5 = 82.5
+    expect(r.notaActual).toBe(82.5)
+  })
+
+  it("entrevista anulada -> recae a bloques puros", async () => {
+    const tx = buildTxConEntrevista({ notaArea: 90, anulado: true })
+    const r = await svc.recalcularConFuentes(tx as never, {
+      colaboradorId: COLAB_ID,
+      skillId: SKILL_ID,
+      cursoId: CURSO_ID,
+      origen: OrigenNotaSkill.ENTREVISTA_IA,
+      referencia: { evento: "ANULADO", motivoLength: 10 },
+    })
+    expect(r.notaActual).toBe(80)
+  })
+
+  it("origen ENTREVISTA_IA persiste en historico", async () => {
+    const tx = buildTxConEntrevista({ notaArea: 80 })
+    await svc.recalcularConFuentes(tx as never, {
+      colaboradorId: COLAB_ID,
+      skillId: SKILL_ID,
+      cursoId: CURSO_ID,
+      origen: OrigenNotaSkill.ENTREVISTA_IA,
+      referencia: { evento: "FINALIZADO" },
+    })
+    expect(tx.historicoNotaSkill.create).toHaveBeenCalledOnce()
+    const histArgs = tx.historicoNotaSkill.create.mock.calls[0]?.[0] as {
+      data: { origen: OrigenNotaSkill }
+    }
+    expect(histArgs.data.origen).toBe(OrigenNotaSkill.ENTREVISTA_IA)
+  })
+
+  it("3 fuentes (bloques + transversal + entrevista) con D33 70/20/10", async () => {
+    const tx = {
+      curso: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          pesoBloques: new Prisma.Decimal(70),
+          pesoTransversal: new Prisma.Decimal(20),
+          pesoEntrevista: new Prisma.Decimal(10),
+          transversalId: TRANSVERSAL_ID,
+          entrevistaIaId: ENTREVISTA_IA_ID,
+        }),
+      },
+      intentoBloque: {
+        findMany: vi.fn().mockResolvedValue([{ nota: new Prisma.Decimal(80) }]),
+      },
+      transversalSkill: {
+        findFirst: vi.fn().mockResolvedValue({ transversalId: TRANSVERSAL_ID }),
+      },
+      intentoTransversal: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "t1",
+            estado: "FINALIZADO",
+            anulado: false,
+            aprobado: true,
+            notaGlobal: new Prisma.Decimal(90),
+            fecha: new Date("2026-05-01"),
+          },
+        ]),
+      },
+      skill: {
+        findUnique: vi.fn().mockResolvedValue({ areaId: "a1111111-1111-1111-1111-111111111111" }),
+      },
+      intentoEntrevistaIA: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "e1",
+            anulado: false,
+            aprobado: true,
+            notaGlobal: new Prisma.Decimal(100),
+            notaAjustadaAdmin: null,
+            fecha: new Date("2026-05-02"),
+            notasPorArea: [{ nota: new Prisma.Decimal(100) }],
+          },
+        ]),
+      },
+      notaSkill: { upsert: vi.fn().mockResolvedValue({ id: "ns-1" }) },
+      historicoNotaSkill: { create: vi.fn().mockResolvedValue({}) },
+    }
+    const r = await svc.recalcularConFuentes(tx as never, {
+      colaboradorId: COLAB_ID,
+      skillId: SKILL_ID,
+      cursoId: CURSO_ID,
+      origen: OrigenNotaSkill.ENTREVISTA_IA,
+      referencia: { evento: "FINALIZADO" },
+    })
+    // 0.7*80 + 0.2*90 + 0.1*100 = 56 + 18 + 10 = 84
+    expect(r.notaActual).toBe(84)
+  })
+})

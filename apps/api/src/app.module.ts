@@ -20,6 +20,7 @@ import { PrismaModule } from "./common/prisma/prisma.module"
 import { StorageModule } from "./common/storage/storage.module"
 import { validateEnv } from "./config/env.validation"
 import { CursosModule } from "./cursos/cursos.module"
+import { EntrevistaIaModule } from "./entrevista-ia/entrevista-ia.module"
 import { EvaluacionInicialModule } from "./evaluacion-inicial/evaluacion-inicial.module"
 import { HealthModule } from "./health/health.module"
 import { IntentosBloqueModule } from "./intentos-bloque/intentos-bloque.module"
@@ -75,6 +76,7 @@ import { TransversalModule } from "./transversal/transversal.module"
     PlanPersonalModule,
     IntentosBloqueModule,
     TransversalModule,
+    EntrevistaIaModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: SesionGuard },

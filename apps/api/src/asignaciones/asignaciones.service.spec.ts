@@ -44,6 +44,10 @@ interface MockPrisma {
   itemPlan: { findMany: ReturnType<typeof vi.fn> }
   intentoBloque: { findMany: ReturnType<typeof vi.fn> }
   aperturaSeccion: { findMany: ReturnType<typeof vi.fn> }
+  // P8c (D-S8-F1) — `evaluarCondicionesListo` ahora consulta intentos
+  // transversal y entrevista IA cuando el curso los tiene activos.
+  intentoTransversal: { findMany: ReturnType<typeof vi.fn> }
+  intentoEntrevistaIA: { findMany: ReturnType<typeof vi.fn> }
   $transaction: ReturnType<typeof vi.fn>
 }
 
@@ -73,6 +77,10 @@ function buildPrismaMock(): MockPrisma {
     itemPlan: { findMany: vi.fn().mockResolvedValue([]) },
     intentoBloque: { findMany: vi.fn().mockResolvedValue([]) },
     aperturaSeccion: { findMany: vi.fn().mockResolvedValue([]) },
+    // P8c default: ningun intento transversal/entrevista vigente. Los tests
+    // que quieran simular "aprobado" sobreescriben puntualmente.
+    intentoTransversal: { findMany: vi.fn().mockResolvedValue([]) },
+    intentoEntrevistaIA: { findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn(),
   }
   mock.$transaction.mockImplementation(

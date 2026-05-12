@@ -158,6 +158,18 @@ export const apiErrorCodes = {
   iaCredencialesInvalidas: "IA_CREDENCIALES_INVALIDAS",
   iaRespuestaMalformada: "IA_RESPUESTA_MALFORMADA",
   repoNoAccesible: "REPO_NO_ACCESIBLE",
+  // Entrevista IA P8c (D-S8-D1..D6, D89).
+  entrevistaIaNoEncontrada: "ENTREVISTA_IA_NO_ENCONTRADA",
+  intentoEntrevistaNoEncontrado: "INTENTO_ENTREVISTA_NO_ENCONTRADO",
+  conflictIntentoEntrevistaEnCurso: "CONFLICT_INTENTO_ENTREVISTA_EN_CURSO",
+  conflictIntentoEntrevistaCerrado: "CONFLICT_INTENTO_ENTREVISTA_CERRADO",
+  conflictIntentoEntrevistaNoFinalizado: "CONFLICT_INTENTO_ENTREVISTA_NO_FINALIZADO",
+  conflictIntentoEntrevistaYaAnulado: "CONFLICT_INTENTO_ENTREVISTA_YA_ANULADO",
+  planIncompletoParaEntrevista: "PLAN_INCOMPLETO_PARA_ENTREVISTA",
+  planVacioParaEntrevista: "PLAN_VACIO_PARA_ENTREVISTA",
+  entrevistaIaNoConfigurada: "ENTREVISTA_IA_NO_CONFIGURADA",
+  rubricaNoConfigurada: "RUBRICA_NO_CONFIGURADA",
+  rateLimitEntrevistaIa: "RATE_LIMIT_ENTREVISTA_IA",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]
