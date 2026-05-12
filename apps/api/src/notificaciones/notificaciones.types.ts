@@ -26,7 +26,7 @@ export type CrearNotificacionResultado =
     }
   | {
       readonly creada: false
-      readonly motivo: "ex-empleado" | "silenciado"
+      readonly motivo: "ex-empleado" | "silenciado" | "usuario-no-encontrado"
     }
 
 /**

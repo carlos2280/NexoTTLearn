@@ -468,10 +468,12 @@ export class PlanPersonalService {
    * `POST /asignaciones/:id/secciones/:seccionId/apertura` — ADMIN o propio.
    * Idempotente: segundo POST devuelve `yaEstaba=true` sin tocar la fila.
    * NO audit log (D-S7-D4): la fila `AperturaSeccion` es el audit funcional.
-   * Deuda §5.123 (FIX-P10-cierre): la apertura de una seccion sin bloques
-   * evaluables podria completar el plan; falta logica que detecte ese caso
-   * para emitir PLAN_RECALCULADO. P10c NO emite aqui — la apertura es
-   * informativa y no recalcula el plan en el flujo actual.
+   *
+   * §5.123 (FIX-P10-cierre): si la apertura es real (no replay) y deja el
+   * plan completo (porcentaje=100, p.ej. seccion sin bloques evaluables que
+   * cierra la ultima obligatoria), emite `PLAN_RECALCULADO` best-effort
+   * FUERA de la transaccion de insercion (R-S10-2 / B7 — los errores de
+   * notificacion no rompen el flujo origen).
    */
   async registrarApertura(
     asignacionId: string,
@@ -541,6 +543,9 @@ export class PlanPersonalService {
         data: { asignacionId, seccionId },
         select: { primeraAperturaAt: true },
       })
+      // §5.123: la apertura quedo persistida. Si esto deja el plan al 100%,
+      // emitir PLAN_RECALCULADO best-effort. No emitir en replay (yaEstaba=true).
+      await this.notificarSiAperturaCompletoPlan(asignacionId)
       return {
         asignacionId,
         seccionId,
@@ -1028,6 +1033,67 @@ export class PlanPersonalService {
       return { ...base, skillId: dto.skillId }
     }
     return { ...base, seccionId: dto.seccionId }
+  }
+
+  /**
+   * §5.123: encapsula la transicion "apertura -> plan al 100%". Si el plan
+   * existe y queda completo tras la apertura, emite `PLAN_RECALCULADO`
+   * (best-effort). Esta encapsulacion mantiene `registrarApertura` por
+   * debajo del limite de complejidad cognitiva (15) y aisla la regla.
+   */
+  private async notificarSiAperturaCompletoPlan(asignacionId: string): Promise<void> {
+    const planId = await this.planEstaCompleto(asignacionId)
+    if (planId) {
+      await this.notificarPlanRecalculado(asignacionId, planId)
+    }
+  }
+
+  /**
+   * §5.123: comprueba si la asignacion tiene un plan al 100%. Reutiliza el
+   * motor `obtenerAvance` para no duplicar la regla de "seccion completada"
+   * (D-S7-B6). Retorna `planId` si esta completo, `null` si no hay plan o
+   * el porcentaje es menor a 100. Errores propagan al caller.
+   */
+  private async planEstaCompleto(asignacionId: string): Promise<string | null> {
+    const plan = await this.prisma.planEstudio.findUnique({
+      where: { asignacionId },
+      select: { id: true },
+    })
+    if (!plan) {
+      return null
+    }
+    const items = await this.prisma.itemPlan.findMany({
+      where: { planId: plan.id, caracter: "OBLIGATORIA" },
+      select: { seccionId: true },
+    })
+    if (items.length === 0) {
+      // Sin obligatorias el porcentaje seria 100 vacuamente, pero no hay
+      // transicion provocada por la apertura: no emitir.
+      return null
+    }
+    const secciones = await this.prisma.seccion.findMany({
+      where: { id: { in: items.map((i) => i.seccionId) } },
+      select: {
+        id: true,
+        bloques: {
+          where: { estado: "ACTIVO", esEvaluable: true },
+          select: { id: true },
+        },
+      },
+    })
+    const asignacion = await this.prisma.asignacionCurso.findUniqueOrThrow({
+      where: { id: asignacionId },
+      select: { colaboradorId: true },
+    })
+    const { avancePlan } = await this.obtenerAvance(
+      this.prisma,
+      asignacionId,
+      asignacion.colaboradorId,
+      items,
+      secciones,
+    )
+    // 100 = porcentaje completo (espejo de PORCENTAJE_TOTAL en plan-personal.helpers).
+    return avancePlan.porcentaje >= 100 ? plan.id : null
   }
 
   /**

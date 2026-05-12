@@ -61,7 +61,17 @@ export class NotificacionesService {
       },
     })
 
-    if (usuario === null || usuario.colaborador.estadoEmpleado === "EX_EMPLEADO") {
+    if (usuario === null) {
+      // Inconsistencia de datos: el caller paso un usuarioId que no existe.
+      // warn (no log) porque indica un bug en el trigger origen, no el flujo
+      // legitimo EX_EMPLEADO definido por D-S10-A4.
+      this.logger.warn(
+        `notif | omitida | usuarioHash=${this.hashId(input.usuarioId)} | tipo=${input.tipo} | motivo=usuario-no-encontrado`,
+      )
+      return { creada: false, motivo: "usuario-no-encontrado" }
+    }
+
+    if (usuario.colaborador.estadoEmpleado === "EX_EMPLEADO") {
       this.logger.log(
         `notif | omitida | usuarioHash=${this.hashId(input.usuarioId)} | tipo=${input.tipo} | motivo=ex_empleado`,
       )

@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
 import { CanalNotif, EstadoEmpleado, TipoEventoNotif } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -123,8 +124,27 @@ describe("NotificacionesService.crear", () => {
     expect(email.llamadas).toHaveLength(0)
   })
 
-  it("no-op cuando el usuario no existe (defensa adicional)", async () => {
+  it("EX_EMPLEADO usa logger.log (no warn) por ser flujo legitimo D-S10-A4 (§5.121)", async () => {
+    prisma.usuario.findUnique.mockResolvedValue({
+      id: USUARIO_ID,
+      colaborador: { email: "ex@nexott.app", estadoEmpleado: EstadoEmpleado.EX_EMPLEADO },
+    })
+    const warnSpy = vi.spyOn(Logger.prototype, "warn").mockImplementation(() => undefined)
+    const logSpy = vi.spyOn(Logger.prototype, "log").mockImplementation(() => undefined)
+
+    await service.crear({
+      usuarioId: USUARIO_ID,
+      tipo: TipoEventoNotif.PLAN_RECALCULADO,
+      payload: {},
+    })
+
+    expect(warnSpy).not.toHaveBeenCalled()
+    expect(logSpy.mock.calls.some((c) => /motivo=ex_empleado/.test(String(c[0])))).toBe(true)
+  })
+
+  it("no-op con motivo 'usuario-no-encontrado' y logger.warn cuando el usuario no existe (§5.121)", async () => {
     prisma.usuario.findUnique.mockResolvedValue(null)
+    const warnSpy = vi.spyOn(Logger.prototype, "warn").mockImplementation(() => undefined)
 
     const resultado = await service.crear({
       usuarioId: USUARIO_ID,
@@ -132,8 +152,10 @@ describe("NotificacionesService.crear", () => {
       payload: {},
     })
 
-    expect(resultado).toEqual({ creada: false, motivo: "ex-empleado" })
+    expect(resultado).toEqual({ creada: false, motivo: "usuario-no-encontrado" })
     expect(prisma.notificacion.create).not.toHaveBeenCalled()
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    expect(warnSpy.mock.calls[0]?.[0]).toMatch(/motivo=usuario-no-encontrado/)
   })
 
   it("no-op cuando el usuario ha silenciado un tipo no critico", async () => {

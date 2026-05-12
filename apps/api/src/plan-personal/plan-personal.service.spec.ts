@@ -1042,6 +1042,74 @@ describe("PlanPersonalService.registrarApertura (P7c)", () => {
       response: { code: apiErrorCodes.conflictAsignacionCerrada },
     })
   })
+
+  it("apertura que completa el plan (sin bloques evaluables) emite PLAN_RECALCULADO (§5.123)", async () => {
+    // Validacion + apertura: la asignacionCurso.findUnique inicial valida el
+    // shape de la asignacion (rol/estado). La 2a llamada dentro de
+    // notificarPlanRecalculado pide curso+colaborador.usuario. Distinguimos
+    // por el select para resolver cada caso (mismo patron que
+    // configurarPlanRecalculadoMock).
+    prisma.asignacionCurso.findUnique.mockImplementation(
+      (args: { select?: Record<string, unknown> }) => {
+        if (args.select && "curso" in args.select) {
+          return Promise.resolve({
+            curso: { titulo: "Curso de prueba" },
+            colaborador: { usuario: { id: USUARIO_PARTICIPANTE } },
+          })
+        }
+        return Promise.resolve({
+          id: ASIGNACION_ID,
+          cursoId: CURSO_ID,
+          colaboradorId: COLABORADOR_ID,
+          rol: RolAsignacion.ASIGNADO,
+          estadoAsignado: EstadoAsignado.EN_PROGRESO,
+          estadoVoluntario: null,
+        })
+      },
+    )
+    prisma.cursoModuloHabilitado.findFirst.mockResolvedValue({ moduloId: MODULO_ID_1 })
+    const fecha = new Date("2026-05-12T10:00:00Z")
+    prisma.aperturaSeccion.create.mockResolvedValue({ primeraAperturaAt: fecha })
+    // planEstaCompleto: 1 obligatoria sin bloques, abierta -> 100%.
+    prisma.planEstudio.findUnique.mockResolvedValueOnce({ id: "plan-completo" })
+    prisma.itemPlan.findMany.mockResolvedValueOnce([{ seccionId: SECCION_ID_1 }])
+    prisma.seccion.findMany.mockResolvedValueOnce([{ id: SECCION_ID_1, bloques: [] }])
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValueOnce({
+      colaboradorId: COLABORADOR_ID,
+    })
+    prisma.aperturaSeccion.findMany.mockResolvedValueOnce([{ seccionId: SECCION_ID_1 }])
+
+    const res = await service.registrarApertura(ASIGNACION_ID, SECCION_ID_1, ADMIN)
+
+    expect(res.yaEstaba).toBe(false)
+    expect(notificaciones.crear).toHaveBeenCalledTimes(1)
+    expect(notificaciones.crear).toHaveBeenCalledWith({
+      usuarioId: USUARIO_PARTICIPANTE,
+      tipo: "PLAN_RECALCULADO",
+      payload: {
+        planId: "plan-completo",
+        asignacionId: ASIGNACION_ID,
+        cursoTitulo: "Curso de prueba",
+      },
+    })
+  })
+
+  it("apertura replay (yaEstaba=true) NO emite PLAN_RECALCULADO (§5.123)", async () => {
+    mockAsignacionActiva()
+    const fecha = new Date("2026-05-12T10:00:00Z")
+    prisma.aperturaSeccion.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("dup", {
+        code: "P2002",
+        clientVersion: "test",
+      }),
+    )
+    prisma.aperturaSeccion.findUnique.mockResolvedValue({ primeraAperturaAt: fecha })
+
+    const res = await service.registrarApertura(ASIGNACION_ID, SECCION_ID_1, ADMIN)
+
+    expect(res.yaEstaba).toBe(true)
+    expect(notificaciones.crear).not.toHaveBeenCalled()
+  })
 })
 
 // =============================================================================
