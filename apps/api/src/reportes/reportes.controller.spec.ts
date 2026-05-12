@@ -6,6 +6,8 @@ import {
   detalleColaboradorQuerySchema,
 } from "@nexott-learn/shared-types"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { ExportService } from "../common/export/export.service"
+import { ConsultasLogService } from "./consultas-log.service"
 import { ReportesController } from "./reportes.controller"
 import { ReportesService } from "./reportes.service"
 
@@ -90,7 +92,13 @@ describe("ReportesController — exigirFormatoJson", () => {
 
   beforeEach(() => {
     svc = buildServiceMock()
-    ctrl = new ReportesController(svc as unknown as ReportesService)
+    const exportStub = {
+      aCsv: vi.fn(),
+      aXlsx: vi.fn(),
+      aPdf: vi.fn(),
+    } as unknown as ExportService
+    const consultasStub = { registrar: vi.fn() } as unknown as ConsultasLogService
+    ctrl = new ReportesController(svc as unknown as ReportesService, exportStub, consultasStub)
   })
 
   it("delega avance-curso con query parseada por Zod", async () => {

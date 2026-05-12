@@ -7,25 +7,36 @@ import type {
   CentroRevisionResponse,
   DetalleColaboradorQuery,
   DetalleColaboradorResponse,
+  EficaciaPlataformaQuery,
+  EficaciaPlataformaResponse,
   EventoHistorico,
   FichaRelevanteItem,
   FilaAvanceCurso,
   FilaCentroRevisionEntrevistaIa,
   FilaCentroRevisionTransversal,
+  HistoricoClienteQuery,
+  HistoricoClienteResponse,
   IntentoBloqueResumen,
   IntentoEntrevistaIaResumen,
   IntentoTransversalResumen,
+  InventarioSkillItem,
+  InventarioSkillsQuery,
+  InventarioSkillsResponse,
   ItemPlanReporte,
   MotivoRevisionTransversal,
+  ObservacionFrecuente,
+  ReutilizacionCatalogoQuery,
+  ReutilizacionCatalogoResponse,
   SkillBrechaItem,
   TipoAlerta,
   UmbralesBrechas,
 } from "@nexott-learn/shared-types"
-import { Prisma } from "@prisma/client"
+import { Prisma, TipoReporteCache } from "@prisma/client"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { type Paginated, buildPaginatedResponse, resolvePaginacion } from "../common/http/paginated"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { PlanPersonalService } from "../plan-personal/plan-personal.service"
+import { ReporteCacheService } from "./reporte-cache.service"
 import {
   ALERTA_INTENTO_INVALIDADO_DIAS,
   ALERTA_SIN_ACTIVIDAD_DIAS,
@@ -37,11 +48,14 @@ import {
   TOPE_ULTIMOS_INTENTOS,
   UMBRAL_APROBADO_DEFAULT,
   UMBRAL_EXCELENCIA_DEFAULT,
+  UMBRAL_INVENTARIO_EXCELENCIA,
+  UMBRAL_INVENTARIO_NO_CUMPLE,
   esSnapshotFotografiaV1,
   esUmbralesLogro,
 } from "./reportes.types"
 
 const MS_DIA = 86_400_000
+const MESES_REUTILIZACION_DEFAULT = 12
 
 /**
  * `ReportesService` — Slice 11 P11b (D-S11-B1..B11).
@@ -59,6 +73,7 @@ export class ReportesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly planPersonalService: PlanPersonalService,
+    private readonly cache: ReporteCacheService,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -705,6 +720,615 @@ export class ReportesService {
     })
     return mapaDesdeGroupBy(filas)
   }
+
+  // ===========================================================================
+  // SLICE 11 P11c — Estrategicos cache + recalculo (D-S11-C1..C7).
+  // ===========================================================================
+
+  /**
+   * E1 — GET /reportes/eficacia-plataforma (D78, D-S11-C3).
+   *
+   * Calcula correlacion entre prediccion del sistema (`estado_asignado`
+   * APTO/NO_APTO) y resultado real con cliente (`resultado_entrevista_cliente`).
+   * Usa cache lazy revalidate-on-miss (24h). Si `presentadosCliente=0` devuelve
+   * `correlacion=null` + `meta.warning='sin-presentados-cliente'`.
+   */
+  async eficaciaPlataforma(query: EficaciaPlataformaQuery): Promise<EficaciaPlataformaResponse> {
+    return this.obtenerEstrategicoConCache(
+      TipoReporteCache.EFICACIA_PLATAFORMA,
+      this.scopeEficacia(query),
+      () => this.recalcularEficaciaPlataforma(query),
+    )
+  }
+
+  /**
+   * E2 — GET /reportes/historico-cliente (D93). `clienteId` requerido.
+   */
+  async historicoCliente(query: HistoricoClienteQuery): Promise<HistoricoClienteResponse> {
+    await this.assertClienteExiste(query.clienteId)
+    return this.obtenerEstrategicoConCache(
+      TipoReporteCache.HISTORICO_CLIENTE,
+      this.scopeHistoricoCliente(query),
+      () => this.recalcularHistoricoCliente(query),
+    )
+  }
+
+  /**
+   * E3 — GET /reportes/inventario-skills. Conteo cualitativo por skill.
+   */
+  async inventarioSkills(query: InventarioSkillsQuery): Promise<InventarioSkillsResponse> {
+    return this.obtenerEstrategicoConCache(
+      TipoReporteCache.INVENTARIO_SKILLS,
+      this.scopeInventarioSkills(query),
+      () => this.recalcularInventarioSkills(query),
+    )
+  }
+
+  /**
+   * E4 — GET /reportes/reutilizacion-catalogo. Ranking modulos + skills.
+   */
+  async reutilizacionCatalogo(
+    query: ReutilizacionCatalogoQuery,
+  ): Promise<ReutilizacionCatalogoResponse> {
+    return this.obtenerEstrategicoConCache(
+      TipoReporteCache.REUTILIZACION_CATALOGO,
+      this.scopeReutilizacion(query),
+      () => this.recalcularReutilizacionCatalogo(query),
+    )
+  }
+
+  /**
+   * Endpoint interno usado por el cron nocturno (D-S11-C2). Toma un `tipo` y
+   * un scope (queryParams normalizados) y recalcula+guarda. Se valida el shape
+   * minimo del scope antes de despachar — un scope corrupto en
+   * `consultas_logs` no debe propagarse como error de cron.
+   */
+  async recalcularYGuardarPorTipo(
+    tipo: TipoReporteCache,
+    scope: Record<string, unknown>,
+  ): Promise<void> {
+    switch (tipo) {
+      case TipoReporteCache.EFICACIA_PLATAFORMA: {
+        const query = this.coerceEficaciaScope(scope)
+        await this.recalcularEficaciaPlataforma(query)
+        return
+      }
+      case TipoReporteCache.HISTORICO_CLIENTE: {
+        const query = this.coerceHistoricoScope(scope)
+        if (!query) {
+          return
+        }
+        await this.recalcularHistoricoCliente(query)
+        return
+      }
+      case TipoReporteCache.INVENTARIO_SKILLS: {
+        const query = this.coerceInventarioScope(scope)
+        await this.recalcularInventarioSkills(query)
+        return
+      }
+      case TipoReporteCache.REUTILIZACION_CATALOGO: {
+        const query = this.coerceReutilizacionScope(scope)
+        await this.recalcularReutilizacionCatalogo(query)
+        return
+      }
+      default:
+        return
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Dispatcher cache lazy revalidate-on-miss
+  // ---------------------------------------------------------------------------
+
+  private async obtenerEstrategicoConCache<
+    T extends { readonly meta: { frescura: string; scopeHash: string; warning?: string } },
+  >(
+    tipo: TipoReporteCache,
+    scope: Record<string, unknown>,
+    recalcular: () => Promise<T>,
+  ): Promise<T> {
+    const hit = await this.cache.obtener<T>(tipo, scope)
+    if (hit) {
+      return {
+        ...hit.payload,
+        meta: {
+          ...hit.payload.meta,
+          frescura: hit.frescura.toISOString(),
+          scopeHash: hit.scopeHash,
+        },
+      } as T
+    }
+    const payload = await recalcular()
+    const { frescura, scopeHash } = await this.cache.guardar(tipo, scope, payload)
+    return {
+      ...payload,
+      meta: { ...payload.meta, frescura: frescura.toISOString(), scopeHash },
+    } as T
+  }
+
+  // ---------------------------------------------------------------------------
+  // E1 — eficacia-plataforma
+  // ---------------------------------------------------------------------------
+
+  private scopeEficacia(query: EficaciaPlataformaQuery): Record<string, unknown> {
+    return {
+      tipo: "EFICACIA_PLATAFORMA",
+      desde: query.desde?.toISOString() ?? null,
+      hasta: query.hasta?.toISOString() ?? null,
+      clienteId: query.clienteId ?? null,
+    }
+  }
+
+  private async recalcularEficaciaPlataforma(
+    query: EficaciaPlataformaQuery,
+  ): Promise<EficaciaPlataformaResponse> {
+    const where: Prisma.AsignacionCursoWhereInput = {
+      rol: "ASIGNADO",
+      ...(query.clienteId ? { curso: { clienteId: query.clienteId } } : {}),
+      ...(query.desde || query.hasta
+        ? {
+            fechaCierre: {
+              ...(query.desde ? { gte: query.desde } : {}),
+              ...(query.hasta ? { lte: query.hasta } : {}),
+            },
+          }
+        : {}),
+    }
+
+    const asignaciones = await this.prisma.asignacionCurso.findMany({
+      where,
+      select: {
+        estadoAsignado: true,
+        resultadoEntrevistaCliente: true,
+        observacionesCliente: true,
+      },
+    })
+
+    const agregado = agregarEficacia(asignaciones)
+    const observacionesFrecuentes = topObservaciones(agregado.observaciones, 5)
+    const correlacion =
+      agregado.presentadosCliente === 0
+        ? null
+        : Number(
+            ((agregado.aptoPaso + agregado.noAptoNoPaso) / agregado.presentadosCliente).toFixed(4),
+          )
+
+    const meta: EficaciaPlataformaResponse["meta"] = {
+      frescura: new Date().toISOString(),
+      scopeHash: "",
+      ...(agregado.presentadosCliente === 0 ? { warning: "sin-presentados-cliente" } : {}),
+    }
+
+    return {
+      presentadosCliente: agregado.presentadosCliente,
+      aptos: {
+        total: agregado.aptoTotal,
+        pasaron: agregado.aptoPaso,
+        noPasaron: agregado.aptoNoPaso,
+        pendientes: agregado.aptoPendiente,
+      },
+      noAptos: {
+        total: agregado.noAptoTotal,
+        presentadosIgual: agregado.noAptoPaso + agregado.noAptoNoPaso,
+        pasaronIgual: agregado.noAptoPaso,
+      },
+      correlacion,
+      observacionesFrecuentes,
+      meta,
+    }
+  }
+
+  private coerceEficaciaScope(scope: Record<string, unknown>): EficaciaPlataformaQuery {
+    return {
+      desde: coerceDateOrUndefined(scope.desde),
+      hasta: coerceDateOrUndefined(scope.hasta),
+      clienteId: typeof scope.clienteId === "string" ? scope.clienteId : undefined,
+      format: "json",
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // E2 — historico-cliente
+  // ---------------------------------------------------------------------------
+
+  private scopeHistoricoCliente(query: HistoricoClienteQuery): Record<string, unknown> {
+    return {
+      tipo: "HISTORICO_CLIENTE",
+      clienteId: query.clienteId,
+      desde: query.desde?.toISOString() ?? null,
+      hasta: query.hasta?.toISOString() ?? null,
+    }
+  }
+
+  private async assertClienteExiste(clienteId: string): Promise<void> {
+    const cliente = await this.prisma.cliente.findUnique({
+      where: { id: clienteId },
+      select: { id: true },
+    })
+    if (!cliente) {
+      throw new NotFoundException({
+        code: apiErrorCodes.clienteNoEncontrado,
+        message: "Cliente no encontrado.",
+      })
+    }
+  }
+
+  private async recalcularHistoricoCliente(
+    query: HistoricoClienteQuery,
+  ): Promise<HistoricoClienteResponse> {
+    const filtroFecha =
+      query.desde || query.hasta
+        ? {
+            ...(query.desde ? { gte: query.desde } : {}),
+            ...(query.hasta ? { lte: query.hasta } : {}),
+          }
+        : undefined
+
+    const cursos = await this.prisma.curso.findMany({
+      where: {
+        clienteId: query.clienteId,
+        ...(filtroFecha ? { fechaCierre: filtroFecha } : {}),
+      },
+      select: {
+        id: true,
+        titulo: true,
+        asignaciones: {
+          where: { rol: "ASIGNADO" },
+          select: {
+            estadoAsignado: true,
+            resultadoEntrevistaCliente: true,
+            observacionesCliente: true,
+          },
+        },
+      },
+    })
+
+    const observacionesAgrupadas = new Map<string, number>()
+    const items = cursos.map((curso) => {
+      const { presentados, aceptados } = agregarCursoHistorico(
+        curso.asignaciones,
+        observacionesAgrupadas,
+      )
+      const porcentaje =
+        presentados === 0 ? 0 : Number(((aceptados / presentados) * 100).toFixed(2))
+      return {
+        cursoId: curso.id,
+        titulo: curso.titulo,
+        presentados,
+        aceptados,
+        porcentajeAceptacion: porcentaje,
+      }
+    })
+
+    return {
+      clienteId: query.clienteId,
+      periodo: {
+        desde: query.desde?.toISOString() ?? null,
+        hasta: query.hasta?.toISOString() ?? null,
+      },
+      cursos: items,
+      observacionesFrecuentes: topObservaciones(observacionesAgrupadas, 5),
+      meta: { frescura: new Date().toISOString(), scopeHash: "" },
+    }
+  }
+
+  private coerceHistoricoScope(scope: Record<string, unknown>): HistoricoClienteQuery | null {
+    if (typeof scope.clienteId !== "string") {
+      return null
+    }
+    return {
+      clienteId: scope.clienteId,
+      desde: coerceDateOrUndefined(scope.desde),
+      hasta: coerceDateOrUndefined(scope.hasta),
+      format: "json",
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // E3 — inventario-skills
+  // ---------------------------------------------------------------------------
+
+  private scopeInventarioSkills(query: InventarioSkillsQuery): Record<string, unknown> {
+    return {
+      tipo: "INVENTARIO_SKILLS",
+      areaId: query.areaId ?? null,
+      skillIds: query.skillIds ? [...query.skillIds].sort() : null,
+      umbralCumple: query.umbralCumple,
+    }
+  }
+
+  private async recalcularInventarioSkills(
+    query: InventarioSkillsQuery,
+  ): Promise<InventarioSkillsResponse> {
+    const where: Prisma.SkillWhereInput = {
+      estado: "ACTIVA",
+      ...(query.areaId ? { areaId: query.areaId } : {}),
+      ...(query.skillIds && query.skillIds.length > 0 ? { id: { in: [...query.skillIds] } } : {}),
+    }
+    const skills = await this.prisma.skill.findMany({
+      where,
+      select: {
+        id: true,
+        etiquetaVisible: true,
+        areaId: true,
+        notasSkill: { select: { notaActual: true } },
+      },
+    })
+
+    const items: InventarioSkillItem[] = skills.map((skill) => {
+      const conteo = clasificarNotas(skill.notasSkill, query.umbralCumple)
+      return {
+        skillId: skill.id,
+        etiqueta: skill.etiquetaVisible,
+        areaId: skill.areaId,
+        totalColaboradores: skill.notasSkill.length,
+        porEtiquetaCualitativa: conteo,
+      }
+    })
+
+    return {
+      skills: items,
+      meta: { frescura: new Date().toISOString(), scopeHash: "" },
+    }
+  }
+
+  private coerceInventarioScope(scope: Record<string, unknown>): InventarioSkillsQuery {
+    const skillIdsRaw = scope.skillIds
+    const skillIds = Array.isArray(skillIdsRaw)
+      ? (skillIdsRaw.filter((v): v is string => typeof v === "string") as readonly string[])
+      : undefined
+    return {
+      areaId: typeof scope.areaId === "string" ? scope.areaId : undefined,
+      skillIds,
+      umbralCumple: typeof scope.umbralCumple === "number" ? scope.umbralCumple : 70,
+      format: "json",
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // E4 — reutilizacion-catalogo
+  // ---------------------------------------------------------------------------
+
+  private scopeReutilizacion(query: ReutilizacionCatalogoQuery): Record<string, unknown> {
+    return {
+      tipo: "REUTILIZACION_CATALOGO",
+      desde: query.desde?.toISOString() ?? null,
+      hasta: query.hasta?.toISOString() ?? null,
+    }
+  }
+
+  private async recalcularReutilizacionCatalogo(
+    query: ReutilizacionCatalogoQuery,
+  ): Promise<ReutilizacionCatalogoResponse> {
+    const desde = query.desde ?? new Date(Date.now() - MESES_REUTILIZACION_DEFAULT * 30 * MS_DIA)
+    const hasta = query.hasta ?? new Date()
+
+    const cursos = await this.prisma.curso.findMany({
+      where: { createdAt: { gte: desde, lte: hasta } },
+      select: {
+        id: true,
+        modulosHabilitados: { select: { moduloId: true } },
+        skillsExigidas: { select: { skillId: true } },
+      },
+    })
+
+    const moduloAgregado = new Map<string, { veces: number; cursos: Set<string> }>()
+    const skillAgregado = new Map<string, { veces: number; cursos: Set<string> }>()
+
+    for (const curso of cursos) {
+      for (const m of curso.modulosHabilitados) {
+        const acc = moduloAgregado.get(m.moduloId) ?? { veces: 0, cursos: new Set<string>() }
+        acc.veces += 1
+        acc.cursos.add(curso.id)
+        moduloAgregado.set(m.moduloId, acc)
+      }
+      for (const s of curso.skillsExigidas) {
+        const acc = skillAgregado.get(s.skillId) ?? { veces: 0, cursos: new Set<string>() }
+        acc.veces += 1
+        acc.cursos.add(curso.id)
+        skillAgregado.set(s.skillId, acc)
+      }
+    }
+
+    const moduloIds = [...moduloAgregado.keys()]
+    const skillIds = [...skillAgregado.keys()]
+    const [modulos, skills] = await Promise.all([
+      moduloIds.length === 0
+        ? Promise.resolve([] as { id: string; titulo: string }[])
+        : this.prisma.modulo.findMany({
+            where: { id: { in: moduloIds } },
+            select: { id: true, titulo: true },
+          }),
+      skillIds.length === 0
+        ? Promise.resolve([] as { id: string; etiquetaVisible: string }[])
+        : this.prisma.skill.findMany({
+            where: { id: { in: skillIds } },
+            select: { id: true, etiquetaVisible: true },
+          }),
+    ])
+
+    const itemsModulos = modulos
+      .map((m) => {
+        const acc = moduloAgregado.get(m.id)
+        return {
+          moduloId: m.id,
+          titulo: m.titulo,
+          vecesUsado: acc?.veces ?? 0,
+          cursosUnicos: acc?.cursos.size ?? 0,
+        }
+      })
+      .sort((a, b) => b.vecesUsado - a.vecesUsado)
+
+    const itemsSkills = skills
+      .map((s) => {
+        const acc = skillAgregado.get(s.id)
+        return {
+          skillId: s.id,
+          etiqueta: s.etiquetaVisible,
+          vecesExigida: acc?.veces ?? 0,
+          cursosUnicos: acc?.cursos.size ?? 0,
+        }
+      })
+      .sort((a, b) => b.vecesExigida - a.vecesExigida)
+
+    return {
+      modulos: itemsModulos,
+      skills: itemsSkills,
+      meta: { frescura: new Date().toISOString(), scopeHash: "" },
+    }
+  }
+
+  private coerceReutilizacionScope(scope: Record<string, unknown>): ReutilizacionCatalogoQuery {
+    return {
+      desde: coerceDateOrUndefined(scope.desde),
+      hasta: coerceDateOrUndefined(scope.hasta),
+      format: "json",
+    }
+  }
+}
+
+function topObservaciones(
+  agrupadas: Map<string, number>,
+  limite: number,
+): readonly ObservacionFrecuente[] {
+  return [...agrupadas.entries()]
+    .map(([texto, casos]) => ({ texto, casos }))
+    .sort((a, b) => b.casos - a.casos)
+    .slice(0, limite)
+}
+
+interface EficaciaAcum {
+  aptoTotal: number
+  aptoPaso: number
+  aptoNoPaso: number
+  aptoPendiente: number
+  noAptoTotal: number
+  noAptoPaso: number
+  noAptoNoPaso: number
+  presentadosCliente: number
+  observaciones: Map<string, number>
+}
+
+interface FilaEficacia {
+  readonly estadoAsignado: string | null
+  readonly resultadoEntrevistaCliente: string | null
+  readonly observacionesCliente: string | null
+}
+
+function agregarEficacia(filas: readonly FilaEficacia[]): EficaciaAcum {
+  const acc: EficaciaAcum = {
+    aptoTotal: 0,
+    aptoPaso: 0,
+    aptoNoPaso: 0,
+    aptoPendiente: 0,
+    noAptoTotal: 0,
+    noAptoPaso: 0,
+    noAptoNoPaso: 0,
+    presentadosCliente: 0,
+    observaciones: new Map<string, number>(),
+  }
+  for (const fila of filas) {
+    const presentado =
+      fila.resultadoEntrevistaCliente === "PASO" || fila.resultadoEntrevistaCliente === "NO_PASO"
+    if (presentado) {
+      acc.presentadosCliente += 1
+    }
+    if (fila.estadoAsignado === "APTO") {
+      acumApto(acc, fila.resultadoEntrevistaCliente)
+    } else if (fila.estadoAsignado === "NO_APTO") {
+      acumNoApto(acc, fila.resultadoEntrevistaCliente)
+    }
+    if (presentado && fila.observacionesCliente) {
+      const txt = fila.observacionesCliente.trim()
+      if (txt.length > 0) {
+        acc.observaciones.set(txt, (acc.observaciones.get(txt) ?? 0) + 1)
+      }
+    }
+  }
+  return acc
+}
+
+function acumApto(acc: EficaciaAcum, resultado: string | null): void {
+  acc.aptoTotal += 1
+  if (resultado === "PASO") {
+    acc.aptoPaso += 1
+  } else if (resultado === "NO_PASO") {
+    acc.aptoNoPaso += 1
+  } else {
+    acc.aptoPendiente += 1
+  }
+}
+
+function acumNoApto(acc: EficaciaAcum, resultado: string | null): void {
+  acc.noAptoTotal += 1
+  if (resultado === "PASO") {
+    acc.noAptoPaso += 1
+  } else if (resultado === "NO_PASO") {
+    acc.noAptoNoPaso += 1
+  }
+}
+
+interface FilaHistoricoCliente {
+  readonly resultadoEntrevistaCliente: string | null
+  readonly observacionesCliente: string | null
+}
+
+function agregarCursoHistorico(
+  asignaciones: readonly FilaHistoricoCliente[],
+  observaciones: Map<string, number>,
+): { presentados: number; aceptados: number } {
+  let presentados = 0
+  let aceptados = 0
+  for (const asig of asignaciones) {
+    if (asig.resultadoEntrevistaCliente === "PASO") {
+      presentados += 1
+      aceptados += 1
+    } else if (asig.resultadoEntrevistaCliente === "NO_PASO") {
+      presentados += 1
+    }
+    if (asig.observacionesCliente) {
+      const txt = asig.observacionesCliente.trim()
+      if (txt.length > 0) {
+        observaciones.set(txt, (observaciones.get(txt) ?? 0) + 1)
+      }
+    }
+  }
+  return { presentados, aceptados }
+}
+
+interface NotaSkillRow {
+  readonly notaActual: { toString(): string } | number | null
+}
+
+function clasificarNotas(
+  notas: readonly NotaSkillRow[],
+  umbralCumple: number,
+): { excelencia: number; solido: number; enDesarrollo: number; noCumple: number } {
+  let excelencia = 0
+  let solido = 0
+  let enDesarrollo = 0
+  let noCumple = 0
+  for (const nota of notas) {
+    const valor = nota.notaActual === null ? null : Number(nota.notaActual)
+    if (valor === null || valor < UMBRAL_INVENTARIO_NO_CUMPLE) {
+      noCumple += 1
+    } else if (valor >= UMBRAL_INVENTARIO_EXCELENCIA) {
+      excelencia += 1
+    } else if (valor >= umbralCumple) {
+      solido += 1
+    } else {
+      enDesarrollo += 1
+    }
+  }
+  return { excelencia, solido, enDesarrollo, noCumple }
+}
+
+function coerceDateOrUndefined(value: unknown): Date | undefined {
+  if (typeof value !== "string" || value.length === 0) {
+    return undefined
+  }
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? undefined : d
 }
 
 function motivosTransversalPendientes(intento: {

@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { PlanPersonalService } from "../plan-personal/plan-personal.service"
+import { ReporteCacheService } from "./reporte-cache.service"
 import { ReportesService } from "./reportes.service"
 import { ALERTA_SIN_ACTIVIDAD_DIAS } from "./reportes.types"
 
@@ -14,7 +15,11 @@ interface PrismaMock {
     count: ReturnType<typeof vi.fn>
     findUnique: ReturnType<typeof vi.fn>
   }
-  curso: { findUnique: ReturnType<typeof vi.fn> }
+  cliente: { findUnique: ReturnType<typeof vi.fn> }
+  curso: {
+    findUnique: ReturnType<typeof vi.fn>
+    findMany: ReturnType<typeof vi.fn>
+  }
   cursoFotografiaCierre: { findUnique: ReturnType<typeof vi.fn> }
   cursoSkillExigida: { findMany: ReturnType<typeof vi.fn> }
   notaSkill: { findMany: ReturnType<typeof vi.fn> }
@@ -32,6 +37,8 @@ interface PrismaMock {
   }
   logCambioCurso: { findMany: ReturnType<typeof vi.fn> }
   historicoEstadoAsignacion: { findMany: ReturnType<typeof vi.fn> }
+  skill: { findMany: ReturnType<typeof vi.fn> }
+  modulo: { findMany: ReturnType<typeof vi.fn> }
   $transaction: ReturnType<typeof vi.fn>
 }
 
@@ -43,10 +50,31 @@ function buildPlanServiceMock(): PlanServiceMock {
   return { obtenerPorcentajeAvance: vi.fn().mockResolvedValue(0) }
 }
 
-function buildService(prisma: PrismaMock, planService: PlanServiceMock): ReportesService {
+interface CacheServiceMock {
+  obtener: ReturnType<typeof vi.fn>
+  guardar: ReturnType<typeof vi.fn>
+  calcularScopeHash: ReturnType<typeof vi.fn>
+  listarTopScopesActivos: ReturnType<typeof vi.fn>
+}
+
+function buildCacheServiceMock(): CacheServiceMock {
+  return {
+    obtener: vi.fn().mockResolvedValue(null),
+    guardar: vi.fn().mockResolvedValue({ frescura: new Date(), scopeHash: "stub-hash" }),
+    calcularScopeHash: vi.fn().mockReturnValue("stub-hash"),
+    listarTopScopesActivos: vi.fn().mockResolvedValue([]),
+  }
+}
+
+function buildService(
+  prisma: PrismaMock,
+  planService: PlanServiceMock,
+  cache: CacheServiceMock = buildCacheServiceMock(),
+): ReportesService {
   return new ReportesService(
     prisma as unknown as PrismaService,
     planService as unknown as PlanPersonalService,
+    cache as unknown as ReporteCacheService,
   )
 }
 
@@ -57,7 +85,8 @@ function buildPrismaMock(): PrismaMock {
       count: vi.fn(),
       findUnique: vi.fn(),
     },
-    curso: { findUnique: vi.fn() },
+    cliente: { findUnique: vi.fn() },
+    curso: { findUnique: vi.fn(), findMany: vi.fn() },
     cursoFotografiaCierre: { findUnique: vi.fn() },
     cursoSkillExigida: { findMany: vi.fn() },
     notaSkill: { findMany: vi.fn() },
@@ -66,6 +95,8 @@ function buildPrismaMock(): PrismaMock {
     intentoEntrevistaIA: { findMany: vi.fn(), groupBy: vi.fn() },
     logCambioCurso: { findMany: vi.fn() },
     historicoEstadoAsignacion: { findMany: vi.fn() },
+    skill: { findMany: vi.fn() },
+    modulo: { findMany: vi.fn() },
     $transaction: vi.fn(),
   }
   prisma.$transaction.mockImplementation((arg: unknown) => {
@@ -701,5 +732,232 @@ describe("ReportesService.obtenerCentroRevision", () => {
       format: "json",
     })
     expect(result.totales).toEqual({ transversales: 1, entrevistasIa: 1 })
+  })
+})
+
+// =============================================================================
+// Slice 11 P11c — Tests endpoints estrategicos
+// =============================================================================
+
+describe("ReportesService — eficacia-plataforma (P11c)", () => {
+  let prisma: PrismaMock
+  let planService: PlanServiceMock
+  let cache: CacheServiceMock
+  let service: ReportesService
+
+  beforeEach(() => {
+    prisma = buildPrismaMock()
+    planService = buildPlanServiceMock()
+    cache = buildCacheServiceMock()
+    service = buildService(prisma, planService, cache)
+  })
+
+  it("presentadosCliente=0 -> correlacion=null + warning", async () => {
+    prisma.asignacionCurso.findMany.mockResolvedValueOnce([
+      {
+        estadoAsignado: "APTO",
+        resultadoEntrevistaCliente: "PENDIENTE",
+        observacionesCliente: null,
+      },
+    ])
+
+    const result = await service.eficaciaPlataforma({ format: "json" })
+
+    expect(result.correlacion).toBeNull()
+    expect(result.meta.warning).toBe("sin-presentados-cliente")
+  })
+
+  it("calcula correlacion = (aptoPaso + noAptoNoPaso) / presentados", async () => {
+    prisma.asignacionCurso.findMany.mockResolvedValueOnce([
+      { estadoAsignado: "APTO", resultadoEntrevistaCliente: "PASO", observacionesCliente: null },
+      { estadoAsignado: "APTO", resultadoEntrevistaCliente: "PASO", observacionesCliente: null },
+      {
+        estadoAsignado: "APTO",
+        resultadoEntrevistaCliente: "NO_PASO",
+        observacionesCliente: null,
+      },
+      {
+        estadoAsignado: "NO_APTO",
+        resultadoEntrevistaCliente: "NO_PASO",
+        observacionesCliente: null,
+      },
+    ])
+
+    const result = await service.eficaciaPlataforma({ format: "json" })
+    // 4 presentados, aptoPaso=2, noAptoNoPaso=1 -> 3/4=0.75
+    expect(result.presentadosCliente).toBe(4)
+    expect(result.aptos.pasaron).toBe(2)
+    expect(result.noAptos.presentadosIgual).toBe(1)
+    expect(result.correlacion).toBeCloseTo(0.75)
+  })
+
+  it("cache hit: NO toca BD, devuelve frescura y scopeHash del cache", async () => {
+    const frescura = new Date(Date.now() - 60_000)
+    cache.obtener.mockResolvedValueOnce({
+      payload: {
+        presentadosCliente: 1,
+        aptos: { total: 1, pasaron: 1, noPasaron: 0, pendientes: 0 },
+        noAptos: { total: 0, presentadosIgual: 0, pasaronIgual: 0 },
+        correlacion: 1,
+        observacionesFrecuentes: [],
+        meta: { frescura: "old", scopeHash: "old" },
+      },
+      frescura,
+      scopeHash: "cached-hash",
+    })
+
+    const result = await service.eficaciaPlataforma({ format: "json" })
+    expect(result.meta.scopeHash).toBe("cached-hash")
+    expect(result.meta.frescura).toBe(frescura.toISOString())
+    expect(prisma.asignacionCurso.findMany).not.toHaveBeenCalled()
+  })
+
+  it("cache miss: recalcula y guarda", async () => {
+    prisma.asignacionCurso.findMany.mockResolvedValueOnce([])
+    await service.eficaciaPlataforma({ format: "json" })
+    expect(cache.guardar).toHaveBeenCalledOnce()
+  })
+})
+
+describe("ReportesService — historico-cliente (P11c)", () => {
+  let prisma: PrismaMock
+  let planService: PlanServiceMock
+  let cache: CacheServiceMock
+  let service: ReportesService
+
+  beforeEach(() => {
+    prisma = buildPrismaMock()
+    planService = buildPlanServiceMock()
+    cache = buildCacheServiceMock()
+    service = buildService(prisma, planService, cache)
+  })
+
+  it("404 si cliente no existe", async () => {
+    prisma.cliente.findUnique.mockResolvedValueOnce(null)
+    await expect(
+      service.historicoCliente({ clienteId: "x", format: "json" }),
+    ).rejects.toBeInstanceOf(NotFoundException)
+  })
+
+  it("agrega presentados/aceptados por curso del cliente", async () => {
+    prisma.cliente.findUnique.mockResolvedValueOnce({ id: "client-1" })
+    prisma.curso.findMany.mockResolvedValueOnce([
+      {
+        id: "c1",
+        titulo: "Curso A",
+        asignaciones: [
+          { resultadoEntrevistaCliente: "PASO", observacionesCliente: null },
+          { resultadoEntrevistaCliente: "PASO", observacionesCliente: null },
+          { resultadoEntrevistaCliente: "NO_PASO", observacionesCliente: null },
+        ],
+      },
+    ])
+
+    const result = await service.historicoCliente({ clienteId: "client-1", format: "json" })
+    expect(result.cursos).toHaveLength(1)
+    expect(result.cursos[0]?.presentados).toBe(3)
+    expect(result.cursos[0]?.aceptados).toBe(2)
+    expect(result.cursos[0]?.porcentajeAceptacion).toBeCloseTo(66.67, 1)
+  })
+})
+
+describe("ReportesService — inventario-skills (P11c)", () => {
+  let prisma: PrismaMock
+  let planService: PlanServiceMock
+  let cache: CacheServiceMock
+  let service: ReportesService
+
+  beforeEach(() => {
+    prisma = buildPrismaMock()
+    planService = buildPlanServiceMock()
+    cache = buildCacheServiceMock()
+    service = buildService(prisma, planService, cache)
+  })
+
+  it("clasifica notas por umbral cualitativo (umbralCumple=70 default)", async () => {
+    prisma.skill.findMany.mockResolvedValueOnce([
+      {
+        id: "s1",
+        etiquetaVisible: "TypeScript",
+        areaId: "area-1",
+        notasSkill: [
+          { notaActual: new Prisma.Decimal(95) }, // excelencia
+          { notaActual: new Prisma.Decimal(75) }, // solido
+          { notaActual: new Prisma.Decimal(60) }, // enDesarrollo
+          { notaActual: new Prisma.Decimal(40) }, // noCumple
+          { notaActual: null }, // noCumple
+        ],
+      },
+    ])
+
+    const result = await service.inventarioSkills({ umbralCumple: 70, format: "json" })
+
+    expect(result.skills).toHaveLength(1)
+    expect(result.skills[0]?.porEtiquetaCualitativa).toEqual({
+      excelencia: 1,
+      solido: 1,
+      enDesarrollo: 1,
+      noCumple: 2,
+    })
+  })
+
+  it("umbralCumple custom recalifica solido vs enDesarrollo", async () => {
+    prisma.skill.findMany.mockResolvedValueOnce([
+      {
+        id: "s1",
+        etiquetaVisible: "TS",
+        areaId: "area-1",
+        notasSkill: [{ notaActual: new Prisma.Decimal(78) }],
+      },
+    ])
+
+    const result = await service.inventarioSkills({ umbralCumple: 80, format: "json" })
+    // 78 < 80 -> enDesarrollo (no solido)
+    expect(result.skills[0]?.porEtiquetaCualitativa.enDesarrollo).toBe(1)
+    expect(result.skills[0]?.porEtiquetaCualitativa.solido).toBe(0)
+  })
+})
+
+describe("ReportesService — reutilizacion-catalogo (P11c)", () => {
+  let prisma: PrismaMock
+  let planService: PlanServiceMock
+  let cache: CacheServiceMock
+  let service: ReportesService
+
+  beforeEach(() => {
+    prisma = buildPrismaMock()
+    planService = buildPlanServiceMock()
+    cache = buildCacheServiceMock()
+    service = buildService(prisma, planService, cache)
+  })
+
+  it("ordena modulos y skills por veces usado/exigida descendente", async () => {
+    prisma.curso.findMany.mockResolvedValueOnce([
+      {
+        id: "c1",
+        modulosHabilitados: [{ moduloId: "m1" }, { moduloId: "m2" }],
+        skillsExigidas: [{ skillId: "sk1" }],
+      },
+      {
+        id: "c2",
+        modulosHabilitados: [{ moduloId: "m1" }],
+        skillsExigidas: [{ skillId: "sk1" }, { skillId: "sk2" }],
+      },
+    ])
+    prisma.modulo.findMany.mockResolvedValueOnce([
+      { id: "m1", titulo: "Mod 1" },
+      { id: "m2", titulo: "Mod 2" },
+    ])
+    prisma.skill.findMany.mockResolvedValueOnce([
+      { id: "sk1", etiquetaVisible: "Skill 1" },
+      { id: "sk2", etiquetaVisible: "Skill 2" },
+    ])
+
+    const result = await service.reutilizacionCatalogo({ format: "json" })
+
+    expect(result.modulos[0]?.moduloId).toBe("m1") // mas usado
+    expect(result.modulos[0]?.vecesUsado).toBe(2)
+    expect(result.skills[0]?.skillId).toBe("sk1")
+    expect(result.skills[0]?.vecesExigida).toBe(2)
   })
 })

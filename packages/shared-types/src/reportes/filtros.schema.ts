@@ -129,3 +129,95 @@ export const centroRevisionQuerySchema = z
   })
   .strict()
 export type CentroRevisionQuery = z.infer<typeof centroRevisionQuerySchema>
+
+// ---------------------------------------------------------------------------
+// Sub-schemas estrictos por endpoint estrategico (P11c)
+// ---------------------------------------------------------------------------
+
+/**
+ * Formato de exportacion soportado por endpoints estrategicos (D-S11-C7).
+ * `json` (default), `csv`, `xlsx`, `pdf`.
+ */
+const formatoExportSchema = z.enum(["json", "csv", "xlsx", "pdf"]).default("json")
+
+const skillIdsCsvSchema = z
+  .union([z.array(uuidSchema), z.string()])
+  .optional()
+  .transform((value, ctx): readonly string[] | undefined => {
+    if (value === undefined) {
+      return undefined
+    }
+    const tokens = Array.isArray(value)
+      ? value
+      : value
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0)
+    const resultado: string[] = []
+    for (const token of tokens) {
+      const parsed = uuidSchema.safeParse(token)
+      if (!parsed.success) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `skillIds contiene un valor no UUID: ${token}`,
+          path: [],
+        })
+        return z.NEVER
+      }
+      resultado.push(parsed.data)
+    }
+    return resultado
+  })
+
+/**
+ * `GET /reportes/eficacia-plataforma` — D-S11-C3.
+ */
+export const eficaciaPlataformaQuerySchema = z
+  .object({
+    desde: isoDateSchema.optional(),
+    hasta: isoDateSchema.optional(),
+    clienteId: uuidSchema.optional(),
+    format: formatoExportSchema,
+  })
+  .strict()
+export type EficaciaPlataformaQuery = z.infer<typeof eficaciaPlataformaQuerySchema>
+
+/**
+ * `GET /reportes/historico-cliente` — D93. `clienteId` REQUERIDO.
+ */
+export const historicoClienteQuerySchema = z
+  .object({
+    clienteId: uuidSchema,
+    desde: isoDateSchema.optional(),
+    hasta: isoDateSchema.optional(),
+    format: formatoExportSchema,
+  })
+  .strict()
+export type HistoricoClienteQuery = z.infer<typeof historicoClienteQuerySchema>
+
+/**
+ * `GET /reportes/inventario-skills`.
+ * `umbralCumple` controla la frontera SOLIDO/EN_DESARROLLO (default 70).
+ */
+export const inventarioSkillsQuerySchema = z
+  .object({
+    areaId: uuidSchema.optional(),
+    skillIds: skillIdsCsvSchema,
+    umbralCumple: z.coerce.number().min(0).max(100).default(70),
+    format: formatoExportSchema,
+  })
+  .strict()
+export type InventarioSkillsQuery = z.infer<typeof inventarioSkillsQuerySchema>
+
+/**
+ * `GET /reportes/reutilizacion-catalogo`.
+ * Conteo por curso creado en rango (default ultimos 12 meses si no se acota).
+ */
+export const reutilizacionCatalogoQuerySchema = z
+  .object({
+    desde: isoDateSchema.optional(),
+    hasta: isoDateSchema.optional(),
+    format: formatoExportSchema,
+  })
+  .strict()
+export type ReutilizacionCatalogoQuery = z.infer<typeof reutilizacionCatalogoQuerySchema>

@@ -182,6 +182,8 @@ export const apiErrorCodes = {
   vistaNoSoportada: "VISTA_NO_SOPORTADA",
   formatoNoSoportadoEnP11b: "FORMATO_NO_SOPORTADO_EN_P11B",
   asignacionColaboradorNoCoincide: "ASIGNACION_COLABORADOR_NO_COINCIDE",
+  // Reportes P11c estrategicos + autoservicio (D-S11-C1..C11).
+  formatoExportNoSoportado: "FORMATO_EXPORT_NO_SOPORTADO",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]

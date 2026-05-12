@@ -355,6 +355,15 @@ enum ArchivoTipo {
   @@map("archivo_tipo_enum")
 }
 
+enum TipoReporteCache {
+  EFICACIA_PLATAFORMA
+  HISTORICO_CLIENTE
+  INVENTARIO_SKILLS
+  REUTILIZACION_CATALOGO
+
+  @@map("tipo_reporte_cache_enum")
+}
+
 // =============================================================================
 // CATALOGO: areas, skills, modulos, secciones, bloques
 // =============================================================================
@@ -1207,10 +1216,32 @@ model ConsultaLog {
   tipoLog        String   @map("tipo_log")
   filtros        Json?    @db.JsonB
   fecha          DateTime @default(now()) @db.Timestamptz(6)
+  endpoint       String   @default("")
+  queryParams    Json     @default("{}") @map("query_params") @db.JsonB
+  latenciaMs     Int?     @map("latencia_ms")
 
   autorUsuario Usuario @relation(fields: [autorUsuarioId], references: [id], onDelete: Restrict)
 
+  @@index([autorUsuarioId, fecha(sort: Desc)])
+  @@index([endpoint, fecha(sort: Desc)])
   @@map("consultas_logs")
+}
+
+/// Cache de reportes estrategicos (Slice 11 P11c — D-S11-C1, D-S11-C2).
+/// `scope_hash` = SHA256(canonicalize(scope)) para lookup O(1) por filtros
+/// normalizados. Lazy revalidate-on-miss: si `generada_at < now()-24h` el
+/// service recalcula y hace UPSERT por `scope_hash`. Cron nocturno
+/// (`ReporteCacheCron`) recalcula los top-N scopes activos.
+model ReporteCache {
+  id         String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tipo       TipoReporteCache
+  scopeHash  String           @unique @map("scope_hash")
+  scope      Json             @db.JsonB
+  payload    Json             @db.JsonB
+  generadaAt DateTime         @default(now()) @map("generada_at") @db.Timestamptz(6)
+
+  @@index([tipo, generadaAt(sort: Desc)], map: "idx_reporte_cache_tipo_generada")
+  @@map("reporte_cache")
 }
 
 // =============================================================================

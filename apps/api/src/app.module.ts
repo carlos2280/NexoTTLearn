@@ -9,6 +9,7 @@ import { CatalogoModule } from "./catalogo/catalogo.module"
 import { ColaboradoresModule } from "./colaboradores/colaboradores.module"
 import { AiModule } from "./common/ai/ai.module"
 import { AuditLogModule } from "./common/audit/audit-log.module"
+import { ExportModule } from "./common/export/export.module"
 import { PrismaExceptionFilter } from "./common/filters/prisma-exception.filter"
 import { CsrfGuard } from "./common/guards/csrf.guard"
 import { MotivoGuard } from "./common/guards/motivo.guard"
@@ -65,6 +66,7 @@ import { TransversalModule } from "./transversal/transversal.module"
     ScheduleModule.forRoot(),
     PrismaModule,
     AuditLogModule,
+    ExportModule,
     StorageModule,
     IdempotencyModule,
     AiModule,

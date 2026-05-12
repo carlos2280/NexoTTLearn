@@ -148,6 +148,28 @@ const envSchema = z
       .default("0 8 * * *"),
     // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
     APP_BASE_URL: z.string().url().default("http://localhost:4000"),
+    // ---------------------------------------------------------------------
+    // Reportes estrategicos (Slice 11 P11c — D-S11-C2, D-S11-C4).
+    //   REPORTE_CACHE_CRON  — recalculo nocturno top-N scopes (default 03:00).
+    //   CONSULTAS_PURGA_CRON — retencion 90 dias en `consultas_logs`
+    //                          (default 04:00, despues del cache cron).
+    // ---------------------------------------------------------------------
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    REPORTE_CACHE_CRON: z
+      .string()
+      .regex(
+        /^[*0-9\-,/\s]+$/,
+        "REPORTE_CACHE_CRON debe ser una expresion cron con * 0-9 - , / o espacios",
+      )
+      .default("0 3 * * *"),
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    CONSULTAS_PURGA_CRON: z
+      .string()
+      .regex(
+        /^[*0-9\-,/\s]+$/,
+        "CONSULTAS_PURGA_CRON debe ser una expresion cron con * 0-9 - , / o espacios",
+      )
+      .default("0 4 * * *"),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV !== "production") {

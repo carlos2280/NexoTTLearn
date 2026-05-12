@@ -388,6 +388,7 @@ export type {
 } from "./notificaciones"
 
 // Reportes P11b — operativos tiempo real (D-S11-B1..B11).
+// Reportes P11c — estrategicos cache + autoservicio + export (D-S11-C1..C11).
 export {
   TIPOS_ALERTA,
   esTipoAlerta,
@@ -396,6 +397,10 @@ export {
   detalleColaboradorQuerySchema,
   brechasDetectadasQuerySchema,
   centroRevisionQuerySchema,
+  eficaciaPlataformaQuerySchema,
+  historicoClienteQuerySchema,
+  inventarioSkillsQuerySchema,
+  reutilizacionCatalogoQuerySchema,
 } from "./reportes"
 export type {
   TipoAlerta,
@@ -405,6 +410,10 @@ export type {
   DetalleColaboradorQuery,
   BrechasDetectadasQuery,
   CentroRevisionQuery,
+  EficaciaPlataformaQuery,
+  HistoricoClienteQuery,
+  InventarioSkillsQuery,
+  ReutilizacionCatalogoQuery,
   ColaboradorEmbed,
   FilaAvanceCurso,
   EventoHistorico,
@@ -425,6 +434,24 @@ export type {
   FilaCentroRevisionTransversal,
   FilaCentroRevisionEntrevistaIa,
   CentroRevisionResponse,
+  MetaEstrategico,
+  EficaciaPlataformaAptos,
+  EficaciaPlataformaNoAptos,
+  ObservacionFrecuente,
+  EficaciaPlataformaResponse,
+  HistoricoClienteCursoItem,
+  HistoricoClienteResponse,
+  InventarioSkillsConteoCualitativo,
+  InventarioSkillItem,
+  InventarioSkillsResponse,
+  ReutilizacionCatalogoModuloItem,
+  ReutilizacionCatalogoSkillItem,
+  ReutilizacionCatalogoResponse,
+  EtiquetaCualitativa,
+  ClaseColorSkill,
+  MeAvancePorSkill,
+  MeAvanceSiguienteSeccion,
+  MeAvanceCursoResponse,
 } from "./reportes"
 
 // Entrevista IA P8c — schemas y tipos del flujo de entrevista IA final (D89).

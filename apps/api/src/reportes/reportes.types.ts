@@ -81,6 +81,18 @@ export const ALERTA_SIN_ACTIVIDAD_DIAS = 7
 export const ALERTA_INTENTO_INVALIDADO_DIAS = 30
 
 /**
+ * Umbrales fijos para reclasificacion cualitativa de `inventario-skills` (P11c).
+ * El `umbralCumple` del query controla la frontera SOLIDO/EN_DESARROLLO; los
+ * dos siguientes son fijos (D-S11-C3 vecindad):
+ *   nota >= 85               -> excelencia
+ *   85 > nota >= umbralCumple -> solido
+ *   umbralCumple > nota >= 50 -> enDesarrollo
+ *   nota < 50  o nota null    -> noCumple
+ */
+export const UMBRAL_INVENTARIO_EXCELENCIA = 85
+export const UMBRAL_INVENTARIO_NO_CUMPLE = 50
+
+/**
  * Forma minima del bloque `umbralesLogro` persistido como JSONB en
  * `Curso.umbralesLogro`. Se valida con un type guard en el service para no
  * confiar en el shape declarado en TS sobre datos no confiables (regla §3
