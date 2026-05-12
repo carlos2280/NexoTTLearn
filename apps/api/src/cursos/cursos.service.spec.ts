@@ -10,6 +10,7 @@ import {
   DesbloqueoCurso,
   EstadoCurso,
   EstadoModulo,
+  RolAsignacion,
   RolUsuario,
 } from "@prisma/client"
 import { Prisma } from "@prisma/client"
@@ -35,7 +36,20 @@ interface MockPrisma {
   }
   cliente: { findFirst: ReturnType<typeof vi.fn> }
   usuario: { findUnique: ReturnType<typeof vi.fn> }
-  asignacionCurso: { findUnique: ReturnType<typeof vi.fn> }
+  asignacionCurso: {
+    findUnique: ReturnType<typeof vi.fn>
+    findMany: ReturnType<typeof vi.fn>
+    updateMany: ReturnType<typeof vi.fn>
+  }
+  notaSkill: { findMany: ReturnType<typeof vi.fn> }
+  historicoEstadoAsignacion: {
+    create: ReturnType<typeof vi.fn>
+    findMany: ReturnType<typeof vi.fn>
+  }
+  cursoFotografiaCierre: {
+    create: ReturnType<typeof vi.fn>
+    updateMany: ReturnType<typeof vi.fn>
+  }
   cursoAreaExigida: {
     createMany: ReturnType<typeof vi.fn>
     deleteMany: ReturnType<typeof vi.fn>
@@ -80,6 +94,7 @@ interface MockPrisma {
     create: ReturnType<typeof vi.fn>
     deleteMany: ReturnType<typeof vi.fn>
     findMany: ReturnType<typeof vi.fn>
+    findFirst: ReturnType<typeof vi.fn>
     count: ReturnType<typeof vi.fn>
   }
   $transaction: ReturnType<typeof vi.fn>
@@ -100,7 +115,10 @@ function buildPrismaMock(): MockPrisma {
     },
     cliente: { findFirst: vi.fn() },
     usuario: { findUnique: vi.fn() },
-    asignacionCurso: { findUnique: vi.fn() },
+    asignacionCurso: { findUnique: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
+    notaSkill: { findMany: vi.fn() },
+    historicoEstadoAsignacion: { create: vi.fn(), findMany: vi.fn() },
+    cursoFotografiaCierre: { create: vi.fn(), updateMany: vi.fn() },
     cursoAreaExigida: { createMany: vi.fn(), deleteMany: vi.fn(), update: vi.fn() },
     cursoSkillExigida: { createMany: vi.fn(), deleteMany: vi.fn(), update: vi.fn() },
     cursoModuloHabilitado: { createMany: vi.fn(), deleteMany: vi.fn() },
@@ -122,6 +140,7 @@ function buildPrismaMock(): MockPrisma {
       create: vi.fn(),
       deleteMany: vi.fn(),
       findMany: vi.fn(),
+      findFirst: vi.fn(),
       count: vi.fn(),
     },
     $transaction: vi.fn(),
@@ -204,6 +223,22 @@ let moduleRef: TestingModule
 
 beforeEach(async () => {
   prisma = buildPrismaMock()
+  // FIX-P11a-tests: comportamiento por defecto del IdempotencyService stub —
+  // ejecutar el `ejecutor(tx)` inline contra el prismaMock, devolviendo
+  // `replay=false`. Cada test puede sobreescribir esta implementacion para
+  // simular replay (idempotencia HIT) o errores especificos.
+  idempotencyStub.runOnce.mockReset()
+  idempotencyStub.runOnce.mockImplementation(
+    async (input: {
+      readonly ejecutor: (
+        tx: unknown,
+      ) => Promise<{ readonly status: number; readonly body: unknown }>
+    }): Promise<{ readonly replay: boolean; readonly status: number; readonly body: unknown }> => {
+      const resultado = await input.ejecutor(prisma)
+      return { replay: false, status: resultado.status, body: resultado.body }
+    },
+  )
+  notificacionesStub.crear.mockReset()
   // Nota H-2: Vitest+esbuild NO preserva `emitDecoratorMetadata`, por lo que
   // `Test.createTestingModule({ providers: [CursosService, ...] })` falla en
   // runtime al intentar resolver `PrismaService` (no hay `design:paramtypes`).
@@ -1576,5 +1611,509 @@ describe("CursosService.publicarCurso", () => {
 
     expect(prisma.curso.updateMany).toHaveBeenCalledTimes(2)
     expect(prisma.logCambioCurso.create).toHaveBeenCalledTimes(1)
+  })
+})
+
+// =============================================================================
+// FIX-P11a-tests — §5.125: cerrarCurso + deshacerCierre (P11a)
+// =============================================================================
+
+const ASIGNACION_ID = "33333333-3333-3333-3333-333333333333"
+const ASIGNACION_VOL_ID = "44444444-4444-4444-4444-444444444444"
+const COLABORADOR_AS_ID = "55555555-5555-5555-5555-555555555555"
+const COLABORADOR_VOL_ID = "66666666-6666-6666-6666-666666666666"
+const SKILL_ID = "77777777-7777-7777-7777-777777777777"
+const LOG_CIERRE_ID = "88888888-8888-8888-8888-888888888888"
+const IDEMPOTENCY_KEY = "99999999-9999-4999-8999-999999999999"
+const MOTIVO_CIERRE = "Cierre administrativo del curso"
+
+function buildCursoSnapshotRow(overrides: Partial<{ estado: EstadoCurso }> = {}) {
+  return {
+    id: CURSO_ID,
+    titulo: "Curso a cerrar",
+    clienteId: CLIENTE_ID,
+    estado: overrides.estado ?? EstadoCurso.ACTIVO,
+    fechaInicio: new Date("2026-04-01T00:00:00Z"),
+    fechaDeadline: new Date("2026-06-30T00:00:00Z"),
+    umbralesLogro: null,
+    pesoBloques: decimal(70),
+    pesoTransversal: decimal(20),
+    pesoEntrevista: decimal(10),
+    transversalId: null,
+    entrevistaIaId: null,
+    areasExigidas: [],
+    skillsExigidas: [
+      {
+        skillId: SKILL_ID,
+        notaMinima: decimal(60),
+        skill: { etiquetaVisible: "Skill demo" },
+      },
+    ],
+    modulosHabilitados: [],
+  }
+}
+
+function buildAsignacionAsignado(estado = "EN_PROGRESO") {
+  return {
+    id: ASIGNACION_ID,
+    rol: RolAsignacion.ASIGNADO,
+    estadoAsignado: estado,
+    estadoVoluntario: null,
+    colaboradorId: COLABORADOR_AS_ID,
+    colaborador: {
+      id: COLABORADOR_AS_ID,
+      nombre: "Colaborador Asignado",
+      email: "colab-as@nttdata.test",
+    },
+  }
+}
+
+function buildAsignacionVoluntario(estado = "EN_PROGRESO") {
+  return {
+    id: ASIGNACION_VOL_ID,
+    rol: RolAsignacion.VOLUNTARIO,
+    estadoAsignado: null,
+    estadoVoluntario: estado,
+    colaboradorId: COLABORADOR_VOL_ID,
+    colaborador: {
+      id: COLABORADOR_VOL_ID,
+      nombre: "Colaborador Voluntario",
+      email: "colab-vol@nttdata.test",
+    },
+  }
+}
+
+function buildCursoDetalleCerrado(estado: EstadoCurso) {
+  const base = buildCursoDetalleRow({ estado })
+  return { ...base, fechaCierre: estado === EstadoCurso.CERRADO ? FECHA : null }
+}
+
+function configurarMocksCierreOk(input: {
+  readonly asignaciones: readonly ReturnType<typeof buildAsignacionAsignado>[]
+  readonly notaActual?: Prisma.Decimal | null
+}) {
+  prisma.curso.findUnique.mockResolvedValue(buildCursoSnapshotRow())
+  prisma.asignacionCurso.findMany.mockResolvedValue(input.asignaciones)
+  prisma.curso.updateMany.mockResolvedValue({ count: 1 })
+  prisma.logCambioCurso.create.mockResolvedValue({ id: LOG_CIERRE_ID })
+  const notaResuelta: Prisma.Decimal | null =
+    input.notaActual === undefined ? new Prisma.Decimal(80) : input.notaActual
+  prisma.notaSkill.findMany.mockResolvedValue(
+    input.asignaciones.map((a) => ({
+      colaboradorId: a.colaboradorId,
+      skillId: SKILL_ID,
+      notaActual: notaResuelta,
+    })),
+  )
+  prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+  prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+  prisma.cursoFotografiaCierre.create.mockResolvedValue({})
+  prisma.curso.findUniqueOrThrow.mockResolvedValue(buildCursoDetalleCerrado(EstadoCurso.CERRADO))
+}
+
+describe("CursosService.cerrarCurso — FIX-P11a-tests §5.125", () => {
+  it("ASIGNADO + CERRAR_APTO con notas >= umbralCumple → APTO + fotografia + log + historico", async () => {
+    const asig = buildAsignacionAsignado("EN_PROGRESO")
+    configurarMocksCierreOk({ asignaciones: [asig], notaActual: new Prisma.Decimal(80) })
+
+    const resultado = await service.cerrarCurso({
+      cursoId: CURSO_ID,
+      body: {
+        decisionPorAsignacion: [{ asignacionId: asig.id, accion: "CERRAR_APTO" }],
+      },
+      motivo: MOTIVO_CIERRE,
+      idempotencyKey: IDEMPOTENCY_KEY,
+      autorUsuarioId: ADMIN_ID,
+    })
+
+    expect(resultado.nuevo).toBe(true)
+    expect(resultado.curso.estado).toBe(EstadoCurso.CERRADO)
+    expect(resultado.notificaciones).toEqual([{ asignacionId: asig.id, resultadoNotif: "APTO" }])
+    expect(prisma.asignacionCurso.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: asig.id },
+        data: expect.objectContaining({ estadoAsignado: "APTO" }),
+      }),
+    )
+    expect(prisma.historicoEstadoAsignacion.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          asignacionId: asig.id,
+          estadoNuevo: "APTO",
+          logCambioCursoId: LOG_CIERRE_ID,
+        }),
+      }),
+    )
+    expect(prisma.cursoFotografiaCierre.create).toHaveBeenCalledTimes(1)
+    const fotoArg = prisma.cursoFotografiaCierre.create.mock.calls[0]?.[0] as {
+      data: {
+        cursoId: string
+        descartada: boolean
+        versionSnapshot: number
+        snapshot: { versionSnapshot: number; curso: { id: string } }
+      }
+    }
+    expect(fotoArg.data.cursoId).toBe(CURSO_ID)
+    expect(fotoArg.data.descartada).toBe(false)
+    expect(fotoArg.data.versionSnapshot).toBe(1)
+    expect(fotoArg.data.snapshot.versionSnapshot).toBe(1)
+    expect(fotoArg.data.snapshot.curso.id).toBe(CURSO_ID)
+  })
+
+  it("ASIGNADO + CERRAR_APTO con notas < umbralCumple → NO_APTO (D44)", async () => {
+    const asig = buildAsignacionAsignado("EN_PROGRESO")
+    configurarMocksCierreOk({ asignaciones: [asig], notaActual: new Prisma.Decimal(30) })
+
+    const resultado = await service.cerrarCurso({
+      cursoId: CURSO_ID,
+      body: {
+        decisionPorAsignacion: [{ asignacionId: asig.id, accion: "CERRAR_APTO" }],
+      },
+      motivo: MOTIVO_CIERRE,
+      idempotencyKey: IDEMPOTENCY_KEY,
+      autorUsuarioId: ADMIN_ID,
+    })
+
+    expect(resultado.notificaciones).toEqual([{ asignacionId: asig.id, resultadoNotif: "NO_APTO" }])
+    expect(prisma.asignacionCurso.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ estadoAsignado: "NO_APTO" }),
+      }),
+    )
+  })
+
+  it("ASIGNADO + RETIRAR → RETIRADO", async () => {
+    const asig = buildAsignacionAsignado("EN_PROGRESO")
+    configurarMocksCierreOk({ asignaciones: [asig], notaActual: null })
+
+    const resultado = await service.cerrarCurso({
+      cursoId: CURSO_ID,
+      body: {
+        decisionPorAsignacion: [{ asignacionId: asig.id, accion: "RETIRAR" }],
+      },
+      motivo: MOTIVO_CIERRE,
+      idempotencyKey: IDEMPOTENCY_KEY,
+      autorUsuarioId: ADMIN_ID,
+    })
+
+    expect(resultado.notificaciones).toEqual([
+      { asignacionId: asig.id, resultadoNotif: "RETIRADO" },
+    ])
+    expect(prisma.asignacionCurso.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ estadoAsignado: "RETIRADO" }),
+      }),
+    )
+  })
+
+  it("ASIGNADO + MANTENER_PENDIENTE → resultadoFinal=null, NO transiciona ni notifica", async () => {
+    const asig = buildAsignacionAsignado("EN_PROGRESO")
+    configurarMocksCierreOk({ asignaciones: [asig], notaActual: new Prisma.Decimal(80) })
+
+    const resultado = await service.cerrarCurso({
+      cursoId: CURSO_ID,
+      body: {
+        decisionPorAsignacion: [{ asignacionId: asig.id, accion: "MANTENER_PENDIENTE" }],
+      },
+      motivo: MOTIVO_CIERRE,
+      idempotencyKey: IDEMPOTENCY_KEY,
+      autorUsuarioId: ADMIN_ID,
+    })
+
+    expect(resultado.notificaciones).toEqual([])
+    expect(prisma.asignacionCurso.updateMany).not.toHaveBeenCalled()
+    expect(prisma.historicoEstadoAsignacion.create).not.toHaveBeenCalled()
+    expect(prisma.cursoFotografiaCierre.create).toHaveBeenCalledTimes(1)
+  })
+
+  it("VOLUNTARIO + CERRAR_APTO → COMPLETADO (D58 voluntarios)", async () => {
+    const asig = buildAsignacionVoluntario("EN_PROGRESO")
+    prisma.curso.findUnique.mockResolvedValue(buildCursoSnapshotRow())
+    prisma.asignacionCurso.findMany.mockResolvedValue([asig])
+    prisma.curso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.logCambioCurso.create.mockResolvedValue({ id: LOG_CIERRE_ID })
+    prisma.notaSkill.findMany.mockResolvedValue([])
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+    prisma.cursoFotografiaCierre.create.mockResolvedValue({})
+    prisma.curso.findUniqueOrThrow.mockResolvedValue(buildCursoDetalleCerrado(EstadoCurso.CERRADO))
+
+    const resultado = await service.cerrarCurso({
+      cursoId: CURSO_ID,
+      body: {
+        decisionPorAsignacion: [{ asignacionId: asig.id, accion: "CERRAR_APTO" }],
+      },
+      motivo: MOTIVO_CIERRE,
+      idempotencyKey: IDEMPOTENCY_KEY,
+      autorUsuarioId: ADMIN_ID,
+    })
+
+    expect(resultado.notificaciones).toEqual([
+      { asignacionId: asig.id, resultadoNotif: "COMPLETADO" },
+    ])
+    expect(prisma.asignacionCurso.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ estadoVoluntario: "COMPLETADO" }),
+      }),
+    )
+  })
+
+  it("replay idempotente: segundo intento devuelve cache sin invocar el ejecutor", async () => {
+    const detalleCacheado = buildCursoDetalleCerrado(EstadoCurso.CERRADO)
+    const bodyCache = {
+      detalle: {
+        id: detalleCacheado.id,
+        titulo: detalleCacheado.titulo,
+        clienteId: detalleCacheado.clienteId,
+        estado: detalleCacheado.estado,
+        fechaInicio: "2026-04-01",
+        fechaDeadline: "2026-06-30",
+        fechaCierre: FECHA.toISOString(),
+        toggleVoluntarios: true,
+        desbloqueo: DesbloqueoCurso.ENCADENADO,
+        createdAt: FECHA.toISOString(),
+        updatedAt: FECHA.toISOString(),
+        toggleCierreAutomatico: false,
+        umbralNoCumple: 10,
+        pesoBloques: 70,
+        pesoTransversal: 20,
+        pesoEntrevista: 10,
+        transversalId: null,
+        entrevistaIaId: null,
+        fechaDesbloqueo: null,
+        areasExigidas: [],
+        skillsExigidas: [],
+        modulosHabilitados: [],
+      },
+      pendientesNotif: [{ asignacionId: ASIGNACION_ID, resultadoNotif: "APTO" }],
+    }
+    idempotencyStub.runOnce.mockReset()
+    idempotencyStub.runOnce.mockResolvedValue({ replay: true, status: 200, body: bodyCache })
+
+    const resultado = await service.cerrarCurso({
+      cursoId: CURSO_ID,
+      body: {
+        decisionPorAsignacion: [{ asignacionId: ASIGNACION_ID, accion: "CERRAR_APTO" }],
+      },
+      motivo: MOTIVO_CIERRE,
+      idempotencyKey: IDEMPOTENCY_KEY,
+      autorUsuarioId: ADMIN_ID,
+    })
+
+    expect(resultado.nuevo).toBe(false)
+    expect(resultado.notificaciones).toEqual([])
+    expect(prisma.cursoFotografiaCierre.create).not.toHaveBeenCalled()
+    expect(prisma.asignacionCurso.updateMany).not.toHaveBeenCalled()
+  })
+
+  it("422 validacionDecisionFaltante: asignacion EN_PROGRESO sin decision en el body", async () => {
+    const asig = buildAsignacionAsignado("EN_PROGRESO")
+    prisma.curso.findUnique.mockResolvedValue(buildCursoSnapshotRow())
+    prisma.asignacionCurso.findMany.mockResolvedValue([asig])
+
+    await expect(
+      service.cerrarCurso({
+        cursoId: CURSO_ID,
+        body: { decisionPorAsignacion: [] },
+        motivo: MOTIVO_CIERRE,
+        idempotencyKey: IDEMPOTENCY_KEY,
+        autorUsuarioId: ADMIN_ID,
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        code: apiErrorCodes.validacionDecisionFaltante,
+        details: { asignacionesFaltantes: [asig.id] },
+      },
+    })
+    expect(prisma.curso.updateMany).not.toHaveBeenCalled()
+    expect(prisma.cursoFotografiaCierre.create).not.toHaveBeenCalled()
+  })
+
+  it("409 conflictCursoNoActivo: el curso ya no esta ACTIVO (updateMany count=0)", async () => {
+    const asig = buildAsignacionAsignado("EN_PROGRESO")
+    prisma.curso.findUnique.mockResolvedValue(buildCursoSnapshotRow())
+    prisma.asignacionCurso.findMany.mockResolvedValue([asig])
+    prisma.curso.updateMany.mockResolvedValue({ count: 0 })
+
+    await expect(
+      service.cerrarCurso({
+        cursoId: CURSO_ID,
+        body: {
+          decisionPorAsignacion: [{ asignacionId: asig.id, accion: "CERRAR_APTO" }],
+        },
+        motivo: MOTIVO_CIERRE,
+        idempotencyKey: IDEMPOTENCY_KEY,
+        autorUsuarioId: ADMIN_ID,
+      }),
+    ).rejects.toMatchObject({
+      response: { code: apiErrorCodes.conflictCursoNoActivo },
+    })
+    expect(prisma.cursoFotografiaCierre.create).not.toHaveBeenCalled()
+    expect(prisma.historicoEstadoAsignacion.create).not.toHaveBeenCalled()
+  })
+})
+
+describe("CursosService.deshacerCierre — FIX-P11a-tests §5.125", () => {
+  function buildHistoricoRow() {
+    return {
+      asignacionId: ASIGNACION_ID,
+      estadoAnterior: "EN_PROGRESO",
+      estadoNuevo: "APTO",
+      asignacion: { id: ASIGNACION_ID, rol: RolAsignacion.ASIGNADO },
+    }
+  }
+
+  it("happy path: dentro de ventana 7d → ACTIVO + fotografia.descartada=true + revierte asignaciones", async () => {
+    const ahora = new Date("2026-05-12T12:00:00Z")
+    vi.useFakeTimers()
+    vi.setSystemTime(ahora)
+    const fechaCierre = new Date(ahora.getTime() - 3 * 24 * 60 * 60 * 1000)
+    prisma.curso.findUnique.mockResolvedValue({
+      id: CURSO_ID,
+      estado: EstadoCurso.CERRADO,
+      fechaCierre,
+    })
+    prisma.logCambioCurso.findFirst.mockResolvedValue({ id: LOG_CIERRE_ID })
+    prisma.curso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.historicoEstadoAsignacion.findMany.mockResolvedValue([buildHistoricoRow()])
+    prisma.logCambioCurso.create.mockResolvedValue({ id: "log-deshacer-id" })
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+    prisma.cursoFotografiaCierre.updateMany.mockResolvedValue({ count: 1 })
+    prisma.curso.findUniqueOrThrow.mockResolvedValue(buildCursoDetalleCerrado(EstadoCurso.ACTIVO))
+
+    const resultado = await service.deshacerCierre({
+      cursoId: CURSO_ID,
+      motivo: "Deshacer cierre por error",
+      idempotencyKey: IDEMPOTENCY_KEY,
+      autorUsuarioId: ADMIN_ID,
+    })
+
+    expect(resultado.nuevo).toBe(true)
+    expect(resultado.curso.estado).toBe(EstadoCurso.ACTIVO)
+    expect(prisma.curso.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: CURSO_ID, estado: EstadoCurso.CERRADO },
+        data: { estado: EstadoCurso.ACTIVO, fechaCierre: null },
+      }),
+    )
+    expect(prisma.logCambioCurso.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          accion: AccionLogCurso.DESHACER_CIERRE,
+          previewImpacto: { logCambioCursoCierreId: LOG_CIERRE_ID, asignacionesRevertidas: 1 },
+        }),
+      }),
+    )
+    expect(prisma.asignacionCurso.updateMany).toHaveBeenCalledTimes(1)
+    expect(prisma.cursoFotografiaCierre.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { cursoId: CURSO_ID, descartada: false },
+        data: expect.objectContaining({ descartada: true }),
+      }),
+    )
+    vi.useRealTimers()
+  })
+
+  it("409 conflictCursoFueraVentana7Dias: fechaCierre > 7 dias atras", async () => {
+    const ahora = new Date("2026-05-12T12:00:00Z")
+    vi.useFakeTimers()
+    vi.setSystemTime(ahora)
+    const fechaCierre = new Date(ahora.getTime() - 8 * 24 * 60 * 60 * 1000)
+    prisma.curso.findUnique.mockResolvedValue({
+      id: CURSO_ID,
+      estado: EstadoCurso.CERRADO,
+      fechaCierre,
+    })
+
+    await expect(
+      service.deshacerCierre({
+        cursoId: CURSO_ID,
+        motivo: "Tarde",
+        idempotencyKey: IDEMPOTENCY_KEY,
+        autorUsuarioId: ADMIN_ID,
+      }),
+    ).rejects.toMatchObject({
+      response: { code: apiErrorCodes.conflictCursoFueraVentana7Dias },
+    })
+    expect(prisma.curso.updateMany).not.toHaveBeenCalled()
+    expect(prisma.cursoFotografiaCierre.updateMany).not.toHaveBeenCalled()
+    vi.useRealTimers()
+  })
+
+  it("409 conflictCursoNoCerrado: curso en ACTIVO no admite deshacer", async () => {
+    prisma.curso.findUnique.mockResolvedValue({
+      id: CURSO_ID,
+      estado: EstadoCurso.ACTIVO,
+      fechaCierre: null,
+    })
+
+    await expect(
+      service.deshacerCierre({
+        cursoId: CURSO_ID,
+        motivo: "No corresponde",
+        idempotencyKey: IDEMPOTENCY_KEY,
+        autorUsuarioId: ADMIN_ID,
+      }),
+    ).rejects.toMatchObject({
+      response: { code: apiErrorCodes.conflictCursoNoCerrado },
+    })
+    expect(prisma.curso.updateMany).not.toHaveBeenCalled()
+  })
+
+  it("404 cursoNoEncontrado: el curso no existe", async () => {
+    prisma.curso.findUnique.mockResolvedValue(null)
+
+    await expect(
+      service.deshacerCierre({
+        cursoId: CURSO_ID,
+        motivo: "Fantasma",
+        idempotencyKey: IDEMPOTENCY_KEY,
+        autorUsuarioId: ADMIN_ID,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException)
+  })
+
+  it("replay idempotente: segundo intento no duplica log DESHACER_CIERRE ni descarta fotografia", async () => {
+    const bodyCache = {
+      detalle: {
+        id: CURSO_ID,
+        titulo: "Curso a cerrar",
+        clienteId: CLIENTE_ID,
+        estado: EstadoCurso.ACTIVO,
+        fechaInicio: "2026-04-01",
+        fechaDeadline: "2026-06-30",
+        fechaCierre: null,
+        toggleVoluntarios: true,
+        desbloqueo: DesbloqueoCurso.ENCADENADO,
+        createdAt: FECHA.toISOString(),
+        updatedAt: FECHA.toISOString(),
+        toggleCierreAutomatico: false,
+        umbralNoCumple: 10,
+        pesoBloques: 70,
+        pesoTransversal: 20,
+        pesoEntrevista: 10,
+        transversalId: null,
+        entrevistaIaId: null,
+        fechaDesbloqueo: null,
+        areasExigidas: [],
+        skillsExigidas: [],
+        modulosHabilitados: [],
+      },
+    }
+    idempotencyStub.runOnce.mockReset()
+    idempotencyStub.runOnce.mockResolvedValue({ replay: true, status: 200, body: bodyCache })
+
+    const resultado = await service.deshacerCierre({
+      cursoId: CURSO_ID,
+      motivo: "Replay",
+      idempotencyKey: IDEMPOTENCY_KEY,
+      autorUsuarioId: ADMIN_ID,
+    })
+
+    expect(resultado.nuevo).toBe(false)
+    expect(resultado.curso.estado).toBe(EstadoCurso.ACTIVO)
+    expect(prisma.logCambioCurso.create).not.toHaveBeenCalled()
+    expect(prisma.cursoFotografiaCierre.updateMany).not.toHaveBeenCalled()
   })
 })
