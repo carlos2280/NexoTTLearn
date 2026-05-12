@@ -387,6 +387,46 @@ export type {
   PatchPreferenciasNotificacionInput,
 } from "./notificaciones"
 
+// Reportes P11b — operativos tiempo real (D-S11-B1..B11).
+export {
+  TIPOS_ALERTA,
+  esTipoAlerta,
+  filtrosEstandarSchema,
+  avanceCursoQuerySchema,
+  detalleColaboradorQuerySchema,
+  brechasDetectadasQuerySchema,
+  centroRevisionQuerySchema,
+} from "./reportes"
+export type {
+  TipoAlerta,
+  VistaReporte,
+  FiltrosEstandar,
+  AvanceCursoQuery,
+  DetalleColaboradorQuery,
+  BrechasDetectadasQuery,
+  CentroRevisionQuery,
+  ColaboradorEmbed,
+  FilaAvanceCurso,
+  EventoHistorico,
+  ItemPlanReporte,
+  FichaRelevanteItem,
+  IntentoBloqueResumen,
+  IntentoTransversalResumen,
+  IntentoEntrevistaIaResumen,
+  DetalleColaboradorAsignacion,
+  UltimosIntentos,
+  HayMasIntentos,
+  DetalleColaboradorResponse,
+  UmbralesBrechas,
+  SkillBrechaItem,
+  BrechasDetectadasResponse,
+  MotivoRevisionTransversal,
+  MotivoRevisionEntrevistaIa,
+  FilaCentroRevisionTransversal,
+  FilaCentroRevisionEntrevistaIa,
+  CentroRevisionResponse,
+} from "./reportes"
+
 // Entrevista IA P8c — schemas y tipos del flujo de entrevista IA final (D89).
 export {
   enviarTurnoSchema,

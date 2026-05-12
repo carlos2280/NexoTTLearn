@@ -177,6 +177,11 @@ export const apiErrorCodes = {
   // Cierre curso P11a (D-S11-A2..A5).
   validacionDecisionFaltante: "VALIDACION_DECISION_FALTANTE",
   conflictCursoFueraVentana7Dias: "CONFLICT_CURSO_FUERA_VENTANA_7_DIAS",
+  // Reportes P11b operativos (D-S11-B7, P11b §2 alcance).
+  fotografiaNoEncontrada: "FOTOGRAFIA_NO_ENCONTRADA",
+  vistaNoSoportada: "VISTA_NO_SOPORTADA",
+  formatoNoSoportadoEnP11b: "FORMATO_NO_SOPORTADO_EN_P11B",
+  asignacionColaboradorNoCoincide: "ASIGNACION_COLABORADOR_NO_COINCIDE",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]

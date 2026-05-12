@@ -26,6 +26,7 @@ import { HealthModule } from "./health/health.module"
 import { IntentosBloqueModule } from "./intentos-bloque/intentos-bloque.module"
 import { NotificacionesModule } from "./notificaciones/notificaciones.module"
 import { PlanPersonalModule } from "./plan-personal/plan-personal.module"
+import { ReportesModule } from "./reportes/reportes.module"
 import { TransversalModule } from "./transversal/transversal.module"
 
 /**
@@ -79,6 +80,7 @@ import { TransversalModule } from "./transversal/transversal.module"
     NotificacionesModule,
     TransversalModule,
     EntrevistaIaModule,
+    ReportesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: SesionGuard },
