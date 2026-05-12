@@ -1,3 +1,4 @@
+import { AsignacionesVista } from "@/pages/admin/asignaciones/components/asignaciones-vista"
 import { Banner } from "@/shared/components/ui/banner"
 import type { CursoConfiguracionResponse, CursoDetalle } from "@nexott-learn/shared-types"
 import { ConfigCursoTab } from "./config/config-curso-tab"
@@ -16,11 +17,7 @@ export function CursoDetallePanel({ tab, curso, nombreCliente }: CursoDetallePan
     return <CursoDetalleResumen curso={curso} nombreCliente={nombreCliente} />
   }
   if (tab === "asignados") {
-    return (
-      <Banner tone="neutral" title="Próximamente">
-        La gestión de asignados estará disponible cuando se libere el módulo de participantes.
-      </Banner>
-    )
+    return <AsignacionesVista cursoId={curso.id} />
   }
   if (tab === "estructura") {
     return (

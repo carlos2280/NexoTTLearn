@@ -1,4 +1,5 @@
 import { AdminShell } from "@/features/admin/layout/components/admin-shell"
+import { AsignacionesPage } from "@/pages/admin/asignaciones/asignaciones.page"
 import { CatalogoPage } from "@/pages/admin/catalogo/catalogo.page"
 import { ModuloDetallePage } from "@/pages/admin/catalogo/modulo-detalle/modulo-detalle.page"
 import { CursoDetallePage } from "@/pages/admin/cursos/curso-detalle.page"
@@ -54,6 +55,7 @@ export function AppRoutes() {
         <Route path="catalogo/modulos/:moduloId" element={<ModuloDetallePage />} />
         <Route path="cursos" element={<CursosPage />} />
         <Route path="cursos/:cursoId" element={<CursoDetallePage />} />
+        <Route path="cursos/:cursoId/asignaciones" element={<AsignacionesPage />} />
         {SEGMENTOS_ADMIN.map((segmento) => (
           <Route key={segmento} path={segmento} element={<ProximamentePage />} />
         ))}
