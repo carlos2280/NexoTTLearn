@@ -325,6 +325,7 @@ enum AccionAuditoria {
   INTENTO_ENTREVISTA_IA_FINALIZADO
   INTENTO_ENTREVISTA_IA_AJUSTADO
   INTENTO_ENTREVISTA_IA_ANULADO
+  PREFERENCIA_NOTIFICACION_ACTUALIZADA
 
   @@map("accion_auditoria_enum")
 }
@@ -1136,6 +1137,9 @@ model Notificacion {
   usuario Usuario             @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   canales NotificacionCanal[]
 
+  // idx_notif_usuario_no_leidas e idx_notif_archivar son indices PARCIALES con
+  // clausula WHERE — Prisma no expresa indices parciales en el schema, asi que
+  // se crean directamente en la migracion SQL (slice_10_notificaciones).
   @@index([usuarioId, fechaCreacion(sort: Desc)], map: "idx_notif_usuario_fecha")
   @@map("notificaciones")
 }

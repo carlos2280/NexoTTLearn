@@ -145,4 +145,36 @@ describe("validateEnv", () => {
     const env = validateEnv(buildEnv())
     expect(env.STORAGE_ROOT).toBe("apps/api/storage")
   })
+
+  it("aplica defaults de notificaciones (NOTIF_PURGA_CRON y APP_BASE_URL)", () => {
+    const env = validateEnv(buildEnv())
+    expect(env.NOTIF_PURGA_CRON).toBe("0 3 * * *")
+    expect(env.APP_BASE_URL).toBe("http://localhost:4000")
+  })
+
+  it("acepta NOTIF_PURGA_CRON con caracteres validos", () => {
+    const env = validateEnv(buildEnv(["NOTIF_PURGA_CRON", "*/30 * * * *"]))
+    expect(env.NOTIF_PURGA_CRON).toBe("*/30 * * * *")
+  })
+
+  it("rechaza NOTIF_PURGA_CRON con caracteres invalidos", () => {
+    expect(() => validateEnv(buildEnv(["NOTIF_PURGA_CRON", "@daily"]))).toThrow(/NOTIF_PURGA_CRON/)
+  })
+
+  it("rechaza APP_BASE_URL que no sea una URL valida", () => {
+    expect(() => validateEnv(buildEnv(["APP_BASE_URL", "no-es-una-url"]))).toThrow(/APP_BASE_URL/)
+  })
+
+  it("acepta APP_BASE_URL https en NODE_ENV=production", () => {
+    const env = validateEnv(
+      buildEnv(
+        ["NODE_ENV", "production"],
+        ["COOKIE_SECURE", "true"],
+        ["ALLOWED_ORIGINS", "https://app.example.com"],
+        ["STORAGE_ROOT", "/data/nexott/storage"],
+        ["APP_BASE_URL", "https://app.example.com"],
+      ),
+    )
+    expect(env.APP_BASE_URL).toBe("https://app.example.com")
+  })
 })

@@ -114,6 +114,27 @@ const envSchema = z
       .string()
       .default("true")
       .transform((value) => value.toLowerCase() === "true"),
+    // ---------------------------------------------------------------------
+    // Notificaciones (Slice 10 P10a — D-S10-B3/B4).
+    //   NOTIF_PURGA_CRON  — expresion cron de 5 campos para
+    //                       ArchivarNotificacionesCron. Default: cada dia 03:00.
+    //   APP_BASE_URL      — URL base de la app, usada en P10c en plantillas
+    //                       HTML para construir links a la bandeja. La
+    //                       obligatoriedad cruzada con ConfiguracionSistema
+    //                       (modo_entrega_password=AUTOMATICO) se valida en
+    //                       runtime al enviar, no al arranque, porque el modo
+    //                       puede alternar sin redeploy.
+    // ---------------------------------------------------------------------
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    NOTIF_PURGA_CRON: z
+      .string()
+      .regex(
+        /^[*0-9\-,/\s]+$/,
+        "NOTIF_PURGA_CRON debe ser una expresion cron con * 0-9 - , / o espacios",
+      )
+      .default("0 3 * * *"),
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    APP_BASE_URL: z.string().url().default("http://localhost:4000"),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV !== "production") {
