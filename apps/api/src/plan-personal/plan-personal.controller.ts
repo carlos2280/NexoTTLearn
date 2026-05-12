@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   HttpCode,
@@ -6,16 +7,25 @@ import {
   InternalServerErrorException,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
 } from "@nestjs/common"
 import { Throttle } from "@nestjs/throttler"
-import type { PlanResponseAdmin, PlanResponseParticipante } from "@nexott-learn/shared-types"
+import type {
+  AjustarPlanInput,
+  AperturaSeccionResponse,
+  PlanDiffResponse,
+  PlanResponseAdmin,
+  PlanResponseParticipante,
+} from "@nexott-learn/shared-types"
+import { ajustarPlanSchema } from "@nexott-learn/shared-types"
 import { RolUsuario } from "@prisma/client"
 import { CurrentUser } from "../common/decorators/current-user.decorator"
 import { Motivo } from "../common/decorators/motivo.decorator"
 import { RequiereMotivo } from "../common/decorators/requiere-motivo.decorator"
 import { Roles } from "../common/decorators/roles.decorator"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
+import { ZodValidationPipe } from "../common/pipes/zod-validation.pipe"
 import { SesionUsuario } from "../common/types/sesion.types"
 import { PlanPersonalService } from "./plan-personal.service"
 
@@ -64,6 +74,44 @@ export class PlanPersonalController {
     @CurrentUser() usuario: SesionUsuario | undefined,
   ): Promise<PlanResponseAdmin | PlanResponseParticipante> {
     return await this.planService.obtener(asignacionId, this.requireUsuario(usuario))
+  }
+
+  @Patch("asignaciones/:asignacionId/plan/ajustes")
+  @Roles(RolUsuario.ADMIN)
+  @RequiereMotivo()
+  @HttpCode(HttpStatus.OK)
+  async ajustar(
+    @Param("asignacionId", ParseUUIDPipe) asignacionId: string,
+    @Body(new ZodValidationPipe(ajustarPlanSchema)) dto: AjustarPlanInput,
+    @Motivo() motivo: string | undefined,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<PlanResponseAdmin> {
+    const sesion = this.requireUsuario(usuario)
+    return await this.planService.ajustarPlan(asignacionId, dto, sesion.usuarioId, motivo ?? "")
+  }
+
+  @Get("asignaciones/:asignacionId/plan/diff")
+  @Roles(RolUsuario.ADMIN, RolUsuario.PARTICIPANTE)
+  async diff(
+    @Param("asignacionId", ParseUUIDPipe) asignacionId: string,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<PlanDiffResponse> {
+    return await this.planService.obtenerDiff(asignacionId, this.requireUsuario(usuario))
+  }
+
+  @Post("asignaciones/:asignacionId/secciones/:seccionId/apertura")
+  @Roles(RolUsuario.ADMIN, RolUsuario.PARTICIPANTE)
+  @HttpCode(HttpStatus.OK)
+  async apertura(
+    @Param("asignacionId", ParseUUIDPipe) asignacionId: string,
+    @Param("seccionId", ParseUUIDPipe) seccionId: string,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<AperturaSeccionResponse> {
+    return await this.planService.registrarApertura(
+      asignacionId,
+      seccionId,
+      this.requireUsuario(usuario),
+    )
   }
 
   private requireUsuario(usuario: SesionUsuario | undefined): SesionUsuario {

@@ -24,3 +24,24 @@ export type {
   PlanResponseParticipante,
   PlanResponse,
 } from "./plan-response.types"
+
+export {
+  ajustarPlanSchema,
+  accionAjustarPlanSchema,
+  caracterAjustePlanSchema,
+} from "./ajustar-plan.schema"
+export type {
+  AjustarPlanInput,
+  AccionAjustarPlan,
+  CaracterAjustePlan,
+} from "./ajustar-plan.schema"
+
+export type {
+  ImpactoDiffSkill,
+  ImpactoSeccionDiff,
+  DiffSeccionAfectada,
+  DiffSkillItem,
+  PlanDiffResponse,
+} from "./diff-plan.types"
+
+export type { AperturaSeccionResponse } from "./apertura-seccion.types"

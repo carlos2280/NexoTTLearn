@@ -127,6 +127,10 @@ export const apiErrorCodes = {
   // Plan personal P7a (D-S7-B1..B6, D-S7-D1..D2).
   planNoEncontrado: "PLAN_NO_ENCONTRADO",
   conflictPlanYaCalculado: "CONFLICT_PLAN_YA_CALCULADO",
+  // Plan personal P7c — ajustes manuales admin + diff.
+  seccionNoEnPlan: "SECCION_NO_EN_PLAN",
+  conflictSeccionYaEnPlan: "CONFLICT_SECCION_YA_EN_PLAN",
+  fichaSnapshotInvalida: "FICHA_SNAPSHOT_INVALIDA",
   // Intentos de bloque P7b (D-S7-C1..C6).
   intentoNoEncontrado: "INTENTO_NO_ENCONTRADO",
   bloqueNoEvaluable: "BLOQUE_NO_EVALUABLE",

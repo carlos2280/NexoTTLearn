@@ -12,7 +12,11 @@
  */
 import { fichaSnapshotV1Schema } from "@nexott-learn/shared-types"
 import type {
+  DiffSeccionAfectada,
+  DiffSkillItem,
+  EstadoBrechaSnapshot,
   FichaSnapshotV1,
+  ImpactoDiffSkill,
   ModuloPlanAdmin,
   ModuloPlanParticipante,
   PlanResponseAdmin,
@@ -480,6 +484,119 @@ function construirParticipante(
     items: modulos,
     avance: input.avance,
   }
+}
+
+// ===========================================================================
+// Diff de plan (P7c, D80, D95)
+// ===========================================================================
+
+interface SkillDiffInputItem {
+  readonly skillId: string
+  /** Mejor intento previo segun snapshot (puede ser null si no habia nota). */
+  readonly notaSnapshot: number | null
+  readonly estadoSnapshot: EstadoBrechaSnapshot
+  readonly notaVigente: number | null
+  readonly notaMinima: number
+  /**
+   * Secciones del plan que ensenan esta skill, con su caracter actual + el
+   * conjunto de skills exigidas que cubren (para decidir el impacto seccion).
+   */
+  readonly seccionesQueEnsenan: ReadonlyArray<{
+    readonly seccionId: string
+    readonly tituloSeccion: string
+    readonly caracterActual: "OBLIGATORIA" | "OPCIONAL"
+  }>
+}
+
+interface CalcularDiffInput {
+  readonly umbralNoCumple: number
+  readonly skills: readonly SkillDiffInputItem[]
+}
+
+/**
+ * Calcula el diff entre la `fichaSnapshot` y las notas vigentes. Solo aparecen
+ * skills cuya nota cambio (o cuyo estado cambio). El impacto a nivel de
+ * seccion lo determinamos por skill: si la skill pasa a CUMPLE, las secciones
+ * que la ensenan podrian dejar de ser obligatorias; si la skill pasa a
+ * NO_CUMPLE/CERCA, podrian pasar a obligatorias.
+ */
+export function calcularDiffPlan(input: CalcularDiffInput): readonly DiffSkillItem[] {
+  const diff: DiffSkillItem[] = []
+  for (const skill of input.skills) {
+    if (skill.notaSnapshot === skill.notaVigente) {
+      continue
+    }
+    const estadoVigente = computarEstado(skill.notaVigente, skill.notaMinima, input.umbralNoCumple)
+    const impacto = computarImpactoSkill(skill.estadoSnapshot, estadoVigente)
+    const seccionesAfectadas = mapSeccionesAfectadas(skill, impacto)
+    diff.push({
+      skillId: skill.skillId,
+      notaSnapshot: skill.notaSnapshot,
+      notaVigente: skill.notaVigente,
+      estadoSnapshot: skill.estadoSnapshot,
+      estadoVigente,
+      impacto,
+      seccionesAfectadas,
+    })
+  }
+  return diff
+}
+
+function computarEstado(
+  nota: number | null,
+  notaMinima: number,
+  umbralNoCumple: number,
+): EstadoBrechaSnapshot {
+  const efectiva = nota ?? 0
+  const brecha = notaMinima - efectiva
+  if (brecha <= 0) {
+    return "CUMPLE"
+  }
+  if (brecha >= umbralNoCumple) {
+    return "NO_CUMPLE"
+  }
+  return "CERCA"
+}
+
+function computarImpactoSkill(
+  estadoSnapshot: EstadoBrechaSnapshot,
+  estadoVigente: EstadoBrechaSnapshot,
+): ImpactoDiffSkill {
+  const requeriaAntes = estadoSnapshot !== "CUMPLE"
+  const requiereAhora = estadoVigente !== "CUMPLE"
+  if (requeriaAntes && !requiereAhora) {
+    return "SECCION_DEJA_DE_SER_OBLIGATORIA"
+  }
+  if (!requeriaAntes && requiereAhora) {
+    return "SECCION_PASA_A_OBLIGATORIA"
+  }
+  return "CAMBIO_NOTA_SIN_IMPACTO"
+}
+
+function mapSeccionesAfectadas(
+  skill: SkillDiffInputItem,
+  impacto: ImpactoDiffSkill,
+): readonly DiffSeccionAfectada[] {
+  if (impacto === "CAMBIO_NOTA_SIN_IMPACTO") {
+    return []
+  }
+  const impactoSeccion =
+    impacto === "SECCION_DEJA_DE_SER_OBLIGATORIA" ? "DEJA_DE_SER_OBLIGATORIA" : "PASA_A_OBLIGATORIA"
+  const resultado: DiffSeccionAfectada[] = []
+  for (const s of skill.seccionesQueEnsenan) {
+    if (impacto === "SECCION_DEJA_DE_SER_OBLIGATORIA" && s.caracterActual !== "OBLIGATORIA") {
+      continue
+    }
+    if (impacto === "SECCION_PASA_A_OBLIGATORIA" && s.caracterActual === "OBLIGATORIA") {
+      continue
+    }
+    resultado.push({
+      seccionId: s.seccionId,
+      tituloSeccion: s.tituloSeccion,
+      impactoSeccion,
+    })
+  }
+  return resultado
 }
 
 /**

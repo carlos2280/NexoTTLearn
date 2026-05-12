@@ -1,14 +1,24 @@
 import {
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from "@nestjs/common"
-import type { PlanResponseAdmin, PlanResponseParticipante } from "@nexott-learn/shared-types"
+import type {
+  AjustarPlanInput,
+  AperturaSeccionResponse,
+  PlanDiffResponse,
+  PlanResponseAdmin,
+  PlanResponseParticipante,
+} from "@nexott-learn/shared-types"
 import { fichaSnapshotV1Schema } from "@nexott-learn/shared-types"
 import {
+  AccionAjustePlan,
   AccionAuditoria,
+  EstadoAsignado,
+  EstadoVoluntario,
   Prisma,
   type CaracterItemPlan as PrismaCaracterItemPlan,
   type RazonItemPlan as PrismaRazonItemPlan,
@@ -22,6 +32,7 @@ import { SesionUsuario } from "../common/types/sesion.types"
 import {
   type ResultadoCalculo,
   calcularAvance,
+  calcularDiffPlan,
   calcularPlan,
   decimalAsNumber,
   toPlanResponse,
@@ -42,12 +53,17 @@ interface CalcularInternalInput {
 }
 
 /**
- * Service del modulo plan-personal (Slice 7 P7a).
+ * Service del modulo plan-personal (Slice 7 P7a + P7c).
  *
- * Endpoints:
- *  - `POST /asignaciones/:id/plan/calcular`  — admin. Falla 409 si ya existe.
+ * Endpoints P7a:
+ *  - `POST /asignaciones/:id/plan/calcular`   — admin. Falla 409 si ya existe.
  *  - `POST /asignaciones/:id/plan/recalcular` — admin con X-Motivo.
- *  - `GET  /asignaciones/:id/plan` — admin o propio (D-AS-9).
+ *  - `GET  /asignaciones/:id/plan`            — admin o propio (D-AS-9).
+ *
+ * Endpoints P7c:
+ *  - `PATCH /asignaciones/:id/plan/ajustes`              — admin con X-Motivo.
+ *  - `GET   /asignaciones/:id/plan/diff`                 — admin only.
+ *  - `POST  /asignaciones/:id/secciones/:sId/apertura`   — admin o propio.
  *
  * Decisiones de referencia: D-S7-A2..D6 (design doc Slice 7).
  */
@@ -233,6 +249,304 @@ export class PlanPersonalService {
       }
     }
     return await this.obtenerPlanInterno(this.prisma, asignacionId, usuario.rol)
+  }
+
+  /**
+   * `PATCH /plan/ajustes` — ADMIN. Aplica un ajuste manual (AGREGAR / QUITAR /
+   * CAMBIAR_CARACTER / EXIMIR). El motivo es obligatorio (controller + guard).
+   * Audit `PLAN_AJUSTADO_MANUALMENTE` fuera del TX (D-S7-D4) sin texto crudo.
+   * TODO(S10): emitir notificacion PLAN_AJUSTADO_MANUALMENTE al participante.
+   */
+  async ajustarPlan(
+    asignacionId: string,
+    dto: AjustarPlanInput,
+    autorUsuarioId: string,
+    motivo: string,
+  ): Promise<PlanResponseAdmin> {
+    const plan = await this.prisma.planEstudio.findUnique({
+      where: { asignacionId },
+      select: {
+        id: true,
+        asignacion: { select: { cursoId: true, rol: true } },
+      },
+    })
+    if (!plan) {
+      throw new NotFoundException({
+        code: apiErrorCodes.planNoEncontrado,
+        message: "El plan no existe para esta asignacion.",
+      })
+    }
+    if (plan.asignacion.rol !== RolAsignacion.ASIGNADO) {
+      throw new UnprocessableEntityException({
+        code: apiErrorCodes.conflictAsignacionNoVoluntario,
+        message: "Solo asignaciones con rol ASIGNADO tienen plan personal.",
+        details: { rol: plan.asignacion.rol },
+      })
+    }
+
+    const cursoId = plan.asignacion.cursoId
+    const planId = plan.id
+
+    await this.prisma.$transaction(async (tx) => {
+      switch (dto.accion) {
+        case "AGREGAR":
+          await this.aplicarAgregar(tx, planId, cursoId, dto.seccionId, dto.caracter)
+          break
+        case "QUITAR":
+          await this.aplicarQuitar(tx, planId, dto.seccionId)
+          break
+        case "CAMBIAR_CARACTER":
+          await this.aplicarCambiarCaracter(tx, planId, dto.seccionId, dto.caracter)
+          break
+        case "EXIMIR":
+          await this.aplicarEximir(tx, planId, cursoId, dto.skillId)
+          break
+      }
+      await this.registrarAjuste(tx, planId, dto, autorUsuarioId, motivo)
+    })
+
+    await this.auditLog.record({
+      usuarioId: autorUsuarioId,
+      accion: AccionAuditoria.PLAN_AJUSTADO_MANUALMENTE,
+      exito: true,
+      recursoTipo: "plan_estudio",
+      recursoId: planId,
+      metadata: this.metadataAuditAjuste(plan.id, asignacionId, dto, motivo),
+    })
+
+    return (await this.obtenerPlanInterno(
+      this.prisma,
+      asignacionId,
+      RolUsuario.ADMIN,
+    )) as PlanResponseAdmin
+  }
+
+  /**
+   * `GET /plan/diff` — ADMIN only (D-S7-D1 estricto: PARTICIPANTE recibe 404).
+   * Lectura READ-ONLY: NO marca el plan como desactualizado, NO recalcula.
+   */
+  async obtenerDiff(asignacionId: string, usuario: SesionUsuario): Promise<PlanDiffResponse> {
+    if (usuario.rol !== RolUsuario.ADMIN) {
+      // D-S7-D1: ocultar existencia (404 en lugar de 403).
+      throw new NotFoundException({
+        code: apiErrorCodes.asignacionNoEncontrada,
+        message: `Asignacion ${asignacionId} no encontrada.`,
+      })
+    }
+    const plan = await this.prisma.planEstudio.findUnique({
+      where: { asignacionId },
+      select: {
+        id: true,
+        fechaCalculo: true,
+        fichaSnapshot: true,
+        estaDesactualizado: true,
+        asignacion: { select: { cursoId: true, colaboradorId: true } },
+      },
+    })
+    if (!plan || plan.fichaSnapshot === null) {
+      throw new NotFoundException({
+        code: apiErrorCodes.planNoEncontrado,
+        message: "El plan no existe para esta asignacion.",
+      })
+    }
+
+    const parseo = fichaSnapshotV1Schema.safeParse(plan.fichaSnapshot)
+    if (!parseo.success) {
+      throw new InternalServerErrorException({
+        code: apiErrorCodes.fichaSnapshotInvalida,
+        message: "El snapshot persistido no cumple el contrato vigente.",
+      })
+    }
+    const snapshot = parseo.data
+
+    const cursoId = plan.asignacion.cursoId
+    const skillIds = snapshot.skillsConsideradas.map((s) => s.skillId)
+
+    const [curso, exigidas, notas, items] = await Promise.all([
+      this.prisma.curso.findUniqueOrThrow({
+        where: { id: cursoId },
+        select: { umbralNoCumple: true },
+      }),
+      this.prisma.cursoSkillExigida.findMany({
+        where: { cursoId, skillId: { in: skillIds } },
+        select: { skillId: true, notaMinima: true },
+      }),
+      this.prisma.notaSkill.findMany({
+        where: {
+          colaboradorId: plan.asignacion.colaboradorId,
+          skillId: { in: skillIds },
+        },
+        select: { skillId: true, notaActual: true },
+      }),
+      this.prisma.itemPlan.findMany({
+        where: { planId: plan.id },
+        select: {
+          seccionId: true,
+          caracter: true,
+          seccion: {
+            select: {
+              id: true,
+              titulo: true,
+              skills: { select: { skillId: true } },
+            },
+          },
+        },
+      }),
+    ])
+
+    const notaMinimaPorSkill = new Map<string, number>()
+    for (const e of exigidas) {
+      notaMinimaPorSkill.set(e.skillId, decimalAsNumber(e.notaMinima) ?? 0)
+    }
+    const notaVigentePorSkill = new Map<string, number | null>()
+    for (const n of notas) {
+      notaVigentePorSkill.set(n.skillId, decimalAsNumber(n.notaActual))
+    }
+
+    const seccionesPorSkill = new Map<
+      string,
+      Array<{
+        seccionId: string
+        tituloSeccion: string
+        caracterActual: "OBLIGATORIA" | "OPCIONAL"
+      }>
+    >()
+    for (const it of items) {
+      for (const sk of it.seccion.skills) {
+        const lista = seccionesPorSkill.get(sk.skillId) ?? []
+        lista.push({
+          seccionId: it.seccionId,
+          tituloSeccion: it.seccion.titulo,
+          caracterActual: it.caracter,
+        })
+        seccionesPorSkill.set(sk.skillId, lista)
+      }
+    }
+
+    const umbralNoCumple = decimalAsNumber(curso.umbralNoCumple) ?? 10
+    const diff = calcularDiffPlan({
+      umbralNoCumple,
+      skills: snapshot.skillsConsideradas.map((s) => ({
+        skillId: s.skillId,
+        notaSnapshot: s.nota,
+        estadoSnapshot: s.estado,
+        notaVigente: notaVigentePorSkill.get(s.skillId) ?? null,
+        notaMinima: notaMinimaPorSkill.get(s.skillId) ?? s.notaMinimaExigida,
+        seccionesQueEnsenan: seccionesPorSkill.get(s.skillId) ?? [],
+      })),
+    })
+
+    return {
+      planId: plan.id,
+      asignacionId,
+      fechaCalculoSnapshot: snapshot.fechaCalculo,
+      estaDesactualizado: plan.estaDesactualizado,
+      diff,
+    }
+  }
+
+  /**
+   * `POST /asignaciones/:id/secciones/:seccionId/apertura` — ADMIN o propio.
+   * Idempotente: segundo POST devuelve `yaEstaba=true` sin tocar la fila.
+   * NO audit log (D-S7-D4): la fila `AperturaSeccion` es el audit funcional.
+   * TODO(S10): si la seccion no tiene bloques evaluables, esto podria marcar
+   * el plan como desactualizado si el avance llega a 100% (emitir notif).
+   */
+  async registrarApertura(
+    asignacionId: string,
+    seccionId: string,
+    usuario: SesionUsuario,
+  ): Promise<AperturaSeccionResponse> {
+    const asignacion = await this.prisma.asignacionCurso.findUnique({
+      where: { id: asignacionId },
+      select: {
+        id: true,
+        cursoId: true,
+        colaboradorId: true,
+        rol: true,
+        estadoAsignado: true,
+        estadoVoluntario: true,
+      },
+    })
+    if (!asignacion) {
+      throw new NotFoundException({
+        code: apiErrorCodes.asignacionNoEncontrada,
+        message: `Asignacion ${asignacionId} no encontrada.`,
+      })
+    }
+    if (usuario.rol === RolUsuario.PARTICIPANTE) {
+      const usuarioConColab = await this.prisma.usuario.findUnique({
+        where: { id: usuario.usuarioId },
+        select: { colaboradorId: true },
+      })
+      const colaboradorId = usuarioConColab?.colaboradorId ?? null
+      if (colaboradorId === null || asignacion.colaboradorId !== colaboradorId) {
+        // D-S7-D1: ocultar existencia (404 no 403).
+        throw new NotFoundException({
+          code: apiErrorCodes.asignacionNoEncontrada,
+          message: `Asignacion ${asignacionId} no encontrada.`,
+        })
+      }
+    }
+    if (estaEnEstadoTerminal(asignacion)) {
+      throw new ConflictException({
+        code: apiErrorCodes.conflictAsignacionCerrada,
+        message: "La asignacion esta en estado terminal: no se permiten aperturas.",
+        details: {
+          estadoAsignado: asignacion.estadoAsignado,
+          estadoVoluntario: asignacion.estadoVoluntario,
+        },
+      })
+    }
+
+    // Validar que la seccion pertenece a un modulo habilitado del curso.
+    const seccionValida = await this.prisma.cursoModuloHabilitado.findFirst({
+      where: {
+        cursoId: asignacion.cursoId,
+        modulo: { secciones: { some: { id: seccionId } } },
+      },
+      select: { moduloId: true },
+    })
+    if (!seccionValida) {
+      // D-S7-D1: no revelar si la seccion existe en otro curso.
+      throw new NotFoundException({
+        code: apiErrorCodes.seccionNoEncontrada,
+        message: `Seccion ${seccionId} no encontrada.`,
+      })
+    }
+
+    try {
+      const creado = await this.prisma.aperturaSeccion.create({
+        data: { asignacionId, seccionId },
+        select: { primeraAperturaAt: true },
+      })
+      return {
+        asignacionId,
+        seccionId,
+        primeraAperturaAt: creado.primeraAperturaAt.toISOString(),
+        yaEstaba: false,
+      }
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        const existente = await this.prisma.aperturaSeccion.findUnique({
+          where: {
+            // biome-ignore lint/style/useNamingConvention: composite key Prisma.
+            asignacionId_seccionId: { asignacionId, seccionId },
+          },
+          select: { primeraAperturaAt: true },
+        })
+        if (!existente) {
+          throw error
+        }
+        return {
+          asignacionId,
+          seccionId,
+          primeraAperturaAt: existente.primeraAperturaAt.toISOString(),
+          yaEstaba: true,
+        }
+      }
+      throw error
+    }
   }
 
   // ===== Internals =====
@@ -506,6 +820,224 @@ export class PlanPersonalService {
       })),
       aperturas,
     }) as Awaited<ReturnType<typeof calcularAvance>>
+  }
+
+  // ===== Internals P7c =====
+
+  private async aplicarAgregar(
+    tx: Prisma.TransactionClient,
+    planId: string,
+    cursoId: string,
+    seccionId: string,
+    caracter: "OBLIGATORIA" | "OPCIONAL",
+  ): Promise<void> {
+    const habilitada = await tx.cursoModuloHabilitado.findFirst({
+      where: {
+        cursoId,
+        modulo: { secciones: { some: { id: seccionId } } },
+      },
+      select: { moduloId: true },
+    })
+    if (!habilitada) {
+      throw new NotFoundException({
+        code: apiErrorCodes.seccionNoEncontrada,
+        message: `Seccion ${seccionId} no encontrada.`,
+      })
+    }
+    const seccion = await tx.seccion.findUnique({
+      where: { id: seccionId },
+      select: { moduloId: true },
+    })
+    if (!seccion) {
+      throw new NotFoundException({
+        code: apiErrorCodes.seccionNoEncontrada,
+        message: `Seccion ${seccionId} no encontrada.`,
+      })
+    }
+    const existente = await tx.itemPlan.findUnique({
+      where: {
+        // biome-ignore lint/style/useNamingConvention: composite key Prisma.
+        planId_seccionId: { planId, seccionId },
+      },
+      select: { id: true },
+    })
+    if (existente) {
+      throw new ConflictException({
+        code: apiErrorCodes.conflictSeccionYaEnPlan,
+        message: "La seccion ya esta en el plan.",
+        details: { seccionId },
+      })
+    }
+    await tx.itemPlan.create({
+      data: {
+        planId,
+        moduloId: seccion.moduloId,
+        seccionId,
+        caracter: caracter as PrismaCaracterItemPlan,
+        razon: "AJUSTE_ADMIN" as PrismaRazonItemPlan,
+      },
+    })
+  }
+
+  private async aplicarQuitar(
+    tx: Prisma.TransactionClient,
+    planId: string,
+    seccionId: string,
+  ): Promise<void> {
+    const existente = await tx.itemPlan.findUnique({
+      where: {
+        // biome-ignore lint/style/useNamingConvention: composite key Prisma.
+        planId_seccionId: { planId, seccionId },
+      },
+      select: { id: true },
+    })
+    if (!existente) {
+      throw new NotFoundException({
+        code: apiErrorCodes.seccionNoEnPlan,
+        message: "La seccion no esta en el plan.",
+        details: { seccionId },
+      })
+    }
+    await tx.itemPlan.delete({
+      where: {
+        // biome-ignore lint/style/useNamingConvention: composite key Prisma.
+        planId_seccionId: { planId, seccionId },
+      },
+    })
+  }
+
+  private async aplicarCambiarCaracter(
+    tx: Prisma.TransactionClient,
+    planId: string,
+    seccionId: string,
+    caracter: "OBLIGATORIA" | "OPCIONAL",
+  ): Promise<void> {
+    const existente = await tx.itemPlan.findUnique({
+      where: {
+        // biome-ignore lint/style/useNamingConvention: composite key Prisma.
+        planId_seccionId: { planId, seccionId },
+      },
+      select: { id: true },
+    })
+    if (!existente) {
+      throw new NotFoundException({
+        code: apiErrorCodes.seccionNoEnPlan,
+        message: "La seccion no esta en el plan.",
+        details: { seccionId },
+      })
+    }
+    await tx.itemPlan.update({
+      where: {
+        // biome-ignore lint/style/useNamingConvention: composite key Prisma.
+        planId_seccionId: { planId, seccionId },
+      },
+      data: { caracter: caracter as PrismaCaracterItemPlan },
+    })
+  }
+
+  private async aplicarEximir(
+    tx: Prisma.TransactionClient,
+    planId: string,
+    cursoId: string,
+    skillId: string,
+  ): Promise<void> {
+    const exigida = await tx.cursoSkillExigida.findUnique({
+      where: {
+        // biome-ignore lint/style/useNamingConvention: composite key Prisma.
+        cursoId_skillId: { cursoId, skillId },
+      },
+      select: { skillId: true },
+    })
+    if (!exigida) {
+      throw new NotFoundException({
+        code: apiErrorCodes.skillNoEncontrada,
+        message: `Skill ${skillId} no exigida en el curso.`,
+      })
+    }
+    const itemsAfectados = await tx.itemPlan.findMany({
+      where: {
+        planId,
+        caracter: "OBLIGATORIA",
+        seccion: { skills: { some: { skillId } } },
+      },
+      select: { id: true },
+    })
+    if (itemsAfectados.length === 0) {
+      return
+    }
+    await tx.itemPlan.updateMany({
+      where: { id: { in: itemsAfectados.map((i) => i.id) } },
+      data: { caracter: "OPCIONAL" },
+    })
+  }
+
+  private async registrarAjuste(
+    tx: Prisma.TransactionClient,
+    planId: string,
+    dto: AjustarPlanInput,
+    autorUsuarioId: string,
+    motivo: string,
+  ): Promise<void> {
+    const accion = mapAccionPrisma(dto.accion)
+    const seccionId = dto.accion === "EXIMIR" ? null : dto.seccionId
+    await tx.ajustePlan.create({
+      data: {
+        planId,
+        accion,
+        autorUsuarioId,
+        motivo,
+        seccionId,
+      },
+    })
+  }
+
+  private metadataAuditAjuste(
+    planId: string,
+    asignacionId: string,
+    dto: AjustarPlanInput,
+    motivo: string,
+  ): Prisma.InputJsonValue {
+    const base = {
+      planId,
+      asignacionId,
+      ajuste: dto.accion,
+      motivoLength: motivo.trim().length,
+    }
+    if (dto.accion === "EXIMIR") {
+      return { ...base, skillId: dto.skillId }
+    }
+    return { ...base, seccionId: dto.seccionId }
+  }
+}
+
+function estaEnEstadoTerminal(asignacion: {
+  readonly rol: RolAsignacion
+  readonly estadoAsignado: EstadoAsignado | null
+  readonly estadoVoluntario: EstadoVoluntario | null
+}): boolean {
+  if (asignacion.rol === RolAsignacion.ASIGNADO) {
+    return (
+      asignacion.estadoAsignado === EstadoAsignado.APTO ||
+      asignacion.estadoAsignado === EstadoAsignado.NO_APTO ||
+      asignacion.estadoAsignado === EstadoAsignado.RETIRADO
+    )
+  }
+  return (
+    asignacion.estadoVoluntario === EstadoVoluntario.COMPLETADO ||
+    asignacion.estadoVoluntario === EstadoVoluntario.RETIRADO
+  )
+}
+
+function mapAccionPrisma(accion: AjustarPlanInput["accion"]): AccionAjustePlan {
+  switch (accion) {
+    case "AGREGAR":
+      return AccionAjustePlan.AGREGAR
+    case "QUITAR":
+      return AccionAjustePlan.QUITAR
+    case "EXIMIR":
+      return AccionAjustePlan.EXIMIR
+    case "CAMBIAR_CARACTER":
+      return AccionAjustePlan.CAMBIAR_CARACTER
   }
 }
 

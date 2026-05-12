@@ -257,6 +257,23 @@ export type {
   PlanResponseParticipante,
   PlanResponse,
 } from "./plan-personal"
+// Plan personal — Slice 7 P7c: ajustes manuales + diff + apertura seccion.
+export {
+  ajustarPlanSchema,
+  accionAjustarPlanSchema,
+  caracterAjustePlanSchema,
+} from "./plan-personal"
+export type {
+  AjustarPlanInput,
+  AccionAjustarPlan,
+  CaracterAjustePlan,
+  ImpactoDiffSkill,
+  ImpactoSeccionDiff,
+  DiffSeccionAfectada,
+  DiffSkillItem,
+  PlanDiffResponse,
+  AperturaSeccionResponse,
+} from "./plan-personal"
 export type {
   RolAsignacion,
   OrigenVoluntario,

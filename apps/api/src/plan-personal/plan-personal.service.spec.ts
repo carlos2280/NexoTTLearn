@@ -1,11 +1,16 @@
-import { ConflictException, NotFoundException, UnprocessableEntityException } from "@nestjs/common"
+import {
+  ConflictException,
+  InternalServerErrorException,
+  NotFoundException,
+  UnprocessableEntityException,
+} from "@nestjs/common"
 import { Test, type TestingModule } from "@nestjs/testing"
 import type {
   FichaSnapshotV1,
   PlanResponseAdmin,
   PlanResponseParticipante,
 } from "@nexott-learn/shared-types"
-import { RolAsignacion, RolUsuario } from "@prisma/client"
+import { EstadoAsignado, Prisma, RolAsignacion, RolUsuario } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AuditLogService } from "../common/audit/audit-log.service"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
@@ -38,11 +43,23 @@ interface MockPrisma {
     findUnique: ReturnType<typeof vi.fn>
     findUniqueOrThrow: ReturnType<typeof vi.fn>
   }
-  curso: { findUniqueOrThrow: ReturnType<typeof vi.fn> }
-  cursoSkillExigida: { findMany: ReturnType<typeof vi.fn> }
-  cursoModuloHabilitado: { findMany: ReturnType<typeof vi.fn> }
+  curso: {
+    findUnique: ReturnType<typeof vi.fn>
+    findUniqueOrThrow: ReturnType<typeof vi.fn>
+  }
+  cursoSkillExigida: {
+    findMany: ReturnType<typeof vi.fn>
+    findUnique: ReturnType<typeof vi.fn>
+  }
+  cursoModuloHabilitado: {
+    findMany: ReturnType<typeof vi.fn>
+    findFirst: ReturnType<typeof vi.fn>
+  }
   notaSkill: { findMany: ReturnType<typeof vi.fn> }
-  seccion: { findMany: ReturnType<typeof vi.fn> }
+  seccion: {
+    findMany: ReturnType<typeof vi.fn>
+    findUnique: ReturnType<typeof vi.fn>
+  }
   planEstudio: {
     findUnique: ReturnType<typeof vi.fn>
     create: ReturnType<typeof vi.fn>
@@ -50,11 +67,21 @@ interface MockPrisma {
   }
   itemPlan: {
     findMany: ReturnType<typeof vi.fn>
+    findUnique: ReturnType<typeof vi.fn>
+    create: ReturnType<typeof vi.fn>
+    update: ReturnType<typeof vi.fn>
+    updateMany: ReturnType<typeof vi.fn>
+    delete: ReturnType<typeof vi.fn>
     createMany: ReturnType<typeof vi.fn>
     deleteMany: ReturnType<typeof vi.fn>
   }
+  ajustePlan: { create: ReturnType<typeof vi.fn> }
+  aperturaSeccion: {
+    findMany: ReturnType<typeof vi.fn>
+    findUnique: ReturnType<typeof vi.fn>
+    create: ReturnType<typeof vi.fn>
+  }
   intentoBloque: { findMany: ReturnType<typeof vi.fn> }
-  aperturaSeccion: { findMany: ReturnType<typeof vi.fn> }
   usuario: { findUnique: ReturnType<typeof vi.fn> }
   $transaction: ReturnType<typeof vi.fn>
 }
@@ -65,11 +92,23 @@ function buildPrismaMock(): MockPrisma {
       findUnique: vi.fn(),
       findUniqueOrThrow: vi.fn(),
     },
-    curso: { findUniqueOrThrow: vi.fn() },
-    cursoSkillExigida: { findMany: vi.fn().mockResolvedValue([]) },
-    cursoModuloHabilitado: { findMany: vi.fn().mockResolvedValue([]) },
+    curso: {
+      findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+    },
+    cursoSkillExigida: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findUnique: vi.fn(),
+    },
+    cursoModuloHabilitado: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn(),
+    },
     notaSkill: { findMany: vi.fn().mockResolvedValue([]) },
-    seccion: { findMany: vi.fn().mockResolvedValue([]) },
+    seccion: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findUnique: vi.fn(),
+    },
     planEstudio: {
       findUnique: vi.fn(),
       create: vi.fn(),
@@ -77,11 +116,21 @@ function buildPrismaMock(): MockPrisma {
     },
     itemPlan: {
       findMany: vi.fn().mockResolvedValue([]),
+      findUnique: vi.fn(),
+      create: vi.fn().mockResolvedValue({}),
+      update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      delete: vi.fn().mockResolvedValue({}),
       createMany: vi.fn().mockResolvedValue({ count: 0 }),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    ajustePlan: { create: vi.fn().mockResolvedValue({}) },
+    aperturaSeccion: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findUnique: vi.fn(),
+      create: vi.fn(),
+    },
     intentoBloque: { findMany: vi.fn().mockResolvedValue([]) },
-    aperturaSeccion: { findMany: vi.fn().mockResolvedValue([]) },
     usuario: { findUnique: vi.fn() },
     $transaction: vi.fn(),
   }
@@ -540,5 +589,431 @@ describe("PlanPersonalService.calcularSiAsignado (cierre TODO S7)", () => {
   it("Asignacion inexistente no lanza ni crea (defensa)", async () => {
     prisma.asignacionCurso.findUnique.mockResolvedValue(null)
     await expect(service.calcularSiAsignado(ASIGNACION_ID)).resolves.toBeUndefined()
+  })
+})
+
+// ===========================================================================
+// P7c — Ajustes manuales admin + diff + apertura seccion
+// ===========================================================================
+
+const PLAN_ID = "p0000000-0000-0000-0000-000000000001"
+
+function mockPlanConRolAsignado(): void {
+  prisma.planEstudio.findUnique.mockResolvedValue({
+    id: PLAN_ID,
+    asignacion: { cursoId: CURSO_ID, rol: RolAsignacion.ASIGNADO },
+  })
+}
+
+function mockPlanReadOk(): void {
+  prisma.asignacionCurso.findUnique.mockResolvedValue({
+    id: ASIGNACION_ID,
+    rol: RolAsignacion.ASIGNADO,
+    colaboradorId: COLABORADOR_ID,
+  })
+  prisma.planEstudio.findUnique.mockResolvedValueOnce({
+    id: PLAN_ID,
+    asignacion: { cursoId: CURSO_ID, rol: RolAsignacion.ASIGNADO },
+  })
+  // Para el obtenerPlanInterno posterior.
+  prisma.planEstudio.findUnique.mockResolvedValue({
+    id: PLAN_ID,
+    asignacionId: ASIGNACION_ID,
+    fechaCalculo: new Date("2026-05-11T10:00:00Z"),
+    fichaSnapshot: {
+      fechaCalculo: new Date().toISOString(),
+      versionSnapshot: 1,
+      skillsConsideradas: [],
+    },
+    estaDesactualizado: false,
+  })
+  prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
+}
+
+describe("PlanPersonalService.ajustarPlan (P7c)", () => {
+  it("AGREGAR seccion valida -> create ItemPlan + AjustePlan", async () => {
+    mockPlanReadOk()
+    prisma.cursoModuloHabilitado.findFirst.mockResolvedValue({ moduloId: MODULO_ID_1 })
+    prisma.seccion.findUnique.mockResolvedValue({ moduloId: MODULO_ID_1 })
+    prisma.itemPlan.findUnique.mockResolvedValue(null)
+    prisma.itemPlan.findMany.mockResolvedValue([])
+
+    await service.ajustarPlan(
+      ASIGNACION_ID,
+      { accion: "AGREGAR", seccionId: SECCION_ID_1, caracter: "OBLIGATORIA" },
+      ADMIN_USER_ID,
+      "motivo valido",
+    )
+
+    expect(prisma.itemPlan.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        planId: PLAN_ID,
+        seccionId: SECCION_ID_1,
+        caracter: "OBLIGATORIA",
+        razon: "AJUSTE_ADMIN",
+      }),
+    })
+    expect(prisma.ajustePlan.create).toHaveBeenCalled()
+  })
+
+  it("AGREGAR seccion ya en plan -> 409 conflictSeccionYaEnPlan", async () => {
+    mockPlanConRolAsignado()
+    prisma.cursoModuloHabilitado.findFirst.mockResolvedValue({ moduloId: MODULO_ID_1 })
+    prisma.seccion.findUnique.mockResolvedValue({ moduloId: MODULO_ID_1 })
+    prisma.itemPlan.findUnique.mockResolvedValue({ id: "existente" })
+
+    await expect(
+      service.ajustarPlan(
+        ASIGNACION_ID,
+        { accion: "AGREGAR", seccionId: SECCION_ID_1, caracter: "OBLIGATORIA" },
+        ADMIN_USER_ID,
+        "motivo",
+      ),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.conflictSeccionYaEnPlan } })
+  })
+
+  it("AGREGAR seccion de otro curso -> 404 seccionNoEncontrada", async () => {
+    mockPlanConRolAsignado()
+    prisma.cursoModuloHabilitado.findFirst.mockResolvedValue(null)
+
+    await expect(
+      service.ajustarPlan(
+        ASIGNACION_ID,
+        { accion: "AGREGAR", seccionId: SECCION_ID_1, caracter: "OBLIGATORIA" },
+        ADMIN_USER_ID,
+        "motivo",
+      ),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.seccionNoEncontrada } })
+  })
+
+  it("QUITAR seccion que no esta en plan -> 404 seccionNoEnPlan", async () => {
+    mockPlanConRolAsignado()
+    prisma.itemPlan.findUnique.mockResolvedValue(null)
+
+    await expect(
+      service.ajustarPlan(
+        ASIGNACION_ID,
+        { accion: "QUITAR", seccionId: SECCION_ID_1 },
+        ADMIN_USER_ID,
+        "motivo",
+      ),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.seccionNoEnPlan } })
+  })
+
+  it("QUITAR seccion valida -> delete + AjustePlan", async () => {
+    mockPlanReadOk()
+    prisma.itemPlan.findUnique.mockResolvedValue({ id: "existente" })
+
+    await service.ajustarPlan(
+      ASIGNACION_ID,
+      { accion: "QUITAR", seccionId: SECCION_ID_1 },
+      ADMIN_USER_ID,
+      "motivo",
+    )
+
+    expect(prisma.itemPlan.delete).toHaveBeenCalledWith({
+      where: {
+        // biome-ignore lint/style/useNamingConvention: composite key Prisma.
+        planId_seccionId: { planId: PLAN_ID, seccionId: SECCION_ID_1 },
+      },
+    })
+    expect(prisma.ajustePlan.create).toHaveBeenCalled()
+  })
+
+  it("CAMBIAR_CARACTER OBLIGATORIA->OPCIONAL -> update + AjustePlan", async () => {
+    mockPlanReadOk()
+    prisma.itemPlan.findUnique.mockResolvedValue({ id: "existente" })
+
+    await service.ajustarPlan(
+      ASIGNACION_ID,
+      { accion: "CAMBIAR_CARACTER", seccionId: SECCION_ID_1, caracter: "OPCIONAL" },
+      ADMIN_USER_ID,
+      "motivo",
+    )
+
+    expect(prisma.itemPlan.update).toHaveBeenCalledWith({
+      where: {
+        // biome-ignore lint/style/useNamingConvention: composite key Prisma.
+        planId_seccionId: { planId: PLAN_ID, seccionId: SECCION_ID_1 },
+      },
+      data: { caracter: "OPCIONAL" },
+    })
+    expect(prisma.ajustePlan.create).toHaveBeenCalled()
+  })
+
+  it("EXIMIR skill exigida -> updateMany a OPCIONAL + AjustePlan sin seccionId", async () => {
+    mockPlanReadOk()
+    prisma.cursoSkillExigida.findUnique.mockResolvedValue({ skillId: SKILL_FALTANTE })
+    prisma.itemPlan.findMany.mockResolvedValueOnce([{ id: "item-1" }, { id: "item-2" }])
+
+    await service.ajustarPlan(
+      ASIGNACION_ID,
+      { accion: "EXIMIR", skillId: SKILL_FALTANTE },
+      ADMIN_USER_ID,
+      "motivo",
+    )
+
+    expect(prisma.itemPlan.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ["item-1", "item-2"] } },
+      data: { caracter: "OPCIONAL" },
+    })
+    expect(prisma.ajustePlan.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        accion: "EXIMIR",
+        planId: PLAN_ID,
+        seccionId: null,
+      }),
+    })
+  })
+
+  it("EXIMIR skill no exigida en curso -> 404 skillNoEncontrada", async () => {
+    mockPlanConRolAsignado()
+    prisma.cursoSkillExigida.findUnique.mockResolvedValue(null)
+
+    await expect(
+      service.ajustarPlan(
+        ASIGNACION_ID,
+        { accion: "EXIMIR", skillId: SKILL_FALTANTE },
+        ADMIN_USER_ID,
+        "motivo",
+      ),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.skillNoEncontrada } })
+  })
+
+  it("Plan inexistente -> 404 planNoEncontrado", async () => {
+    prisma.planEstudio.findUnique.mockResolvedValue(null)
+
+    await expect(
+      service.ajustarPlan(
+        ASIGNACION_ID,
+        { accion: "QUITAR", seccionId: SECCION_ID_1 },
+        ADMIN_USER_ID,
+        "motivo",
+      ),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.planNoEncontrado } })
+  })
+
+  it("Plan de asignacion VOLUNTARIO -> 422 conflictAsignacionNoVoluntario", async () => {
+    prisma.planEstudio.findUnique.mockResolvedValue({
+      id: PLAN_ID,
+      asignacion: { cursoId: CURSO_ID, rol: RolAsignacion.VOLUNTARIO },
+    })
+
+    await expect(
+      service.ajustarPlan(
+        ASIGNACION_ID,
+        { accion: "QUITAR", seccionId: SECCION_ID_1 },
+        ADMIN_USER_ID,
+        "motivo",
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException)
+  })
+})
+
+describe("PlanPersonalService.obtenerDiff (P7c)", () => {
+  function mockDiffOk(opts: {
+    notaSnapshot: number | null
+    notaVigente: number | null
+    estadoSnapshot: "NO_CUMPLE" | "CERCA" | "CUMPLE"
+    caracterActual?: "OBLIGATORIA" | "OPCIONAL"
+  }): void {
+    prisma.planEstudio.findUnique.mockResolvedValue({
+      id: PLAN_ID,
+      fechaCalculo: new Date("2026-05-11T10:00:00Z"),
+      estaDesactualizado: false,
+      fichaSnapshot: {
+        fechaCalculo: new Date("2026-05-11T10:00:00Z").toISOString(),
+        versionSnapshot: 1,
+        skillsConsideradas: [
+          {
+            skillId: SKILL_FALTANTE,
+            nota: opts.notaSnapshot,
+            origen: "MANUAL",
+            notaMinimaExigida: 70,
+            brecha: 70 - (opts.notaSnapshot ?? 0),
+            estado: opts.estadoSnapshot,
+          },
+        ],
+      },
+      asignacion: { cursoId: CURSO_ID, colaboradorId: COLABORADOR_ID },
+    })
+    prisma.curso.findUniqueOrThrow.mockResolvedValue({ umbralNoCumple: 10 })
+    prisma.cursoSkillExigida.findMany.mockResolvedValue([
+      { skillId: SKILL_FALTANTE, notaMinima: 70 },
+    ])
+    prisma.notaSkill.findMany.mockResolvedValue([
+      { skillId: SKILL_FALTANTE, notaActual: opts.notaVigente },
+    ])
+    prisma.itemPlan.findMany.mockResolvedValue([
+      {
+        seccionId: SECCION_ID_1,
+        caracter: opts.caracterActual ?? "OBLIGATORIA",
+        seccion: {
+          id: SECCION_ID_1,
+          titulo: "S1",
+          skills: [{ skillId: SKILL_FALTANTE }],
+        },
+      },
+    ])
+  }
+
+  it("nota sube y skill pasa a CUMPLE -> impacto SECCION_DEJA_DE_SER_OBLIGATORIA", async () => {
+    mockDiffOk({
+      notaSnapshot: 40,
+      notaVigente: 90,
+      estadoSnapshot: "NO_CUMPLE",
+      caracterActual: "OBLIGATORIA",
+    })
+    const res = await service.obtenerDiff(ASIGNACION_ID, ADMIN)
+    expect(res.diff).toHaveLength(1)
+    expect(res.diff[0]?.impacto).toBe("SECCION_DEJA_DE_SER_OBLIGATORIA")
+    expect(res.diff[0]?.estadoVigente).toBe("CUMPLE")
+    expect(res.diff[0]?.seccionesAfectadas).toHaveLength(1)
+  })
+
+  it("nota baja y skill pasa a NO_CUMPLE -> impacto SECCION_PASA_A_OBLIGATORIA", async () => {
+    mockDiffOk({
+      notaSnapshot: 80,
+      notaVigente: 30,
+      estadoSnapshot: "CUMPLE",
+      caracterActual: "OPCIONAL",
+    })
+    const res = await service.obtenerDiff(ASIGNACION_ID, ADMIN)
+    expect(res.diff[0]?.impacto).toBe("SECCION_PASA_A_OBLIGATORIA")
+    expect(res.diff[0]?.estadoVigente).toBe("NO_CUMPLE")
+  })
+
+  it("sin cambios -> diff vacio", async () => {
+    mockDiffOk({
+      notaSnapshot: 50,
+      notaVigente: 50,
+      estadoSnapshot: "CERCA",
+      caracterActual: "OBLIGATORIA",
+    })
+    const res = await service.obtenerDiff(ASIGNACION_ID, ADMIN)
+    expect(res.diff).toEqual([])
+  })
+
+  it("PARTICIPANTE -> 404 asignacionNoEncontrada (D-S7-D1)", async () => {
+    await expect(service.obtenerDiff(ASIGNACION_ID, PARTICIPANTE)).rejects.toMatchObject({
+      response: { code: apiErrorCodes.asignacionNoEncontrada },
+    })
+  })
+
+  it("plan sin snapshot -> 404 planNoEncontrado", async () => {
+    prisma.planEstudio.findUnique.mockResolvedValue({
+      id: PLAN_ID,
+      fechaCalculo: new Date(),
+      estaDesactualizado: false,
+      fichaSnapshot: null,
+      asignacion: { cursoId: CURSO_ID, colaboradorId: COLABORADOR_ID },
+    })
+    await expect(service.obtenerDiff(ASIGNACION_ID, ADMIN)).rejects.toMatchObject({
+      response: { code: apiErrorCodes.planNoEncontrado },
+    })
+  })
+
+  it("snapshot invalido -> 500 fichaSnapshotInvalida", async () => {
+    prisma.planEstudio.findUnique.mockResolvedValue({
+      id: PLAN_ID,
+      fechaCalculo: new Date(),
+      estaDesactualizado: false,
+      fichaSnapshot: { foo: "bar" },
+      asignacion: { cursoId: CURSO_ID, colaboradorId: COLABORADOR_ID },
+    })
+    await expect(service.obtenerDiff(ASIGNACION_ID, ADMIN)).rejects.toBeInstanceOf(
+      InternalServerErrorException,
+    )
+  })
+})
+
+describe("PlanPersonalService.registrarApertura (P7c)", () => {
+  function mockAsignacionActiva(): void {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      cursoId: CURSO_ID,
+      colaboradorId: COLABORADOR_ID,
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: EstadoAsignado.EN_PROGRESO,
+      estadoVoluntario: null,
+    })
+    prisma.cursoModuloHabilitado.findFirst.mockResolvedValue({ moduloId: MODULO_ID_1 })
+  }
+
+  it("primera apertura -> create + yaEstaba=false", async () => {
+    mockAsignacionActiva()
+    const fecha = new Date("2026-05-11T12:00:00Z")
+    prisma.aperturaSeccion.create.mockResolvedValue({ primeraAperturaAt: fecha })
+
+    const res = await service.registrarApertura(ASIGNACION_ID, SECCION_ID_1, ADMIN)
+    expect(res.yaEstaba).toBe(false)
+    expect(res.primeraAperturaAt).toBe(fecha.toISOString())
+  })
+
+  it("segunda apertura (P2002) -> findUnique + yaEstaba=true con mismo timestamp", async () => {
+    mockAsignacionActiva()
+    const fecha = new Date("2026-05-11T12:00:00Z")
+    prisma.aperturaSeccion.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("dup", {
+        code: "P2002",
+        clientVersion: "test",
+      }),
+    )
+    prisma.aperturaSeccion.findUnique.mockResolvedValue({ primeraAperturaAt: fecha })
+
+    const res = await service.registrarApertura(ASIGNACION_ID, SECCION_ID_1, ADMIN)
+    expect(res.yaEstaba).toBe(true)
+    expect(res.primeraAperturaAt).toBe(fecha.toISOString())
+  })
+
+  it("seccion de otro curso -> 404 seccionNoEncontrada", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      cursoId: CURSO_ID,
+      colaboradorId: COLABORADOR_ID,
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: EstadoAsignado.EN_PROGRESO,
+      estadoVoluntario: null,
+    })
+    prisma.cursoModuloHabilitado.findFirst.mockResolvedValue(null)
+
+    await expect(
+      service.registrarApertura(ASIGNACION_ID, SECCION_ID_1, ADMIN),
+    ).rejects.toMatchObject({
+      response: { code: apiErrorCodes.seccionNoEncontrada },
+    })
+  })
+
+  it("PARTICIPANTE ajeno -> 404 asignacionNoEncontrada (D-S7-D1)", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      cursoId: CURSO_ID,
+      colaboradorId: "otro-colab",
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: EstadoAsignado.EN_PROGRESO,
+      estadoVoluntario: null,
+    })
+    prisma.usuario.findUnique.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
+
+    await expect(
+      service.registrarApertura(ASIGNACION_ID, SECCION_ID_1, PARTICIPANTE),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.asignacionNoEncontrada } })
+  })
+
+  it("asignacion en estado terminal APTO -> 409 conflictAsignacionCerrada", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      cursoId: CURSO_ID,
+      colaboradorId: COLABORADOR_ID,
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: EstadoAsignado.APTO,
+      estadoVoluntario: null,
+    })
+
+    await expect(
+      service.registrarApertura(ASIGNACION_ID, SECCION_ID_1, ADMIN),
+    ).rejects.toMatchObject({
+      response: { code: apiErrorCodes.conflictAsignacionCerrada },
+    })
   })
 })
