@@ -10,6 +10,7 @@ import { IEmailProvider } from "./email/email-provider.interface"
 import { EMAIL_PROVIDER } from "./email/email-provider.token"
 import { MockEmailProvider } from "./email/mock-email-provider.service"
 import { ResendEmailProvider } from "./email/resend-email-provider.service"
+import { NotificacionesController } from "./notificaciones.controller"
 import { NotificacionesService } from "./notificaciones.service"
 
 /**
@@ -51,6 +52,7 @@ const emailProviderProvider: Provider = {
  */
 @Module({
   imports: [PrismaModule, CifradoModule],
+  controllers: [NotificacionesController],
   providers: [
     MockEmailProvider,
     emailProviderProvider,

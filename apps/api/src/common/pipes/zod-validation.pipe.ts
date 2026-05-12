@@ -1,5 +1,5 @@
 import { ArgumentMetadata, BadRequestException, Injectable, PipeTransform } from "@nestjs/common"
-import { ZodError, ZodSchema } from "zod"
+import { ZodError, ZodType, ZodTypeDef } from "zod"
 import { apiErrorCodes } from "../errors/api-error.codes"
 
 /**
@@ -18,7 +18,10 @@ import { apiErrorCodes } from "../errors/api-error.codes"
  */
 @Injectable()
 export class ZodValidationPipe<T> implements PipeTransform<unknown, T> {
-  constructor(private readonly schema: ZodSchema<T>) {}
+  // `ZodType<T, ZodTypeDef, unknown>` permite schemas con Input distinto del
+  // Output — caso comun cuando se usan `.default()`, `.coerce.*` o
+  // `.transform()` (FIX P10b — listarNotificacionesQuerySchema combina varios).
+  constructor(private readonly schema: ZodType<T, ZodTypeDef, unknown>) {}
 
   transform(value: unknown, metadata: ArgumentMetadata): T {
     const result = this.schema.safeParse(value)

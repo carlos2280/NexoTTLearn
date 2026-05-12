@@ -360,6 +360,25 @@ export type {
   AnularTransversalResponse,
 } from "./transversal"
 
+// Notificaciones P10b — inbox + preferencias (D-S10-C3..C7).
+export {
+  TIPOS_EVENTO_NOTIF,
+  TIPOS_CRITICOS_NOTIF,
+  CANALES_NOTIF,
+  listarNotificacionesQuerySchema,
+  patchPreferenciasNotificacionSchema,
+} from "./notificaciones"
+export type {
+  TipoEventoNotif,
+  CanalNotif,
+  NotificacionResumen,
+  NotificacionResponse,
+  NotificacionBadgeResponse,
+  PreferenciasNotificacionResponse,
+  ListarNotificacionesQuery,
+  PatchPreferenciasNotificacionInput,
+} from "./notificaciones"
+
 // Entrevista IA P8c — schemas y tipos del flujo de entrevista IA final (D89).
 export {
   enviarTurnoSchema,

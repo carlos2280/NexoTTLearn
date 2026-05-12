@@ -170,6 +170,10 @@ export const apiErrorCodes = {
   entrevistaIaNoConfigurada: "ENTREVISTA_IA_NO_CONFIGURADA",
   rubricaNoConfigurada: "RUBRICA_NO_CONFIGURADA",
   rateLimitEntrevistaIa: "RATE_LIMIT_ENTREVISTA_IA",
+  // Notificaciones P10b — inbox + preferencias (D-S10-C7, §19.3 punto 1).
+  notificacionNoEncontrada: "NOTIFICACION_NO_ENCONTRADA",
+  validacionTipoCriticoNoSilenciable: "VALIDACION_TIPO_CRITICO_NO_SILENCIABLE",
+  validacionTipoEnSilenciarYDesilenciar: "VALIDACION_TIPO_EN_SILENCIAR_Y_DESILENCIAR",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]
