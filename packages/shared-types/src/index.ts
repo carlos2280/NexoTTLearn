@@ -526,3 +526,18 @@ export type {
   ListarAuditoriaQuery,
   ExportarAuditoriaQuery,
 } from "./admin"
+
+// Admin — Slice futuro B foundation: 2 visores de logs especificos
+// (log_cambios_curso + historico_estados_asignacion).
+export {
+  ACCIONES_LOG_CURSO,
+  listarLogsCursosQuerySchema,
+  listarLogsAsignacionesQuerySchema,
+} from "./admin"
+export type {
+  AccionLogCursoLiteral,
+  LogCambioCursoResumen,
+  ListarLogsCursosQuery,
+  HistoricoEstadoAsignacionResumen,
+  ListarLogsAsignacionesQuery,
+} from "./admin"

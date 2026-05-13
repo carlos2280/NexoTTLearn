@@ -5,3 +5,16 @@ export {
   exportarAuditoriaQuerySchema,
 } from "./auditoria.schema"
 export type { ListarAuditoriaQuery, ExportarAuditoriaQuery } from "./auditoria.schema"
+
+export {
+  ACCIONES_LOG_CURSO,
+  listarLogsCursosQuerySchema,
+  listarLogsAsignacionesQuerySchema,
+} from "./logs"
+export type {
+  AccionLogCursoLiteral,
+  LogCambioCursoResumen,
+  ListarLogsCursosQuery,
+  HistoricoEstadoAsignacionResumen,
+  ListarLogsAsignacionesQuery,
+} from "./logs"

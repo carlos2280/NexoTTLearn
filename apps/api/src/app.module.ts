@@ -26,6 +26,7 @@ import { EntrevistaIaModule } from "./entrevista-ia/entrevista-ia.module"
 import { EvaluacionInicialModule } from "./evaluacion-inicial/evaluacion-inicial.module"
 import { HealthModule } from "./health/health.module"
 import { IntentosBloqueModule } from "./intentos-bloque/intentos-bloque.module"
+import { LogsModule } from "./logs/logs.module"
 import { NotificacionesModule } from "./notificaciones/notificaciones.module"
 import { PlanPersonalModule } from "./plan-personal/plan-personal.module"
 import { ReportesModule } from "./reportes/reportes.module"
@@ -85,6 +86,7 @@ import { TransversalModule } from "./transversal/transversal.module"
     EntrevistaIaModule,
     ReportesModule,
     AuditoriaModule,
+    LogsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: SesionGuard },

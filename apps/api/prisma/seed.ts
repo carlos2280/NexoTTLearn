@@ -1,9 +1,11 @@
 import {
+  AccionLogCurso,
   EstadoBloque,
   EstadoEmpleado,
   EstadoModulo,
   EstadoSkill,
   PrismaClient,
+  RolAsignacion,
   RolUsuario,
   TipoBloque,
 } from "@prisma/client"
@@ -30,6 +32,13 @@ const SEED_BLOQUE_NODE_1_ID = "33333333-0000-0000-0000-000000000001"
 const SEED_BLOQUE_NODE_2_ID = "33333333-0000-0000-0000-000000000002"
 const SEED_BLOQUE_REACT_1_ID = "33333333-0000-0000-0000-000000000003"
 const SEED_BLOQUE_REACT_2_ID = "33333333-0000-0000-0000-000000000004"
+
+// Slice futuro B foundation — IDs fijos para el helper `seedLogsDemo` no-prod.
+const SEED_CURSO_LOGS_DEMO_ID = "66666666-0000-0000-0000-000000000001"
+const SEED_COLAB_LOGS_DEMO_EMAIL = "logs-demo@nexott.local"
+const SEED_ASIGNACION_LOGS_DEMO_ID = "77777777-0000-0000-0000-000000000001"
+const SEED_LOG_CURSO_ID_PREFIX = "44444444-0000-0000-0000-0000000000"
+const SEED_HIST_ASIG_ID_PREFIX = "55555555-0000-0000-0000-0000000000"
 
 const prisma = new PrismaClient()
 
@@ -208,6 +217,141 @@ async function upsertCatalogoMinimo(): Promise<void> {
   })
 }
 
+/**
+ * Slice futuro B foundation — helper no-prod que siembra datos demo en los dos
+ * visores de logs (`/admin/logs/cursos` y `/admin/logs/asignaciones`).
+ *
+ * Solo se ejecuta cuando `NODE_ENV !== "production"`. Idempotente: cada fila
+ * se identifica por un UUID fijo con `upsert`, asi que correr el seed N veces
+ * deja el estado equivalente a una sola corrida.
+ *
+ * Crea (si no existen):
+ *   - Cliente "Demo Logs" (acepta el `unique nombre`).
+ *   - Curso con UUID fijo (`SEED_CURSO_LOGS_DEMO_ID`).
+ *   - Colaborador `logs-demo@nexott.local` (sin Usuario, solo para ocupar la
+ *     FK de asignacion).
+ *   - Asignacion (`SEED_ASIGNACION_LOGS_DEMO_ID`) sobre el curso anterior.
+ *   - 10 filas `log_cambios_curso` (autor = admin).
+ *   - 10 filas `historico_estados_asignacion` (autor = admin).
+ */
+async function seedLogsDemo(): Promise<void> {
+  const admin = await prisma.usuario.findFirst({
+    where: { colaborador: { email: ADMIN_EMAIL } },
+    select: { id: true },
+  })
+  if (!admin) {
+    return
+  }
+
+  const cliente = await prisma.cliente.upsert({
+    where: { nombre: "Demo Logs" },
+    update: { activo: true, deletedAt: null },
+    create: { nombre: "Demo Logs", activo: true },
+    select: { id: true },
+  })
+
+  await prisma.curso.upsert({
+    where: { id: SEED_CURSO_LOGS_DEMO_ID },
+    update: { titulo: "Curso demo logs", clienteId: cliente.id },
+    create: {
+      id: SEED_CURSO_LOGS_DEMO_ID,
+      titulo: "Curso demo logs",
+      clienteId: cliente.id,
+      fechaInicio: new Date("2026-04-01"),
+      fechaDeadline: new Date("2026-12-31"),
+    },
+  })
+
+  const colabDemo = await prisma.colaborador.upsert({
+    where: { email: SEED_COLAB_LOGS_DEMO_EMAIL },
+    update: { nombre: "Demo Logs", estadoEmpleado: EstadoEmpleado.ACTIVO },
+    create: {
+      email: SEED_COLAB_LOGS_DEMO_EMAIL,
+      nombre: "Demo Logs",
+      estadoEmpleado: EstadoEmpleado.ACTIVO,
+    },
+    select: { id: true },
+  })
+
+  await prisma.asignacionCurso.upsert({
+    where: { id: SEED_ASIGNACION_LOGS_DEMO_ID },
+    update: {},
+    create: {
+      id: SEED_ASIGNACION_LOGS_DEMO_ID,
+      colaboradorId: colabDemo.id,
+      cursoId: SEED_CURSO_LOGS_DEMO_ID,
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: "ASIGNADO",
+    },
+  })
+
+  const accionesDemo: ReadonlyArray<{
+    readonly sufijo: string
+    readonly accion: AccionLogCurso
+    readonly motivo: string
+  }> = [
+    { sufijo: "01", accion: AccionLogCurso.PUBLICACION, motivo: "Publicacion inicial" },
+    { sufijo: "02", accion: AccionLogCurso.CAMBIO_AREAS, motivo: "Reajuste de areas" },
+    { sufijo: "03", accion: AccionLogCurso.CAMBIO_PESOS, motivo: "Pesos 60/30/10" },
+    { sufijo: "04", accion: AccionLogCurso.CAMBIO_OBJETIVOS, motivo: "Nuevos objetivos" },
+    { sufijo: "05", accion: AccionLogCurso.TOGGLE_TRANSVERSAL, motivo: "Activar transversal" },
+    { sufijo: "06", accion: AccionLogCurso.TOGGLE_ENTREVISTA, motivo: "Activar entrevista" },
+    { sufijo: "07", accion: AccionLogCurso.CAMBIO_MODULOS, motivo: "Anadir modulo Node" },
+    { sufijo: "08", accion: AccionLogCurso.CIERRE, motivo: "Cierre manual" },
+    { sufijo: "09", accion: AccionLogCurso.DESHACER_CIERRE, motivo: "Reapertura por error" },
+    { sufijo: "0A", accion: AccionLogCurso.ARCHIVADO, motivo: "Archivado" },
+  ]
+
+  for (const a of accionesDemo) {
+    const id = `${SEED_LOG_CURSO_ID_PREFIX}${a.sufijo}`
+    await prisma.logCambioCurso.upsert({
+      where: { id },
+      update: {},
+      create: {
+        id,
+        cursoId: SEED_CURSO_LOGS_DEMO_ID,
+        autorUsuarioId: admin.id,
+        accion: a.accion,
+        motivo: a.motivo,
+      },
+    })
+  }
+
+  const transicionesDemo: ReadonlyArray<{
+    readonly sufijo: string
+    readonly estadoAnterior: string
+    readonly estadoNuevo: string
+    readonly motivo: string | null
+  }> = [
+    { sufijo: "01", estadoAnterior: "ASIGNADO", estadoNuevo: "EN_PROGRESO", motivo: null },
+    { sufijo: "02", estadoAnterior: "EN_PROGRESO", estadoNuevo: "LISTO", motivo: null },
+    { sufijo: "03", estadoAnterior: "LISTO", estadoNuevo: "APTO", motivo: "Aprobado" },
+    { sufijo: "04", estadoAnterior: "APTO", estadoNuevo: "EN_PROGRESO", motivo: "Reapertura" },
+    { sufijo: "05", estadoAnterior: "EN_PROGRESO", estadoNuevo: "LISTO", motivo: null },
+    { sufijo: "06", estadoAnterior: "LISTO", estadoNuevo: "NO_APTO", motivo: "Bajo umbral" },
+    { sufijo: "07", estadoAnterior: "NO_APTO", estadoNuevo: "EN_PROGRESO", motivo: "Plan B" },
+    { sufijo: "08", estadoAnterior: "EN_PROGRESO", estadoNuevo: "LISTO", motivo: null },
+    { sufijo: "09", estadoAnterior: "LISTO", estadoNuevo: "APTO", motivo: null },
+    { sufijo: "0A", estadoAnterior: "APTO", estadoNuevo: "RETIRADO", motivo: "Baja voluntaria" },
+  ]
+
+  for (const t of transicionesDemo) {
+    const id = `${SEED_HIST_ASIG_ID_PREFIX}${t.sufijo}`
+    await prisma.historicoEstadoAsignacion.upsert({
+      where: { id },
+      update: {},
+      create: {
+        id,
+        asignacionId: SEED_ASIGNACION_LOGS_DEMO_ID,
+        autorUsuarioId: admin.id,
+        estadoAnterior: t.estadoAnterior,
+        estadoNuevo: t.estadoNuevo,
+        motivo: t.motivo,
+      },
+    })
+  }
+}
+
 async function main(): Promise<number> {
   const args = process.argv.slice(2)
 
@@ -226,6 +370,9 @@ async function main(): Promise<number> {
 
   await upsertAdmin()
   await upsertCatalogoMinimo()
+  if (process.env.NODE_ENV !== "production") {
+    await seedLogsDemo()
+  }
   process.stdout.write(
     `Seed completado: ${ADMIN_EMAIL} (rol ADMIN, requiere cambio de password) + catalogo minimo P2\n`,
   )
