@@ -1,10 +1,7 @@
-import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
-import { AvatarIniciales } from "@/shared/components/ui/avatar-iniciales"
 import { Button } from "@/shared/components/ui/button"
 import { Kbd } from "@/shared/components/ui/kbd"
-import { RUTAS } from "@/shared/constants/rutas"
-import { LogOut, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react"
-import { useNavigate } from "react-router-dom"
+import { PanelLeftClose, PanelLeftOpen, Search } from "lucide-react"
+import { AdminUserMenu } from "./admin-user-menu"
 
 interface AdminTopbarProps {
   readonly sidebarColapsado: boolean
@@ -17,9 +14,6 @@ export function AdminTopbar({
   onAlternarSidebar,
   onAbrirPaleta,
 }: AdminTopbarProps) {
-  const { data: usuario } = useUsuarioActual()
-  const navigate = useNavigate()
-
   const IconoToggle = sidebarColapsado ? PanelLeftOpen : PanelLeftClose
   const etiquetaToggle = sidebarColapsado ? "Expandir menú lateral" : "Colapsar menú lateral"
 
@@ -49,28 +43,8 @@ export function AdminTopbar({
         </span>
       </button>
 
-      <div className="ml-auto flex items-center gap-2">
-        {usuario ? (
-          <button
-            type="button"
-            onClick={() => navigate(RUTAS.cuenta)}
-            aria-label="Ir a mi cuenta"
-            className="flex items-center gap-2 rounded-pill py-1 pr-3 pl-1 transition-colors duration-fast ease-default hover:bg-subtle focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
-          >
-            <AvatarIniciales nombre={usuario.nombre} tamano="sm" />
-            <span className="hidden text-body-sm text-text-primary sm:inline">
-              {usuario.nombre}
-            </span>
-          </button>
-        ) : null}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate(RUTAS.logout)}
-          aria-label="Cerrar sesión"
-        >
-          <LogOut className="h-4 w-4" aria-hidden={true} />
-        </Button>
+      <div className="ml-auto">
+        <AdminUserMenu />
       </div>
     </div>
   )

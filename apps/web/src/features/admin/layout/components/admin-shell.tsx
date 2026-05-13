@@ -16,7 +16,7 @@ export function AdminShell() {
       <div className="flex h-screen overflow-hidden bg-canvas">
         <aside
           className={cn(
-            "hidden shrink-0 overflow-y-auto border-border border-r bg-subtle transition-[width] duration-base ease-default md:block",
+            "hidden shrink-0 overflow-y-auto border-border-strong border-r bg-canvas transition-[width] duration-base ease-default md:block",
             colapsado ? "w-16" : "w-[260px]",
           )}
         >
