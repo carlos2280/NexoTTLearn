@@ -48,13 +48,17 @@ interface MockPrisma {
     count: ReturnType<typeof vi.fn>
   }
   colaborador: { findMany: ReturnType<typeof vi.fn> }
-  usuario: { findUnique: ReturnType<typeof vi.fn> }
+  usuario: {
+    findUnique: ReturnType<typeof vi.fn>
+    findMany: ReturnType<typeof vi.fn>
+  }
   // Plan personal (S7): los mocks por defecto simulan "sin items
   // obligatorios" para que `evaluarCondicionesListo` devuelva planCompleto=true
   // y los tests existentes de marcarListo/reabrirCaso sigan verdes.
   planEstudio: {
     findUnique: ReturnType<typeof vi.fn>
     updateMany: ReturnType<typeof vi.fn>
+    count: ReturnType<typeof vi.fn>
   }
   itemPlan: { findMany: ReturnType<typeof vi.fn> }
   intentoBloque: { findMany: ReturnType<typeof vi.fn> }
@@ -81,13 +85,22 @@ function buildPrismaMock(): MockPrisma {
     historicoEstadoAsignacion: { create: vi.fn(), findMany: vi.fn(), count: vi.fn() },
     curso: { findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), findMany: vi.fn(), count: vi.fn() },
     colaborador: { findMany: vi.fn() },
-    usuario: { findUnique: vi.fn() },
+    usuario: {
+      findUnique: vi.fn(),
+      // P11.5b: broadcastAdminsActivos consulta admins activos. Default vacio
+      // para que los tests existentes no emitan notificaciones admin.
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     planEstudio: {
       // Default: plan existente con 0 items obligatorios -> planCompleto=true
       // vacuamente. Los tests que necesiten "sin plan" sobreescriben con
       // `mockResolvedValueOnce(null)`.
       findUnique: vi.fn().mockResolvedValue({ id: "plan-mock" }),
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      // P11.5b: notificarPlanesDesactualizadosPorReabrir cuenta planes
+      // marcados. Default 0 para que NO emita notificacion broadcast por
+      // defecto.
+      count: vi.fn().mockResolvedValue(0),
     },
     itemPlan: { findMany: vi.fn().mockResolvedValue([]) },
     intentoBloque: { findMany: vi.fn().mockResolvedValue([]) },
@@ -1679,5 +1692,181 @@ describe("AsignacionesService P11.5a — CASO_REABIERTO en reabrirCaso", () => {
       autorUsuarioId: ADMIN_ID,
     })
     expect(res.nuevo).toBe(true)
+  })
+})
+
+describe("AsignacionesService P11.5b — COLABORADOR_LISTO en marcarListo", () => {
+  function configurarFindUniqueParaNotifListo(): void {
+    prisma.asignacionCurso.findUnique.mockImplementation(
+      (args: { select?: Record<string, unknown> }) => {
+        if (args.select && "curso" in args.select && "colaborador" in args.select) {
+          return Promise.resolve({
+            curso: { id: CURSO_ID, titulo: "Curso para LISTO" },
+            colaborador: { id: COLABORADOR_ID, nombre: "Ana Lopez" },
+          })
+        }
+        return Promise.resolve({
+          id: ASIGNACION_ID,
+          rol: RolAsignacion.ASIGNADO,
+          cursoId: CURSO_ID,
+          estadoAsignado: "EN_PROGRESO",
+          estadoVoluntario: null,
+        })
+      },
+    )
+    prisma.curso.findUniqueOrThrow = vi.fn().mockResolvedValue({
+      transversalId: null,
+      entrevistaIaId: null,
+      toggleCierreAutomatico: false,
+    })
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({ estadoAsignado: "LISTO" }),
+    )
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+  }
+
+  it("broadcast a admins activos tras transicion EN_PROGRESO -> LISTO", async () => {
+    configurarFindUniqueParaNotifListo()
+    prisma.usuario.findMany.mockResolvedValue([{ id: "admin-1" }, { id: "admin-2" }])
+
+    await service.marcarListo(ASIGNACION_ID, ADMIN_ID)
+
+    expect(notificaciones.crear).toHaveBeenCalledTimes(2)
+    expect(notificaciones.crear).toHaveBeenCalledWith({
+      usuarioId: "admin-1",
+      tipo: "COLABORADOR_LISTO",
+      payload: expect.objectContaining({
+        asignacionId: ASIGNACION_ID,
+        cursoId: CURSO_ID,
+        cursoTitulo: "Curso para LISTO",
+        colaboradorId: COLABORADOR_ID,
+        colaboradorNombre: "Ana Lopez",
+      }),
+    })
+  })
+
+  it("NO emite si la transicion falla con 409 (count===0)", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      cursoId: CURSO_ID,
+      estadoAsignado: "EN_PROGRESO",
+      estadoVoluntario: null,
+    })
+    prisma.curso.findUniqueOrThrow = vi.fn().mockResolvedValue({
+      transversalId: null,
+      entrevistaIaId: null,
+      toggleCierreAutomatico: false,
+    })
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 0 })
+
+    await expect(service.marcarListo(ASIGNACION_ID, ADMIN_ID)).rejects.toMatchObject({
+      response: { code: apiErrorCodes.conflictAsignacionEstado },
+    })
+    expect(notificaciones.crear).not.toHaveBeenCalled()
+  })
+
+  it("error de notificaciones.crear NO propaga al admin (best-effort)", async () => {
+    configurarFindUniqueParaNotifListo()
+    prisma.usuario.findMany.mockResolvedValue([{ id: "admin-1" }])
+    notificaciones.crear.mockRejectedValueOnce(new Error("resend down"))
+
+    const res = await service.marcarListo(ASIGNACION_ID, ADMIN_ID)
+    expect(res.estadoAsignado).toBe("LISTO")
+  })
+})
+
+describe("AsignacionesService P11.5b — PLANES_DESACTUALIZADOS en reabrirCaso", () => {
+  const idempKey = "66666666-6666-6666-6666-666666666666"
+
+  function configurarReabrirOk(): void {
+    prisma.asignacionCurso.findUnique.mockImplementation(
+      (args: { select?: Record<string, unknown> }) => {
+        if (args.select && "curso" in args.select && "colaborador" in args.select) {
+          return Promise.resolve({
+            curso: { id: CURSO_ID, titulo: "Curso X" },
+            colaborador: { usuario: { id: PARTICIPANTE_ID } },
+          })
+        }
+        if (args.select && "cursoId" in args.select && !("colaborador" in args.select)) {
+          return Promise.resolve({ cursoId: CURSO_ID })
+        }
+        return Promise.resolve({
+          id: ASIGNACION_ID,
+          rol: RolAsignacion.ASIGNADO,
+          estadoAsignado: "APTO",
+          estadoVoluntario: null,
+        })
+      },
+    )
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue(
+      asignacionRow({ estadoAsignado: "EN_PROGRESO" }),
+    )
+    prisma.historicoEstadoAsignacion.create.mockResolvedValue({})
+  }
+
+  it("emite broadcast PLANES_DESACTUALIZADOS driver=reabrir_caso solo si count>=1", async () => {
+    configurarReabrirOk()
+    prisma.planEstudio.count.mockResolvedValue(1)
+    prisma.usuario.findMany.mockResolvedValue([{ id: "admin-1" }])
+
+    await service.reabrirCaso({
+      asignacionId: ASIGNACION_ID,
+      motivo: "x",
+      idempotencyKey: idempKey,
+      autorUsuarioId: ADMIN_ID,
+    })
+
+    const llamadasPlanes = notificaciones.crear.mock.calls.filter(
+      (c) => (c[0] as { tipo: string }).tipo === "PLANES_DESACTUALIZADOS",
+    )
+    expect(llamadasPlanes).toHaveLength(1)
+    expect(llamadasPlanes[0]?.[0]).toMatchObject({
+      usuarioId: "admin-1",
+      tipo: "PLANES_DESACTUALIZADOS",
+      payload: { driver: "reabrir_caso", cursoId: CURSO_ID, planesAfectados: 1 },
+    })
+  })
+
+  it("NO emite PLANES_DESACTUALIZADOS si count===0", async () => {
+    configurarReabrirOk()
+    prisma.planEstudio.count.mockResolvedValue(0)
+    prisma.usuario.findMany.mockResolvedValue([{ id: "admin-1" }])
+
+    await service.reabrirCaso({
+      asignacionId: ASIGNACION_ID,
+      motivo: "x",
+      idempotencyKey: idempKey,
+      autorUsuarioId: ADMIN_ID,
+    })
+
+    const llamadasPlanes = notificaciones.crear.mock.calls.filter(
+      (c) => (c[0] as { tipo: string }).tipo === "PLANES_DESACTUALIZADOS",
+    )
+    expect(llamadasPlanes).toHaveLength(0)
+  })
+
+  it("NO emite PLANES_DESACTUALIZADOS en replay (post-cache)", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      estadoAsignado: "EN_PROGRESO",
+      estadoVoluntario: null,
+    })
+    const cached = { id: ASIGNACION_ID, estadoAsignado: "EN_PROGRESO" } as unknown as Asignacion
+    idempotency.runOnce.mockResolvedValueOnce({ status: 200, body: cached, replay: true })
+    prisma.planEstudio.count.mockResolvedValue(1)
+    prisma.usuario.findMany.mockResolvedValue([{ id: "admin-1" }])
+
+    await service.reabrirCaso({
+      asignacionId: ASIGNACION_ID,
+      motivo: "x",
+      idempotencyKey: idempKey,
+      autorUsuarioId: ADMIN_ID,
+    })
+
+    expect(notificaciones.crear).not.toHaveBeenCalled()
   })
 })

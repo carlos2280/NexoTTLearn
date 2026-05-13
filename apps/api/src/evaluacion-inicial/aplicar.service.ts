@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from "@nestjs/common"
@@ -11,10 +12,12 @@ import {
   previewCambiosArraySchema,
   previewRechazosArraySchema,
 } from "@nexott-learn/shared-types"
-import { OrigenNotaSkill, Prisma } from "@prisma/client"
+import { OrigenNotaSkill, Prisma, TipoEventoNotif } from "@prisma/client"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
+import { broadcastAdminsActivos } from "../notificaciones/notificaciones.helpers"
+import { NotificacionesService } from "../notificaciones/notificaciones.service"
 
 const IDEMPOTENCY_SCOPE = "evaluacion-inicial.aplicar"
 const HTTP_OK = 200
@@ -62,9 +65,12 @@ interface AplicarRunResult {
  */
 @Injectable()
 export class AplicarService {
+  private readonly logger = new Logger(AplicarService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly idempotency: IdempotencyService,
+    private readonly notificaciones: NotificacionesService,
   ) {}
 
   async aplicar(input: AplicarInput): Promise<AplicarRunResult> {
@@ -90,6 +96,21 @@ export class AplicarService {
       },
       ejecutor: (tx) => this.ejecutarAplicar(tx, input),
     })
+
+    if (!ejecucion.replay) {
+      // D-AUDIT-2 / R-S11.5-1: notificaciones FUERA del runOnce y solo si no
+      // es replay. EXCEL_CARGADO va al admin actor (1-a-1, critico).
+      // PLANES_DESACTUALIZADOS va broadcast a admins (silenciable) solo si
+      // la carga marco >=1 plan como desactualizado (D-S11.5-B3 (a), D80).
+      await this.notificarExcelCargado(input, ejecucion.body)
+      if (ejecucion.body.planesMarcadosDesactualizados > 0) {
+        await this.notificarPlanesDesactualizadosPorRecarga(
+          input.cursoId,
+          ejecucion.body.planesMarcadosDesactualizados,
+        )
+      }
+    }
+
     return ejecucion
   }
 
@@ -299,5 +320,64 @@ export class AplicarService {
 
   private clavePar(colaboradorId: string, skillId: string): string {
     return `${colaboradorId}::${skillId}`
+  }
+
+  /**
+   * Trigger EXCEL_CARGADO (D-S11.5-B2, D88). Tipo critico (operativo). 1-a-1
+   * al admin actor — NO broadcast, porque la confirmacion de "tu carga
+   * termino" es informacion personal del usuario que la disparo. La identidad
+   * (`input.usuarioId`) viene del controller validada via sesion (NUNCA del
+   * body — A01). Errores se loggean sin propagar (R-S10-2 / R-S11.5-2).
+   */
+  private async notificarExcelCargado(input: AplicarInput, body: AplicarResponse): Promise<void> {
+    try {
+      await this.notificaciones.crear({
+        usuarioId: input.usuarioId,
+        tipo: TipoEventoNotif.EXCEL_CARGADO,
+        payload: {
+          cursoId: input.cursoId,
+          cargaId: body.cargaId,
+          skillsActualizadas: body.skillsActualizadas,
+          colaboradoresActualizados: body.colaboradoresActualizados,
+          planesMarcadosDesactualizados: body.planesMarcadosDesactualizados,
+        },
+      })
+    } catch (error) {
+      const detalle = error instanceof Error ? error.message : String(error)
+      this.logger.warn(
+        `notif | fallo | tipo=EXCEL_CARGADO | carga=${body.cargaId} | error=${detalle}`,
+      )
+    }
+  }
+
+  /**
+   * Trigger PLANES_DESACTUALIZADOS driver `recarga_excel` (D-S11.5-B3 (a),
+   * D80). Tipo silenciable. Broadcast a TODOS los admins activos cuando la
+   * aplicacion del Excel marco >=1 plan como desactualizado. La identidad
+   * (cursoId) viene de `AplicarInput` validado server-side (NUNCA del body
+   * crudo — A01). Errores se loggean sin propagar (R-S10-2 / R-S11.5-2).
+   */
+  private async notificarPlanesDesactualizadosPorRecarga(
+    cursoId: string,
+    planesAfectados: number,
+  ): Promise<void> {
+    try {
+      await broadcastAdminsActivos(
+        this.prisma,
+        this.notificaciones,
+        this.logger,
+        TipoEventoNotif.PLANES_DESACTUALIZADOS,
+        {
+          driver: "recarga_excel",
+          cursoId,
+          planesAfectados,
+        },
+      )
+    } catch (error) {
+      const detalle = error instanceof Error ? error.message : String(error)
+      this.logger.warn(
+        `notif | fallo | tipo=PLANES_DESACTUALIZADOS | curso=${cursoId} | error=${detalle}`,
+      )
+    }
   }
 }

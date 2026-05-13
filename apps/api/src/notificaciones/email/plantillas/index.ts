@@ -4,15 +4,28 @@ import {
   esAsignacionCursoPayload,
 } from "../../payload/asignacion-curso.payload"
 import { CasoReabiertoPayload, esCasoReabiertoPayload } from "../../payload/caso-reabierto.payload"
+import {
+  ColaboradorListoPayload,
+  esColaboradorListoPayload,
+} from "../../payload/colaborador-listo.payload"
 import { CursoDeadlinePayload, esCursoDeadlinePayload } from "../../payload/curso-deadline.payload"
 import {
   EntrevistaIaDisponiblePayload,
   esEntrevistaIaDisponiblePayload,
 } from "../../payload/entrevista-ia-disponible.payload"
+import { ExcelCargadoPayload, esExcelCargadoPayload } from "../../payload/excel-cargado.payload"
+import {
+  ModuloHuerfanoSkillPayload,
+  esModuloHuerfanoSkillPayload,
+} from "../../payload/modulo-huerfano-skill.payload"
 import {
   PlanRecalculadoPayload,
   esPlanRecalculadoPayload,
 } from "../../payload/plan-recalculado.payload"
+import {
+  PlanesDesactualizadosPayload,
+  esPlanesDesactualizadosPayload,
+} from "../../payload/planes-desactualizados.payload"
 import {
   ResultadoCierrePayload,
   esResultadoCierrePayload,
@@ -23,13 +36,17 @@ import {
 } from "../../payload/transversal-disponible.payload"
 import { construirAsignacionCurso } from "./asignacion-curso.template"
 import { construirCasoReabierto } from "./caso-reabierto.template"
+import { construirColaboradorListo } from "./colaborador-listo.template"
 import { construirCursoDeadline } from "./curso-deadline.template"
 import { construirEntrevistaIaDisponible } from "./entrevista-ia-disponible.template"
+import { construirExcelCargado } from "./excel-cargado.template"
+import { construirModuloHuerfanoSkill } from "./modulo-huerfano-skill.template"
 import {
   PlantillaContexto,
   PlantillaResultado,
   construirPlanRecalculado,
 } from "./plan-recalculado.template"
+import { construirPlanesDesactualizados } from "./planes-desactualizados.template"
 import { construirResultadoCierre } from "./resultado-cierre.template"
 import { construirTransversalDisponible } from "./transversal-disponible.template"
 
@@ -87,6 +104,26 @@ const ENTRY_ENTREVISTA_IA_DISPONIBLE: PlantillaEntry<EntrevistaIaDisponiblePaylo
   construir: construirEntrevistaIaDisponible,
 }
 
+const ENTRY_COLABORADOR_LISTO: PlantillaEntry<ColaboradorListoPayload> = {
+  esPayloadValido: esColaboradorListoPayload,
+  construir: construirColaboradorListo,
+}
+
+const ENTRY_EXCEL_CARGADO: PlantillaEntry<ExcelCargadoPayload> = {
+  esPayloadValido: esExcelCargadoPayload,
+  construir: construirExcelCargado,
+}
+
+const ENTRY_PLANES_DESACTUALIZADOS: PlantillaEntry<PlanesDesactualizadosPayload> = {
+  esPayloadValido: esPlanesDesactualizadosPayload,
+  construir: construirPlanesDesactualizados,
+}
+
+const ENTRY_MODULO_HUERFANO_SKILL: PlantillaEntry<ModuloHuerfanoSkillPayload> = {
+  esPayloadValido: esModuloHuerfanoSkillPayload,
+  construir: construirModuloHuerfanoSkill,
+}
+
 export const PLANTILLAS: ReadonlyMap<TipoEventoNotif, PlantillaEntry<unknown>> = new Map<
   TipoEventoNotif,
   PlantillaEntry<unknown>
@@ -101,6 +138,10 @@ export const PLANTILLAS: ReadonlyMap<TipoEventoNotif, PlantillaEntry<unknown>> =
     TipoEventoNotif.ENTREVISTA_IA_DISPONIBLE,
     ENTRY_ENTREVISTA_IA_DISPONIBLE as PlantillaEntry<unknown>,
   ],
+  [TipoEventoNotif.COLABORADOR_LISTO, ENTRY_COLABORADOR_LISTO as PlantillaEntry<unknown>],
+  [TipoEventoNotif.EXCEL_CARGADO, ENTRY_EXCEL_CARGADO as PlantillaEntry<unknown>],
+  [TipoEventoNotif.PLANES_DESACTUALIZADOS, ENTRY_PLANES_DESACTUALIZADOS as PlantillaEntry<unknown>],
+  [TipoEventoNotif.MODULO_HUERFANO_SKILL, ENTRY_MODULO_HUERFANO_SKILL as PlantillaEntry<unknown>],
 ])
 
 /**

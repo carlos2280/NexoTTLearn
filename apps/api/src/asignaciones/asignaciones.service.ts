@@ -31,6 +31,7 @@ import { buildPaginatedResponse, resolvePaginacion } from "../common/http/pagina
 import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
+import { broadcastAdminsActivos } from "../notificaciones/notificaciones.helpers"
 import { NotificacionesService } from "../notificaciones/notificaciones.service"
 import { ResultadoCierre } from "../notificaciones/payload/resultado-cierre.payload"
 import { PlanPersonalService } from "../plan-personal/plan-personal.service"
@@ -644,7 +645,7 @@ export class AsignacionesService {
       previa.rol === RolAsignacion.VOLUNTARIO ? "LISTO" : null,
     )
 
-    return await this.prisma.$transaction(async (tx) => {
+    const asignacion = await this.prisma.$transaction(async (tx) => {
       const r = await tx.asignacionCurso.updateMany({
         where:
           previa.rol === RolAsignacion.ASIGNADO
@@ -674,9 +675,18 @@ export class AsignacionesService {
         where: { id: asignacionId },
         select: SELECT_ASIGNACION_FIELDS,
       })
-      // TODO(S11): emitir notificacion COLABORADOR_LISTO al admin del curso (D88).
+      // (S11.5) emitido via notificarColaboradorListo (D-S11.5-B1, D88) FUERA
+      // del $transaction. marcarListo no aplica idempotencia explicita: la
+      // unicidad la garantiza la transicion EN_PROGRESO -> LISTO (count==0
+      // ya causo throw arriba), por lo que NO se necesita guard !replay.
       return toAsignacion(row)
     })
+
+    // R-S10-2 / R-S11.5-2: notificacion FUERA del $transaction. Fallos in-app
+    // o de Resend NO deben deshacer la transicion de estado.
+    await this.notificarColaboradorListo(asignacionId)
+
+    return asignacion
   }
 
   /**
@@ -944,18 +954,21 @@ export class AsignacionesService {
           where: { asignacionId: input.asignacionId },
           data: { estaDesactualizado: true },
         })
-        // (S11.5) emitido via notificarCasoReabierto FUERA del runOnce — ver
-        // bloque post-ejecucion (D-AUDIT-2 / R-S11.5-1).
-        // TODO(S11): emitir notificacion PLAN_DESACTUALIZADO al admin (D-S7-D3).
+        // (S11.5) emitido via notificarCasoReabierto + notificarPlanesDesactualizadosPorReabrir
+        // FUERA del runOnce (D-S11.5-B3, D-AUDIT-2 / R-S11.5-1). El primero al
+        // colaborador (critico), el segundo broadcast a admins (silenciable).
         return { status: HTTP_OK, body: toAsignacion(row) }
       },
     })
 
     if (!ejecucion.replay) {
-      // D-AUDIT-2 / R-S11.5-1: notificacion FUERA del runOnce. Si la accion
-      // fue un replay idempotente, NO se reemite. CASO_REABIERTO es critico
+      // D-AUDIT-2 / R-S11.5-1: notificaciones FUERA del runOnce. Si la accion
+      // fue un replay idempotente, NO se reemiten. CASO_REABIERTO es critico
       // (D-S11.5-A2) — el guard EX_EMPLEADO se aplica en el service de notif.
       await this.notificarCasoReabierto(input.asignacionId, input.motivo)
+      // D-S11.5-B3 (b): reabrir individual marca planes como desactualizados
+      // (§9.5). El broadcast a admins solo se emite si hay >=1 plan afectado.
+      await this.notificarPlanesDesactualizadosPorReabrir(input.asignacionId)
     }
 
     return { asignacion: ejecucion.body, nuevo: !ejecucion.replay }
@@ -1315,6 +1328,104 @@ export class AsignacionesService {
       const detalle = error instanceof Error ? error.message : String(error)
       this.logger.warn(
         `notif | fallo | tipo=CASO_REABIERTO | asignacion=${asignacionId} | error=${detalle}`,
+      )
+    }
+  }
+
+  /**
+   * Trigger COLABORADOR_LISTO (D-S11.5-B1, D88). Tipo silenciable. Broadcast a
+   * TODOS los admins activos via `broadcastAdminsActivos`. La identidad del
+   * recurso se resuelve via `findUnique` proyectando solo lo necesario (A01).
+   * Cualquier error se loggea sin propagar al admin que disparo marcarListo
+   * (R-S10-2 / R-S11.5-2). Se invoca FUERA del `$transaction` que cerro la
+   * transicion EN_PROGRESO -> LISTO; no necesita guard !replay porque
+   * marcarListo no usa runOnce (la unicidad la garantiza la transicion).
+   */
+  private async notificarColaboradorListo(asignacionId: string): Promise<void> {
+    try {
+      const asignacion = await this.prisma.asignacionCurso.findUnique({
+        where: { id: asignacionId },
+        select: {
+          curso: { select: { id: true, titulo: true } },
+          colaborador: { select: { id: true, nombre: true } },
+        },
+      })
+      const cursoId = asignacion?.curso?.id
+      const cursoTitulo = asignacion?.curso?.titulo
+      const colaboradorId = asignacion?.colaborador?.id
+      const colaboradorNombre = asignacion?.colaborador?.nombre
+      if (!(cursoId && cursoTitulo && colaboradorId && colaboradorNombre)) {
+        this.logger.warn(
+          `notif | colaborador-listo omitida | asignacion=${asignacionId} | motivo=sin-curso-o-colaborador`,
+        )
+        return
+      }
+      await broadcastAdminsActivos(
+        this.prisma,
+        this.notificaciones,
+        this.logger,
+        TipoEventoNotif.COLABORADOR_LISTO,
+        {
+          asignacionId,
+          cursoId,
+          cursoTitulo,
+          colaboradorId,
+          colaboradorNombre,
+        },
+      )
+    } catch (error) {
+      const detalle = error instanceof Error ? error.message : String(error)
+      this.logger.warn(
+        `notif | fallo | tipo=COLABORADOR_LISTO | asignacion=${asignacionId} | error=${detalle}`,
+      )
+    }
+  }
+
+  /**
+   * Trigger PLANES_DESACTUALIZADOS driver `reabrir_caso` (D-S11.5-B3 (b), D80,
+   * §9.5). Tipo silenciable. Broadcast a TODOS los admins activos solo si
+   * existen planes marcados como desactualizados para la asignacion reabierta
+   * (count >= 1). El `cursoId` se resuelve a partir de la asignacion (identidad
+   * del recurso, NUNCA del body — A01). Cualquier error se loggea sin propagar
+   * (R-S10-2 / R-S11.5-2). Se invoca FUERA del `runOnce` y solo cuando
+   * `!ejecucion.replay` (D-AUDIT-2 / R-S11.5-1) — el caller controla esa guarda.
+   */
+  private async notificarPlanesDesactualizadosPorReabrir(asignacionId: string): Promise<void> {
+    try {
+      const asignacion = await this.prisma.asignacionCurso.findUnique({
+        where: { id: asignacionId },
+        select: { cursoId: true },
+      })
+      if (!asignacion?.cursoId) {
+        this.logger.warn(
+          `notif | planes-desactualizados omitida | asignacion=${asignacionId} | motivo=sin-curso`,
+        )
+        return
+      }
+      const planesAfectados = await this.prisma.planEstudio.count({
+        where: { asignacionId, estaDesactualizado: true },
+      })
+      if (planesAfectados < 1) {
+        // No hubo planes a desactualizar (caso sin plan generado). El broadcast
+        // se omite — coherente con D-S11.5-B3 ("una sola emision por evento,
+        // solo si N>=1").
+        return
+      }
+      await broadcastAdminsActivos(
+        this.prisma,
+        this.notificaciones,
+        this.logger,
+        TipoEventoNotif.PLANES_DESACTUALIZADOS,
+        {
+          driver: "reabrir_caso",
+          cursoId: asignacion.cursoId,
+          planesAfectados,
+        },
+      )
+    } catch (error) {
+      const detalle = error instanceof Error ? error.message : String(error)
+      this.logger.warn(
+        `notif | fallo | tipo=PLANES_DESACTUALIZADOS | asignacion=${asignacionId} | error=${detalle}`,
       )
     }
   }

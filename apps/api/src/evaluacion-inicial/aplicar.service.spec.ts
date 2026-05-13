@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { RunOnceInput } from "../common/idempotency/idempotency.types"
 import { PrismaService } from "../common/prisma/prisma.service"
+import { NotificacionesService } from "../notificaciones/notificaciones.service"
 import { AplicarService } from "./aplicar.service"
 
 const CURSO_ID = "11111111-1111-1111-1111-111111111111"
@@ -20,6 +21,7 @@ const SKILL_Y = "dddddddd-dddd-dddd-dddd-dddddddddddd"
 
 interface PrismaMock {
   curso: { findUnique: ReturnType<typeof vi.fn> }
+  usuario: { findMany: ReturnType<typeof vi.fn> }
 }
 
 interface TxMock {
@@ -45,7 +47,10 @@ interface TxMock {
 }
 
 function buildPrismaMock(): PrismaMock {
-  return { curso: { findUnique: vi.fn() } }
+  return {
+    curso: { findUnique: vi.fn() },
+    usuario: { findMany: vi.fn().mockResolvedValue([]) },
+  }
 }
 
 function buildTxMock(): TxMock {
@@ -116,20 +121,35 @@ function cambio(
   }
 }
 
+interface NotificacionesMock {
+  crear: ReturnType<typeof vi.fn>
+}
+
+function buildNotificacionesMock(): NotificacionesMock {
+  return {
+    crear: vi
+      .fn()
+      .mockResolvedValue({ creada: true, notificacionId: "n-1", canalesEnviados: ["IN_APP"] }),
+  }
+}
+
 function build(): {
   service: AplicarService
   prisma: PrismaMock
   tx: TxMock
   idempotency: IdempotencyMock
+  notificaciones: NotificacionesMock
 } {
   const prisma = buildPrismaMock()
   const tx = buildTxMock()
   const idempotency = buildIdempotencyMock(tx)
+  const notificaciones = buildNotificacionesMock()
   const service = new AplicarService(
     prisma as unknown as PrismaService,
     idempotency as unknown as IdempotencyService,
+    notificaciones as unknown as NotificacionesService,
   )
-  return { service, prisma, tx, idempotency }
+  return { service, prisma, tx, idempotency, notificaciones }
 }
 
 function cursoOk() {
@@ -378,5 +398,105 @@ describe("AplicarService", () => {
     // No hay AuditLogService inyectado en AplicarService — confirma el patrón.
     // (Si alguna vez se inyecta, este test fallaria al compilar.)
     expect(true).toBe(true)
+  })
+})
+
+describe("AplicarService P11.5b — EXCEL_CARGADO + PLANES_DESACTUALIZADOS", () => {
+  let h: ReturnType<typeof build>
+
+  beforeEach(() => {
+    h = build()
+    h.tx.cargaEvaluacionInicial.create.mockResolvedValue({ id: CARGA_ID })
+    h.tx.previewEvaluacionInicial.updateMany.mockResolvedValue({ count: 1 })
+    h.tx.notaSkill.upsert.mockResolvedValue({ id: "nota-id" })
+    h.tx.notaSkill.findMany.mockResolvedValue([])
+    h.tx.historicoNotaSkill.createMany.mockResolvedValue({ count: 0 })
+    h.tx.planEstudio.findMany.mockResolvedValue([])
+    h.tx.planEstudio.updateMany.mockResolvedValue({ count: 0 })
+    h.tx.cargaEvaluacionInicial.update.mockResolvedValue({ id: CARGA_ID })
+  })
+
+  it("emite EXCEL_CARGADO 1-a-1 al admin actor cuando !replay", async () => {
+    h.prisma.curso.findUnique.mockResolvedValue(cursoOk())
+    h.tx.previewEvaluacionInicial.findUnique.mockResolvedValue(previewBase({ cambios: [] }))
+    await h.service.aplicar(aplicarInput())
+
+    const llamadasExcel = h.notificaciones.crear.mock.calls.filter(
+      (c) => (c[0] as { tipo: string }).tipo === "EXCEL_CARGADO",
+    )
+    expect(llamadasExcel).toHaveLength(1)
+    expect(llamadasExcel[0]?.[0]).toMatchObject({
+      usuarioId: USR_ID,
+      tipo: "EXCEL_CARGADO",
+      payload: {
+        cursoId: CURSO_ID,
+        cargaId: CARGA_ID,
+        skillsActualizadas: 0,
+        colaboradoresActualizados: 0,
+        planesMarcadosDesactualizados: 0,
+      },
+    })
+  })
+
+  it("NO emite EXCEL_CARGADO en replay (idempotencia post-cache)", async () => {
+    h.prisma.curso.findUnique.mockResolvedValue(cursoOk())
+    h.idempotency.runOnce.mockResolvedValueOnce({
+      status: 200,
+      body: {
+        aplicado: true,
+        skillsActualizadas: 0,
+        colaboradoresActualizados: 0,
+        planesMarcadosDesactualizados: 0,
+        planesRecalculados: 0,
+        cargaId: CARGA_ID,
+      },
+      replay: true,
+    })
+    await h.service.aplicar(aplicarInput())
+    expect(h.notificaciones.crear).not.toHaveBeenCalled()
+  })
+
+  it("emite PLANES_DESACTUALIZADOS broadcast cuando planesMarcadosDesactualizados>0", async () => {
+    h.prisma.curso.findUnique.mockResolvedValue(cursoOk())
+    h.prisma.usuario.findMany.mockResolvedValue([{ id: "admin-1" }, { id: "admin-2" }])
+    h.tx.previewEvaluacionInicial.findUnique.mockResolvedValue(
+      previewBase({ cambios: [cambio(COL_A, SKILL_X, 80)] }),
+    )
+    h.tx.notaSkill.findMany.mockResolvedValue([
+      { id: "n1", colaboradorId: COL_A, skillId: SKILL_X },
+    ])
+    h.tx.planEstudio.findMany.mockResolvedValue([{ id: "p1" }, { id: "p2" }])
+    h.tx.planEstudio.updateMany.mockResolvedValue({ count: 2 })
+
+    await h.service.aplicar(aplicarInput())
+    const llamadasPlanes = h.notificaciones.crear.mock.calls.filter(
+      (c) => (c[0] as { tipo: string }).tipo === "PLANES_DESACTUALIZADOS",
+    )
+    expect(llamadasPlanes).toHaveLength(2)
+    expect(llamadasPlanes[0]?.[0]).toMatchObject({
+      usuarioId: "admin-1",
+      tipo: "PLANES_DESACTUALIZADOS",
+      payload: { driver: "recarga_excel", cursoId: CURSO_ID, planesAfectados: 2 },
+    })
+  })
+
+  it("NO emite PLANES_DESACTUALIZADOS si planesMarcadosDesactualizados===0", async () => {
+    h.prisma.curso.findUnique.mockResolvedValue(cursoOk())
+    h.prisma.usuario.findMany.mockResolvedValue([{ id: "admin-1" }])
+    h.tx.previewEvaluacionInicial.findUnique.mockResolvedValue(previewBase({ cambios: [] }))
+    await h.service.aplicar(aplicarInput())
+
+    const llamadasPlanes = h.notificaciones.crear.mock.calls.filter(
+      (c) => (c[0] as { tipo: string }).tipo === "PLANES_DESACTUALIZADOS",
+    )
+    expect(llamadasPlanes).toHaveLength(0)
+  })
+
+  it("error en notificaciones.crear NO propaga al admin (best-effort)", async () => {
+    h.prisma.curso.findUnique.mockResolvedValue(cursoOk())
+    h.tx.previewEvaluacionInicial.findUnique.mockResolvedValue(previewBase({ cambios: [] }))
+    h.notificaciones.crear.mockRejectedValueOnce(new Error("notif down"))
+    const res = await h.service.aplicar(aplicarInput())
+    expect(res.body.aplicado).toBe(true)
   })
 })

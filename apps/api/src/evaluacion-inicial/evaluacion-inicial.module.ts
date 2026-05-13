@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common"
 import { PrismaModule } from "../common/prisma/prisma.module"
+import { NotificacionesModule } from "../notificaciones/notificaciones.module"
 import { AplicarService } from "./aplicar.service"
 import { EvaluacionInicialController } from "./evaluacion-inicial.controller"
 import { ExcelParserService } from "./excel-parser.service"
@@ -20,7 +21,7 @@ import { PreviewService } from "./preview.service"
  * vive en `ColaboradoresModule` con `FichaEdicionService`.
  */
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, NotificacionesModule],
   controllers: [EvaluacionInicialController],
   providers: [
     ExcelTemplateService,

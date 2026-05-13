@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AuditLogService } from "../../common/audit/audit-log.service"
 import { apiErrorCodes } from "../../common/errors/api-error.codes"
 import { PrismaService } from "../../common/prisma/prisma.service"
+import { NotificacionesService } from "../../notificaciones/notificaciones.service"
 import { ModulosService } from "./modulos.service"
 
 interface MockPrisma {
@@ -24,6 +25,7 @@ interface MockPrisma {
   seccion: { count: ReturnType<typeof vi.fn> }
   seccionSkill: { findMany: ReturnType<typeof vi.fn> }
   bloque: { findMany: ReturnType<typeof vi.fn> }
+  usuario: { findMany: ReturnType<typeof vi.fn> }
   $transaction: ReturnType<typeof vi.fn>
 }
 
@@ -45,6 +47,7 @@ function buildPrismaMock(): MockPrisma {
     seccion: { count: vi.fn() },
     seccionSkill: { findMany: vi.fn() },
     bloque: { findMany: vi.fn() },
+    usuario: { findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn(),
   }
   mock.$transaction.mockImplementation(
@@ -60,6 +63,14 @@ function buildPrismaMock(): MockPrisma {
 
 function buildAudit(): { record: ReturnType<typeof vi.fn> } {
   return { record: vi.fn().mockResolvedValue(undefined) }
+}
+
+function buildNotificaciones(): { crear: ReturnType<typeof vi.fn> } {
+  return {
+    crear: vi
+      .fn()
+      .mockResolvedValue({ creada: true, notificacionId: "n-1", canalesEnviados: ["IN_APP"] }),
+  }
 }
 
 const FECHA = new Date("2026-01-01T00:00:00Z")
@@ -79,21 +90,25 @@ function buildModuloRow(overrides: Partial<{ estado: EstadoModulo; titulo: strin
 
 let prisma: MockPrisma
 let audit: ReturnType<typeof buildAudit>
+let notificaciones: ReturnType<typeof buildNotificaciones>
 let service: ModulosService
 let moduleRef: TestingModule
 
 beforeEach(async () => {
   prisma = buildPrismaMock()
   audit = buildAudit()
+  notificaciones = buildNotificaciones()
   moduleRef = await Test.createTestingModule({
     providers: [
       {
         provide: ModulosService,
-        useFactory: (p: PrismaService, a: AuditLogService) => new ModulosService(p, a),
-        inject: [PrismaService, AuditLogService],
+        useFactory: (p: PrismaService, a: AuditLogService, n: NotificacionesService) =>
+          new ModulosService(p, a, n),
+        inject: [PrismaService, AuditLogService, NotificacionesService],
       },
       { provide: PrismaService, useValue: prisma },
       { provide: AuditLogService, useValue: audit },
+      { provide: NotificacionesService, useValue: notificaciones },
     ],
   }).compile()
   service = moduleRef.get(ModulosService)
@@ -225,6 +240,74 @@ describe("ModulosService.archivar", () => {
     const acciones = audit.record.mock.calls.map((c) => (c[0] as { accion: string }).accion)
     expect(acciones).toContain("MODULO_ARCHIVADO")
     expect(acciones).toContain("MODULO_HUERFANO_DETECTADO")
+  })
+})
+
+describe("ModulosService P11.5b — MODULO_HUERFANO_SKILL en archivar", () => {
+  function configurarArchivadoConHuerfana(): void {
+    prisma.modulo.findFirst.mockResolvedValue({ id: MOD_ID, estado: EstadoModulo.ACTIVO })
+    prisma.modulo.update.mockResolvedValue(buildModuloRow({ estado: EstadoModulo.ARCHIVADO }))
+    prisma.cursoModuloHabilitado.findMany.mockImplementation(
+      (args: { where: { moduloId?: string } }) => {
+        if (args.where.moduloId === MOD_ID) {
+          return Promise.resolve([{ cursoId: "curso-1", curso: { titulo: "Curso X" } }])
+        }
+        return Promise.resolve([])
+      },
+    )
+    prisma.cursoSkillExigida.findMany.mockResolvedValue([
+      {
+        skill: {
+          id: "skill-huerfana",
+          etiquetaVisible: "python.fastapi",
+          estado: EstadoSkill.ACTIVA,
+        },
+      },
+    ])
+    prisma.cursoAreaExigida.findMany.mockResolvedValue([])
+  }
+
+  it("broadcast a admins activos solo si skillsHuerfanas.length > 0", async () => {
+    configurarArchivadoConHuerfana()
+    prisma.usuario.findMany.mockResolvedValue([{ id: "admin-1" }, { id: "admin-2" }])
+
+    await service.archivar(MOD_ID, "motivo", ADMIN_ID)
+
+    expect(notificaciones.crear).toHaveBeenCalledTimes(2)
+    expect(notificaciones.crear).toHaveBeenCalledWith({
+      usuarioId: "admin-1",
+      tipo: "MODULO_HUERFANO_SKILL",
+      payload: expect.objectContaining({
+        moduloId: MOD_ID,
+        cursos: [{ cursoId: "curso-1", titulo: "Curso X" }],
+        huerfanas: [
+          {
+            skillId: "skill-huerfana",
+            etiquetaVisible: "python.fastapi",
+            cursosDondeQuedaHuerfana: ["curso-1"],
+          },
+        ],
+      }),
+    })
+  })
+
+  it("NO emite si skillsHuerfanas vacio (preview sin impacto)", async () => {
+    prisma.modulo.findFirst.mockResolvedValue({ id: MOD_ID, estado: EstadoModulo.ACTIVO })
+    prisma.modulo.update.mockResolvedValue(buildModuloRow({ estado: EstadoModulo.ARCHIVADO }))
+    prisma.cursoModuloHabilitado.findMany.mockResolvedValue([])
+    prisma.usuario.findMany.mockResolvedValue([{ id: "admin-1" }])
+
+    await service.archivar(MOD_ID, "motivo", ADMIN_ID)
+    expect(notificaciones.crear).not.toHaveBeenCalled()
+  })
+
+  it("error en notificaciones.crear NO propaga al admin (best-effort)", async () => {
+    configurarArchivadoConHuerfana()
+    prisma.usuario.findMany.mockResolvedValue([{ id: "admin-1" }])
+    notificaciones.crear.mockRejectedValueOnce(new Error("resend down"))
+
+    const res = await service.archivar(MOD_ID, "motivo", ADMIN_ID)
+    expect(res.modulo.estado).toBe("ARCHIVADO")
   })
 })
 

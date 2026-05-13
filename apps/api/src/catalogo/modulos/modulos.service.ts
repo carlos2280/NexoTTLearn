@@ -3,6 +3,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common"
 import {
@@ -22,12 +23,15 @@ import {
   EstadoModulo,
   EstadoSkill,
   Prisma,
+  TipoEventoNotif,
 } from "@prisma/client"
 import { AuditLogService } from "../../common/audit/audit-log.service"
 import { ContextoHttpAuditoria } from "../../common/audit/audit-log.types"
 import { apiErrorCodes } from "../../common/errors/api-error.codes"
 import { buildPaginatedResponse, resolvePaginacion } from "../../common/http/paginated"
 import { PrismaService } from "../../common/prisma/prisma.service"
+import { broadcastAdminsActivos } from "../../notificaciones/notificaciones.helpers"
+import { NotificacionesService } from "../../notificaciones/notificaciones.service"
 
 const SELECT_MODULO_FIELDS = {
   id: true,
@@ -58,9 +62,12 @@ export interface ArchivarModuloResponse {
 
 @Injectable()
 export class ModulosService {
+  private readonly logger = new Logger(ModulosService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
+    private readonly notificaciones: NotificacionesService,
   ) {}
 
   async listar(query: ListarModulosQuery): Promise<Paginated<ModuloResponse>> {
@@ -269,7 +276,7 @@ export class ModulosService {
       ...contexto,
     })
     if (previewImpacto.skillsHuerfanas.length > 0) {
-      // P10 consumira este evento para emitir la notificacion D82.
+      // (S11.5) emitido via notificarModuloHuerfanoSkill (D-S11.5-B4, D88).
       await this.auditLog.record({
         usuarioId: adminUsuarioId,
         accion: AccionAuditoria.MODULO_HUERFANO_DETECTADO,
@@ -286,8 +293,51 @@ export class ModulosService {
         },
         ...contexto,
       })
+      // Notificacion broadcast a admins activos (tipo critico — no silenciable).
+      // FUERA del $transaction (R-S10-2 / R-S11.5-2): un fallo de envio NO
+      // deshace el archivado del modulo ni el audit log que ya quedo escrito.
+      await this.notificarModuloHuerfanoSkill(moduloId, previewImpacto)
     }
     return { modulo: toModuloResponse(modulo), previewImpacto }
+  }
+
+  /**
+   * Trigger MODULO_HUERFANO_SKILL (D-S11.5-B4, D79+D82, D88). Tipo critico —
+   * broadcast a TODOS los admins activos. Solo se invoca si
+   * `previewImpacto.skillsHuerfanas.length > 0` (guard en el caller). Cualquier
+   * error se loggea sin propagar (R-S10-2 / R-S11.5-2). La identidad del
+   * recurso (moduloId, cursos, huerfanas) viene del `previewImpacto` calculado
+   * server-side dentro del `$transaction` previo (A01).
+   */
+  private async notificarModuloHuerfanoSkill(
+    moduloId: string,
+    previewImpacto: PreviewImpactoArchivoModulo,
+  ): Promise<void> {
+    try {
+      await broadcastAdminsActivos(
+        this.prisma,
+        this.notificaciones,
+        this.logger,
+        TipoEventoNotif.MODULO_HUERFANO_SKILL,
+        {
+          moduloId,
+          cursos: previewImpacto.cursosActivosAfectados.map((c) => ({
+            cursoId: c.cursoId,
+            titulo: c.titulo,
+          })),
+          huerfanas: previewImpacto.skillsHuerfanas.map((s) => ({
+            skillId: s.skillId,
+            etiquetaVisible: s.etiquetaVisible,
+            cursosDondeQuedaHuerfana: [...s.cursosDondeQuedaHuerfana],
+          })),
+        },
+      )
+    } catch (error) {
+      const detalle = error instanceof Error ? error.message : String(error)
+      this.logger.warn(
+        `notif | fallo | tipo=MODULO_HUERFANO_SKILL | modulo=${moduloId} | error=${detalle}`,
+      )
+    }
   }
 
   private async calcularImpactoArchivado(

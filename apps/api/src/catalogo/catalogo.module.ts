@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common"
 import { PrismaModule } from "../common/prisma/prisma.module"
+import { NotificacionesModule } from "../notificaciones/notificaciones.module"
 import { AreasController } from "./areas/areas.controller"
 import { AreasService } from "./areas/areas.service"
 import { BloquesController } from "./bloques/bloques.controller"
@@ -21,7 +22,7 @@ import { SkillsService } from "./skills/skills.service"
  * validar referencias en mutaciones.
  */
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, NotificacionesModule],
   controllers: [
     AreasController,
     SkillsController,
