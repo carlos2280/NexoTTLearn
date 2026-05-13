@@ -184,6 +184,8 @@ export const apiErrorCodes = {
   asignacionColaboradorNoCoincide: "ASIGNACION_COLABORADOR_NO_COINCIDE",
   // Reportes P11c estrategicos + autoservicio (D-S11-C1..C11).
   formatoExportNoSoportado: "FORMATO_EXPORT_NO_SOPORTADO",
+  // Auditoria P12 — visor admin (D-S12-A5).
+  filtroDemasiadoAmplio: "FILTRO_DEMASIADO_AMPLIO",
 } as const
 
 export type ApiErrorCode = (typeof apiErrorCodes)[keyof typeof apiErrorCodes]

@@ -193,6 +193,19 @@ const envSchema = z
         "CENTRO_REVISION_CRON debe ser una expresion cron con * 0-9 - , / o espacios",
       )
       .default("0 8 * * *"),
+    // ---------------------------------------------------------------------
+    // Auditoria (Slice 12 P12 — D-S12-A4).
+    //   PURGA_AUDITORIA_CRON — retencion 24 meses en `activity_logs`
+    //                          (default 03:00 UTC; batched LIMIT 1000).
+    // ---------------------------------------------------------------------
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    PURGA_AUDITORIA_CRON: z
+      .string()
+      .regex(
+        /^[*0-9\-,/\s]+$/,
+        "PURGA_AUDITORIA_CRON debe ser una expresion cron con * 0-9 - , / o espacios",
+      )
+      .default("0 3 * * *"),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV !== "production") {

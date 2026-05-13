@@ -22,10 +22,15 @@ const DIST_DISPONIBLE = existsSync(join(DIST_DIR, "app.module.js"))
 // de este e2e. Cobertura del wire: `aplicar.service.spec.ts` valida que
 // EXCEL_CARGADO se emite 1-a-1 al actor solo si !replay, y que la plantilla
 // esta registrada en PLANTILLAS (`tipo-evento.constants.spec.ts`).
-// §5.131 (FIX-P11.5-cierre): parametrizado por env var. Por defecto
-// skipped (mismo issue raíz §5.123 — MockEmailProvider singletons
-// divergentes en Vitest CJS+ESM). Activar con `RUN_E2E_DEFERIDO=1`
-// cuando el bug del provider se resuelva en S12.
+// §5.131 (P12 — Slice 12): el fix D-S12-B1/B2 (globalThis singleton de
+// MockEmailProvider con `Symbol.for`) corrige el reparto de instancias entre
+// realms para el provider de email, pero el spec usa ademas
+// `app.select(EvaluacionInicialModule).get(AplicarService)` que dispara la
+// MISMA familia de fallo CJS+ESM en otro vector: la clase `Module` importada
+// estaticamente desde el spec (ESM) no coincide con la registrada en `dist/`
+// (CJS). Se mantiene skipped por defecto hasta resolver tambien el resolve
+// de modulos en el harness e2e (deuda §5.131 reabierta P12). Activar con
+// `RUN_E2E_DEFERIDO=1` si el harness se arregla en S13.
 const RUN_E2E_DEFERIDO = process.env.RUN_E2E_DEFERIDO === "1"
 const RUN_E2E = HAS_DB_URL && DIST_DISPONIBLE && RUN_E2E_DEFERIDO
 

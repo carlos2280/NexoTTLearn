@@ -1080,9 +1080,8 @@ export class PlanPersonalService {
    * Recalcula todas las asignaciones ASIGNADO no-terminales del curso. Cada
    * recalculo va con try/catch individual (R-S10-2): un fallo aislado no
    * rompe el batch. No audit por-asignacion duplicado (cada `recalcular`
-   * ya emite `PLAN_RECALCULADO`); se anade un audit-resumen con metadata
-   * estructural reusando el mismo enum (TODO(S12) para anadir el valor
-   * `PLAN_RECALCULADO_MASIVO`).
+   * ya emite `PLAN_RECALCULADO`); el resumen agregado se audita con
+   * `PLAN_RECALCULADO_MASIVO` (D-S12-D3).
    */
   async recalcularMasivo(
     cursoId: string,
@@ -1120,17 +1119,13 @@ export class PlanPersonalService {
       }
     }
     const duracionMs = Date.now() - inicio
-    // TODO(S12): migrar enum AccionAuditoria para anadir PLAN_RECALCULADO_MASIVO.
-    // Hoy se reusa PLAN_RECALCULADO con metadata `{tipo: "masivo", ...}` para
-    // mantener trazabilidad sin migracion en este FIX (D-S7-D4 inline policy).
     await this.auditLog.record({
       usuarioId: autorUsuarioId,
-      accion: AccionAuditoria.PLAN_RECALCULADO,
+      accion: AccionAuditoria.PLAN_RECALCULADO_MASIVO,
       exito: true,
       recursoTipo: "curso",
       recursoId: cursoId,
       metadata: {
-        tipo: "masivo",
         cursoId,
         total: asignaciones.length,
         recalculadas,

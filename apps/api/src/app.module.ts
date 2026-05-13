@@ -4,6 +4,7 @@ import { APP_FILTER, APP_GUARD } from "@nestjs/core"
 import { ScheduleModule } from "@nestjs/schedule"
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler"
 import { AsignacionesModule } from "./asignaciones/asignaciones.module"
+import { AuditoriaModule } from "./auditoria/auditoria.module"
 import { AuthModule } from "./auth/auth.module"
 import { CatalogoModule } from "./catalogo/catalogo.module"
 import { ColaboradoresModule } from "./colaboradores/colaboradores.module"
@@ -83,6 +84,7 @@ import { TransversalModule } from "./transversal/transversal.module"
     TransversalModule,
     EntrevistaIaModule,
     ReportesModule,
+    AuditoriaModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: SesionGuard },

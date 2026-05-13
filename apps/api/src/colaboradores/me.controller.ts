@@ -95,19 +95,13 @@ export class MeController {
       response.end(pdf)
     }
 
-    // TODO(S12): migrar enum AccionAuditoria para anadir FICHA_EXPORTADA y
-    // sustituir `EVALUACION_TEMPLATE_DESCARGADO`. Hoy se reusa el evento de
-    // descarga (mismo patron operativo) con metadata explicita; el TODO sella
-    // el contrato auditable para no perder trazabilidad de portabilidad RGPD
-    // (D90 §20.3 / OWASP A09).
     await this.auditLog.record({
       usuarioId: sesion.usuarioId,
-      accion: AccionAuditoria.EVALUACION_TEMPLATE_DESCARGADO,
+      accion: AccionAuditoria.FICHA_EXPORTADA,
       exito: true,
       recursoTipo: "ficha",
       recursoId: ficha.colaboradorId,
       metadata: {
-        accionReal: "FICHA_EXPORTADA",
         formato: query.formato,
       },
     })

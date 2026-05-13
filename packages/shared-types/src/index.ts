@@ -513,3 +513,16 @@ export type {
   ExportarFichaQuery,
   FormatoExportFicha,
 } from "./colaboradores"
+
+// Admin — Slice 12 P12: visor de auditoria (activity_logs).
+export {
+  ACCIONES_AUDITORIA,
+  listarAuditoriaQuerySchema,
+  exportarAuditoriaQuerySchema,
+} from "./admin"
+export type {
+  AccionAuditoriaLiteral,
+  AuditoriaResumen,
+  ListarAuditoriaQuery,
+  ExportarAuditoriaQuery,
+} from "./admin"
