@@ -1216,8 +1216,6 @@ model AceptacionAvisoPrivacidad {
 model ConsultaLog {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   autorUsuarioId String   @map("autor_usuario_id") @db.Uuid
-  tipoLog        String   @map("tipo_log")
-  filtros        Json?    @db.JsonB
   fecha          DateTime @default(now()) @db.Timestamptz(6)
   endpoint       String   @default("")
   queryParams    Json     @default("{}") @map("query_params") @db.JsonB

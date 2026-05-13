@@ -206,7 +206,7 @@ describe.runIf(RUN_E2E)("reportes estrategicos e2e (P11c)", () => {
     expect(a.body.meta.frescura).toBe(b.body.meta.frescura)
   })
 
-  it("consultas_logs poblado tras consumir el endpoint — INCLUYE tipo_log legacy", async () => {
+  it("consultas_logs poblado tras consumir el endpoint (post-cleanup §5.129)", async () => {
     await agenteAdmin.get("/api/v1/reportes/eficacia-plataforma").expect(200)
     const filas = await prisma.consultaLog.findMany({
       where: {
@@ -215,8 +215,8 @@ describe.runIf(RUN_E2E)("reportes estrategicos e2e (P11c)", () => {
       },
     })
     expect(filas.length).toBeGreaterThanOrEqual(1)
-    // DE-P11c-1: legacy tipo_log duplica endpoint.
-    expect(filas[0]?.tipoLog).toBe("/reportes/eficacia-plataforma")
+    expect(filas[0]?.endpoint).toBe("/reportes/eficacia-plataforma")
+    expect(filas[0]?.queryParams).toBeDefined()
   })
 
   it("GET /reportes/historico-cliente exige clienteId requerido", async () => {

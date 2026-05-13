@@ -541,3 +541,28 @@ export type {
   HistoricoEstadoAsignacionResumen,
   ListarLogsAsignacionesQuery,
 } from "./admin"
+
+// Admin — Slice futuro B P-B-b: 4 visores adicionales
+// (historico skills + historico modulos + ajustes plan + meta-auditoria).
+export {
+  TIPOS_EVENTO_LOG_SKILL,
+  listarLogsSkillsQuerySchema,
+  ESTADOS_LOG_MODULO,
+  listarLogsModulosQuerySchema,
+  ACCIONES_AJUSTE_PLAN,
+  listarLogsAjustesPlanQuerySchema,
+  listarLogsConsultasQuerySchema,
+} from "./admin"
+export type {
+  TipoEventoLogSkill,
+  LogSkillEventoResumen,
+  ListarLogsSkillsQuery,
+  EstadoLogModulo,
+  LogModuloEstadoResumen,
+  ListarLogsModulosQuery,
+  AccionAjustePlanLiteral,
+  LogAjustePlanResumen,
+  ListarLogsAjustesPlanQuery,
+  LogConsultaResumen,
+  ListarLogsConsultasQuery,
+} from "./admin"

@@ -1,4 +1,6 @@
+// biome-ignore lint/correctness/noNodejsModules: el harness e2e necesita filesystem para detectar dist/.
 import { existsSync } from "node:fs"
+// biome-ignore lint/correctness/noNodejsModules: idem.
 import { join, resolve } from "node:path"
 import type { INestApplication, Type } from "@nestjs/common"
 import { PrismaClient, type PrismaClient as PrismaClientType } from "@prisma/client"
@@ -108,6 +110,10 @@ describe.runIf(RUN_E2E)("Logs e2e (Slice futuro B foundation — /admin/logs)", 
   let adminUsuarioId: string
   let cursoId: string
   let asignacionId: string
+  // P-B-b — markers para los 4 visores nuevos.
+  let skillId: string
+  let moduloId: string
+  let planId: string
 
   beforeAll(async () => {
     prisma = new PrismaClient()
@@ -240,6 +246,130 @@ describe.runIf(RUN_E2E)("Logs e2e (Slice futuro B foundation — /admin/logs)", 
       ],
     })
 
+    // P-B-b — fixtures para los 4 visores nuevos.
+    const areaA = await prisma.area.upsert({
+      where: { nombre: "Area e2e logs PBb A" },
+      update: {},
+      create: { nombre: "Area e2e logs PBb A" },
+      select: { id: true },
+    })
+    const areaB = await prisma.area.upsert({
+      where: { nombre: "Area e2e logs PBb B" },
+      update: {},
+      create: { nombre: "Area e2e logs PBb B" },
+      select: { id: true },
+    })
+    const skill = await prisma.skill.upsert({
+      where: { etiquetaVisible: "Skill e2e logs PBb" },
+      update: { areaId: areaA.id },
+      create: { etiquetaVisible: "Skill e2e logs PBb", areaId: areaA.id },
+      select: { id: true },
+    })
+    skillId = skill.id
+
+    const moduloExistente = await prisma.modulo.findFirst({
+      where: { titulo: "Modulo e2e logs PBb" },
+      select: { id: true },
+    })
+    moduloId =
+      moduloExistente?.id ??
+      (
+        await prisma.modulo.create({
+          data: { titulo: "Modulo e2e logs PBb" },
+          select: { id: true },
+        })
+      ).id
+
+    const planExistente = await prisma.planEstudio.findUnique({
+      where: { asignacionId },
+      select: { id: true },
+    })
+    planId =
+      planExistente?.id ??
+      (
+        await prisma.planEstudio.create({
+          data: { asignacionId },
+          select: { id: true },
+        })
+      ).id
+
+    await prisma.historicoRenombradoSkill.deleteMany({
+      where: { skillId, motivo: "marker-e2e-pbb" },
+    })
+    await prisma.historicoCambiosAreaSkill.deleteMany({
+      where: { skillId, motivo: "marker-e2e-pbb" },
+    })
+    await prisma.historicoEstadoModulo.deleteMany({
+      where: { moduloId, motivo: "marker-e2e-pbb" },
+    })
+    await prisma.ajustePlan.deleteMany({
+      where: { planId, motivo: "marker-e2e-pbb" },
+    })
+
+    await prisma.historicoRenombradoSkill.createMany({
+      data: [
+        {
+          skillId,
+          autorUsuarioId: adminUsuarioId,
+          etiquetaAnterior: "Skill e2e logs PBb v1",
+          etiquetaNueva: "Skill e2e logs PBb",
+          motivo: "marker-e2e-pbb",
+        },
+        {
+          skillId,
+          autorUsuarioId: adminUsuarioId,
+          etiquetaAnterior: "Skill e2e logs PBb v0",
+          etiquetaNueva: "Skill e2e logs PBb v1",
+          motivo: "marker-e2e-pbb",
+        },
+      ],
+    })
+    await prisma.historicoCambiosAreaSkill.createMany({
+      data: [
+        {
+          skillId,
+          autorUsuarioId: adminUsuarioId,
+          areaAnteriorId: areaA.id,
+          areaNuevaId: areaB.id,
+          motivo: "marker-e2e-pbb",
+        },
+      ],
+    })
+    await prisma.historicoEstadoModulo.createMany({
+      data: [
+        {
+          moduloId,
+          autorUsuarioId: adminUsuarioId,
+          estadoAnterior: "ACTIVO",
+          estadoNuevo: "ARCHIVADO",
+          motivo: "marker-e2e-pbb",
+        },
+        {
+          moduloId,
+          autorUsuarioId: adminUsuarioId,
+          estadoAnterior: "ARCHIVADO",
+          estadoNuevo: "ACTIVO",
+          motivo: "marker-e2e-pbb",
+        },
+      ],
+    })
+    await prisma.ajustePlan.createMany({
+      data: [
+        {
+          planId,
+          autorUsuarioId: adminUsuarioId,
+          accion: "AGREGAR",
+          motivo: "marker-e2e-pbb",
+        },
+        {
+          planId,
+          autorUsuarioId: adminUsuarioId,
+          accion: "QUITAR",
+          motivo: "marker-e2e-pbb",
+        },
+      ],
+    })
+
     await prisma.$executeRaw`
       DELETE FROM sesiones
       WHERE (sess::jsonb->>'usuarioId') IN (
@@ -252,7 +382,7 @@ describe.runIf(RUN_E2E)("Logs e2e (Slice futuro B foundation — /admin/logs)", 
     const moduleHttp = (await import(join(DIST_DIR, "bootstrap-http.js"))) as ModuloHttp
     const { Test } = await import("@nestjs/testing")
     const { ThrottlerGuard, ThrottlerStorage } = await import("@nestjs/throttler")
-    const { ThrottlerStorageFake } = await import("../../test/throttler-storage-fake.js")
+    const { ThrottlerStorageFake } = await import("../throttler-storage-fake.js")
     const throttlerSiempreOk = { canActivate: (): boolean => true }
     const moduleRef = await Test.createTestingModule({ imports: [moduleApp.AppModule] })
       .overrideGuard(ThrottlerGuard)
@@ -276,6 +406,19 @@ describe.runIf(RUN_E2E)("Logs e2e (Slice futuro B foundation — /admin/logs)", 
       })
       await prisma.logCambioCurso.deleteMany({
         where: { cursoId, motivo: "marker-e2e-pba" },
+      })
+      // P-B-b cleanup
+      await prisma.historicoRenombradoSkill.deleteMany({
+        where: { skillId, motivo: "marker-e2e-pbb" },
+      })
+      await prisma.historicoCambiosAreaSkill.deleteMany({
+        where: { skillId, motivo: "marker-e2e-pbb" },
+      })
+      await prisma.historicoEstadoModulo.deleteMany({
+        where: { moduloId, motivo: "marker-e2e-pbb" },
+      })
+      await prisma.ajustePlan.deleteMany({
+        where: { planId, motivo: "marker-e2e-pbb" },
       })
       await prisma.consultaLog.deleteMany({
         where: { autorUsuarioId: adminUsuarioId, endpoint: { startsWith: "/admin/logs/" } },
@@ -359,5 +502,135 @@ describe.runIf(RUN_E2E)("Logs e2e (Slice futuro B foundation — /admin/logs)", 
       where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/asignaciones" },
     })
     expect(despuesAs).toBeGreaterThan(antesAs)
+  })
+
+  // ===========================================================================
+  // P-B-b — 4 visores adicionales
+  // ===========================================================================
+
+  it("Sin sesion -> 401 en skills / modulos / ajustes-plan / consultas", async () => {
+    const rutas = ["skills", "modulos", "ajustes-plan", "consultas"]
+    for (const ruta of rutas) {
+      await supertest(app.getHttpServer()).get(`/api/v1/admin/logs/${ruta}`).expect(401)
+    }
+  })
+
+  it("PARTICIPANTE -> 403 en skills / modulos / ajustes-plan / consultas", async () => {
+    const rutas = ["skills", "modulos", "ajustes-plan", "consultas"]
+    for (const ruta of rutas) {
+      await agentePart.get(`/api/v1/admin/logs/${ruta}`).expect(403)
+    }
+  })
+
+  it("ADMIN /admin/logs/skills filtrado por skillId -> 200 + union de eventos", async () => {
+    const res = await agenteAdmin.get(`/api/v1/admin/logs/skills?skillId=${skillId}`).expect(200)
+    expect(res.body.meta.total).toBeGreaterThanOrEqual(3) // 2 renombrados + 1 cambio area
+    const tipos = new Set<string>(res.body.data.map((x: { tipoEvento: string }) => x.tipoEvento))
+    expect(tipos.has("RENOMBRADO")).toBe(true)
+    expect(tipos.has("CAMBIO_AREA")).toBe(true)
+    const fila = res.body.data[0] as Record<string, unknown>
+    expect(fila).toHaveProperty("autorEmail")
+    expect(fila).toHaveProperty("autorNombre")
+  })
+
+  it("ADMIN /admin/logs/skills tipoEvento=RENOMBRADO -> solo renombrados", async () => {
+    const res = await agenteAdmin
+      .get(`/api/v1/admin/logs/skills?skillId=${skillId}&tipoEvento=RENOMBRADO`)
+      .expect(200)
+    const eventos = res.body.data as Array<{ tipoEvento: string; etiquetaAnterior: string | null }>
+    expect(eventos.length).toBeGreaterThanOrEqual(2)
+    for (const e of eventos) {
+      expect(e.tipoEvento).toBe("RENOMBRADO")
+      expect(e.etiquetaAnterior).not.toBeNull()
+    }
+  })
+
+  it("ADMIN /admin/logs/modulos filtrado por moduloId -> 200 paginado", async () => {
+    const res = await agenteAdmin.get(`/api/v1/admin/logs/modulos?moduloId=${moduloId}`).expect(200)
+    expect(res.body.meta.total).toBeGreaterThanOrEqual(2)
+    const fila = res.body.data[0] as Record<string, unknown>
+    expect(fila).toHaveProperty("estadoAnterior")
+    expect(fila).toHaveProperty("estadoNuevo")
+    expect(fila).toHaveProperty("autorEmail")
+  })
+
+  it("ADMIN /admin/logs/ajustes-plan filtrado por planId -> 200 paginado", async () => {
+    const res = await agenteAdmin
+      .get(`/api/v1/admin/logs/ajustes-plan?planId=${planId}`)
+      .expect(200)
+    expect(res.body.meta.total).toBeGreaterThanOrEqual(2)
+    const fila = res.body.data[0] as Record<string, unknown>
+    expect(fila).toHaveProperty("accion")
+    expect(fila).toHaveProperty("motivo")
+    expect(fila).toHaveProperty("autorEmail")
+  })
+
+  it("ADMIN /admin/logs/consultas filtrado por endpoint -> 200 paginado", async () => {
+    // Asegura que hay al menos una fila previa.
+    await agenteAdmin.get(`/api/v1/admin/logs/cursos?cursoId=${cursoId}`).expect(200)
+    const res = await agenteAdmin
+      .get("/api/v1/admin/logs/consultas?endpoint=/admin/logs/cursos")
+      .expect(200)
+    expect(res.body.meta.total).toBeGreaterThanOrEqual(1)
+    expect(res.body.data[0]).toHaveProperty("endpoint", "/admin/logs/cursos")
+  })
+
+  it("tipoEvento invalido en skills -> 400", async () => {
+    await agenteAdmin.get("/api/v1/admin/logs/skills?tipoEvento=BOGUS").expect(400)
+  })
+
+  it("estadoNuevo invalido en modulos -> 400", async () => {
+    await agenteAdmin.get("/api/v1/admin/logs/modulos?estadoNuevo=BOGUS").expect(400)
+  })
+
+  it("accion invalida en ajustes-plan -> 400", async () => {
+    await agenteAdmin.get("/api/v1/admin/logs/ajustes-plan?accion=BOGUS").expect(400)
+  })
+
+  it("autorUsuarioId no UUID en consultas -> 400", async () => {
+    await agenteAdmin.get("/api/v1/admin/logs/consultas?autorUsuarioId=not-a-uuid").expect(400)
+  })
+
+  it("meta-auditoria: skills/modulos/ajustes-plan registran; consultas NO (recursion bloqueada)", async () => {
+    const antesSkills = await prisma.consultaLog.count({
+      where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/skills" },
+    })
+    await agenteAdmin.get(`/api/v1/admin/logs/skills?skillId=${skillId}`).expect(200)
+    expect(
+      await prisma.consultaLog.count({
+        where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/skills" },
+      }),
+    ).toBeGreaterThan(antesSkills)
+
+    const antesModulos = await prisma.consultaLog.count({
+      where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/modulos" },
+    })
+    await agenteAdmin.get(`/api/v1/admin/logs/modulos?moduloId=${moduloId}`).expect(200)
+    expect(
+      await prisma.consultaLog.count({
+        where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/modulos" },
+      }),
+    ).toBeGreaterThan(antesModulos)
+
+    const antesAjustes = await prisma.consultaLog.count({
+      where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/ajustes-plan" },
+    })
+    await agenteAdmin.get(`/api/v1/admin/logs/ajustes-plan?planId=${planId}`).expect(200)
+    expect(
+      await prisma.consultaLog.count({
+        where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/ajustes-plan" },
+      }),
+    ).toBeGreaterThan(antesAjustes)
+
+    // Recursion bloqueada: el visor de consultas no se autoinscribe.
+    const antesConsultas = await prisma.consultaLog.count({
+      where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/consultas" },
+    })
+    await agenteAdmin.get("/api/v1/admin/logs/consultas").expect(200)
+    expect(
+      await prisma.consultaLog.count({
+        where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/consultas" },
+      }),
+    ).toBe(antesConsultas)
   })
 })

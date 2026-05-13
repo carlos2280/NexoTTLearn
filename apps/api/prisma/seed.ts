@@ -1,4 +1,5 @@
 import {
+  AccionAjustePlan,
   AccionLogCurso,
   EstadoBloque,
   EstadoEmpleado,
@@ -39,6 +40,12 @@ const SEED_COLAB_LOGS_DEMO_EMAIL = "logs-demo@nexott.local"
 const SEED_ASIGNACION_LOGS_DEMO_ID = "77777777-0000-0000-0000-000000000001"
 const SEED_LOG_CURSO_ID_PREFIX = "44444444-0000-0000-0000-0000000000"
 const SEED_HIST_ASIG_ID_PREFIX = "55555555-0000-0000-0000-0000000000"
+
+// P-B-b — IDs fijos para `seedLogsDemo` (no-prod).
+const SEED_HIST_RENOMBRADO_ID_PREFIX = "88888888-0000-0000-0000-0000000000"
+const SEED_HIST_CAMBIO_AREA_ID_PREFIX = "99999999-0000-0000-0000-0000000000"
+const SEED_HIST_MODULO_ID_PREFIX = "aaaaaaaa-0000-0000-0000-0000000000"
+const SEED_AJUSTE_PLAN_ID_PREFIX = "bbbbbbbb-0000-0000-0000-0000000000"
 
 const prisma = new PrismaClient()
 
@@ -347,6 +354,162 @@ async function seedLogsDemo(): Promise<void> {
         estadoAnterior: t.estadoAnterior,
         estadoNuevo: t.estadoNuevo,
         motivo: t.motivo,
+      },
+    })
+  }
+
+  // P-B-b — filas demo para los 4 visores nuevos. Idempotentes por id fijo.
+  const skillDemo = await prisma.skill.findFirst({
+    where: { etiquetaVisible: "Node.js" },
+    select: { id: true, areaId: true },
+  })
+  const areaAlt = await prisma.area.findFirst({
+    where: { nombre: "Frontend" },
+    select: { id: true },
+  })
+  if (skillDemo && areaAlt) {
+    const renombrados: ReadonlyArray<{
+      readonly sufijo: string
+      readonly anterior: string
+      readonly nueva: string
+      readonly motivo: string | null
+    }> = [
+      { sufijo: "01", anterior: "Node 16", nueva: "Node 18", motivo: null },
+      { sufijo: "02", anterior: "Node 18", nueva: "Node 20", motivo: "Actualizacion mayor" },
+      { sufijo: "03", anterior: "Node 20", nueva: "Node.js", motivo: "Normalizacion" },
+      { sufijo: "04", anterior: "Node.js v0", nueva: "Node.js", motivo: null },
+      { sufijo: "05", anterior: "Node.js prev", nueva: "Node.js", motivo: null },
+    ]
+    for (const r of renombrados) {
+      const id = `${SEED_HIST_RENOMBRADO_ID_PREFIX}${r.sufijo}`
+      await prisma.historicoRenombradoSkill.upsert({
+        where: { id },
+        update: {},
+        create: {
+          id,
+          skillId: skillDemo.id,
+          autorUsuarioId: admin.id,
+          etiquetaAnterior: r.anterior,
+          etiquetaNueva: r.nueva,
+          motivo: r.motivo,
+        },
+      })
+    }
+
+    const cambiosArea: ReadonlyArray<{ readonly sufijo: string; readonly motivo: string }> = [
+      { sufijo: "01", motivo: "Reclasificacion catalogo" },
+      { sufijo: "02", motivo: "Devolver al area original" },
+      { sufijo: "03", motivo: "Reclasificacion definitiva" },
+      { sufijo: "04", motivo: "Correccion clasificacion" },
+      { sufijo: "05", motivo: "Ajuste final" },
+    ]
+    for (const c of cambiosArea) {
+      const id = `${SEED_HIST_CAMBIO_AREA_ID_PREFIX}${c.sufijo}`
+      // Alterna anterior/nueva en cada par para que el historial sea coherente.
+      const par = Number.parseInt(c.sufijo, 10) % 2 === 0
+      await prisma.historicoCambiosAreaSkill.upsert({
+        where: { id },
+        update: {},
+        create: {
+          id,
+          skillId: skillDemo.id,
+          autorUsuarioId: admin.id,
+          areaAnteriorId: par ? areaAlt.id : skillDemo.areaId,
+          areaNuevaId: par ? skillDemo.areaId : areaAlt.id,
+          motivo: c.motivo,
+        },
+      })
+    }
+  }
+
+  const moduloDemo = await prisma.modulo.findFirst({
+    where: { titulo: "Fundamentos Node" },
+    select: { id: true },
+  })
+  if (moduloDemo) {
+    const cambiosEstado: ReadonlyArray<{
+      readonly sufijo: string
+      readonly anterior: EstadoModulo
+      readonly nueva: EstadoModulo
+      readonly motivo: string
+    }> = [
+      {
+        sufijo: "01",
+        anterior: EstadoModulo.ACTIVO,
+        nueva: EstadoModulo.ARCHIVADO,
+        motivo: "Archivado temporal",
+      },
+      {
+        sufijo: "02",
+        anterior: EstadoModulo.ARCHIVADO,
+        nueva: EstadoModulo.ACTIVO,
+        motivo: "Reactivacion",
+      },
+      {
+        sufijo: "03",
+        anterior: EstadoModulo.ACTIVO,
+        nueva: EstadoModulo.ARCHIVADO,
+        motivo: "Obsolescencia",
+      },
+      {
+        sufijo: "04",
+        anterior: EstadoModulo.ARCHIVADO,
+        nueva: EstadoModulo.ACTIVO,
+        motivo: "Vuelta a curriculum",
+      },
+      {
+        sufijo: "05",
+        anterior: EstadoModulo.ACTIVO,
+        nueva: EstadoModulo.ARCHIVADO,
+        motivo: "Cierre definitivo",
+      },
+    ]
+    for (const c of cambiosEstado) {
+      const id = `${SEED_HIST_MODULO_ID_PREFIX}${c.sufijo}`
+      await prisma.historicoEstadoModulo.upsert({
+        where: { id },
+        update: {},
+        create: {
+          id,
+          moduloId: moduloDemo.id,
+          autorUsuarioId: admin.id,
+          estadoAnterior: c.anterior,
+          estadoNuevo: c.nueva,
+          motivo: c.motivo,
+        },
+      })
+    }
+  }
+
+  // PlanEstudio sobre la asignacion demo (relacion 1:1 por asignacion_id unique).
+  const planDemo = await prisma.planEstudio.upsert({
+    where: { asignacionId: SEED_ASIGNACION_LOGS_DEMO_ID },
+    update: {},
+    create: { asignacionId: SEED_ASIGNACION_LOGS_DEMO_ID },
+    select: { id: true },
+  })
+  const ajustesDemo: ReadonlyArray<{
+    readonly sufijo: string
+    readonly accion: AccionAjustePlan
+    readonly motivo: string
+  }> = [
+    { sufijo: "01", accion: AccionAjustePlan.AGREGAR, motivo: "Anadir seccion Node" },
+    { sufijo: "02", accion: AccionAjustePlan.QUITAR, motivo: "Retirar seccion duplicada" },
+    { sufijo: "03", accion: AccionAjustePlan.EXIMIR, motivo: "Exencion por experiencia" },
+    { sufijo: "04", accion: AccionAjustePlan.CAMBIAR_CARACTER, motivo: "Pasar a opcional" },
+    { sufijo: "05", accion: AccionAjustePlan.AGREGAR, motivo: "Refuerzo de fundamentos" },
+  ]
+  for (const a of ajustesDemo) {
+    const id = `${SEED_AJUSTE_PLAN_ID_PREFIX}${a.sufijo}`
+    await prisma.ajustePlan.upsert({
+      where: { id },
+      update: {},
+      create: {
+        id,
+        planId: planDemo.id,
+        autorUsuarioId: admin.id,
+        accion: a.accion,
+        motivo: a.motivo,
       },
     })
   }

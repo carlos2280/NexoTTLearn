@@ -22,7 +22,7 @@ describe("ConsultasLogService.registrar", () => {
     service = new ConsultasLogService(prisma as unknown as PrismaService)
   })
 
-  it("puebla las 5 columnas de negocio + tipoLog + filtros (DE-P11c-1)", async () => {
+  it("puebla las 5 columnas de negocio (post-cleanup §5.129)", async () => {
     await service.registrar({
       autorUsuarioId: "user-1",
       endpoint: "/reportes/eficacia-plataforma",
@@ -32,22 +32,15 @@ describe("ConsultasLogService.registrar", () => {
 
     expect(prisma.consultaLog.create).toHaveBeenCalledTimes(1)
     const call = prisma.consultaLog.create.mock.calls[0]?.[0] as {
-      data: {
-        autorUsuarioId: string
-        endpoint: string
-        queryParams: Record<string, unknown>
-        latenciaMs: number | null
-        tipoLog: string
-        filtros: unknown
-      }
+      data: Record<string, unknown>
     }
     expect(call.data.autorUsuarioId).toBe("user-1")
     expect(call.data.endpoint).toBe("/reportes/eficacia-plataforma")
     expect(call.data.queryParams).toEqual({ clienteId: "x" })
     expect(call.data.latenciaMs).toBe(42)
-    // legacy duplicado §5.129
-    expect(call.data.tipoLog).toBe("/reportes/eficacia-plataforma")
-    expect(call.data.filtros).toEqual({ clienteId: "x" })
+    // Columnas legacy retiradas por la migracion 20260601000000.
+    expect(call.data).not.toHaveProperty("tipoLog")
+    expect(call.data).not.toHaveProperty("filtros")
   })
 
   it("acepta latenciaMs ausente como null", async () => {
