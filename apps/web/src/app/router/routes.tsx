@@ -16,7 +16,7 @@ import { Navigate, Route, Routes } from "react-router-dom"
 import { GuardRol } from "./guard-rol"
 import { GuardSesion } from "./guard-sesion"
 
-const SEGMENTOS_ADMIN: readonly string[] = ["clientes", "reportes", "sistema"]
+const SEGMENTOS_ADMIN: readonly string[] = ["reportes", "sistema"]
 
 export function AppRoutes() {
   return (
@@ -67,6 +67,10 @@ export function AppRoutes() {
       >
         <Route index={true} element={<InicioPage />} />
         <Route path="catalogo" element={<CatalogoPage />} />
+        <Route
+          path="clientes"
+          element={<Navigate to="/admin/catalogo?tab=clientes" replace={true} />}
+        />
         <Route path="cursos" element={<CursosPage />} />
         <Route path="cursos/:cursoId" element={<CursoDetallePage />} />
         <Route path="cursos/:cursoId/asignaciones" element={<AsignacionesPage />} />
