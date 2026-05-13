@@ -10,6 +10,7 @@ import { PersonasPage } from "@/pages/admin/personas/personas.page"
 import { ProximamentePage } from "@/pages/admin/proximamente/proximamente.page"
 import { BandejaPage } from "@/pages/bandeja/bandeja.page"
 import { CuentaPage } from "@/pages/cuenta/cuenta.page"
+import { CursoDetallePage as CursoDetalleParticipantePage } from "@/pages/curso-detalle/curso-detalle.page"
 import { LoginPage } from "@/pages/login/login.page"
 import { LogoutPage } from "@/pages/logout/logout.page"
 import { MisCursosPage } from "@/pages/mis-cursos/mis-cursos.page"
@@ -35,6 +36,7 @@ export function AppRoutes() {
       >
         <Route path={RUTAS.bandeja} element={<BandejaPage />} />
         <Route path={RUTAS.participante.misCursos} element={<MisCursosPage />} />
+        <Route path="/cursos/:cursoId" element={<CursoDetalleParticipantePage />} />
         <Route path={RUTAS.participante.miFicha} element={<ParticipanteProximamentePage />} />
         <Route path={RUTAS.participante.catalogo} element={<ParticipanteProximamentePage />} />
       </Route>

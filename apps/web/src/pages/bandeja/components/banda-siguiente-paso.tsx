@@ -58,7 +58,7 @@ export function BandaSiguientePaso({
           Continúa desde donde lo dejaste. Llevas {cursoSugerido.porcentajeAvance}% de avance.
         </p>
         <div className="mt-2">
-          <Button onClick={() => navigate(RUTAS.participante.misCursos)}>
+          <Button onClick={() => navigate(RUTAS.participante.cursoDetalle(cursoSugerido.cursoId))}>
             Continuar <ArrowRight className="ml-2 h-4 w-4" aria-hidden={true} />
           </Button>
         </div>

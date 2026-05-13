@@ -63,7 +63,7 @@ function FilaCurso({ curso }: FilaCursoProps) {
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => navigate(RUTAS.participante.misCursos)}
+          onClick={() => navigate(RUTAS.participante.cursoDetalle(curso.cursoId))}
         >
           Continuar
         </Button>

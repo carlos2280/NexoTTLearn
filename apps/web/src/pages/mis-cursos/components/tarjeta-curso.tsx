@@ -57,7 +57,7 @@ export function TarjetaCurso({ curso }: TarjetaCursoProps) {
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => navigate(RUTAS.bandeja)}
+          onClick={() => navigate(RUTAS.participante.cursoDetalle(curso.cursoId))}
           aria-label={`Continuar con ${curso.cursoTitulo}`}
         >
           Continuar
