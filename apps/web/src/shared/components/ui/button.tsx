@@ -6,11 +6,11 @@ import { type VariantProps, tv } from "tailwind-variants"
 const buttonStyles = tv({
   base: [
     "inline-flex items-center justify-center gap-2 select-none whitespace-nowrap",
-    "rounded-pill font-medium",
-    "transition-[background-color,border-color,color,box-shadow,transform] duration-fast ease-default",
+    "cursor-pointer rounded-pill font-medium",
+    "transition-[background-color,background-position,border-color,color,box-shadow,transform] duration-base ease-default",
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
     "active:scale-[0.98]",
-    "disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100",
+    "disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100",
   ],
   variants: {
     variant: {
@@ -18,6 +18,16 @@ const buttonStyles = tv({
         "bg-accent text-accent-text",
         "shadow-accent-glow hover:shadow-accent-glow-lg",
         "hover:bg-accent-hover active:bg-accent-pressed",
+      ],
+      // Aurora — CTA "premium" para momentos cumbre (login, publicar, completar)
+      // Gradiente cyan → violet → magenta + halo aurora. La posición del fondo
+      // se desplaza al hover para sensación de "el color respira".
+      aurora: [
+        "relative text-white",
+        "bg-[image:var(--gradient-aurora)] bg-[length:180%_180%] bg-[position:0%_50%]",
+        "shadow-aurora-glow",
+        "hover:bg-[position:100%_50%] hover:shadow-[0_16px_44px_rgb(var(--color-aurora-violet-rgb)/0.4)]",
+        "focus-visible:outline-aurora-violet",
       ],
       secondary: [
         "bg-surface text-text-primary",

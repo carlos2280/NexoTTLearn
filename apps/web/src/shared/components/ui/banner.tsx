@@ -4,14 +4,17 @@ import type { ReactNode } from "react"
 import { type VariantProps, tv } from "tailwind-variants"
 
 const bannerStyles = tv({
-  base: ["flex items-start gap-3 rounded-md border px-4 py-3 text-body-sm"],
+  // Borde-izquierdo grueso en color sólido del tono + borde sutil al resto.
+  // Identidad visual de "callout" — el color sigue siendo SEMÁNTICO (rojo=error,
+  // verde=éxito, etc.); la aurora se reserva para CTAs y momentos de marca.
+  base: ["flex items-start gap-3 rounded-xl border border-l-4 px-4 py-3.5 text-body-sm"],
   variants: {
     tone: {
-      info: "bg-info-soft border-info-soft text-info-on-soft",
-      success: "bg-success-soft border-success-soft text-success-on-soft",
-      warning: "bg-warning-soft border-warning-soft text-warning-on-soft",
-      danger: "bg-danger-soft border-danger-soft text-danger-on-soft",
-      neutral: "bg-subtle border-border text-text-secondary",
+      info: "bg-info-soft border-info/15 border-l-info text-info-on-soft",
+      success: "bg-success-soft border-success/15 border-l-success text-success-on-soft",
+      warning: "bg-warning-soft border-warning/15 border-l-warning text-warning-on-soft",
+      danger: "bg-danger-soft border-danger/15 border-l-danger text-danger-on-soft",
+      neutral: "bg-subtle border-border border-l-border-emphasis text-text-secondary",
     },
   },
   defaultVariants: {
