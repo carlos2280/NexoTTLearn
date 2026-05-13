@@ -1,5 +1,5 @@
 import { RUTAS } from "@/shared/constants/rutas"
-import { BarChart3, BookOpen, Building2, Home, Library, Settings, Users } from "lucide-react"
+import { BarChart3, BookOpen, Home, Library, Settings, Users } from "lucide-react"
 import type { NavItem } from "./types"
 
 export const NAV_ITEMS: readonly NavItem[] = [
@@ -16,13 +16,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
     etiqueta: "Personas",
     ruta: RUTAS.admin.personas,
     icono: Users,
-    grupo: "principal",
-  },
-  {
-    id: "clientes",
-    etiqueta: "Clientes",
-    ruta: RUTAS.admin.clientes,
-    icono: Building2,
     grupo: "principal",
   },
   {

@@ -1,14 +1,5 @@
 import { RUTAS } from "@/shared/constants/rutas"
-import {
-  BarChart3,
-  BookOpen,
-  Building2,
-  Home,
-  Library,
-  type LucideIcon,
-  Settings,
-  Users,
-} from "lucide-react"
+import { BarChart3, BookOpen, Home, Library, type LucideIcon, Settings, Users } from "lucide-react"
 
 export type GrupoComando = "navegar" | "acciones"
 
@@ -46,14 +37,6 @@ export const COMANDOS: readonly Comando[] = [
     grupo: "navegar",
     ruta: RUTAS.admin.personas,
     atajo: ["g", "p"],
-  },
-  {
-    id: "nav-clientes",
-    etiqueta: "Ir a Clientes",
-    icono: Building2,
-    grupo: "navegar",
-    ruta: RUTAS.admin.clientes,
-    atajo: ["g", "l"],
   },
   {
     id: "nav-catalogo",
