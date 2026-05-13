@@ -807,9 +807,12 @@ export class PlanPersonalService {
       seccionTitulo: s.titulo,
     }))
 
-    // El JSON persistido puede ser cualquier shape antiguo. Validamos con Zod
-    // antes de devolverlo a admin (defense in depth).
-    const fichaSnapshot = fichaSnapshotV1Schema.parse(plan.fichaSnapshot)
+    // El JSON persistido puede ser cualquier shape antiguo. Sólo lo parseamos
+    // cuando lo vamos a entregar (rol ADMIN, D-S7-D2): el PARTICIPANTE no
+    // recibe `fichaSnapshot` y no debe romper si la fila es legacy (seed
+    // antiguo, migración pendiente).
+    const fichaSnapshot =
+      rol === RolUsuario.ADMIN ? fichaSnapshotV1Schema.parse(plan.fichaSnapshot) : undefined
 
     return toPlanResponse({
       planId: plan.id,

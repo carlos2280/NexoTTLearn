@@ -363,7 +363,9 @@ interface ToPlanResponseInput {
   readonly asignacionId: string
   readonly fechaCalculo: Date
   readonly estaDesactualizado: boolean
-  readonly fichaSnapshot: FichaSnapshotV1
+  // Opcional: solo se entrega cuando rol === ADMIN. El service evita parsear
+  // el JSON persistido para PARTICIPANTE (D-S7-D2) y pasa `undefined`.
+  readonly fichaSnapshot?: FichaSnapshotV1
   readonly items: ReadonlyArray<{
     readonly moduloId: string
     readonly seccionId: string
@@ -415,6 +417,13 @@ function construirAdmin(
   itemsPorModulo: ReadonlyMap<string, readonly ToPlanResponseInput["items"][number][]>,
   refsPorSeccion: ReadonlyMap<string, ModuloSeccionRef>,
 ): PlanResponseAdmin {
+  // Invariante interno: el service parsea el snapshot SOLO cuando rol=ADMIN,
+  // por lo que llegar aquí sin él es un bug de programación. Asertamos para
+  // que TypeScript pueda estrechar el tipo y para fallar ruidoso si pasa.
+  if (!input.fichaSnapshot) {
+    throw new Error("construirAdmin: fichaSnapshot es obligatorio para rol=ADMIN")
+  }
+  const fichaSnapshot = input.fichaSnapshot
   const modulos: ModuloPlanAdmin[] = []
   for (const [moduloId, items] of itemsPorModulo) {
     const primero = items[0]
@@ -441,7 +450,7 @@ function construirAdmin(
     asignacionId: input.asignacionId,
     fechaCalculo: input.fechaCalculo.toISOString(),
     estaDesactualizado: input.estaDesactualizado,
-    fichaSnapshot: input.fichaSnapshot,
+    fichaSnapshot,
     items: modulos,
     avance: input.avance,
   }
