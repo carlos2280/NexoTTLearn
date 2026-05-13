@@ -3,6 +3,11 @@ export const RUTAS = {
   logout: "/logout",
   bandeja: "/bandeja",
   cuenta: "/cuenta",
+  participante: {
+    misCursos: "/mis-cursos",
+    miFicha: "/mi-ficha",
+    catalogo: "/catalogo",
+  },
   admin: {
     inicio: "/admin",
     cursos: "/admin/cursos",

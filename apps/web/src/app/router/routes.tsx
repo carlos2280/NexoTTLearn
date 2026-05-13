@@ -1,4 +1,5 @@
 import { AdminShell } from "@/features/admin/layout/components/admin-shell"
+import { ParticipanteShell } from "@/features/participante-layout/components/participante-shell"
 import { AsignacionesPage } from "@/pages/admin/asignaciones/asignaciones.page"
 import { CatalogoPage } from "@/pages/admin/catalogo/catalogo.page"
 import { ModuloBuilderPage } from "@/pages/admin/catalogo/modulo-builder/modulo-builder.page"
@@ -11,6 +12,7 @@ import { BandejaPage } from "@/pages/bandeja/bandeja.page"
 import { CuentaPage } from "@/pages/cuenta/cuenta.page"
 import { LoginPage } from "@/pages/login/login.page"
 import { LogoutPage } from "@/pages/logout/logout.page"
+import { ParticipanteProximamentePage } from "@/pages/participante-proximamente/participante-proximamente.page"
 import { RUTAS } from "@/shared/constants/rutas"
 import { Navigate, Route, Routes } from "react-router-dom"
 import { GuardRol } from "./guard-rol"
@@ -24,13 +26,17 @@ export function AppRoutes() {
       <Route path={RUTAS.login} element={<LoginPage />} />
       <Route path={RUTAS.logout} element={<LogoutPage />} />
       <Route
-        path={RUTAS.bandeja}
         element={
           <GuardSesion>
-            <BandejaPage />
+            <ParticipanteShell />
           </GuardSesion>
         }
-      />
+      >
+        <Route path={RUTAS.bandeja} element={<BandejaPage />} />
+        <Route path={RUTAS.participante.misCursos} element={<ParticipanteProximamentePage />} />
+        <Route path={RUTAS.participante.miFicha} element={<ParticipanteProximamentePage />} />
+        <Route path={RUTAS.participante.catalogo} element={<ParticipanteProximamentePage />} />
+      </Route>
       <Route
         path={RUTAS.cuenta}
         element={
