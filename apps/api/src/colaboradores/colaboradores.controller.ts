@@ -13,14 +13,17 @@ import {
   Req,
 } from "@nestjs/common"
 import {
+  ColaboradorAdminResumen,
   CrearColaboradorInput,
   EntradaHistoricoNotaSkill,
   FichaResponse,
+  ListarColaboradoresQuery,
   PaginacionQuery,
   Paginated,
   PatchSkillRequest,
   PatchSkillResponse,
   crearColaboradorSchema,
+  listarColaboradoresQuerySchema,
   paginacionQuerySchema,
   patchSkillRequestSchema,
 } from "@nexott-learn/shared-types"
@@ -48,6 +51,14 @@ export class ColaboradoresController {
     private readonly fichaEdicionService: FichaEdicionService,
     private readonly auditLog: AuditLogService,
   ) {}
+
+  @Get()
+  @Roles(RolUsuario.ADMIN)
+  async listar(
+    @Query(new ZodValidationPipe(listarColaboradoresQuerySchema)) query: ListarColaboradoresQuery,
+  ): Promise<Paginated<ColaboradorAdminResumen>> {
+    return await this.colaboradoresService.listar(query)
+  }
 
   @Post()
   @Roles(RolUsuario.ADMIN)

@@ -8,6 +8,27 @@ export const SELECT_COLABORADOR_BASE = {
   createdAt: true,
 } as const satisfies Prisma.ColaboradorSelect
 
+export const SELECT_COLABORADOR_ADMIN = {
+  id: true,
+  email: true,
+  nombre: true,
+  estadoEmpleado: true,
+  fechaOffBoarding: true,
+  createdAt: true,
+  usuario: {
+    select: {
+      id: true,
+      rol: true,
+      bloqueado: true,
+      mfaHabilitado: true,
+      requiereCambioPassword: true,
+      requiereSetupMfa: true,
+      intentosFallidos: true,
+      ultimoLogin: true,
+    },
+  },
+} as const satisfies Prisma.ColaboradorSelect
+
 export interface AltaColaboradorResponse {
   readonly colaborador: {
     readonly id: string

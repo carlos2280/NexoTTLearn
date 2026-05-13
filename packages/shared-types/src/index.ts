@@ -514,6 +514,18 @@ export type {
   FormatoExportFicha,
 } from "./colaboradores"
 
+// Colaboradores — admin: listar paginado para /admin/personas.
+export {
+  estadoEmpleadoSchema,
+  listarColaboradoresQuerySchema,
+} from "./colaboradores"
+export type {
+  EstadoEmpleado,
+  ListarColaboradoresQuery,
+  ColaboradorAdminUsuarioInfo,
+  ColaboradorAdminResumen,
+} from "./colaboradores"
+
 // Admin — Slice 12 P12: visor de auditoria (activity_logs).
 export {
   ACCIONES_AUDITORIA,

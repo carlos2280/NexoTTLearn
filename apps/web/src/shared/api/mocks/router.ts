@@ -3,6 +3,7 @@ import { handlersAdmin } from "./handlers-admin"
 import { handlersAuth } from "./handlers-auth"
 import { handlersBloques } from "./handlers-bloques"
 import { handlersCatalogo } from "./handlers-catalogo"
+import { handlersPersonas } from "./handlers-personas"
 import { handlersReportes } from "./handlers-reportes"
 import { handlersSecciones } from "./handlers-secciones"
 
@@ -28,6 +29,7 @@ const routes: RouteEntry[] = [
   ...handlersBloques,
   ...handlersReportes,
   ...handlersAdmin,
+  ...handlersPersonas,
 ]
 
 const MOCK_LATENCY_MS = 280

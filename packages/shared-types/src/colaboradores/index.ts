@@ -9,3 +9,14 @@ export type {
   ExportarFichaQuery,
   FormatoExportFicha,
 } from "./me-cursos.types"
+
+export {
+  estadoEmpleadoSchema,
+  listarColaboradoresQuerySchema,
+} from "./listar-colaboradores.types"
+export type {
+  EstadoEmpleado,
+  ListarColaboradoresQuery,
+  ColaboradorAdminUsuarioInfo,
+  ColaboradorAdminResumen,
+} from "./listar-colaboradores.types"

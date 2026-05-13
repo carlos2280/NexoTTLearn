@@ -1,13 +1,20 @@
 import { ConflictException, Injectable, Logger, NotImplementedException } from "@nestjs/common"
-import { CrearColaboradorInput } from "@nexott-learn/shared-types"
+import {
+  ColaboradorAdminResumen,
+  CrearColaboradorInput,
+  ListarColaboradoresQuery,
+  Paginated,
+} from "@nexott-learn/shared-types"
 import { AccionAuditoria, ModoEntregaPassword, Prisma } from "@prisma/client"
 import bcrypt from "bcrypt"
 import { AuditLogService } from "../common/audit/audit-log.service"
 import { ContextoHttpAuditoria } from "../common/audit/audit-log.types"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
-import { AltaColaboradorResponse } from "./colaboradores.types"
+import { AltaColaboradorResponse, SELECT_COLABORADOR_ADMIN } from "./colaboradores.types"
 import { generarPasswordSegura } from "./password-generator"
+
+type ColaboradorAdminRow = Prisma.ColaboradorGetPayload<{ select: typeof SELECT_COLABORADOR_ADMIN }>
 
 const FACTOR_BCRYPT = 12
 const DIAS_CADUCIDAD_PASSWORD_INICIAL = 7
@@ -111,5 +118,77 @@ export class ColaboradoresService {
       }
       throw error
     }
+  }
+
+  async listar(query: ListarColaboradoresQuery): Promise<Paginated<ColaboradorAdminResumen>> {
+    const { page, pageSize, q, rol, estadoEmpleado, bloqueado } = query
+    const skip = (page - 1) * pageSize
+
+    const where: Prisma.ColaboradorWhereInput = {
+      ...(estadoEmpleado ? { estadoEmpleado } : {}),
+      ...(q
+        ? {
+            // biome-ignore lint/style/useNamingConvention: clave de Prisma para WHERE OR.
+            OR: [
+              { nombre: { contains: q, mode: "insensitive" } },
+              { email: { contains: q, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+      ...(rol !== undefined || bloqueado !== undefined
+        ? {
+            usuario: {
+              is: {
+                ...(rol ? { rol } : {}),
+                ...(bloqueado !== undefined ? { bloqueado } : {}),
+              },
+            },
+          }
+        : {}),
+    }
+
+    const [filas, total] = await this.prisma.$transaction([
+      this.prisma.colaborador.findMany({
+        where,
+        select: SELECT_COLABORADOR_ADMIN,
+        orderBy: [{ nombre: "asc" }],
+        skip,
+        take: pageSize,
+      }),
+      this.prisma.colaborador.count({ where }),
+    ])
+
+    return {
+      data: filas.map(toColaboradorAdminResumen),
+      meta: {
+        page,
+        pageSize,
+        total,
+        totalPages: pageSize > 0 ? Math.ceil(total / pageSize) : 0,
+      },
+    }
+  }
+}
+
+function toColaboradorAdminResumen(row: ColaboradorAdminRow): ColaboradorAdminResumen {
+  return {
+    id: row.id,
+    email: row.email,
+    nombre: row.nombre,
+    estadoEmpleado: row.estadoEmpleado,
+    fechaOffBoarding: row.fechaOffBoarding ? row.fechaOffBoarding.toISOString() : null,
+    createdAt: row.createdAt.toISOString(),
+    usuario: row.usuario
+      ? {
+          id: row.usuario.id,
+          rol: row.usuario.rol,
+          bloqueado: row.usuario.bloqueado,
+          mfaHabilitado: row.usuario.mfaHabilitado,
+          requiereCambioPassword: row.usuario.requiereCambioPassword,
+          requiereSetupMfa: row.usuario.requiereSetupMfa,
+          intentosFallidos: row.usuario.intentosFallidos,
+          ultimoLogin: row.usuario.ultimoLogin ? row.usuario.ultimoLogin.toISOString() : null,
+        }
+      : null,
   }
 }

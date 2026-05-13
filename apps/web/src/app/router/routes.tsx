@@ -5,6 +5,7 @@ import { ModuloBuilderPage } from "@/pages/admin/catalogo/modulo-builder/modulo-
 import { CursoDetallePage } from "@/pages/admin/cursos/curso-detalle.page"
 import { CursosPage } from "@/pages/admin/cursos/cursos.page"
 import { InicioPage } from "@/pages/admin/inicio/inicio.page"
+import { PersonasPage } from "@/pages/admin/personas/personas.page"
 import { ProximamentePage } from "@/pages/admin/proximamente/proximamente.page"
 import { BandejaPage } from "@/pages/bandeja/bandeja.page"
 import { CuentaPage } from "@/pages/cuenta/cuenta.page"
@@ -15,7 +16,7 @@ import { Navigate, Route, Routes } from "react-router-dom"
 import { GuardRol } from "./guard-rol"
 import { GuardSesion } from "./guard-sesion"
 
-const SEGMENTOS_ADMIN: readonly string[] = ["personas", "clientes", "reportes", "sistema"]
+const SEGMENTOS_ADMIN: readonly string[] = ["clientes", "reportes", "sistema"]
 
 export function AppRoutes() {
   return (
@@ -69,6 +70,7 @@ export function AppRoutes() {
         <Route path="cursos" element={<CursosPage />} />
         <Route path="cursos/:cursoId" element={<CursoDetallePage />} />
         <Route path="cursos/:cursoId/asignaciones" element={<AsignacionesPage />} />
+        <Route path="personas" element={<PersonasPage />} />
         {SEGMENTOS_ADMIN.map((segmento) => (
           <Route key={segmento} path={segmento} element={<ProximamentePage />} />
         ))}
