@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -11,11 +12,14 @@ import {
   Post,
   Query,
   Req,
+  Res,
 } from "@nestjs/common"
+import { Throttle } from "@nestjs/throttler"
 import {
   ColaboradorAdminResumen,
   CrearColaboradorInput,
   EntradaHistoricoNotaSkill,
+  ExportarColaboradoresQuery,
   FichaResponse,
   ListarColaboradoresQuery,
   PaginacionQuery,
@@ -23,12 +27,14 @@ import {
   PatchSkillRequest,
   PatchSkillResponse,
   crearColaboradorSchema,
+  exportarColaboradoresQuerySchema,
   listarColaboradoresQuerySchema,
   paginacionQuerySchema,
   patchSkillRequestSchema,
 } from "@nexott-learn/shared-types"
-import { AccionAuditoria, RolUsuario } from "@prisma/client"
-import { Request } from "express"
+import { AccionAuditoria, type Prisma, RolUsuario } from "@prisma/client"
+import { Request, Response } from "express"
+import { LIMITE_FILAS_EXPORTACION } from "../auditoria/auditoria-export.helpers"
 import { AuditLogService } from "../common/audit/audit-log.service"
 import { extractContextoHttp } from "../common/audit/extract-contexto"
 import { CurrentUser } from "../common/decorators/current-user.decorator"
@@ -36,8 +42,14 @@ import { Motivo } from "../common/decorators/motivo.decorator"
 import { RequiereMotivo } from "../common/decorators/requiere-motivo.decorator"
 import { Roles } from "../common/decorators/roles.decorator"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
+import { ExportService } from "../common/export/export.service"
 import { ZodValidationPipe } from "../common/pipes/zod-validation.pipe"
 import { SesionUsuario } from "../common/types/sesion.types"
+import {
+  COLUMNAS_COLABORADORES_EXPORT,
+  aplanarColaboradorParaExport,
+  nombreArchivoExportColaboradores,
+} from "./colaboradores-export.helpers"
 import { ColaboradoresService } from "./colaboradores.service"
 import { AltaColaboradorResponse } from "./colaboradores.types"
 import { FichaEdicionService } from "./ficha/ficha-edicion.service"
@@ -50,6 +62,7 @@ export class ColaboradoresController {
     private readonly fichaService: FichaService,
     private readonly fichaEdicionService: FichaEdicionService,
     private readonly auditLog: AuditLogService,
+    private readonly exportService: ExportService,
   ) {}
 
   @Get()
@@ -58,6 +71,50 @@ export class ColaboradoresController {
     @Query(new ZodValidationPipe(listarColaboradoresQuerySchema)) query: ListarColaboradoresQuery,
   ): Promise<Paginated<ColaboradorAdminResumen>> {
     return await this.colaboradoresService.listar(query)
+  }
+
+  @Get("exportar")
+  @Roles(RolUsuario.ADMIN)
+  @Throttle({ default: { ttl: 60_000, limit: 3 } })
+  async exportar(
+    @Query(new ZodValidationPipe(exportarColaboradoresQuerySchema))
+    query: ExportarColaboradoresQuery,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    const sesion = this.requireUsuario(usuario)
+    const total = await this.colaboradoresService.contar(query)
+    if (total > LIMITE_FILAS_EXPORTACION) {
+      throw new BadRequestException({
+        code: apiErrorCodes.errorInterno,
+        message: "El filtro produce demasiados resultados. Reduce el alcance y reintenta.",
+      })
+    }
+    const colaboradores = await this.colaboradoresService.listarTodosParaExport(query)
+    const filas = colaboradores.map(aplanarColaboradorParaExport)
+    const result =
+      query.formato === "xlsx"
+        ? await this.exportService.aXlsx(filas, COLUMNAS_COLABORADORES_EXPORT, "colaboradores")
+        : await this.exportService.aCsv(filas, COLUMNAS_COLABORADORES_EXPORT)
+
+    response.setHeader("Content-Type", result.mime)
+    response.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${nombreArchivoExportColaboradores(query.formato)}"`,
+    )
+    response.send(result.buffer)
+
+    await this.auditLog.record({
+      usuarioId: sesion.usuarioId,
+      accion: AccionAuditoria.LOGS_EXPORTADO,
+      exito: true,
+      recursoTipo: "colaboradores",
+      metadata: {
+        formato: query.formato,
+        totalFilas: total,
+        filtrosAplicados: filtrosExportMetadata(query),
+      } satisfies Prisma.InputJsonObject,
+    })
   }
 
   @Post()
@@ -162,4 +219,21 @@ export class ColaboradoresController {
     }
     return usuario
   }
+}
+
+function filtrosExportMetadata(query: ExportarColaboradoresQuery): Prisma.InputJsonObject {
+  const filtros: Record<string, Prisma.InputJsonValue> = {}
+  if (query.q) {
+    filtros.q = query.q
+  }
+  if (query.rol) {
+    filtros.rol = query.rol
+  }
+  if (query.estadoEmpleado) {
+    filtros.estadoEmpleado = query.estadoEmpleado
+  }
+  if (query.bloqueado !== undefined) {
+    filtros.bloqueado = query.bloqueado
+  }
+  return filtros
 }

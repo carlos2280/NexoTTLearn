@@ -2,6 +2,7 @@ import { ConflictException, Injectable, Logger, NotImplementedException } from "
 import {
   ColaboradorAdminResumen,
   CrearColaboradorInput,
+  ExportarColaboradoresQuery,
   ListarColaboradoresQuery,
   Paginated,
 } from "@nexott-learn/shared-types"
@@ -121,31 +122,9 @@ export class ColaboradoresService {
   }
 
   async listar(query: ListarColaboradoresQuery): Promise<Paginated<ColaboradorAdminResumen>> {
-    const { page, pageSize, q, rol, estadoEmpleado, bloqueado } = query
+    const { page, pageSize } = query
     const skip = (page - 1) * pageSize
-
-    const where: Prisma.ColaboradorWhereInput = {
-      ...(estadoEmpleado ? { estadoEmpleado } : {}),
-      ...(q
-        ? {
-            // biome-ignore lint/style/useNamingConvention: clave de Prisma para WHERE OR.
-            OR: [
-              { nombre: { contains: q, mode: "insensitive" } },
-              { email: { contains: q, mode: "insensitive" } },
-            ],
-          }
-        : {}),
-      ...(rol !== undefined || bloqueado !== undefined
-        ? {
-            usuario: {
-              is: {
-                ...(rol ? { rol } : {}),
-                ...(bloqueado !== undefined ? { bloqueado } : {}),
-              },
-            },
-          }
-        : {}),
-    }
+    const where = this.buildWhere(query)
 
     const [filas, total] = await this.prisma.$transaction([
       this.prisma.colaborador.findMany({
@@ -166,6 +145,52 @@ export class ColaboradoresService {
         total,
         totalPages: pageSize > 0 ? Math.ceil(total / pageSize) : 0,
       },
+    }
+  }
+
+  async contar(query: ExportarColaboradoresQuery): Promise<number> {
+    return await this.prisma.colaborador.count({ where: this.buildWhere(query) })
+  }
+
+  async listarTodosParaExport(
+    query: ExportarColaboradoresQuery,
+  ): Promise<readonly ColaboradorAdminResumen[]> {
+    const filas = await this.prisma.colaborador.findMany({
+      where: this.buildWhere(query),
+      select: SELECT_COLABORADOR_ADMIN,
+      orderBy: [{ nombre: "asc" }],
+    })
+    return filas.map(toColaboradorAdminResumen)
+  }
+
+  private buildWhere(filtros: {
+    readonly q?: string
+    readonly rol?: "ADMIN" | "PARTICIPANTE"
+    readonly estadoEmpleado?: "ACTIVO" | "EX_EMPLEADO"
+    readonly bloqueado?: boolean
+  }): Prisma.ColaboradorWhereInput {
+    const { q, rol, estadoEmpleado, bloqueado } = filtros
+    return {
+      ...(estadoEmpleado ? { estadoEmpleado } : {}),
+      ...(q
+        ? {
+            // biome-ignore lint/style/useNamingConvention: clave de Prisma para WHERE OR.
+            OR: [
+              { nombre: { contains: q, mode: "insensitive" } },
+              { email: { contains: q, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+      ...(rol !== undefined || bloqueado !== undefined
+        ? {
+            usuario: {
+              is: {
+                ...(rol ? { rol } : {}),
+                ...(bloqueado !== undefined ? { bloqueado } : {}),
+              },
+            },
+          }
+        : {}),
     }
   }
 }

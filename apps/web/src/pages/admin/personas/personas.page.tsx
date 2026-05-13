@@ -4,12 +4,17 @@ import { DataTable } from "@/shared/components/ui/data-table"
 import { MenuAcciones } from "@/shared/components/ui/menu-acciones"
 import { Pagination } from "@/shared/components/ui/pagination"
 import { Select } from "@/shared/components/ui/select"
-import type { ListarColaboradoresQuery } from "@nexott-learn/shared-types"
+import type {
+  ExportarColaboradoresQuery,
+  FormatoExportColaboradores,
+  ListarColaboradoresQuery,
+} from "@nexott-learn/shared-types"
 import { Plus, Users } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { accionesPorPersona } from "./components/personas-acciones-menu"
 import { COLUMNAS_PERSONAS } from "./components/personas-columnas"
 import { PersonasDialogos } from "./components/personas-dialogos"
+import { PersonasExportarBoton } from "./components/personas-exportar-boton"
 import { PersonasFiltros } from "./components/personas-filtros"
 import { FILTROS_PERSONAS_INICIAL, type FiltrosPersonas } from "./personas.types"
 import { usePersonasOrquestacion } from "./use-personas-orquestacion"
@@ -17,19 +22,21 @@ import { usePersonasOrquestacion } from "./use-personas-orquestacion"
 const OPCIONES_PAGE_SIZE = [10, 20, 30, 50, 100] as const
 const PAGE_SIZE_INICIAL = 10
 
-function aQuery(
-  filtros: FiltrosPersonas,
-  page: number,
-  pageSize: number,
-): ListarColaboradoresQuery {
+function filtrosBase(filtros: FiltrosPersonas) {
   return {
-    page,
-    pageSize,
     q: filtros.busqueda.trim().length >= 2 ? filtros.busqueda.trim() : undefined,
     rol: filtros.rol === "TODOS" ? undefined : filtros.rol,
     estadoEmpleado: filtros.estadoEmpleado === "TODOS" ? undefined : filtros.estadoEmpleado,
     bloqueado: filtros.bloqueado === "TODOS" ? undefined : filtros.bloqueado === "SI",
   }
+}
+
+function aQuery(
+  filtros: FiltrosPersonas,
+  page: number,
+  pageSize: number,
+): ListarColaboradoresQuery {
+  return { page, pageSize, ...filtrosBase(filtros) }
 }
 
 export function PersonasPage() {
@@ -39,6 +46,14 @@ export function PersonasPage() {
   const query = useMemo(() => aQuery(filtros, page, pageSize), [filtros, page, pageSize])
   const { data, isLoading } = useListarPersonas(query)
   const orq = usePersonasOrquestacion()
+
+  const construirExportQuery = useCallback(
+    (formato: FormatoExportColaboradores): ExportarColaboradoresQuery => ({
+      formato,
+      ...filtrosBase(filtros),
+    }),
+    [filtros],
+  )
 
   function actualizarFiltros(siguiente: FiltrosPersonas) {
     setFiltros(siguiente)
@@ -66,10 +81,13 @@ export function PersonasPage() {
       <section className="flex flex-col gap-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <PersonasFiltros valor={filtros} onCambio={actualizarFiltros} />
-          <Button variant="primary" size="sm" onClick={() => orq.abrir("crear")}>
-            <Plus className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
-            Nuevo colaborador
-          </Button>
+          <div className="flex items-center gap-2">
+            <PersonasExportarBoton construirQuery={construirExportQuery} />
+            <Button variant="primary" size="sm" onClick={() => orq.abrir("crear")}>
+              <Plus className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
+              Nuevo colaborador
+            </Button>
+          </div>
         </div>
 
         <DataTable
