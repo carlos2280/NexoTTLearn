@@ -618,6 +618,65 @@ describe("PlanPersonalService.calcularSiAsignado (cierre TODO S7)", () => {
   })
 })
 
+// =============================================================================
+// P11.5c (D-S11.5-C*) — cierre TODO(S11) en `crearAsignacionesAdmin` y
+// `convertirAAsignado`: `calcularSiAsignado` notifica al participante tras un
+// calculo exitoso reutilizando `notificarPlanRecalculado`.
+// =============================================================================
+
+describe("PlanPersonalService.calcularSiAsignado -> notificacion PLAN_RECALCULADO", () => {
+  it("exito: emite PLAN_RECALCULADO al participante con planId recuperado", async () => {
+    prisma.asignacionCurso.findUnique.mockImplementation(
+      (args: { select?: Record<string, unknown> }) => {
+        if (args.select && "curso" in args.select && "colaborador" in args.select) {
+          return Promise.resolve({
+            curso: { titulo: "Curso de prueba" },
+            colaborador: { usuario: { id: USUARIO_PARTICIPANTE } },
+          })
+        }
+        return Promise.resolve({ id: ASIGNACION_ID, rol: RolAsignacion.ASIGNADO })
+      },
+    )
+    prisma.planEstudio.findUnique
+      .mockResolvedValueOnce(null) // calcularInterno -> sin plan previo
+      .mockResolvedValueOnce({ id: "plan-nuevo" }) // recuperacion post-calculo
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValueOnce({
+      id: ASIGNACION_ID,
+      cursoId: CURSO_ID,
+      colaboradorId: COLABORADOR_ID,
+    })
+    prisma.curso.findUniqueOrThrow.mockResolvedValue({ id: CURSO_ID, umbralNoCumple: 10 })
+    prisma.planEstudio.create.mockResolvedValue({ id: "plan-nuevo" })
+
+    await service.calcularSiAsignado(ASIGNACION_ID)
+
+    expect(notificaciones.crear).toHaveBeenCalledTimes(1)
+    expect(notificaciones.crear).toHaveBeenCalledWith({
+      usuarioId: USUARIO_PARTICIPANTE,
+      tipo: "PLAN_RECALCULADO",
+      payload: {
+        planId: "plan-nuevo",
+        asignacionId: ASIGNACION_ID,
+        cursoTitulo: "Curso de prueba",
+      },
+    })
+  })
+
+  it("fallo del motor (calcularInterno lanza): NO notifica", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValueOnce({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+    })
+    // calcularInterno hace planEstudio.findUnique primero; si lanza, el catch del
+    // service loggea y calculoExitoso=false -> no se notifica.
+    prisma.planEstudio.findUnique.mockRejectedValueOnce(new Error("motor explotado"))
+
+    await expect(service.calcularSiAsignado(ASIGNACION_ID)).resolves.toBeUndefined()
+
+    expect(notificaciones.crear).not.toHaveBeenCalled()
+  })
+})
+
 // ===========================================================================
 // P7c — Ajustes manuales admin + diff + apertura seccion
 // ===========================================================================

@@ -273,9 +273,10 @@ export class AsignacionesService {
         // que rebotaron por race P2002 -> YA_INSCRITO). Best-effort: errores
         // no propagan al admin (R-S11.5-2).
         await this.notificarAsignacionCurso(row.id)
-        // TODO(S11): emitir notificacion PLAN_CALCULADO al participante (D-S7-D3).
-        //  -- nota P10c: el calculo del plan no llama a calcularExplicito/recalcular,
-        //     usa calcularSiAsignado interno; el trigger debe cablearse aqui en S11.
+        // (S11.5) emitido via plan-personal.service.calcularSiAsignado ->
+        // notificarPlanRecalculado (D-S11.5-C*, D88). El helper interno del
+        // service del plan resuelve el destinatario, hace findUnique del
+        // plan persistido y emite fire-and-forget solo en exito.
       } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
           // Race: otro admin asigno el mismo colaborador en paralelo. Lo
@@ -355,7 +356,8 @@ export class AsignacionesService {
       // Calcular plan personal en el mismo TX (D-S7-B4). El voluntario
       // promovido pasa a ASIGNADO y obtiene plan calculado desde cero.
       await this.planPersonal.calcularSiAsignado(asignacionId, tx)
-      // TODO(S11): emitir notificacion PLAN_CALCULADO al participante (D-S7-D3).
+      // (S11.5) emitido via plan-personal.service.calcularSiAsignado ->
+      // notificarPlanRecalculado (D-S11.5-C*, D88).
       return toAsignacion(row)
     })
   }

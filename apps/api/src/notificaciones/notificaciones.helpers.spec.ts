@@ -2,7 +2,7 @@ import { Logger } from "@nestjs/common"
 import { TipoEventoNotif } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { PrismaService } from "../common/prisma/prisma.service"
-import { broadcastAdminsActivos } from "./notificaciones.helpers"
+import { broadcastAdminsActivos, yaEmitidoHoy } from "./notificaciones.helpers"
 import { NotificacionesService } from "./notificaciones.service"
 
 interface PrismaMock {
@@ -133,5 +133,84 @@ describe("broadcastAdminsActivos", () => {
       ),
     ).rejects.toThrow("db down")
     expect(m.notificaciones.crear).not.toHaveBeenCalled()
+  })
+})
+
+interface PrismaMockNotif {
+  notificacion: { findFirst: ReturnType<typeof vi.fn> }
+}
+
+describe("yaEmitidoHoy", () => {
+  let prismaNotif: PrismaMockNotif
+
+  beforeEach(() => {
+    prismaNotif = { notificacion: { findFirst: vi.fn() } }
+  })
+
+  it("con usuarioId: filtra por (tipoEvento, usuarioId, ventana del dia)", async () => {
+    prismaNotif.notificacion.findFirst.mockResolvedValue(null)
+    const hoy = new Date(Date.UTC(2026, 4, 13, 8, 30, 0))
+    const resultado = await yaEmitidoHoy(
+      prismaNotif as unknown as PrismaService,
+      TipoEventoNotif.RECORDATORIO_DEADLINE,
+      "user-1",
+      hoy,
+    )
+    expect(resultado).toBe(false)
+    const arg = prismaNotif.notificacion.findFirst.mock.calls[0]?.[0] as {
+      where: {
+        tipoEvento: string
+        usuarioId: string
+        fechaCreacion: { gte: Date; lt: Date }
+      }
+    }
+    expect(arg.where.tipoEvento).toBe(TipoEventoNotif.RECORDATORIO_DEADLINE)
+    expect(arg.where.usuarioId).toBe("user-1")
+    expect(arg.where.fechaCreacion.gte.toISOString()).toBe("2026-05-13T00:00:00.000Z")
+    expect(arg.where.fechaCreacion.lt.toISOString()).toBe("2026-05-14T00:00:00.000Z")
+  })
+
+  it("sin usuarioId (null): filtra solo por (tipoEvento, ventana del dia) — caso broadcast", async () => {
+    prismaNotif.notificacion.findFirst.mockResolvedValue({ id: "n-existe" })
+    const hoy = new Date(Date.UTC(2026, 4, 13, 8, 30, 0))
+    const resultado = await yaEmitidoHoy(
+      prismaNotif as unknown as PrismaService,
+      TipoEventoNotif.CENTRO_REVISION,
+      null,
+      hoy,
+    )
+    expect(resultado).toBe(true)
+    const arg = prismaNotif.notificacion.findFirst.mock.calls[0]?.[0] as {
+      where: { tipoEvento: string; usuarioId?: string }
+    }
+    expect(arg.where.tipoEvento).toBe(TipoEventoNotif.CENTRO_REVISION)
+    expect("usuarioId" in arg.where).toBe(false)
+  })
+
+  it("devuelve true cuando ya existe una fila del dia", async () => {
+    prismaNotif.notificacion.findFirst.mockResolvedValue({ id: "n-existente" })
+    const resultado = await yaEmitidoHoy(
+      prismaNotif as unknown as PrismaService,
+      TipoEventoNotif.RECORDATORIO_DEADLINE,
+      "user-1",
+      new Date(),
+    )
+    expect(resultado).toBe(true)
+  })
+
+  it("la ventana respeta el cambio de dia UTC (corte exacto a medianoche)", async () => {
+    prismaNotif.notificacion.findFirst.mockResolvedValue(null)
+    const finDeAnioUtc = new Date(Date.UTC(2026, 11, 31, 23, 59, 59))
+    await yaEmitidoHoy(
+      prismaNotif as unknown as PrismaService,
+      TipoEventoNotif.RECORDATORIO_DEADLINE,
+      "user-1",
+      finDeAnioUtc,
+    )
+    const arg = prismaNotif.notificacion.findFirst.mock.calls[0]?.[0] as {
+      where: { fechaCreacion: { gte: Date; lt: Date } }
+    }
+    expect(arg.where.fechaCreacion.gte.toISOString()).toBe("2026-12-31T00:00:00.000Z")
+    expect(arg.where.fechaCreacion.lt.toISOString()).toBe("2027-01-01T00:00:00.000Z")
   })
 })

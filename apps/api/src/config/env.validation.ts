@@ -170,6 +170,29 @@ const envSchema = z
         "CONSULTAS_PURGA_CRON debe ser una expresion cron con * 0-9 - , / o espacios",
       )
       .default("0 4 * * *"),
+    // ---------------------------------------------------------------------
+    // Notificaciones residuales (Slice 11.5 P11.5c — D-S11.5-C1/C3/C6).
+    //   RECORDATORIO_DEADLINE_CRON — recordatorio T+7 / T+1 a colaboradores
+    //                                con asignacion activa (default 08:00).
+    //   CENTRO_REVISION_CRON       — digest diario a admins con pendientes
+    //                                en el Centro de revision (default 08:00).
+    // ---------------------------------------------------------------------
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    RECORDATORIO_DEADLINE_CRON: z
+      .string()
+      .regex(
+        /^[*0-9\-,/\s]+$/,
+        "RECORDATORIO_DEADLINE_CRON debe ser una expresion cron con * 0-9 - , / o espacios",
+      )
+      .default("0 8 * * *"),
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    CENTRO_REVISION_CRON: z
+      .string()
+      .regex(
+        /^[*0-9\-,/\s]+$/,
+        "CENTRO_REVISION_CRON debe ser una expresion cron con * 0-9 - , / o espacios",
+      )
+      .default("0 8 * * *"),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV !== "production") {

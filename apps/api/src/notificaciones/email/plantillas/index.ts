@@ -5,6 +5,10 @@ import {
 } from "../../payload/asignacion-curso.payload"
 import { CasoReabiertoPayload, esCasoReabiertoPayload } from "../../payload/caso-reabierto.payload"
 import {
+  CentroRevisionPayload,
+  esCentroRevisionPayload,
+} from "../../payload/centro-revision.payload"
+import {
   ColaboradorListoPayload,
   esColaboradorListoPayload,
 } from "../../payload/colaborador-listo.payload"
@@ -27,6 +31,10 @@ import {
   esPlanesDesactualizadosPayload,
 } from "../../payload/planes-desactualizados.payload"
 import {
+  RecordatorioDeadlinePayload,
+  esRecordatorioDeadlinePayload,
+} from "../../payload/recordatorio-deadline.payload"
+import {
   ResultadoCierrePayload,
   esResultadoCierrePayload,
 } from "../../payload/resultado-cierre.payload"
@@ -36,6 +44,7 @@ import {
 } from "../../payload/transversal-disponible.payload"
 import { construirAsignacionCurso } from "./asignacion-curso.template"
 import { construirCasoReabierto } from "./caso-reabierto.template"
+import { construirCentroRevision } from "./centro-revision.template"
 import { construirColaboradorListo } from "./colaborador-listo.template"
 import { construirCursoDeadline } from "./curso-deadline.template"
 import { construirEntrevistaIaDisponible } from "./entrevista-ia-disponible.template"
@@ -47,6 +56,7 @@ import {
   construirPlanRecalculado,
 } from "./plan-recalculado.template"
 import { construirPlanesDesactualizados } from "./planes-desactualizados.template"
+import { construirRecordatorioDeadline } from "./recordatorio-deadline.template"
 import { construirResultadoCierre } from "./resultado-cierre.template"
 import { construirTransversalDisponible } from "./transversal-disponible.template"
 
@@ -124,6 +134,16 @@ const ENTRY_MODULO_HUERFANO_SKILL: PlantillaEntry<ModuloHuerfanoSkillPayload> = 
   construir: construirModuloHuerfanoSkill,
 }
 
+const ENTRY_RECORDATORIO_DEADLINE: PlantillaEntry<RecordatorioDeadlinePayload> = {
+  esPayloadValido: esRecordatorioDeadlinePayload,
+  construir: construirRecordatorioDeadline,
+}
+
+const ENTRY_CENTRO_REVISION: PlantillaEntry<CentroRevisionPayload> = {
+  esPayloadValido: esCentroRevisionPayload,
+  construir: construirCentroRevision,
+}
+
 export const PLANTILLAS: ReadonlyMap<TipoEventoNotif, PlantillaEntry<unknown>> = new Map<
   TipoEventoNotif,
   PlantillaEntry<unknown>
@@ -142,6 +162,8 @@ export const PLANTILLAS: ReadonlyMap<TipoEventoNotif, PlantillaEntry<unknown>> =
   [TipoEventoNotif.EXCEL_CARGADO, ENTRY_EXCEL_CARGADO as PlantillaEntry<unknown>],
   [TipoEventoNotif.PLANES_DESACTUALIZADOS, ENTRY_PLANES_DESACTUALIZADOS as PlantillaEntry<unknown>],
   [TipoEventoNotif.MODULO_HUERFANO_SKILL, ENTRY_MODULO_HUERFANO_SKILL as PlantillaEntry<unknown>],
+  [TipoEventoNotif.RECORDATORIO_DEADLINE, ENTRY_RECORDATORIO_DEADLINE as PlantillaEntry<unknown>],
+  [TipoEventoNotif.CENTRO_REVISION, ENTRY_CENTRO_REVISION as PlantillaEntry<unknown>],
 ])
 
 /**

@@ -3,6 +3,8 @@ import { Prisma, RolUsuario, TipoEventoNotif } from "@prisma/client"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { NotificacionesService } from "./notificaciones.service"
 
+const MS_POR_DIA = 24 * 60 * 60 * 1000
+
 /**
  * `broadcastAdminsActivos` — helper P11.5b (D-S11.5-B5).
  *
@@ -53,4 +55,44 @@ export async function broadcastAdminsActivos(
       logger.warn(`broadcast | fallo | tipo=${tipo} | admin=${admin.id} | error=${detalle}`)
     }
   }
+}
+
+/**
+ * `yaEmitidoHoy` — helper de idempotencia diaria para crons (D-S11.5-C5).
+ *
+ * Resuelve si ya existe en la tabla `notificaciones` al menos una fila con
+ * (tipo, [usuarioId?]) creada dentro de la ventana `[startOfDay(hoy),
+ * startOfDay(hoy+1))`. Se usa antes de emitir para evitar duplicar el envio
+ * si el container reinicia entre 08:00 y 08:01 y `@Cron` se dispara dos veces.
+ *
+ * Discriminante:
+ *  - Si `usuarioId` se proporciona: idempotencia por (usuarioId, tipo, dia).
+ *    Caso `RECORDATORIO_DEADLINE` — un colaborador no recibe 2 al dia.
+ *  - Si `usuarioId` es `null`: idempotencia por (tipo, dia) — cualquier fila
+ *    del tipo basta para considerar emitido el digest del dia. Caso
+ *    `CENTRO_REVISION` — basta una de las N filas del broadcast para detectar
+ *    que ya se emitio hoy.
+ *
+ * Mantenido SIN migracion (D-S11.5-C5): se reutiliza el indice
+ * `idx_notif_usuario_fecha` para queries con `usuarioId` y se acepta un scan
+ * acotado de un dia para queries sin `usuarioId` (volumen MVP < 1k filas/dia).
+ */
+export async function yaEmitidoHoy(
+  prisma: PrismaService,
+  tipo: TipoEventoNotif,
+  usuarioId: string | null,
+  hoy: Date,
+): Promise<boolean> {
+  const inicioDia = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate()))
+  const inicioManana = new Date(inicioDia.getTime() + MS_POR_DIA)
+  const where: Prisma.NotificacionWhereInput = {
+    tipoEvento: tipo,
+    fechaCreacion: { gte: inicioDia, lt: inicioManana },
+    ...(usuarioId === null ? {} : { usuarioId }),
+  }
+  const existente = await prisma.notificacion.findFirst({
+    where,
+    select: { id: true },
+  })
+  return existente !== null
 }

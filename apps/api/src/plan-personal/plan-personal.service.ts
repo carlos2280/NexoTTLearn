@@ -84,6 +84,14 @@ export class PlanPersonalService {
    * el motor se invoca tras crear la asignacion. Sin TX explicito: en
    * `crearAsignacionesAdmin` el TX externo no existe; en `convertirAAsignado`
    * el caller pasa su `tx` y se reutiliza.
+   *
+   * P11.5c — cierre TODO(S11) §6.1 item 45: tras un calculo exitoso se emite
+   * `PLAN_RECALCULADO` al participante reutilizando el helper privado
+   * `notificarPlanRecalculado`. La emision es fire-and-forget (ver helper) y
+   * se hace SOLO si el plan quedo realmente persistido (recuperado via
+   * `findUnique` por `asignacionId`). El fallo silencioso del calculo (catch
+   * que loggea) implica que `findUnique` devolvera `null` y no se notifica
+   * — evita falsos positivos al participante (D-S11.5-C*, D88).
    */
   async calcularSiAsignado(asignacionId: string, tx?: PrismaTx): Promise<void> {
     const cliente = tx ?? this.prisma
@@ -98,12 +106,14 @@ export class PlanPersonalService {
       // D-AS-1: voluntarios sin plan personal.
       return
     }
+    let calculoExitoso = false
     try {
       await this.calcularInterno({
         asignacionId,
         tx: cliente,
         fallarSiExiste: false,
       })
+      calculoExitoso = true
     } catch (error) {
       // El cierre del TODO(S7) no debe abortar el alta. Logueamos para
       // diagnostico y dejamos al admin recalcular manualmente si hace falta.
@@ -111,6 +121,23 @@ export class PlanPersonalService {
         `calcularSiAsignado(${asignacionId}) fallo: ${error instanceof Error ? error.message : String(error)}`,
       )
     }
+    if (!calculoExitoso) {
+      return
+    }
+    // Recuperar el planId tras el calculo (el motor lo creo o lo reescribio).
+    // Si el plan no existe (caso imposible si calculoExitoso=true salvo race),
+    // el helper se loggea sin propagar y no se notifica.
+    const plan = await this.prisma.planEstudio.findUnique({
+      where: { asignacionId },
+      select: { id: true },
+    })
+    if (!plan) {
+      this.logger.warn(
+        `notif | plan-recalculado omitida | asignacion=${asignacionId} | motivo=plan-no-encontrado-post-calculo`,
+      )
+      return
+    }
+    await this.notificarPlanRecalculado(asignacionId, plan.id)
   }
 
   /**

@@ -6,6 +6,8 @@ import { PrismaModule } from "../common/prisma/prisma.module"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { AppEnv } from "../config/env.validation"
 import { ArchivarNotificacionesCron } from "./cron/archivar-notificaciones.cron"
+import { CentroRevisionCron } from "./cron/centro-revision.cron"
+import { RecordatorioDeadlineCron } from "./cron/recordatorio-deadline.cron"
 import { IEmailProvider } from "./email/email-provider.interface"
 import { EMAIL_PROVIDER } from "./email/email-provider.token"
 import { MockEmailProvider } from "./email/mock-email-provider.service"
@@ -58,6 +60,8 @@ const emailProviderProvider: Provider = {
     emailProviderProvider,
     NotificacionesService,
     ArchivarNotificacionesCron,
+    RecordatorioDeadlineCron,
+    CentroRevisionCron,
   ],
   exports: [NotificacionesService],
 })
