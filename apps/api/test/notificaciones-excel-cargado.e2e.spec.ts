@@ -22,7 +22,11 @@ const DIST_DISPONIBLE = existsSync(join(DIST_DIR, "app.module.js"))
 // de este e2e. Cobertura del wire: `aplicar.service.spec.ts` valida que
 // EXCEL_CARGADO se emite 1-a-1 al actor solo si !replay, y que la plantilla
 // esta registrada en PLANTILLAS (`tipo-evento.constants.spec.ts`).
-const RUN_E2E_DEFERIDO = false
+// §5.131 (FIX-P11.5-cierre): parametrizado por env var. Por defecto
+// skipped (mismo issue raíz §5.123 — MockEmailProvider singletons
+// divergentes en Vitest CJS+ESM). Activar con `RUN_E2E_DEFERIDO=1`
+// cuando el bug del provider se resuelva en S12.
+const RUN_E2E_DEFERIDO = process.env.RUN_E2E_DEFERIDO === "1"
 const RUN_E2E = HAS_DB_URL && DIST_DISPONIBLE && RUN_E2E_DEFERIDO
 
 const ADMIN_EMAIL = "notif-excel-admin@nttdata.test"

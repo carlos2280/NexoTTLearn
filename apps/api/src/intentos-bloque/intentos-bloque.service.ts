@@ -273,7 +273,8 @@ export class IntentosBloqueService {
           where: { id: intento.id },
           select: SELECT_INTENTO_FIELDS,
         })
-        // TODO(S11): emitir notificacion ... (no se emite nada en P7b — D-S7-D3).
+        // (S11.5 cerrado) NO emite notificacion por intento de bloque
+        // entregado — D-S7-D3 confirmo silencio en el catalogo D88.
         return { status: HTTP_CREATED, body: toIntentoResponse(intentoFinal) }
       },
     })

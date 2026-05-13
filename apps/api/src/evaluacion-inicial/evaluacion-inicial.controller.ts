@@ -246,9 +246,9 @@ export class EvaluacionInicialController {
       })
     }
 
-    // TODO(S11): emitir notificacion EXCEL_CARGADO (admin, no silenciable)
-    // y PLANES_DESACTUALIZADOS si planesMarcadosDesactualizados > 0
-    // — fuera del alcance MVP (P10c solo cablea triggers participante).
+    // (S11.5b cerrado) EXCEL_CARGADO + PLANES_DESACTUALIZADOS se emiten
+    // desde aplicar.service.ts:105 y :107 tras runOnce exitoso con
+    // guard `!ejecucion.replay`. Identidad desde input.usuarioId (A01).
 
     return ejecucion.body
   }

@@ -21,7 +21,11 @@ const DIST_DISPONIBLE = existsSync(join(DIST_DIR, "app.module.js"))
 // `skillsHuerfanas`. Cobertura del wire: `modulos.service.spec.ts` valida
 // que MODULO_HUERFANO_SKILL emite broadcast solo si skillsHuerfanas>0, y que
 // la plantilla esta registrada en PLANTILLAS (`tipo-evento.constants.spec.ts`).
-const RUN_E2E_DEFERIDO = false
+// §5.131 (FIX-P11.5-cierre): parametrizado por env var. Por defecto
+// skipped (mismo issue raíz §5.123 — MockEmailProvider singletons
+// divergentes en Vitest CJS+ESM). Activar con `RUN_E2E_DEFERIDO=1`
+// cuando el bug del provider se resuelva en S12.
+const RUN_E2E_DEFERIDO = process.env.RUN_E2E_DEFERIDO === "1"
 const RUN_E2E = HAS_DB_URL && DIST_DISPONIBLE && RUN_E2E_DEFERIDO
 
 const ADMIN_EMAIL = "notif-mhs-admin@nttdata.test"

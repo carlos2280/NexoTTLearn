@@ -62,8 +62,8 @@ export const AUDIENCIA_POR_TIPO: ReadonlyMap<TipoEventoNotif, AudienciaTipo> = n
  * Tipos con plantilla HTML/text disponible.
  *
  * Fuente unica de verdad: el registro `PLANTILLAS` en `email/plantillas/index.ts`.
- * En P10c se activan `PLAN_RECALCULADO` y `RESULTADO_CIERRE`; los demas tipos
- * D88 entraran cuando sus plantillas se implementen (TODO(S11)).
+ * P11.5c (D-S11.5-C*): los 13 tipos del enum tienen plantilla
+ * activa — catalogo D88 100% cubierto.
  *
  * Se expone como funcion (no como objeto literal) para poder mockearla en tests
  * sin mutar global state — `vi.spyOn(catalogoTipoEvento, 'tienePlantilla')`.
