@@ -8,6 +8,7 @@ import type {
   ActualizarSkillsExigidasCursoInput,
   ActualizarTransversalCursoInput,
   ActualizarUmbralesLogroCursoInput,
+  CerrarCursoInput,
   CrearCursoInput,
   CursoConfiguracionResponse,
   CursoDetalle,
@@ -93,6 +94,29 @@ export function duplicarCurso(
   motivo: string,
 ): Promise<DuplicarCursoResponse> {
   return httpClient.post<DuplicarCursoResponse>(`/cursos/${id}/duplicar`, input, { motivo })
+}
+
+export function cerrarCurso(
+  id: string,
+  input: CerrarCursoInput,
+  motivo: string,
+  idempotencyKey: string,
+): Promise<CursoDetalle> {
+  return httpClient.post<CursoDetalle>(`/cursos/${id}/cerrar`, input, {
+    motivo,
+    idempotencyKey,
+  })
+}
+
+export function deshacerCierreCurso(
+  id: string,
+  motivo: string,
+  idempotencyKey: string,
+): Promise<CursoDetalle> {
+  return httpClient.post<CursoDetalle>(`/cursos/${id}/deshacer-cierre`, undefined, {
+    motivo,
+    idempotencyKey,
+  })
 }
 
 function buildLogQueryString(query: ListarLogCambiosQuery): string {

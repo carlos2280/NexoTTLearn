@@ -1,5 +1,6 @@
 import type {
   ActualizarCursoInput,
+  CerrarCursoInput,
   CrearCursoInput,
   DuplicarCursoInput,
 } from "@nexott-learn/shared-types"
@@ -7,8 +8,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   actualizarCurso,
   archivarCurso,
+  cerrarCurso,
   crearCurso,
   desarchivarCurso,
+  deshacerCierreCurso,
   duplicarCurso,
   eliminarCurso,
   publicarCurso,
@@ -94,6 +97,37 @@ export function useDuplicarCurso() {
   const invalidar = useInvalidar()
   return useMutation({
     mutationFn: ({ id, input, motivo }: DuplicarArgs) => duplicarCurso(id, input, motivo),
+    onSuccess: () => invalidar(),
+  })
+}
+
+interface CerrarArgs {
+  readonly id: string
+  readonly input: CerrarCursoInput
+  readonly motivo: string
+  readonly idempotencyKey: string
+}
+
+export function useCerrarCurso() {
+  const invalidar = useInvalidar()
+  return useMutation({
+    mutationFn: ({ id, input, motivo, idempotencyKey }: CerrarArgs) =>
+      cerrarCurso(id, input, motivo, idempotencyKey),
+    onSuccess: () => invalidar(),
+  })
+}
+
+interface DeshacerCierreArgs {
+  readonly id: string
+  readonly motivo: string
+  readonly idempotencyKey: string
+}
+
+export function useDeshacerCierreCurso() {
+  const invalidar = useInvalidar()
+  return useMutation({
+    mutationFn: ({ id, motivo, idempotencyKey }: DeshacerCierreArgs) =>
+      deshacerCierreCurso(id, motivo, idempotencyKey),
     onSuccess: () => invalidar(),
   })
 }

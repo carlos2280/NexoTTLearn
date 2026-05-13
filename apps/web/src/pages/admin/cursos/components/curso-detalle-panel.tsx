@@ -1,10 +1,9 @@
 import { AsignacionesVista } from "@/pages/admin/asignaciones/components/asignaciones-vista"
-import { Banner } from "@/shared/components/ui/banner"
 import type { CursoConfiguracionResponse, CursoDetalle } from "@nexott-learn/shared-types"
 import { ConfigCursoTab } from "./config/config-curso-tab"
 import { CursoDetalleResumen } from "./curso-detalle-resumen"
 
-export type TabDetalle = "resumen" | "asignados" | "estructura" | "configuracion"
+export type TabDetalle = "resumen" | "asignados" | "configuracion"
 
 interface CursoDetallePanelProps {
   readonly tab: TabDetalle
@@ -18,14 +17,6 @@ export function CursoDetallePanel({ tab, curso, nombreCliente }: CursoDetallePan
   }
   if (tab === "asignados") {
     return <AsignacionesVista cursoId={curso.id} nombreCurso={curso.titulo} />
-  }
-  if (tab === "estructura") {
-    return (
-      <Banner tone="neutral" title="Próximamente">
-        La estructura del curso (módulos / secciones / bloques) se podrá editar cuando se libere el
-        módulo de contenido.
-      </Banner>
-    )
   }
   return <ConfigCursoTab curso={curso} />
 }

@@ -1,7 +1,9 @@
 import {
   useArchivarCurso,
+  useCerrarCurso,
   useCrearCurso,
   useDesarchivarCurso,
+  useDeshacerCierreCurso,
   useDuplicarCurso,
   usePublicarCurso,
 } from "@/features/cursos/hooks/use-mutaciones-curso"
@@ -18,13 +20,18 @@ export type ModoDialogCursos =
   | "archivar"
   | "desarchivar"
   | "duplicar"
+  | "cerrar"
+  | "deshacer-cierre"
 
 export interface EstadoDialogCursos {
   readonly modo: ModoDialogCursos
   readonly curso: CursoResumen | null
+  readonly idempotencyKey: string | null
 }
 
-const CERRADO: EstadoDialogCursos = { modo: "cerrado", curso: null }
+const CERRADO: EstadoDialogCursos = { modo: "cerrado", curso: null, idempotencyKey: null }
+
+const MODOS_CON_IDEMPOTENCY: readonly ModoDialogCursos[] = ["cerrar", "deshacer-cierre"]
 
 export function useCursosOrquestacion() {
   const [dialog, setDialog] = useState<EstadoDialogCursos>(CERRADO)
@@ -34,9 +41,13 @@ export function useCursosOrquestacion() {
   const archivar = useArchivarCurso()
   const desarchivar = useDesarchivarCurso()
   const duplicar = useDuplicarCurso()
+  const cerrarCursoMut = useCerrarCurso()
+  const deshacerCierreMut = useDeshacerCierreCurso()
 
-  const abrir = (modo: ModoDialogCursos, curso: CursoResumen | null = null) =>
-    setDialog({ modo, curso })
+  const abrir = (modo: ModoDialogCursos, curso: CursoResumen | null = null) => {
+    const idempotencyKey = MODOS_CON_IDEMPOTENCY.includes(modo) ? crypto.randomUUID() : null
+    setDialog({ modo, curso, idempotencyKey })
+  }
   const cerrar = () => setDialog(CERRADO)
 
   async function conCurso(op: (c: CursoResumen) => Promise<void>) {
@@ -44,6 +55,16 @@ export function useCursosOrquestacion() {
       return
     }
     await op(dialog.curso)
+    cerrar()
+  }
+
+  async function conCursoEIdempotency(
+    op: (c: CursoResumen, idempotencyKey: string) => Promise<void>,
+  ) {
+    if (!dialog.curso || !dialog.idempotencyKey) {
+      return
+    }
+    await op(dialog.curso, dialog.idempotencyKey)
     cerrar()
   }
 
@@ -57,6 +78,8 @@ export function useCursosOrquestacion() {
       archivar: (c: CursoResumen) => abrir("archivar", c),
       desarchivar: (c: CursoResumen) => abrir("desarchivar", c),
       duplicar: (c: CursoResumen) => abrir("duplicar", c),
+      cerrar: (c: CursoResumen) => abrir("cerrar", c),
+      deshacerCierre: (c: CursoResumen) => abrir("deshacer-cierre", c),
     },
     ejecutar: {
       crear: async (input: CrearCursoInput) => {
@@ -90,6 +113,21 @@ export function useCursosOrquestacion() {
           toast.success(`Curso duplicado como «${res.curso.titulo}»`)
           navigate(RUTAS.admin.cursoDetalle(res.curso.id))
         }),
+      cerrar: (motivo: string) =>
+        conCursoEIdempotency(async (c, idempotencyKey) => {
+          await cerrarCursoMut.mutateAsync({
+            id: c.id,
+            input: { decisionPorAsignacion: [] },
+            motivo,
+            idempotencyKey,
+          })
+          toast.success(`Curso «${c.titulo}» cerrado`)
+        }),
+      deshacerCierre: (motivo: string) =>
+        conCursoEIdempotency(async (c, idempotencyKey) => {
+          await deshacerCierreMut.mutateAsync({ id: c.id, motivo, idempotencyKey })
+          toast.success(`Cierre de «${c.titulo}» deshecho`)
+        }),
     },
     estado: {
       enviandoCrear: crear.isPending,
@@ -97,6 +135,8 @@ export function useCursosOrquestacion() {
       enviandoArchivar: archivar.isPending,
       enviandoDesarchivar: desarchivar.isPending,
       enviandoDuplicar: duplicar.isPending,
+      enviandoCerrar: cerrarCursoMut.isPending,
+      enviandoDeshacerCierre: deshacerCierreMut.isPending,
     },
   }
 }

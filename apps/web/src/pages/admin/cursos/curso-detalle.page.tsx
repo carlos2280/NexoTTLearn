@@ -18,7 +18,6 @@ import { useCursosOrquestacion } from "./hooks/use-cursos-orquestacion"
 const TABS: readonly { readonly id: TabDetalle; readonly etiqueta: string }[] = [
   { id: "resumen", etiqueta: "Resumen" },
   { id: "asignados", etiqueta: "Asignados" },
-  { id: "estructura", etiqueta: "Estructura" },
   { id: "configuracion", etiqueta: "Configuración" },
 ]
 
@@ -83,6 +82,8 @@ export function CursoDetallePage() {
         nombreCliente={nombreCliente}
         onEditar={() => setEditando(true)}
         onPublicar={() => orq.abrir("publicar", cursoResumenParaOrq)}
+        onCerrar={() => orq.abrir("cerrar", cursoResumenParaOrq)}
+        onDeshacerCierre={() => orq.abrir("deshacer-cierre", cursoResumenParaOrq)}
         onArchivar={() => orq.abrir("archivar", cursoResumenParaOrq)}
         onDesarchivar={() => orq.abrir("desarchivar", cursoResumenParaOrq)}
         onDuplicar={() => orq.abrir("duplicar", cursoResumenParaOrq)}

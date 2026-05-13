@@ -1,6 +1,6 @@
 import type { AccionMenu } from "@/shared/components/ui/menu-acciones"
 import type { CursoResumen } from "@nexott-learn/shared-types"
-import { Archive, ArchiveRestore, Copy, Eye, Rocket } from "lucide-react"
+import { Archive, ArchiveRestore, Copy, Eye, Lock, Rocket, Undo2 } from "lucide-react"
 
 export interface AccionesCursoOrq {
   readonly verDetalle: (c: CursoResumen) => void
@@ -8,6 +8,8 @@ export interface AccionesCursoOrq {
   readonly archivar: (c: CursoResumen) => void
   readonly desarchivar: (c: CursoResumen) => void
   readonly duplicar: (c: CursoResumen) => void
+  readonly cerrar: (c: CursoResumen) => void
+  readonly deshacerCierre: (c: CursoResumen) => void
 }
 
 export function accionesPorCurso(
@@ -33,6 +35,20 @@ export function accionesPorCurso(
     icono: Copy,
     onClick: () => orq.duplicar(c),
   }
+  const cerrarItem: AccionMenu = {
+    id: "cerrar",
+    etiqueta: "Cerrar curso",
+    icono: Lock,
+    deshabilitada: c.estado !== "ACTIVO",
+    onClick: () => orq.cerrar(c),
+  }
+  const deshacerCierreItem: AccionMenu = {
+    id: "deshacer-cierre",
+    etiqueta: "Deshacer cierre",
+    icono: Undo2,
+    deshabilitada: c.estado !== "CERRADO",
+    onClick: () => orq.deshacerCierre(c),
+  }
   const archivarItem: AccionMenu = {
     id: "archivar",
     etiqueta: "Archivar",
@@ -52,10 +68,13 @@ export function accionesPorCurso(
     return [[verItem, duplicarItem], [desarchivarItem]]
   }
   if (c.estado === "CERRADO") {
-    return [[verItem, duplicarItem], [archivarItem]]
+    return [
+      [verItem, duplicarItem],
+      [deshacerCierreItem, archivarItem],
+    ]
   }
   if (c.estado === "BORRADOR") {
     return [[verItem, publicarItem, duplicarItem]]
   }
-  return [[verItem, duplicarItem]]
+  return [[verItem, duplicarItem], [cerrarItem]]
 }

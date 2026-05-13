@@ -2,7 +2,17 @@ import { Badge } from "@/shared/components/ui/badge"
 import { Button } from "@/shared/components/ui/button"
 import { RUTAS } from "@/shared/constants/rutas"
 import type { CursoDetalle, EstadoCurso } from "@nexott-learn/shared-types"
-import { Archive, ArchiveRestore, ChevronLeft, Copy, History, Pencil, Rocket } from "lucide-react"
+import {
+  Archive,
+  ArchiveRestore,
+  ChevronLeft,
+  Copy,
+  History,
+  Lock,
+  Pencil,
+  Rocket,
+  Undo2,
+} from "lucide-react"
 import { Link } from "react-router-dom"
 
 interface CursoDetalleCabeceraProps {
@@ -10,6 +20,8 @@ interface CursoDetalleCabeceraProps {
   readonly nombreCliente: string | undefined
   readonly onEditar: () => void
   readonly onPublicar: () => void
+  readonly onCerrar: () => void
+  readonly onDeshacerCierre: () => void
   readonly onArchivar: () => void
   readonly onDesarchivar: () => void
   readonly onDuplicar: () => void
@@ -63,6 +75,8 @@ export function CursoDetalleCabecera({
   nombreCliente,
   onEditar,
   onPublicar,
+  onCerrar,
+  onDeshacerCierre,
   onArchivar,
   onDesarchivar,
   onDuplicar,
@@ -120,11 +134,23 @@ export function CursoDetalleCabecera({
               Publicar
             </Button>
           ) : null}
-          {curso.estado === "CERRADO" ? (
-            <Button variant="secondary" size="sm" onClick={onArchivar}>
-              <Archive className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
-              Archivar
+          {curso.estado === "ACTIVO" ? (
+            <Button variant="secondary" size="sm" onClick={onCerrar}>
+              <Lock className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
+              Cerrar curso
             </Button>
+          ) : null}
+          {curso.estado === "CERRADO" ? (
+            <>
+              <Button variant="secondary" size="sm" onClick={onDeshacerCierre}>
+                <Undo2 className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
+                Deshacer cierre
+              </Button>
+              <Button variant="secondary" size="sm" onClick={onArchivar}>
+                <Archive className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
+                Archivar
+              </Button>
+            </>
           ) : null}
           {curso.estado === "ARCHIVADO" ? (
             <Button variant="secondary" size="sm" onClick={onDesarchivar}>

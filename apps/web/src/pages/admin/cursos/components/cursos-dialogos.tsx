@@ -60,6 +60,25 @@ export function CursosDialogos({ orq, clientes, cargandoClientes }: CursosDialog
         enviando={estado.enviandoDuplicar}
         onConfirmar={ejecutar.duplicar}
       />
+      <ConfirmMotivoDialog
+        abierto={dialog.modo === "cerrar"}
+        onCambiarAbierto={(a) => (a ? null : cerrar())}
+        titulo={`Cerrar curso «${dialog.curso?.titulo ?? ""}»`}
+        descripcion="El curso pasará a CERRADO. Si hay asignaciones EN_PROGRESO sin decisión, el cierre fallará y deberás resolverlas desde la tab Asignados antes de reintentar. Tienes 7 días para deshacer el cierre."
+        textoConfirmar="Cerrar curso"
+        variante="danger"
+        enviando={estado.enviandoCerrar}
+        onConfirmar={ejecutar.cerrar}
+      />
+      <ConfirmMotivoDialog
+        abierto={dialog.modo === "deshacer-cierre"}
+        onCambiarAbierto={(a) => (a ? null : cerrar())}
+        titulo={`Deshacer cierre de «${dialog.curso?.titulo ?? ""}»`}
+        descripcion="El curso volverá a ACTIVO. Solo es posible dentro de los 7 días posteriores al cierre."
+        textoConfirmar="Deshacer cierre"
+        enviando={estado.enviandoDeshacerCierre}
+        onConfirmar={ejecutar.deshacerCierre}
+      />
     </>
   )
 }
