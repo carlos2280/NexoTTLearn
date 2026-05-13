@@ -3,7 +3,7 @@ import { ApiError } from "@/shared/api/api-error"
 import { Banner } from "@/shared/components/ui/banner"
 import { Button } from "@/shared/components/ui/button"
 import { useMutation } from "@tanstack/react-query"
-import { motion } from "framer-motion"
+import { motion, useReducedMotion } from "framer-motion"
 import { useCallback, useRef, useState } from "react"
 import type { MfaChallenge } from "../login.types"
 import { BandaTemporal } from "./banda-temporal"
@@ -15,7 +15,20 @@ interface PasoMfaProps {
   readonly onReiniciar: () => void
 }
 
+const stagger = (i: number) => ({
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0 },
+  transition: {
+    type: "spring" as const,
+    stiffness: 80,
+    damping: 18,
+    mass: 0.6,
+    delay: 0.3 + i * 0.08,
+  },
+})
+
 export function PasoMfa({ challenge, onExito, onReiniciar }: PasoMfaProps) {
+  const reducedMotion = useReducedMotion()
   const [codigo, setCodigo] = useState("")
   const ultimoEnviado = useRef<string>("")
 
@@ -27,6 +40,7 @@ export function PasoMfa({ challenge, onExito, onReiniciar }: PasoMfaProps) {
   })
 
   const apiError = mutation.error instanceof ApiError ? mutation.error : null
+  const motionProps = (i: number) => (reducedMotion ? {} : stagger(i))
 
   const enviar = useCallback(
     async (codigoFinal: string): Promise<void> => {
@@ -42,14 +56,16 @@ export function PasoMfa({ challenge, onExito, onReiniciar }: PasoMfaProps) {
   )
 
   return (
-    <div className="flex flex-col gap-7">
-      <header className="flex flex-col gap-2">
-        <p className="nx-eyebrow text-text-tertiary">Doble verificación</p>
+    <div className="flex flex-col gap-6">
+      <motion.header {...motionProps(0)} className="flex flex-col gap-1.5">
+        <span className="nx-eyebrow text-aurora-violet">Doble verificación</span>
         <h2 className="text-h1 text-text-primary">
-          Solo tú<span className="text-accent">.</span>
+          Solo tú<span className="text-aurora-violet">.</span>
         </h2>
-        <p className="text-body text-text-secondary">Código de tu app autenticadora.</p>
-      </header>
+        <p className="text-body-sm text-text-secondary">
+          Ingresa el código de 6 dígitos de tu app autenticadora.
+        </p>
+      </motion.header>
 
       {apiError ? (
         <motion.div
@@ -61,20 +77,24 @@ export function PasoMfa({ challenge, onExito, onReiniciar }: PasoMfaProps) {
         </motion.div>
       ) : null}
 
-      <CodigoMfaInput
-        onChange={setCodigo}
-        onComplete={enviar}
-        disabled={mutation.isPending}
-        hasError={Boolean(apiError)}
-      />
+      <motion.div {...motionProps(1)}>
+        <CodigoMfaInput
+          onChange={setCodigo}
+          onComplete={enviar}
+          disabled={mutation.isPending}
+          hasError={Boolean(apiError)}
+        />
+      </motion.div>
 
-      <BandaTemporal
-        expiraEn={challenge.expiraEn}
-        etiqueta="El código expira en"
-        onExpirar={onReiniciar}
-      />
+      <motion.div {...motionProps(2)}>
+        <BandaTemporal
+          expiraEn={challenge.expiraEn}
+          etiqueta="El código expira en"
+          onExpirar={onReiniciar}
+        />
+      </motion.div>
 
-      <div className="flex flex-col gap-2">
+      <motion.div {...motionProps(3)} className="flex flex-col gap-2 pt-1">
         <Button
           type="button"
           fullWidth={true}
@@ -93,7 +113,7 @@ export function PasoMfa({ challenge, onExito, onReiniciar }: PasoMfaProps) {
         >
           Volver al inicio
         </Button>
-      </div>
+      </motion.div>
     </div>
   )
 }

@@ -1,5 +1,6 @@
-import { motion } from "framer-motion"
+import { NexoMark } from "@/shared/components/nexo-mark"
 import { DUR, EASE } from "@/shared/lib/motion"
+import { motion } from "framer-motion"
 import type { PasoLogin } from "../login.types"
 import { ConstelacionFondo } from "./constelacion-fondo"
 import { FraseRotativa } from "./frase-rotativa"
@@ -47,6 +48,9 @@ export function EscenarioMarca({ paso }: EscenarioMarcaProps) {
       transition={{ duration: DUR.cinematic, ease: EASE.default }}
       className="nx-grain relative isolate overflow-hidden"
     >
+      {/* Aurora — capa de identidad siempre presente. Respira lento. */}
+      <div aria-hidden="true" className="nx-aurora-drift" />
+
       <ConstelacionFondo />
       <StreamVivo />
 
@@ -56,10 +60,26 @@ export function EscenarioMarca({ paso }: EscenarioMarcaProps) {
           aria-hidden="true"
           animate={{ opacity: p === paso ? 1 : 0 }}
           transition={{ duration: DUR.cinematic, ease: EASE.default }}
-          className="pointer-events-none absolute inset-0"
+          className="pointer-events-none absolute inset-0 mix-blend-overlay"
           style={{ background: GRADIENTE_POR_PASO[p] }}
         />
       ))}
+
+      {/* Vignette — oscurece la zona del contenido para que el texto blanco lea. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={{ background: "var(--gradient-aurora-vignette)" }}
+      />
+
+      {/* Sello del mark — esquina inferior izquierda, ancla la marca al panel.
+          Variante "tinta" (línea blanca) para no sumar color sobre la aurora. */}
+      <div
+        aria-hidden="true"
+        className="absolute bottom-6 left-6 z-10 text-white/85 lg:bottom-10 lg:left-16"
+      >
+        <NexoMark tono="tinta" tamano={40} />
+      </div>
 
       <div className="relative z-10 flex h-full items-center px-5 py-6 sm:px-8 sm:py-8 lg:px-16 lg:py-14">
         <motion.div

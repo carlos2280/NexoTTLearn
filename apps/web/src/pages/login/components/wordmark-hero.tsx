@@ -14,7 +14,10 @@ export function WordmarkHero() {
   const baseDelay = 0.15
 
   return (
-    <h1 className="text-h1 text-text-primary sm:text-display-md lg:text-display-lg xl:text-display-xl">
+    <h1
+      className="text-h1 text-white sm:text-display-md lg:text-display-lg xl:text-display-xl"
+      style={{ textShadow: "var(--shadow-text-aurora)" }}
+    >
       <span className="inline-flex items-baseline gap-3">
         <span className="inline-flex">
           {LETRAS.map(({ char, pos }) => (
@@ -44,8 +47,8 @@ export function WordmarkHero() {
             duration: 0.7,
             ease: [0.16, 1, 0.3, 1],
           }}
-          className="relative inline-flex items-center justify-center text-accent"
-          style={{ textShadow: "0 0 24px rgb(var(--color-accent-rgb) / 0.45)" }}
+          className="relative inline-flex items-center justify-center text-aurora-cyan"
+          style={{ textShadow: "0 0 32px rgb(var(--color-aurora-cyan-rgb) / 0.75)" }}
         >
           ·
         </motion.span>
@@ -58,7 +61,7 @@ export function WordmarkHero() {
             stiffness: 90,
             damping: 18,
           }}
-          className="font-mono font-normal text-[0.62em] text-text-tertiary tracking-tight"
+          className="font-mono font-normal text-[0.62em] text-white/60 tracking-tight"
         >
           learn
         </motion.span>

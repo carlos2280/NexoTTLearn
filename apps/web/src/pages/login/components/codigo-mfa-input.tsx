@@ -101,12 +101,14 @@ export function CodigoMfaInput(props: CodigoMfaInputProps) {
               disabled={disabled}
               aria-label={`Dígito ${i + 1} de ${LENGTH}`}
               className={cn(
-                "h-14 w-full rounded-md border bg-surface",
+                "h-14 w-full rounded-xl border bg-surface",
                 "tabular text-center font-medium font-mono text-mfa text-text-primary",
                 "transition-[border-color,box-shadow,background-color] duration-base ease-default",
-                "focus:border-accent focus:shadow-ring-accent focus:outline-none",
+                "focus:border-aurora-violet focus:shadow-ring-aurora focus:outline-none",
                 "disabled:cursor-not-allowed disabled:opacity-50",
-                valor ? "border-accent bg-accent-soft" : "border-border-strong",
+                valor
+                  ? "border-aurora-violet bg-[rgb(var(--color-aurora-violet-rgb)/0.08)]"
+                  : "border-border-strong",
                 hasError && "border-danger focus:border-danger focus:shadow-ring-danger",
               )}
             />

@@ -2,9 +2,10 @@ import { cambiarPassword } from "@/features/auth/api/cambiar-password.api"
 import { ApiError } from "@/shared/api/api-error"
 import { Banner } from "@/shared/components/ui/banner"
 import { Button } from "@/shared/components/ui/button"
-import { Field } from "@/shared/components/ui/field"
-import { Input } from "@/shared/components/ui/input"
+import { PasswordField } from "@/shared/components/ui/password-field"
 import { useMutation } from "@tanstack/react-query"
+import { motion, useReducedMotion } from "framer-motion"
+import { KeyRound, Lock, LockKeyhole } from "lucide-react"
 import { type FormEvent, useState } from "react"
 import { z } from "zod"
 import { CriteriosPassword, cumpleTodosLosCriterios } from "./criterios-password"
@@ -24,7 +25,20 @@ const schema = z
     path: ["repetida"],
   })
 
+const stagger = (i: number) => ({
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0 },
+  transition: {
+    type: "spring" as const,
+    stiffness: 80,
+    damping: 18,
+    mass: 0.6,
+    delay: 0.3 + i * 0.07,
+  },
+})
+
 export function PasoCambiarPassword({ onExito }: PasoCambiarPasswordProps) {
+  const reducedMotion = useReducedMotion()
   const [actual, setActual] = useState("")
   const [nueva, setNueva] = useState("")
   const [repetida, setRepetida] = useState("")
@@ -38,6 +52,7 @@ export function PasoCambiarPassword({ onExito }: PasoCambiarPasswordProps) {
   })
 
   const apiError = mutation.error instanceof ApiError ? mutation.error : null
+  const motionProps = (i: number) => (reducedMotion ? {} : stagger(i))
 
   async function handleSubmit(event: FormEvent): Promise<void> {
     event.preventDefault()
@@ -63,64 +78,70 @@ export function PasoCambiarPassword({ onExito }: PasoCambiarPasswordProps) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate={true}>
-      <header className="flex flex-col gap-1.5">
-        <p className="nx-eyebrow text-text-tertiary">Primer acceso</p>
-        <h2 className="text-h2 text-text-primary">
-          Define tu contraseña<span className="text-accent">.</span>
+      <motion.header {...motionProps(0)} className="flex flex-col gap-1.5">
+        <span className="nx-eyebrow text-aurora-violet">Primer acceso</span>
+        <h2 className="text-h1 text-text-primary">
+          Define tu contraseña<span className="text-aurora-violet">.</span>
         </h2>
-        <p className="text-body text-text-secondary">Es la llave a tu ficha de skills.</p>
-      </header>
+        <p className="text-body-sm text-text-secondary">Es la llave a tu ficha de skills.</p>
+      </motion.header>
 
-      {apiError ? <Banner tone="danger">{apiError.message}</Banner> : null}
+      {apiError ? (
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25 }}
+        >
+          <Banner tone="danger">{apiError.message}</Banner>
+        </motion.div>
+      ) : null}
 
-      <Field label="Contraseña actual" error={errores.actual}>
-        {(attrs) => (
-          <Input
-            {...attrs}
-            type="password"
-            autoComplete="current-password"
-            autoFocus={true}
-            value={actual}
-            onChange={(e) => setActual(e.target.value)}
-            disabled={mutation.isPending}
-            hasError={Boolean(errores.actual)}
-          />
-        )}
-      </Field>
+      <motion.div {...motionProps(1)}>
+        <PasswordField
+          label="Contraseña actual"
+          icon={<Lock className="h-4 w-4" />}
+          autoComplete="current-password"
+          autoFocus={true}
+          placeholder="••••••••"
+          value={actual}
+          onChange={(e) => setActual(e.target.value)}
+          disabled={mutation.isPending}
+          error={errores.actual}
+        />
+      </motion.div>
 
-      <Field label="Nueva contraseña" error={errores.nueva}>
-        {(attrs) => (
-          <Input
-            {...attrs}
-            type="password"
-            autoComplete="new-password"
-            value={nueva}
-            onChange={(e) => setNueva(e.target.value)}
-            disabled={mutation.isPending}
-            hasError={Boolean(errores.nueva)}
-          />
-        )}
-      </Field>
+      <motion.div {...motionProps(2)} className="flex flex-col gap-2.5">
+        <PasswordField
+          label="Nueva contraseña"
+          icon={<KeyRound className="h-4 w-4" />}
+          autoComplete="new-password"
+          placeholder="••••••••"
+          value={nueva}
+          onChange={(e) => setNueva(e.target.value)}
+          disabled={mutation.isPending}
+          error={errores.nueva}
+        />
+        <CriteriosPassword valor={nueva} />
+      </motion.div>
 
-      <CriteriosPassword valor={nueva} />
+      <motion.div {...motionProps(3)}>
+        <PasswordField
+          label="Repite la nueva contraseña"
+          icon={<LockKeyhole className="h-4 w-4" />}
+          autoComplete="new-password"
+          placeholder="••••••••"
+          value={repetida}
+          onChange={(e) => setRepetida(e.target.value)}
+          disabled={mutation.isPending}
+          error={errores.repetida}
+        />
+      </motion.div>
 
-      <Field label="Repite la nueva contraseña" error={errores.repetida}>
-        {(attrs) => (
-          <Input
-            {...attrs}
-            type="password"
-            autoComplete="new-password"
-            value={repetida}
-            onChange={(e) => setRepetida(e.target.value)}
-            disabled={mutation.isPending}
-            hasError={Boolean(errores.repetida)}
-          />
-        )}
-      </Field>
-
-      <Button type="submit" fullWidth={true} size="lg" isLoading={mutation.isPending}>
-        Guardar y continuar
-      </Button>
+      <motion.div {...motionProps(4)} className="pt-1">
+        <Button type="submit" fullWidth={true} isLoading={mutation.isPending}>
+          Guardar y continuar
+        </Button>
+      </motion.div>
     </form>
   )
 }

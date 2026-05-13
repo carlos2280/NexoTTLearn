@@ -3,10 +3,11 @@ import type { LoginResponse } from "@/features/auth/types"
 import { ApiError } from "@/shared/api/api-error"
 import { Banner } from "@/shared/components/ui/banner"
 import { Button } from "@/shared/components/ui/button"
-import { Field } from "@/shared/components/ui/field"
-import { Input } from "@/shared/components/ui/input"
+import { PasswordField } from "@/shared/components/ui/password-field"
+import { TextField } from "@/shared/components/ui/text-field"
 import { useMutation } from "@tanstack/react-query"
 import { motion, useReducedMotion } from "framer-motion"
+import { Lock, Mail } from "lucide-react"
 import { type FormEvent, useState } from "react"
 import { z } from "zod"
 
@@ -66,11 +67,13 @@ export function PasoCredenciales({ onExito }: PasoCredencialesProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-7" noValidate={true}>
-      <motion.header {...motionProps(0)}>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-6" noValidate={true}>
+      <motion.header {...motionProps(0)} className="flex flex-col gap-1.5">
+        <span className="nx-eyebrow text-aurora-violet">Acceso · Colaboradores</span>
         <h2 className="text-h1 text-text-primary">
-          Bienvenido<span className="text-accent">.</span>
+          Bienvenido<span className="text-aurora-violet">.</span>
         </h2>
+        <p className="text-body-sm text-text-secondary">Tu próximo curso te está esperando.</p>
       </motion.header>
 
       {apiError ? (
@@ -84,36 +87,31 @@ export function PasoCredenciales({ onExito }: PasoCredencialesProps) {
       ) : null}
 
       <motion.div {...motionProps(1)}>
-        <Field label="Email corporativo" error={errores.email}>
-          {(attrs) => (
-            <Input
-              {...attrs}
-              type="email"
-              autoComplete="email"
-              autoFocus={true}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={mutation.isPending}
-              hasError={Boolean(errores.email)}
-            />
-          )}
-        </Field>
+        <TextField
+          label="Email corporativo"
+          icon={<Mail className="h-4 w-4" />}
+          type="email"
+          autoComplete="email"
+          autoFocus={true}
+          placeholder="nombre@nttdata.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={mutation.isPending}
+          error={errores.email}
+        />
       </motion.div>
 
       <motion.div {...motionProps(2)}>
-        <Field label="Contraseña" error={errores.password}>
-          {(attrs) => (
-            <Input
-              {...attrs}
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={mutation.isPending}
-              hasError={Boolean(errores.password)}
-            />
-          )}
-        </Field>
+        <PasswordField
+          label="Contraseña"
+          icon={<Lock className="h-4 w-4" />}
+          autoComplete="current-password"
+          placeholder="••••••••"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={mutation.isPending}
+          error={errores.password}
+        />
       </motion.div>
 
       <motion.div {...motionProps(3)} className="pt-1">

@@ -52,10 +52,11 @@ export function FraseRotativa() {
             damping: 18,
             mass: 0.7,
           }}
-          className="absolute inset-0 flex flex-col gap-1 text-quote text-text-primary"
+          className="absolute inset-0 flex flex-col gap-1 text-quote text-white"
+          style={{ textShadow: "var(--shadow-text-aurora)" }}
         >
           <span>{frase.cuerpo}</span>
-          <span className="font-serif text-accent italic">{frase.enfasis}</span>
+          <span className="font-serif text-aurora-cyan italic">{frase.enfasis}</span>
         </motion.p>
       </AnimatePresence>
     </div>

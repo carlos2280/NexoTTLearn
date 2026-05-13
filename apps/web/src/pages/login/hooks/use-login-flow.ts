@@ -7,7 +7,9 @@ import { useCallback, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import type { MfaChallenge, PasoLogin } from "../login.types"
 
-const DURACION_BIENVENIDA_MS = 2600
+// Sincronizado con paso-bienvenida.tsx: la línea aurora dura 1.4s (delay) + 2.6s
+// (animación) = 4s. Dejamos 500ms extra para que el usuario "respire" antes de navegar.
+const DURACION_BIENVENIDA_MS = 4500
 const MFA_CHALLENGE_TTL_MS = 5 * 60 * 1000
 
 interface UseLoginFlowResult {

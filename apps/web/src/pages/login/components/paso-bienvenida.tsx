@@ -15,7 +15,7 @@ export function PasoBienvenida({ usuario }: PasoBienvenidaProps) {
         initial={reducedMotion ? { opacity: 1 } : { opacity: 0, y: 14, filter: "blur(8px)" }}
         animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
         transition={{ duration: 0.6, ease }}
-        className="nx-eyebrow text-accent-on-soft"
+        className="nx-eyebrow text-aurora-violet"
       >
         Identidad verificada
       </motion.p>
@@ -31,10 +31,10 @@ export function PasoBienvenida({ usuario }: PasoBienvenidaProps) {
           initial={reducedMotion ? { opacity: 1 } : { opacity: 0, y: 24, filter: "blur(10px)" }}
           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           transition={{ delay: 0.5, duration: 0.8, ease }}
-          className="font-normal font-serif text-accent italic"
+          className="font-normal font-serif text-aurora-violet italic"
         >
           {usuario.nombre}
-          <span className="text-text-tertiary">.</span>
+          <span className="text-aurora-cyan">.</span>
         </motion.span>
       </motion.h2>
 
@@ -50,11 +50,13 @@ export function PasoBienvenida({ usuario }: PasoBienvenidaProps) {
         <p className="nx-eyebrow font-mono text-text-tertiary">Llevándote a tu bandeja</p>
       </motion.div>
 
+      {/* Línea de progreso — sincronizada con DURACION_BIENVENIDA_MS del hook.
+          La línea termina justo antes de que el flujo navegue al dashboard. */}
       <motion.div
         initial={{ width: 0 }}
         animate={{ width: "100%" }}
-        transition={{ delay: 1.4, duration: 1.2, ease: "linear" }}
-        className="mt-2 h-[2px] max-w-[200px] bg-accent"
+        transition={{ delay: 1.4, duration: 2.6, ease: "linear" }}
+        className="mt-2 h-[2px] max-w-[200px] rounded-pill bg-[image:var(--gradient-aurora)]"
         aria-hidden="true"
       />
     </div>
