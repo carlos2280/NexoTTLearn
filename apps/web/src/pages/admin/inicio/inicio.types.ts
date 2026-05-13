@@ -7,11 +7,13 @@ export interface KpiPulso {
   readonly etiqueta: string
   readonly valor: number
   readonly sufijo?: string
-  readonly delta: number
   readonly tono: TonoKpi
   readonly icono: LucideIcon
-  readonly serie: readonly number[]
   readonly nota: string
+  /** Variación respecto al periodo anterior. Solo se renderiza si hay histórico real. */
+  readonly delta?: number
+  /** Serie temporal para el sparkline. Solo se renderiza si tiene ≥ 2 puntos. */
+  readonly serie?: readonly number[]
 }
 
 export type PrioridadCaso = "urgente" | "alta" | "normal"

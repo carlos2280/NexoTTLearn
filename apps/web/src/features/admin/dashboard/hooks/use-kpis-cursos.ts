@@ -26,10 +26,8 @@ function construirKpis(cursos: readonly CursoResumen[]): readonly KpiPulso[] {
       id: "cursos-activos",
       etiqueta: "Cursos activos",
       valor: activos.length,
-      delta: 0,
       tono: "acento",
       icono: BookOpen,
-      serie: [activos.length],
       nota:
         activos.length === 0
           ? "Aún no hay cursos publicados"
@@ -39,30 +37,24 @@ function construirKpis(cursos: readonly CursoResumen[]): readonly KpiPulso[] {
       id: "cursos-borrador",
       etiqueta: "Borradores",
       valor: borrador.length,
-      delta: 0,
       tono: borrador.length > 0 ? "warning" : "success",
       icono: FileEdit,
-      serie: [borrador.length],
       nota: borrador.length === 0 ? "Sin pendientes" : "Pendientes de publicar",
     },
     {
       id: "deadline-proximo",
       etiqueta: "Deadline próximo",
       valor: proximosDeadline.length,
-      delta: 0,
       tono: proximosDeadline.length > 0 ? "warning" : "success",
       icono: CalendarClock,
-      serie: [proximosDeadline.length],
       nota: `≤ ${DIAS_VENTANA_DEADLINE} días`,
     },
     {
       id: "cursos-archivados",
       etiqueta: "Archivados",
       valor: archivados.length,
-      delta: 0,
       tono: "acento",
       icono: Archive,
-      serie: [archivados.length],
       nota:
         archivados.length === 1 ? "1 curso archivado" : `${archivados.length} cursos archivados`,
     },

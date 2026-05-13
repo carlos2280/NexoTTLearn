@@ -1,7 +1,9 @@
 import { ApiError } from "../api-error"
+import { handlersAdmin } from "./handlers-admin"
 import { handlersAuth } from "./handlers-auth"
 import { handlersBloques } from "./handlers-bloques"
 import { handlersCatalogo } from "./handlers-catalogo"
+import { handlersReportes } from "./handlers-reportes"
 import { handlersSecciones } from "./handlers-secciones"
 
 export interface MockRequest {
@@ -24,6 +26,8 @@ const routes: RouteEntry[] = [
   ...handlersCatalogo,
   ...handlersSecciones,
   ...handlersBloques,
+  ...handlersReportes,
+  ...handlersAdmin,
 ]
 
 const MOCK_LATENCY_MS = 280

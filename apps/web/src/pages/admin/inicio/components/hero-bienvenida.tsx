@@ -16,12 +16,12 @@ export function HeroBienvenida() {
 
   return (
     <header className="flex flex-col gap-6">
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-5">
         <motion.div
           initial={variantes.initial}
           animate={variantes.animate}
           transition={{ duration: DUR.storytelling, ease: EASE.default }}
-          className="nx-eyebrow flex items-center gap-2 text-text-tertiary"
+          className="nx-eyebrow flex items-center gap-2 text-aurora-violet"
         >
           <span
             aria-hidden={true}
@@ -29,7 +29,7 @@ export function HeroBienvenida() {
           />
           <span>{fechaLarga}</span>
           <span className="text-border-strong">·</span>
-          <span className="tabular">{hora}</span>
+          <span className="tabular text-text-tertiary">{hora}</span>
         </motion.div>
 
         <motion.h1
@@ -40,17 +40,30 @@ export function HeroBienvenida() {
         >
           <span className="text-text-secondary">{saludo},</span>
           {usuario ? <> {usuario.nombre}</> : null}
-          <span className="text-accent">.</span>
+          <span className="text-aurora-violet">.</span>
         </motion.h1>
 
-        <motion.p
+        <motion.div
           initial={variantes.initial}
           animate={variantes.animate}
           transition={{ duration: DUR.storytelling, delay: 0.12, ease: EASE.default }}
-          className="max-w-xl font-serif text-h2 text-text-secondary italic leading-snug"
+          className="flex max-w-xl flex-col gap-3"
         >
-          Tu equipo está <span className="text-accent">aprendiendo</span>.
-        </motion.p>
+          <p className="font-serif text-h2 text-text-secondary italic leading-snug">
+            Tu equipo está{" "}
+            <span
+              className="text-accent"
+              style={{ textShadow: "0 1px 24px rgb(var(--color-accent-rgb) / 0.35)" }}
+            >
+              aprendiendo
+            </span>
+            .
+          </p>
+          <span
+            aria-hidden={true}
+            className="block h-px w-24 rounded-pill bg-[image:var(--gradient-aurora)] opacity-70"
+          />
+        </motion.div>
       </div>
     </header>
   )

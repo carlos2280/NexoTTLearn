@@ -11,6 +11,7 @@ import { CalendarClock, Flag } from "lucide-react"
 import { Link } from "react-router-dom"
 
 const MAX_VISIBLES = 6
+const MS_POR_DIA = 24 * 60 * 60 * 1000
 
 function formatearFecha(iso: string): string {
   return new Date(iso).toLocaleDateString("es-ES", {
@@ -20,12 +21,27 @@ function formatearFecha(iso: string): string {
   })
 }
 
+function calcularProgreso(inicioIso: string, deadlineIso: string): number {
+  const inicio = new Date(inicioIso).getTime()
+  const fin = new Date(deadlineIso).getTime()
+  const ahora = Date.now()
+  if (fin <= inicio) {
+    return 0
+  }
+  const pct = ((ahora - inicio) / (fin - inicio)) * 100
+  return Math.max(0, Math.min(100, Math.round(pct)))
+}
+
 function TarjetaCurso({
   curso,
   indice,
 }: { readonly curso: CursoResumen; readonly indice: number }) {
   const reduceMotion = useReducedMotion()
   const delay = reduceMotion ? 0 : 0.05 + indice * 0.07
+  const progreso = calcularProgreso(curso.fechaInicio, curso.fechaDeadline)
+  const diasRestantes = Math.ceil(
+    (new Date(curso.fechaDeadline).getTime() - Date.now()) / MS_POR_DIA,
+  )
 
   return (
     <motion.div
@@ -33,11 +49,25 @@ function TarjetaCurso({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: DUR.storytelling, delay, ease: EASE.default }}
     >
-      <Card tono="plano" interactiva={true} className="flex h-full flex-col gap-4" asChild={true}>
+      <Card
+        tono="plano"
+        interactiva={true}
+        className="group flex h-full flex-col gap-4 overflow-hidden hover:border-accent-soft-hover hover:shadow-sm"
+        asChild={true}
+      >
         <Link to={RUTAS.admin.cursoDetalle(curso.id)}>
           <header className="flex flex-col gap-2">
-            <Badge tono="contorno">Activo</Badge>
-            <h3 className="line-clamp-2 text-body text-text-primary">{curso.titulo}</h3>
+            <div className="flex items-center justify-between gap-2">
+              <Badge tono="info" conPunto={true}>
+                Activo
+              </Badge>
+              <span className="tabular text-caption text-text-tertiary">
+                {diasRestantes > 0 ? `${diasRestantes} d restantes` : "vencido"}
+              </span>
+            </div>
+            <h3 className="line-clamp-2 text-body text-text-primary transition-colors group-hover:text-accent">
+              {curso.titulo}
+            </h3>
           </header>
 
           <div className="flex flex-col gap-1.5 text-caption text-text-secondary">
@@ -53,6 +83,19 @@ function TarjetaCurso({
               />
               Deadline: {formatearFecha(curso.fechaDeadline)}
             </span>
+          </div>
+
+          <div className="mt-auto flex flex-col gap-1.5">
+            <div className="flex items-center justify-between text-caption text-text-tertiary">
+              <span>Avance temporal</span>
+              <span className="tabular">{progreso}%</span>
+            </div>
+            <div aria-hidden={true} className="relative h-1 overflow-hidden rounded-pill bg-subtle">
+              <div
+                className="absolute inset-y-0 left-0 rounded-pill bg-[image:var(--gradient-aurora)]"
+                style={{ width: `${progreso}%` }}
+              />
+            </div>
           </div>
         </Link>
       </Card>

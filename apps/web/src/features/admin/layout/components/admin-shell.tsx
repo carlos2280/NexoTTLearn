@@ -31,10 +31,12 @@ export function AdminShell() {
             />
           </header>
           <main
-            className="flex-1 overflow-y-auto px-6 py-8"
+            className="flex-1 overflow-y-auto px-6 py-8 lg:px-10 lg:py-10"
             style={{ backgroundImage: "var(--gradient-admin-canvas)" }}
           >
-            <Outlet />
+            <div className="mx-auto w-full max-w-[1440px]">
+              <Outlet />
+            </div>
           </main>
         </div>
         <PaletaComandos abierta={paleta.abierta} onCerrar={paleta.cerrar} />

@@ -1,59 +1,40 @@
 import type { CasoRevision, PrioridadCaso } from "@/pages/admin/inicio/inicio.types"
-import type { CursoResumen } from "@nexott-learn/shared-types"
+import type {
+  CentroRevisionResponse,
+  FilaCentroRevisionEntrevistaIa,
+  FilaCentroRevisionTransversal,
+  MotivoRevisionEntrevistaIa,
+  MotivoRevisionTransversal,
+} from "@nexott-learn/shared-types"
 
 const DIAS_URGENTE = 7
-const DIAS_ALTA = 21
+const DIAS_ALTA = 3
 const MS_POR_DIA = 24 * 60 * 60 * 1000
 const MAX_CASOS = 6
 
-function diasHasta(iso: string): number {
-  return Math.ceil((new Date(iso).getTime() - Date.now()) / MS_POR_DIA)
-}
-
-function prioridadPorDeadline(dias: number): PrioridadCaso {
-  if (dias <= DIAS_URGENTE) {
-    return "urgente"
-  }
-  if (dias <= DIAS_ALTA) {
-    return "alta"
-  }
-  return "normal"
-}
-
-function slaTexto(dias: number): string {
-  if (dias < 0) {
-    return `vencido hace ${Math.abs(dias)} d`
-  }
-  if (dias === 0) {
-    return "vence hoy"
-  }
-  if (dias === 1) {
-    return "vence mañana"
-  }
-  return `vence en ${dias} d`
-}
-
-function casoBorrador(curso: CursoResumen): CasoRevision {
-  const dias = diasHasta(curso.fechaDeadline)
-  return {
-    id: `borrador-${curso.id}`,
-    titulo: `Curso «${curso.titulo}» en borrador`,
-    contexto: "Esperando publicación",
-    prioridad: dias <= DIAS_URGENTE ? "urgente" : "alta",
-    slaRestante: slaTexto(dias),
-    responsable: "Equipo Catálogo",
+function textoMotivoTransversal(motivo: MotivoRevisionTransversal): string {
+  switch (motivo) {
+    case "CAPA_PENDIENTE_TESTS":
+      return "Falta cargar capa de tests"
+    case "CAPA_PENDIENTE_CUALITATIVA":
+      return "Falta cargar capa cualitativa"
+    case "CAPA_PENDIENTE_COMPRENSION":
+      return "Falta cargar capa de comprensión"
+    default: {
+      const exhaustivo: never = motivo
+      return exhaustivo
+    }
   }
 }
 
-function casoDeadline(curso: CursoResumen): CasoRevision {
-  const dias = diasHasta(curso.fechaDeadline)
-  return {
-    id: `deadline-${curso.id}`,
-    titulo: `«${curso.titulo}» se acerca al deadline`,
-    contexto: "Curso activo con fecha límite próxima",
-    prioridad: prioridadPorDeadline(dias),
-    slaRestante: slaTexto(dias),
-    responsable: "Equipo Catálogo",
+function textoMotivoEntrevistaIa(motivo: MotivoRevisionEntrevistaIa): string {
+  switch (motivo) {
+    case "AJUSTE_ADMIN_PENDIENTE":
+      return "Ajuste de admin pendiente"
+    default: {
+      const exhaustivo: never = motivo
+      return exhaustivo
+    }
   }
 }
 
@@ -63,13 +44,68 @@ const ORDEN_PRIORIDAD: Record<PrioridadCaso, number> = {
   normal: 2,
 }
 
-export function construirCasosRevision(cursos: readonly CursoResumen[]): readonly CasoRevision[] {
-  const borradores = cursos.filter((c) => c.estado === "BORRADOR").map(casoBorrador)
-  const deadlines = cursos
-    .filter((c) => c.estado === "ACTIVO" && diasHasta(c.fechaDeadline) <= DIAS_ALTA)
-    .map(casoDeadline)
+function diasEspera(isoFinalizacion: string | null): number {
+  if (!isoFinalizacion) {
+    return 0
+  }
+  return Math.floor((Date.now() - new Date(isoFinalizacion).getTime()) / MS_POR_DIA)
+}
 
-  return [...borradores, ...deadlines]
+function prioridadPorEspera(dias: number): PrioridadCaso {
+  if (dias >= DIAS_URGENTE) {
+    return "urgente"
+  }
+  if (dias >= DIAS_ALTA) {
+    return "alta"
+  }
+  return "normal"
+}
+
+function textoEspera(dias: number): string {
+  if (dias <= 0) {
+    return "esperando hoy"
+  }
+  if (dias === 1) {
+    return "espera 1 día"
+  }
+  return `espera ${dias} días`
+}
+
+function casoTransversal(fila: FilaCentroRevisionTransversal): CasoRevision {
+  const dias = diasEspera(fila.fechaFinalizacion)
+  return {
+    id: `transversal-${fila.intentoId}`,
+    titulo: `Transversal de ${fila.colaborador.nombre}`,
+    contexto: textoMotivoTransversal(fila.motivoRevision),
+    prioridad: prioridadPorEspera(dias),
+    slaRestante: textoEspera(dias),
+    responsable: "Equipo evaluación",
+  }
+}
+
+function casoEntrevistaIa(fila: FilaCentroRevisionEntrevistaIa): CasoRevision {
+  const dias = diasEspera(fila.fechaFinalizacion)
+  return {
+    id: `entrevista-ia-${fila.intentoId}`,
+    titulo: `Entrevista IA de ${fila.colaborador.nombre}`,
+    contexto: textoMotivoEntrevistaIa(fila.motivoRevision),
+    prioridad: prioridadPorEspera(dias),
+    slaRestante: textoEspera(dias),
+    responsable: "Admin",
+  }
+}
+
+export function construirCasosRevision(
+  respuesta: CentroRevisionResponse | undefined,
+): readonly CasoRevision[] {
+  if (!respuesta) {
+    return []
+  }
+
+  const transversales = respuesta.transversales.map(casoTransversal)
+  const entrevistas = respuesta.entrevistasIa.map(casoEntrevistaIa)
+
+  return [...transversales, ...entrevistas]
     .sort((a, b) => ORDEN_PRIORIDAD[a.prioridad] - ORDEN_PRIORIDAD[b.prioridad])
     .slice(0, MAX_CASOS)
 }
