@@ -32,7 +32,7 @@ export function ConfigSkillsExigidas({ curso, bloqueado }: ConfigSkillsExigidasP
   const mutacion = useActualizarSkillsExigidasCurso()
   const skillsCatalogo = useListarSkills({
     page: 1,
-    pageSize: 200,
+    pageSize: 100,
     estado: "ACTIVA",
   })
   const catalogo = useMemo(() => skillsCatalogo.data?.data ?? [], [skillsCatalogo.data])

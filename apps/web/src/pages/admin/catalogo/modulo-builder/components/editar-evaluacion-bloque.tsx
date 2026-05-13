@@ -20,7 +20,7 @@ interface EditarEvaluacionBloqueProps {
  * `version` e invalida intentos previos en back.
  */
 export function EditarEvaluacionBloque({ bloque }: EditarEvaluacionBloqueProps) {
-  const skillsQuery = useListarSkills({ page: 1, pageSize: 200 })
+  const skillsQuery = useListarSkills({ page: 1, pageSize: 100 })
   const patch = usePatchBloque()
   const [esEvaluable, setEsEvaluable] = useState(bloque.esEvaluable)
   const [skillId, setSkillId] = useState<string>(bloque.skillQueMideId ?? "")

@@ -44,7 +44,7 @@ export function useBuilderAcciones({ moduloId, seleccion }: UseBuilderAccionesAr
   const abrir = (siguiente: Dialog) => setDialog(siguiente)
 
   async function ejecutarCrearSeccion(titulo: string) {
-    // No enviamos `orden`: el back/mock asigna max(orden) + 1 dentro del tx.
+    // No enviamos `orden`: el back asigna max(orden) + 1 dentro del tx.
     // Enviarlo desde cliente abre la puerta a duplicados con datos stale.
     const nueva = await crearSeccion.mutateAsync({
       moduloId,

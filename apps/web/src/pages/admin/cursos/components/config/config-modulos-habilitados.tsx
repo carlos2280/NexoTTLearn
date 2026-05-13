@@ -20,7 +20,7 @@ function mismosIds(a: readonly string[], b: readonly string[]): boolean {
 
 export function ConfigModulosHabilitados({ curso, bloqueado }: ConfigModulosHabilitadosProps) {
   const mutacion = useActualizarModulosHabilitadosCurso()
-  const modulosCatalogo = useListarModulos({ page: 1, pageSize: 200, estado: "ACTIVO" })
+  const modulosCatalogo = useListarModulos({ page: 1, pageSize: 100, estado: "ACTIVO" })
   const catalogo = useMemo(() => modulosCatalogo.data?.data ?? [], [modulosCatalogo.data])
 
   const idsIniciales = useMemo(
