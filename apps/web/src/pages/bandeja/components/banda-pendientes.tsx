@@ -1,9 +1,9 @@
+import { type TonoDeadline, formatearDeadline } from "@/features/me/lib/deadline-curso"
 import { Button } from "@/shared/components/ui/button"
 import { RUTAS } from "@/shared/constants/rutas"
 import { cn } from "@/shared/lib/cn"
 import type { MeCursoResumen } from "@nexott-learn/shared-types"
 import { useNavigate } from "react-router-dom"
-import { type TonoDeadline, formatearDeadline } from "../lib/deadline"
 
 interface BandaPendientesProps {
   readonly cursos: readonly MeCursoResumen[]

@@ -1,9 +1,9 @@
 import { useMarcarTodasLeidas } from "@/features/notificaciones/hooks/use-marcar-leida"
 import { Button } from "@/shared/components/ui/button"
 import { cn } from "@/shared/lib/cn"
+import { tiempoRelativo } from "@/shared/lib/tiempo-relativo"
 import type { NotificacionResumen } from "@nexott-learn/shared-types"
 import { obtenerCopyNotificacion } from "../lib/copy-notificacion"
-import { tiempoRelativo } from "../lib/deadline"
 import { FilaNovedad } from "./fila-novedad"
 
 interface BandaNovedadesProps {

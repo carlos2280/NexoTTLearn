@@ -94,6 +94,114 @@ const MOCK_MIS_CURSOS: readonly MeCursoResumen[] = [
     fechaDeadline: diasDesdeHoy(90),
     porcentajeAvance: 45,
   },
+  {
+    asignacionId: "asg-spring-004",
+    cursoId: "curso-spring-boot",
+    cursoTitulo: "Spring Boot Avanzado",
+    cursoEstado: "ACTIVO",
+    rol: "ASIGNADO",
+    estadoAsignado: "ASIGNADO",
+    estadoVoluntario: null,
+    fechaInscripcion: diasDesdeHoy(-2),
+    fechaDeadline: diasDesdeHoy(60),
+    porcentajeAvance: 0,
+  },
+  {
+    asignacionId: "asg-test-005",
+    cursoId: "curso-testing-pyramid",
+    cursoTitulo: "Testing Pyramid en JS",
+    cursoEstado: "ACTIVO",
+    rol: "VOLUNTARIO",
+    estadoAsignado: null,
+    estadoVoluntario: "INSCRITO",
+    fechaInscripcion: diasDesdeHoy(-1),
+    fechaDeadline: diasDesdeHoy(45),
+    porcentajeAvance: 5,
+  },
+  {
+    asignacionId: "asg-docker-006",
+    cursoId: "curso-docker-k8s",
+    cursoTitulo: "Docker y Kubernetes",
+    cursoEstado: "CERRADO",
+    rol: "ASIGNADO",
+    estadoAsignado: "APTO",
+    estadoVoluntario: null,
+    fechaInscripcion: diasDesdeHoy(-120),
+    fechaDeadline: diasDesdeHoy(-30),
+    porcentajeAvance: 100,
+  },
+  {
+    asignacionId: "asg-sql-007",
+    cursoId: "curso-sql-avanzado",
+    cursoTitulo: "SQL Avanzado",
+    cursoEstado: "CERRADO",
+    rol: "VOLUNTARIO",
+    estadoAsignado: null,
+    estadoVoluntario: "COMPLETADO",
+    fechaInscripcion: diasDesdeHoy(-90),
+    fechaDeadline: diasDesdeHoy(-15),
+    porcentajeAvance: 100,
+  },
+  {
+    asignacionId: "asg-archi-008",
+    cursoId: "curso-arquitectura-hex",
+    cursoTitulo: "Arquitectura Hexagonal",
+    cursoEstado: "ARCHIVADO",
+    rol: "ASIGNADO",
+    estadoAsignado: "RETIRADO",
+    estadoVoluntario: null,
+    fechaInscripcion: diasDesdeHoy(-200),
+    fechaDeadline: diasDesdeHoy(-60),
+    porcentajeAvance: 30,
+  },
+  {
+    asignacionId: "asg-aws-009",
+    cursoId: "curso-aws-fundamentals",
+    cursoTitulo: "AWS Fundamentals",
+    cursoEstado: "ACTIVO",
+    rol: "VOLUNTARIO",
+    estadoAsignado: null,
+    estadoVoluntario: "EN_PROGRESO",
+    fechaInscripcion: diasDesdeHoy(-20),
+    fechaDeadline: diasDesdeHoy(40),
+    porcentajeAvance: 25,
+  },
+  {
+    asignacionId: "asg-py-010",
+    cursoId: "curso-python-data",
+    cursoTitulo: "Python para Data",
+    cursoEstado: "ACTIVO",
+    rol: "ASIGNADO",
+    estadoAsignado: "LISTO",
+    estadoVoluntario: null,
+    fechaInscripcion: diasDesdeHoy(-45),
+    fechaDeadline: diasDesdeHoy(5),
+    porcentajeAvance: 100,
+  },
+  {
+    asignacionId: "asg-net-011",
+    cursoId: "curso-networking",
+    cursoTitulo: "Networking esencial",
+    cursoEstado: "ACTIVO",
+    rol: "VOLUNTARIO",
+    estadoAsignado: null,
+    estadoVoluntario: "EN_PROGRESO",
+    fechaInscripcion: diasDesdeHoy(-5),
+    fechaDeadline: diasDesdeHoy(60),
+    porcentajeAvance: 12,
+  },
+  {
+    asignacionId: "asg-git-012",
+    cursoId: "curso-git-flows",
+    cursoTitulo: "Git workflows",
+    cursoEstado: "CERRADO",
+    rol: "ASIGNADO",
+    estadoAsignado: "NO_APTO",
+    estadoVoluntario: null,
+    fechaInscripcion: diasDesdeHoy(-150),
+    fechaDeadline: diasDesdeHoy(-80),
+    porcentajeAvance: 70,
+  },
 ]
 
 const MOCK_VOLUNTARIADO_TOTAL = 8
@@ -130,7 +238,17 @@ function leerStringQuery(path: string, clave: string): string | null {
 function handlerMeCursos(req: MockRequest): Paginated<MeCursoResumen> {
   const page = leerNumeroQuery(req.path, "page", 1)
   const pageSize = leerNumeroQuery(req.path, "pageSize", 20)
-  return paginar(MOCK_MIS_CURSOS, page, pageSize)
+  const estado = leerStringQuery(req.path, "estado")
+  const rol = leerStringQuery(req.path, "rol")
+
+  let filtrados: readonly MeCursoResumen[] = MOCK_MIS_CURSOS
+  if (estado && estado !== "TODOS") {
+    filtrados = filtrados.filter((c) => c.cursoEstado === estado)
+  }
+  if (rol && rol !== "TODOS") {
+    filtrados = filtrados.filter((c) => c.rol === rol)
+  }
+  return paginar(filtrados, page, pageSize)
 }
 
 function handlerCursosDisponibles(req: MockRequest): Paginated<CursoDisponibleVoluntario> {
