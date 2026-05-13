@@ -50,6 +50,14 @@ export class BloquesController {
     return await this.bloquesService.listar(query)
   }
 
+  @Get("secciones/:seccionId/bloques")
+  @Roles(RolUsuario.ADMIN, RolUsuario.PARTICIPANTE)
+  async listarPorSeccion(
+    @Param("seccionId", ParseUUIDPipe) seccionId: string,
+  ): Promise<readonly BloqueResponse[]> {
+    return await this.bloquesService.listarPorSeccion(seccionId)
+  }
+
   @Get("bloques/:id")
   @Roles(RolUsuario.ADMIN, RolUsuario.PARTICIPANTE)
   async obtener(@Param("id", ParseUUIDPipe) id: string): Promise<BloqueDetalleResponse> {

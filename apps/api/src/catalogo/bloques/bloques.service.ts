@@ -117,6 +117,31 @@ export class BloquesService {
     return buildPaginatedResponse(filas.map(toBloqueResponse), total, page, pageSize)
   }
 
+  /**
+   * `GET /catalogo/secciones/:seccionId/bloques` (FIX-pre-S12) — listado
+   * dedicado por seccion sin paginacion. Devuelve solo bloques ACTIVOS,
+   * ordenados por `orden ASC`. 404 explicito si la seccion no existe.
+   * Lectura, sin audit.
+   */
+  async listarPorSeccion(seccionId: string): Promise<readonly BloqueResponse[]> {
+    const seccion = await this.prisma.seccion.findUnique({
+      where: { id: seccionId },
+      select: { id: true },
+    })
+    if (!seccion) {
+      throw new NotFoundException({
+        code: apiErrorCodes.seccionNoEncontrada,
+        message: "Seccion no encontrada.",
+      })
+    }
+    const filas = await this.prisma.bloque.findMany({
+      where: { seccionId, estado: EstadoBloque.ACTIVO },
+      select: SELECT_BLOQUE_FIELDS,
+      orderBy: { orden: "asc" },
+    })
+    return filas.map(toBloqueResponse)
+  }
+
   async obtenerPorIdOrThrow(id: string): Promise<BloqueDetalleResponse> {
     const fila = await this.prisma.bloque.findUnique({
       where: { id },

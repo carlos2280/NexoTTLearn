@@ -1076,6 +1076,78 @@ export class PlanPersonalService {
   }
 
   /**
+   * `POST /cursos/:cursoId/planes/recalcular-masivo` (FIX-pre-S12) — ADMIN.
+   * Recalcula todas las asignaciones ASIGNADO no-terminales del curso. Cada
+   * recalculo va con try/catch individual (R-S10-2): un fallo aislado no
+   * rompe el batch. No audit por-asignacion duplicado (cada `recalcular`
+   * ya emite `PLAN_RECALCULADO`); se anade un audit-resumen con metadata
+   * estructural reusando el mismo enum (TODO(S12) para anadir el valor
+   * `PLAN_RECALCULADO_MASIVO`).
+   */
+  async recalcularMasivo(
+    cursoId: string,
+    autorUsuarioId: string,
+  ): Promise<{
+    readonly cursoId: string
+    readonly total: number
+    readonly recalculadas: number
+    readonly fallidas: number
+    readonly duracionMs: number
+  }> {
+    const inicio = Date.now()
+    const asignaciones = await this.prisma.asignacionCurso.findMany({
+      where: {
+        cursoId,
+        rol: RolAsignacion.ASIGNADO,
+        estadoAsignado: {
+          in: [EstadoAsignado.ASIGNADO, EstadoAsignado.EN_PROGRESO, EstadoAsignado.LISTO],
+        },
+      },
+      select: { id: true },
+    })
+    let recalculadas = 0
+    let fallidas = 0
+    for (const { id } of asignaciones) {
+      try {
+        await this.recalcular(id, autorUsuarioId, "RECALCULO_MASIVO")
+        recalculadas += 1
+      } catch (error) {
+        fallidas += 1
+        const detalle = error instanceof Error ? error.message : String(error)
+        this.logger.warn(
+          `recalcularMasivo | curso=${cursoId} | asignacion=${id} | fallo=${detalle}`,
+        )
+      }
+    }
+    const duracionMs = Date.now() - inicio
+    // TODO(S12): migrar enum AccionAuditoria para anadir PLAN_RECALCULADO_MASIVO.
+    // Hoy se reusa PLAN_RECALCULADO con metadata `{tipo: "masivo", ...}` para
+    // mantener trazabilidad sin migracion en este FIX (D-S7-D4 inline policy).
+    await this.auditLog.record({
+      usuarioId: autorUsuarioId,
+      accion: AccionAuditoria.PLAN_RECALCULADO,
+      exito: true,
+      recursoTipo: "curso",
+      recursoId: cursoId,
+      metadata: {
+        tipo: "masivo",
+        cursoId,
+        total: asignaciones.length,
+        recalculadas,
+        fallidas,
+        duracionMs,
+      },
+    })
+    return {
+      cursoId,
+      total: asignaciones.length,
+      recalculadas,
+      fallidas,
+      duracionMs,
+    }
+  }
+
+  /**
    * §5.128 (FIX-P11b-avance): expone el porcentaje 0-100 del plan vigente de
    * la asignacion reutilizando el motor `obtenerAvance` (D-S7-B6). Pensado
    * para consumo desde `ReportesService.avanceCursoActual` — por eso no

@@ -99,6 +99,24 @@ export class PlanPersonalController {
     return await this.planService.obtenerDiff(asignacionId, this.requireUsuario(usuario))
   }
 
+  @Post("cursos/:cursoId/planes/recalcular-masivo")
+  @Roles(RolUsuario.ADMIN)
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  @HttpCode(HttpStatus.OK)
+  async recalcularMasivo(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<{
+    readonly cursoId: string
+    readonly total: number
+    readonly recalculadas: number
+    readonly fallidas: number
+    readonly duracionMs: number
+  }> {
+    const sesion = this.requireUsuario(usuario)
+    return await this.planService.recalcularMasivo(cursoId, sesion.usuarioId)
+  }
+
   @Post("asignaciones/:asignacionId/secciones/:seccionId/apertura")
   @Roles(RolUsuario.ADMIN, RolUsuario.PARTICIPANTE)
   @HttpCode(HttpStatus.OK)

@@ -500,3 +500,16 @@ export type {
   AnularEntrevistaResponse,
   TurnoEntrevistaIa,
 } from "./entrevista-ia"
+
+// Colaboradores — endpoints autoservicio /me/* (FIX-pre-S12).
+export {
+  meCursosQuerySchema,
+  exportarFichaQuerySchema,
+  formatoExportFichaSchema,
+} from "./colaboradores"
+export type {
+  MeCursoResumen,
+  MeCursosQuery,
+  ExportarFichaQuery,
+  FormatoExportFicha,
+} from "./colaboradores"

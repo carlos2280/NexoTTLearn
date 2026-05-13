@@ -359,3 +359,30 @@ describe("BloquesService.eliminarSoft", () => {
     )
   })
 })
+
+describe("BloquesService.listarPorSeccion (FIX-pre-S12)", () => {
+  it("404 SECCION_NO_ENCONTRADA si la seccion no existe", async () => {
+    prisma.seccion.findUnique.mockResolvedValueOnce(null)
+    await expect(service.listarPorSeccion(SEC_ID)).rejects.toMatchObject({
+      response: { code: apiErrorCodes.seccionNoEncontrada },
+    })
+    expect(prisma.bloque.findMany).not.toHaveBeenCalled()
+  })
+
+  it("happy: devuelve solo ACTIVOS de esa seccion, ordenados por orden ASC", async () => {
+    prisma.seccion.findUnique.mockResolvedValueOnce({ id: SEC_ID })
+    prisma.bloque.findMany.mockResolvedValueOnce([
+      buildDetalleRow({ version: 1 }),
+      { ...buildDetalleRow({ version: 1 }), id: "33333333-3333-3333-3333-333333333334", orden: 2 },
+    ])
+    const out = await service.listarPorSeccion(SEC_ID)
+    expect(out).toHaveLength(2)
+    const findManyArg = prisma.bloque.findMany.mock.calls[0]?.[0] as {
+      where: { seccionId: string; estado: EstadoBloque }
+      orderBy: { orden: "asc" | "desc" }
+    }
+    expect(findManyArg.where.seccionId).toBe(SEC_ID)
+    expect(findManyArg.where.estado).toBe(EstadoBloque.ACTIVO)
+    expect(findManyArg.orderBy).toEqual({ orden: "asc" })
+  })
+})
