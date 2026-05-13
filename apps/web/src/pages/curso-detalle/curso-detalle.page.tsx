@@ -35,6 +35,7 @@ export function CursoDetallePage() {
       asignacion={detalle.asignacion}
       avance={detalle.avance}
       plan={detalle.plan}
+      errorPlan={detalle.errorPlan}
       transversal={detalle.transversal}
       entrevistaIa={detalle.entrevistaIa}
     />

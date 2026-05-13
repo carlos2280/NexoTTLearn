@@ -1,3 +1,4 @@
+import type { ApiError } from "@/shared/api/api-error"
 import { RUTAS } from "@/shared/constants/rutas"
 import type {
   CursoDetalle,
@@ -9,9 +10,8 @@ import type {
 } from "@nexott-learn/shared-types"
 import { useNavigate } from "react-router-dom"
 import { CabeceraCurso } from "./cabecera-curso"
-import { EmptyPlan } from "./empty-plan"
-import { ListaModulos } from "./lista-modulos"
 import { PanelSkills } from "./panel-skills"
+import { SeccionPlan } from "./seccion-plan"
 import { TarjetaEvaluacion } from "./tarjeta-evaluacion"
 
 interface CursoDetalleContenidoProps {
@@ -19,6 +19,7 @@ interface CursoDetalleContenidoProps {
   readonly asignacion: MeCursoResumen
   readonly avance: MeAvanceCursoResponse
   readonly plan: PlanResponseParticipante | undefined
+  readonly errorPlan: ApiError | null
   readonly transversal: DisponibilidadTransversalResponse | undefined
   readonly entrevistaIa: DisponibilidadEntrevistaIaResponse | undefined
 }
@@ -28,13 +29,13 @@ export function CursoDetalleContenido({
   asignacion,
   avance,
   plan,
+  errorPlan,
   transversal,
   entrevistaIa,
 }: CursoDetalleContenidoProps) {
   const navigate = useNavigate()
   const muestraTransversal = curso.transversalId !== null
   const muestraEntrevistaIa = curso.entrevistaIaId !== null
-  const tieneSecciones = !!plan && plan.items.length > 0
 
   return (
     <div className="flex flex-col gap-6">
@@ -47,14 +48,7 @@ export function CursoDetalleContenido({
         muestraTransversal={muestraTransversal}
         muestraEntrevistaIa={muestraEntrevistaIa}
       />
-      {tieneSecciones ? (
-        <ListaModulos
-          modulos={plan.items}
-          onAbrirSeccion={(seccionId) => navigate(`${RUTAS.bandeja}?seccion=${seccionId}`)}
-        />
-      ) : (
-        <EmptyPlan />
-      )}
+      <SeccionPlan plan={plan} errorPlan={errorPlan} />
       {muestraTransversal ? (
         <TarjetaEvaluacion
           titulo="Proyecto Transversal"

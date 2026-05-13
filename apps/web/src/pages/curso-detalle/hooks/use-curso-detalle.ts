@@ -17,6 +17,7 @@ import type {
 export interface DetalleCursoVista {
   readonly cargandoBasico: boolean
   readonly errorBasico: ApiError | null
+  readonly errorPlan: ApiError | null
   readonly asignacion: MeCursoResumen | null
   readonly curso: CursoDetalle | undefined
   readonly avance: MeAvanceCursoResponse | undefined
@@ -30,6 +31,13 @@ export interface DetalleCursoVista {
  * Compone las queries necesarias para la vista Plan del curso. Cuando llegue
  * un endpoint específico (p.ej. `GET /me/cursos/:cursoId/detalle`) se podrá
  * reducir a una sola query.
+ *
+ * Reglas de tolerancia:
+ *  - El plan puede fallar y la página sigue mostrándose (cabecera + skills).
+ *    `errorPlan` se expone aparte para que el contenido lo señale.
+ *  - Las disponibilidades de transversal/IA SOLO se piden si el curso las
+ *    tiene configuradas (transversalId/entrevistaIaId no nulos). Esto evita
+ *    los 404 ruidosos del backend cuando el curso no las tiene activas.
  */
 export function useCursoDetalle(cursoId: string): DetalleCursoVista {
   const misCursos = useMisCursos({ pageSize: 100 })
@@ -39,14 +47,18 @@ export function useCursoDetalle(cursoId: string): DetalleCursoVista {
   const curso = useCurso(cursoId)
   const avance = useAvanceCurso(cursoId)
   const plan = usePlanParticipante(asignacionId)
-  const transversal = useDisponibilidadTransversal(asignacionId)
-  const entrevistaIa = useDisponibilidadEntrevistaIa(asignacionId)
+
+  const tieneTransversal = !!curso.data?.transversalId
+  const tieneEntrevistaIa = !!curso.data?.entrevistaIaId
+  const transversal = useDisponibilidadTransversal(tieneTransversal ? asignacionId : null)
+  const entrevistaIa = useDisponibilidadEntrevistaIa(tieneEntrevistaIa ? asignacionId : null)
 
   const noTieneAcceso = !(misCursos.isLoading || asignacion)
 
   return {
-    cargandoBasico: misCursos.isLoading || curso.isLoading || avance.isLoading || plan.isLoading,
-    errorBasico: curso.error ?? avance.error ?? plan.error ?? null,
+    cargandoBasico: misCursos.isLoading || curso.isLoading || avance.isLoading,
+    errorBasico: curso.error ?? avance.error ?? null,
+    errorPlan: plan.error ?? null,
     asignacion,
     curso: curso.data,
     avance: avance.data,
