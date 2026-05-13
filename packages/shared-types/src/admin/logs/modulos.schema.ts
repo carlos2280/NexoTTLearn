@@ -20,3 +20,15 @@ export const listarLogsModulosQuerySchema = z.object({
 })
 
 export type ListarLogsModulosQuery = z.infer<typeof listarLogsModulosQuerySchema>
+
+/**
+ * Schema para `GET /admin/logs/modulos/exportar` (P-B-c). Hereda filtros del
+ * visor, omite paginacion, anade `formato`.
+ */
+export const exportarLogsModulosQuerySchema = listarLogsModulosQuerySchema
+  .omit({ page: true, pageSize: true })
+  .extend({
+    formato: z.enum(["csv", "xlsx"]).default("csv"),
+  })
+
+export type ExportarLogsModulosQuery = z.infer<typeof exportarLogsModulosQuerySchema>

@@ -423,6 +423,11 @@ describe.runIf(RUN_E2E)("Logs e2e (Slice futuro B foundation — /admin/logs)", 
       await prisma.consultaLog.deleteMany({
         where: { autorUsuarioId: adminUsuarioId, endpoint: { startsWith: "/admin/logs/" } },
       })
+      // P-B-c cleanup: filas auditoria LOGS_EXPORTADO emitidas por los tests
+      // de export. accion LOGS_EXPORTADO solo la emiten los 6 exportadores.
+      await prisma.activityLog.deleteMany({
+        where: { usuarioId: adminUsuarioId, accion: "LOGS_EXPORTADO" },
+      })
       await prisma.$executeRaw`
         DELETE FROM sesiones
         WHERE (sess::jsonb->>'usuarioId') IN (
@@ -632,5 +637,218 @@ describe.runIf(RUN_E2E)("Logs e2e (Slice futuro B foundation — /admin/logs)", 
         where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/consultas" },
       }),
     ).toBe(antesConsultas)
+  })
+
+  // ===========================================================================
+  // P-B-c — 6 exportadores CSV/XLSX
+  // ===========================================================================
+
+  const mimeCsv = "text/csv; charset=utf-8"
+  const mimeXlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  const dominios = ["cursos", "asignaciones", "skills", "modulos", "ajustes-plan", "consultas"]
+
+  it("Sin sesion -> 401 en los 6 exportadores", async () => {
+    for (const dominio of dominios) {
+      await supertest(app.getHttpServer()).get(`/api/v1/admin/logs/${dominio}/exportar`).expect(401)
+    }
+  })
+
+  it("PARTICIPANTE -> 403 en los 6 exportadores", async () => {
+    for (const dominio of dominios) {
+      await agentePart.get(`/api/v1/admin/logs/${dominio}/exportar`).expect(403)
+    }
+  })
+
+  it("ADMIN exporta cursos CSV -> 200 + header CSV + filename con dominio + audit LOGS_EXPORTADO", async () => {
+    const antesAudit = await prisma.activityLog.count({
+      where: { usuarioId: adminUsuarioId, accion: "LOGS_EXPORTADO" },
+    })
+    const res = await agenteAdmin
+      .get(`/api/v1/admin/logs/cursos/exportar?cursoId=${cursoId}`)
+      .expect(200)
+    expect(res.headers["content-type"]).toContain(mimeCsv)
+    expect(res.headers["content-disposition"]).toMatch(
+      /attachment; filename="logs-cursos-\d{8}\.csv"/,
+    )
+    const body = res.text ?? res.body.toString()
+    expect(body).toContain("cursoTitulo")
+    expect(body).toContain("accion")
+
+    const despuesAudit = await prisma.activityLog.count({
+      where: { usuarioId: adminUsuarioId, accion: "LOGS_EXPORTADO" },
+    })
+    expect(despuesAudit).toBe(antesAudit + 1)
+  })
+
+  it("ADMIN exporta cursos XLSX -> 200 + MIME XLSX + filename .xlsx", async () => {
+    const res = await agenteAdmin
+      .get(`/api/v1/admin/logs/cursos/exportar?cursoId=${cursoId}&formato=xlsx`)
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks: Buffer[] = []
+        response.on("data", (chunk: Buffer) => chunks.push(chunk))
+        response.on("end", () => callback(null, Buffer.concat(chunks)))
+      })
+      .expect(200)
+    expect(res.headers["content-type"]).toContain(mimeXlsx)
+    expect(res.headers["content-disposition"]).toMatch(/filename="logs-cursos-\d{8}\.xlsx"/)
+    expect((res.body as Buffer).length).toBeGreaterThan(0)
+  })
+
+  it("ADMIN exporta asignaciones CSV -> 200 con headers correctos", async () => {
+    const res = await agenteAdmin
+      .get(`/api/v1/admin/logs/asignaciones/exportar?asignacionId=${asignacionId}`)
+      .expect(200)
+    expect(res.headers["content-type"]).toContain(mimeCsv)
+    expect(res.headers["content-disposition"]).toMatch(/filename="logs-asignaciones-\d{8}\.csv"/)
+    const body = res.text ?? res.body.toString()
+    expect(body).toContain("estadoAnterior")
+    expect(body).toContain("estadoNuevo")
+  })
+
+  it("ADMIN exporta skills XLSX (union renombrados + cambios area)", async () => {
+    const res = await agenteAdmin
+      .get(`/api/v1/admin/logs/skills/exportar?skillId=${skillId}&formato=xlsx`)
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks: Buffer[] = []
+        response.on("data", (chunk: Buffer) => chunks.push(chunk))
+        response.on("end", () => callback(null, Buffer.concat(chunks)))
+      })
+      .expect(200)
+    expect(res.headers["content-type"]).toContain(mimeXlsx)
+  })
+
+  it("ADMIN exporta modulos CSV -> 200", async () => {
+    const res = await agenteAdmin
+      .get(`/api/v1/admin/logs/modulos/exportar?moduloId=${moduloId}`)
+      .expect(200)
+    expect(res.headers["content-type"]).toContain(mimeCsv)
+    const body = res.text ?? res.body.toString()
+    expect(body).toContain("estadoAnterior")
+  })
+
+  it("ADMIN exporta ajustes-plan CSV -> 200", async () => {
+    const res = await agenteAdmin
+      .get(`/api/v1/admin/logs/ajustes-plan/exportar?planId=${planId}`)
+      .expect(200)
+    expect(res.headers["content-type"]).toContain(mimeCsv)
+    expect(res.headers["content-disposition"]).toMatch(/filename="logs-ajustes-plan-\d{8}\.csv"/)
+    const body = res.text ?? res.body.toString()
+    expect(body).toContain("planId")
+    expect(body).toContain("accion")
+  })
+
+  it("ADMIN exporta consultas CSV -> 200 (recursion bloqueada en consultas_logs)", async () => {
+    // Aseguramos que el visor de consultas tiene algo que exportar.
+    await agenteAdmin.get(`/api/v1/admin/logs/cursos?cursoId=${cursoId}`).expect(200)
+
+    const antesConsultas = await prisma.consultaLog.count({
+      where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/consultas/exportar" },
+    })
+    const res = await agenteAdmin.get("/api/v1/admin/logs/consultas/exportar").expect(200)
+    expect(res.headers["content-type"]).toContain(mimeCsv)
+    expect(res.headers["content-disposition"]).toMatch(/filename="logs-consultas-\d{8}\.csv"/)
+
+    // El exportador de consultas no se autoinscribe (recursion bloqueada).
+    const despuesConsultas = await prisma.consultaLog.count({
+      where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/consultas/exportar" },
+    })
+    expect(despuesConsultas).toBe(antesConsultas)
+  })
+
+  it("formato invalido -> 400 (Zod)", async () => {
+    await agenteAdmin.get("/api/v1/admin/logs/cursos/exportar?formato=pdf").expect(400)
+  })
+
+  it("accion invalida en cursos/exportar -> 400", async () => {
+    await agenteAdmin.get("/api/v1/admin/logs/cursos/exportar?accion=BOGUS").expect(400)
+  })
+
+  it("meta-auditoria: 5 de 6 exportadores registran consultas_logs (excepto consultas/exportar)", async () => {
+    // Cursos
+    const antesCursos = await prisma.consultaLog.count({
+      where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/cursos/exportar" },
+    })
+    await agenteAdmin.get(`/api/v1/admin/logs/cursos/exportar?cursoId=${cursoId}`).expect(200)
+    expect(
+      await prisma.consultaLog.count({
+        where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/cursos/exportar" },
+      }),
+    ).toBeGreaterThan(antesCursos)
+
+    // Asignaciones
+    const antesAs = await prisma.consultaLog.count({
+      where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/asignaciones/exportar" },
+    })
+    await agenteAdmin
+      .get(`/api/v1/admin/logs/asignaciones/exportar?asignacionId=${asignacionId}`)
+      .expect(200)
+    expect(
+      await prisma.consultaLog.count({
+        where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/asignaciones/exportar" },
+      }),
+    ).toBeGreaterThan(antesAs)
+
+    // Skills
+    const antesSk = await prisma.consultaLog.count({
+      where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/skills/exportar" },
+    })
+    await agenteAdmin.get(`/api/v1/admin/logs/skills/exportar?skillId=${skillId}`).expect(200)
+    expect(
+      await prisma.consultaLog.count({
+        where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/skills/exportar" },
+      }),
+    ).toBeGreaterThan(antesSk)
+
+    // Modulos
+    const antesMod = await prisma.consultaLog.count({
+      where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/modulos/exportar" },
+    })
+    await agenteAdmin.get(`/api/v1/admin/logs/modulos/exportar?moduloId=${moduloId}`).expect(200)
+    expect(
+      await prisma.consultaLog.count({
+        where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/modulos/exportar" },
+      }),
+    ).toBeGreaterThan(antesMod)
+
+    // Ajustes-plan
+    const antesAj = await prisma.consultaLog.count({
+      where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/ajustes-plan/exportar" },
+    })
+    await agenteAdmin.get(`/api/v1/admin/logs/ajustes-plan/exportar?planId=${planId}`).expect(200)
+    expect(
+      await prisma.consultaLog.count({
+        where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/ajustes-plan/exportar" },
+      }),
+    ).toBeGreaterThan(antesAj)
+
+    // Consultas (debe seguir igual — recursion bloqueada)
+    const antesCons = await prisma.consultaLog.count({
+      where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/consultas/exportar" },
+    })
+    await agenteAdmin.get("/api/v1/admin/logs/consultas/exportar").expect(200)
+    expect(
+      await prisma.consultaLog.count({
+        where: { autorUsuarioId: adminUsuarioId, endpoint: "/admin/logs/consultas/exportar" },
+      }),
+    ).toBe(antesCons)
+  })
+
+  it("metadata audit LOGS_EXPORTADO incluye dominio + formato + totalFilas + filtrosAplicados", async () => {
+    await agenteAdmin
+      .get(`/api/v1/admin/logs/cursos/exportar?cursoId=${cursoId}&formato=csv`)
+      .expect(200)
+    const fila = await prisma.activityLog.findFirst({
+      where: { usuarioId: adminUsuarioId, accion: "LOGS_EXPORTADO" },
+      orderBy: { createdAt: "desc" },
+      select: { metadata: true, recursoTipo: true },
+    })
+    expect(fila?.recursoTipo).toBe("logs")
+    const meta = fila?.metadata as Record<string, unknown>
+    expect(meta.dominio).toBe("cursos")
+    expect(meta.formato).toBe("csv")
+    expect(typeof meta.totalFilas).toBe("number")
+    expect((meta.filtrosAplicados as Record<string, unknown>).cursoId).toBe(cursoId)
   })
 })

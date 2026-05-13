@@ -23,3 +23,19 @@ export const listarLogsCursosQuerySchema = z.object({
 })
 
 export type ListarLogsCursosQuery = z.infer<typeof listarLogsCursosQuerySchema>
+
+/**
+ * Schema para `GET /admin/logs/cursos/exportar` (P-B-c).
+ *
+ * Hereda los filtros del visor pagindo pero omite `page`/`pageSize` (los
+ * exports no paginan; aplican el tope `LIMITE_FILAS_EXPORTACION = 50_000` del
+ * helper auditoria). Anade `formato` con default CSV (alineado con el patron
+ * `me/ficha/exportar?formato=csv|pdf` del autoservicio).
+ */
+export const exportarLogsCursosQuerySchema = listarLogsCursosQuerySchema
+  .omit({ page: true, pageSize: true })
+  .extend({
+    formato: z.enum(["csv", "xlsx"]).default("csv"),
+  })
+
+export type ExportarLogsCursosQuery = z.infer<typeof exportarLogsCursosQuerySchema>

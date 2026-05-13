@@ -21,3 +21,15 @@ export const listarLogsAjustesPlanQuerySchema = z.object({
 })
 
 export type ListarLogsAjustesPlanQuery = z.infer<typeof listarLogsAjustesPlanQuerySchema>
+
+/**
+ * Schema para `GET /admin/logs/ajustes-plan/exportar` (P-B-c). Hereda filtros
+ * del visor, omite paginacion, anade `formato`.
+ */
+export const exportarLogsAjustesPlanQuerySchema = listarLogsAjustesPlanQuerySchema
+  .omit({ page: true, pageSize: true })
+  .extend({
+    formato: z.enum(["csv", "xlsx"]).default("csv"),
+  })
+
+export type ExportarLogsAjustesPlanQuery = z.infer<typeof exportarLogsAjustesPlanQuerySchema>

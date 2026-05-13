@@ -17,3 +17,15 @@ export const listarLogsAsignacionesQuerySchema = z.object({
 })
 
 export type ListarLogsAsignacionesQuery = z.infer<typeof listarLogsAsignacionesQuerySchema>
+
+/**
+ * Schema para `GET /admin/logs/asignaciones/exportar` (P-B-c). Hereda filtros
+ * del visor, omite paginacion, anade `formato` (CSV default).
+ */
+export const exportarLogsAsignacionesQuerySchema = listarLogsAsignacionesQuerySchema
+  .omit({ page: true, pageSize: true })
+  .extend({
+    formato: z.enum(["csv", "xlsx"]).default("csv"),
+  })
+
+export type ExportarLogsAsignacionesQuery = z.infer<typeof exportarLogsAsignacionesQuerySchema>

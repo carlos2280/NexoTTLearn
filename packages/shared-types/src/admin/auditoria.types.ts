@@ -85,6 +85,7 @@ export const ACCIONES_AUDITORIA = [
   "FICHA_EXPORTADA",
   "PLAN_RECALCULADO_MASIVO",
   "AUDITORIA_EXPORTADA",
+  "LOGS_EXPORTADO",
 ] as const
 
 export type AccionAuditoriaLiteral = (typeof ACCIONES_AUDITORIA)[number]

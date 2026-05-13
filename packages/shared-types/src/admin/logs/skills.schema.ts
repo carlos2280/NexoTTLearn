@@ -21,3 +21,15 @@ export const listarLogsSkillsQuerySchema = z.object({
 })
 
 export type ListarLogsSkillsQuery = z.infer<typeof listarLogsSkillsQuerySchema>
+
+/**
+ * Schema para `GET /admin/logs/skills/exportar` (P-B-c). Hereda filtros del
+ * visor (incluido `tipoEvento`), omite paginacion, anade `formato`.
+ */
+export const exportarLogsSkillsQuerySchema = listarLogsSkillsQuerySchema
+  .omit({ page: true, pageSize: true })
+  .extend({
+    formato: z.enum(["csv", "xlsx"]).default("csv"),
+  })
+
+export type ExportarLogsSkillsQuery = z.infer<typeof exportarLogsSkillsQuerySchema>

@@ -1,5 +1,11 @@
 import { Injectable } from "@nestjs/common"
 import type {
+  ExportarLogsAjustesPlanQuery,
+  ExportarLogsAsignacionesQuery,
+  ExportarLogsConsultasQuery,
+  ExportarLogsCursosQuery,
+  ExportarLogsModulosQuery,
+  ExportarLogsSkillsQuery,
   HistoricoEstadoAsignacionResumen,
   ListarLogsAjustesPlanQuery,
   ListarLogsAsignacionesQuery,
@@ -14,6 +20,7 @@ import type {
   LogSkillEventoResumen,
 } from "@nexott-learn/shared-types"
 import type { AccionAjustePlan, AccionLogCurso, EstadoModulo, Prisma } from "@prisma/client"
+import { LIMITE_FILAS_EXPORTACION } from "../auditoria/auditoria-export.helpers"
 import { type Paginated, buildPaginatedResponse, resolvePaginacion } from "../common/http/paginated"
 import { PrismaService } from "../common/prisma/prisma.service"
 
@@ -210,6 +217,156 @@ export class LogsService {
 
     return buildPaginatedResponse(filas.map(toConsultaLogResumen), total, page, pageSize)
   }
+
+  // ===========================================================================
+  // Exportadores (P-B-c) — pre-count + fetch en $transaction. El controller
+  // valida el tope `LIMITE_FILAS_EXPORTACION` con el `total` devuelto y emite
+  // `400 filtroDemasiadoAmplio` antes de transformar a CSV/XLSX.
+  // ===========================================================================
+
+  async contarYListarCambiosCursoParaExportar(
+    query: ExportarLogsCursosQuery,
+  ): Promise<{ readonly filas: readonly LogCambioCursoResumen[]; readonly total: number }> {
+    const where = construirWhereCursos(query)
+    const [filas, total] = await this.prisma.$transaction([
+      this.prisma.logCambioCurso.findMany({
+        where,
+        select: selectLogCambioCurso,
+        orderBy: { fecha: "desc" },
+        take: LIMITE_FILAS_EXPORTACION,
+      }),
+      this.prisma.logCambioCurso.count({ where }),
+    ])
+    return { filas: filas.map(toLogCambioCursoResumen), total }
+  }
+
+  async contarYListarHistoricoAsignacionParaExportar(
+    query: ExportarLogsAsignacionesQuery,
+  ): Promise<{
+    readonly filas: readonly HistoricoEstadoAsignacionResumen[]
+    readonly total: number
+  }> {
+    const where = construirWhereAsignaciones(query)
+    const [filas, total] = await this.prisma.$transaction([
+      this.prisma.historicoEstadoAsignacion.findMany({
+        where,
+        select: selectHistoricoEstadoAsignacion,
+        orderBy: { fecha: "desc" },
+        take: LIMITE_FILAS_EXPORTACION,
+      }),
+      this.prisma.historicoEstadoAsignacion.count({ where }),
+    ])
+    return { filas: filas.map(toHistoricoEstadoAsignacionResumen), total }
+  }
+
+  /**
+   * Variante export del visor unificado de skills. Same union-merge strategy
+   * que `listarEventosSkill` pero sin paginacion: cada tabla aplica `take:
+   * LIMITE_FILAS_EXPORTACION` como defensa adicional contra condiciones de
+   * carrera entre el count y el fetch. Tras el merge se trunca al tope.
+   */
+  async contarYListarEventosSkillParaExportar(
+    query: ExportarLogsSkillsQuery,
+  ): Promise<{ readonly filas: readonly LogSkillEventoResumen[]; readonly total: number }> {
+    const filtros = construirFiltrosSkills(query)
+    const necesitaRenombrados = !query.tipoEvento || query.tipoEvento === "RENOMBRADO"
+    const necesitaCambiosArea = !query.tipoEvento || query.tipoEvento === "CAMBIO_AREA"
+
+    const operaciones: Prisma.PrismaPromise<unknown>[] = []
+    if (necesitaRenombrados) {
+      operaciones.push(
+        this.prisma.historicoRenombradoSkill.findMany({
+          where: filtros.renombrados,
+          select: selectHistoricoRenombrado,
+          orderBy: { fecha: "desc" },
+          take: LIMITE_FILAS_EXPORTACION,
+        }),
+        this.prisma.historicoRenombradoSkill.count({ where: filtros.renombrados }),
+      )
+    }
+    if (necesitaCambiosArea) {
+      operaciones.push(
+        this.prisma.historicoCambiosAreaSkill.findMany({
+          where: filtros.cambiosArea,
+          select: selectHistoricoCambiosArea,
+          orderBy: { fecha: "desc" },
+          take: LIMITE_FILAS_EXPORTACION,
+        }),
+        this.prisma.historicoCambiosAreaSkill.count({ where: filtros.cambiosArea }),
+      )
+    }
+    const resultados = await this.prisma.$transaction(operaciones)
+
+    let cursor = 0
+    let renombradosFilas: HistoricoRenombradoProyectado[] = []
+    let renombradosCount = 0
+    let cambiosAreaFilas: HistoricoCambiosAreaProyectado[] = []
+    let cambiosAreaCount = 0
+    if (necesitaRenombrados) {
+      renombradosFilas = resultados[cursor++] as HistoricoRenombradoProyectado[]
+      renombradosCount = resultados[cursor++] as number
+    }
+    if (necesitaCambiosArea) {
+      cambiosAreaFilas = resultados[cursor++] as HistoricoCambiosAreaProyectado[]
+      cambiosAreaCount = resultados[cursor++] as number
+    }
+
+    const mergeado: LogSkillEventoResumen[] = [
+      ...renombradosFilas.map(toResumenRenombrado),
+      ...cambiosAreaFilas.map(toResumenCambioArea),
+    ].sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0))
+    const filas = mergeado.slice(0, LIMITE_FILAS_EXPORTACION)
+    const total = renombradosCount + cambiosAreaCount
+    return { filas, total }
+  }
+
+  async contarYListarEventosModuloParaExportar(
+    query: ExportarLogsModulosQuery,
+  ): Promise<{ readonly filas: readonly LogModuloEstadoResumen[]; readonly total: number }> {
+    const where = construirWhereModulos(query)
+    const [filas, total] = await this.prisma.$transaction([
+      this.prisma.historicoEstadoModulo.findMany({
+        where,
+        select: selectHistoricoEstadoModulo,
+        orderBy: { fecha: "desc" },
+        take: LIMITE_FILAS_EXPORTACION,
+      }),
+      this.prisma.historicoEstadoModulo.count({ where }),
+    ])
+    return { filas: filas.map(toModuloEstadoResumen), total }
+  }
+
+  async contarYListarAjustesPlanParaExportar(
+    query: ExportarLogsAjustesPlanQuery,
+  ): Promise<{ readonly filas: readonly LogAjustePlanResumen[]; readonly total: number }> {
+    const where = construirWhereAjustesPlan(query)
+    const [filas, total] = await this.prisma.$transaction([
+      this.prisma.ajustePlan.findMany({
+        where,
+        select: selectAjustePlan,
+        orderBy: { fecha: "desc" },
+        take: LIMITE_FILAS_EXPORTACION,
+      }),
+      this.prisma.ajustePlan.count({ where }),
+    ])
+    return { filas: filas.map(toAjustePlanResumen), total }
+  }
+
+  async contarYListarConsultasParaExportar(
+    query: ExportarLogsConsultasQuery,
+  ): Promise<{ readonly filas: readonly LogConsultaResumen[]; readonly total: number }> {
+    const where = construirWhereConsultas(query)
+    const [filas, total] = await this.prisma.$transaction([
+      this.prisma.consultaLog.findMany({
+        where,
+        select: selectConsultaLog,
+        orderBy: { fecha: "desc" },
+        take: LIMITE_FILAS_EXPORTACION,
+      }),
+      this.prisma.consultaLog.count({ where }),
+    ])
+    return { filas: filas.map(toConsultaLogResumen), total }
+  }
 }
 
 // =============================================================================
@@ -390,7 +547,7 @@ type HistoricoCambiosAreaProyectado = Prisma.HistoricoCambiosAreaSkillGetPayload
   select: typeof selectHistoricoCambiosArea
 }>
 
-function construirFiltrosSkills(query: ListarLogsSkillsQuery): {
+function construirFiltrosSkills(query: Omit<ListarLogsSkillsQuery, "page" | "pageSize">): {
   readonly renombrados: Prisma.HistoricoRenombradoSkillWhereInput
   readonly cambiosArea: Prisma.HistoricoCambiosAreaSkillWhereInput
 } {
@@ -478,7 +635,7 @@ type HistoricoEstadoModuloProyectado = Prisma.HistoricoEstadoModuloGetPayload<{
 }>
 
 function construirWhereModulos(
-  query: ListarLogsModulosQuery,
+  query: Omit<ListarLogsModulosQuery, "page" | "pageSize">,
 ): Prisma.HistoricoEstadoModuloWhereInput {
   const where: Prisma.HistoricoEstadoModuloWhereInput = {}
   if (query.moduloId) {
@@ -539,7 +696,9 @@ const selectAjustePlan = {
 
 type AjustePlanProyectado = Prisma.AjustePlanGetPayload<{ select: typeof selectAjustePlan }>
 
-function construirWhereAjustesPlan(query: ListarLogsAjustesPlanQuery): Prisma.AjustePlanWhereInput {
+function construirWhereAjustesPlan(
+  query: Omit<ListarLogsAjustesPlanQuery, "page" | "pageSize">,
+): Prisma.AjustePlanWhereInput {
   const where: Prisma.AjustePlanWhereInput = {}
   if (query.planId) {
     where.planId = query.planId
@@ -601,7 +760,9 @@ const selectConsultaLog = {
 
 type ConsultaLogProyectado = Prisma.ConsultaLogGetPayload<{ select: typeof selectConsultaLog }>
 
-function construirWhereConsultas(query: ListarLogsConsultasQuery): Prisma.ConsultaLogWhereInput {
+function construirWhereConsultas(
+  query: Omit<ListarLogsConsultasQuery, "page" | "pageSize">,
+): Prisma.ConsultaLogWhereInput {
   const where: Prisma.ConsultaLogWhereInput = {}
   if (query.autorUsuarioId) {
     where.autorUsuarioId = query.autorUsuarioId

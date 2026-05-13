@@ -331,6 +331,7 @@ enum AccionAuditoria {
   FICHA_EXPORTADA
   PLAN_RECALCULADO_MASIVO
   AUDITORIA_EXPORTADA
+  LOGS_EXPORTADO
 
   @@map("accion_auditoria_enum")
 }

@@ -1,4 +1,10 @@
 import type {
+  ExportarLogsAjustesPlanQuery,
+  ExportarLogsAsignacionesQuery,
+  ExportarLogsConsultasQuery,
+  ExportarLogsCursosQuery,
+  ExportarLogsModulosQuery,
+  ExportarLogsSkillsQuery,
   ListarLogsAjustesPlanQuery,
   ListarLogsAsignacionesQuery,
   ListarLogsConsultasQuery,
@@ -7,6 +13,7 @@ import type {
   ListarLogsSkillsQuery,
 } from "@nexott-learn/shared-types"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { LIMITE_FILAS_EXPORTACION } from "../auditoria/auditoria-export.helpers"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { LogsService } from "./logs.service"
 
@@ -769,5 +776,290 @@ describe("LogsService.listarConsultas", () => {
 
     expect(out.data[0]?.queryParams).toEqual({})
     expect(out.data[0]?.latenciaMs).toBeNull()
+  })
+})
+
+// =============================================================================
+// P-B-c: 6 exportadores
+// =============================================================================
+
+function buildExportCursos(
+  overrides: Partial<ExportarLogsCursosQuery> = {},
+): ExportarLogsCursosQuery {
+  return { formato: "csv", ...overrides }
+}
+
+function buildExportAsignaciones(
+  overrides: Partial<ExportarLogsAsignacionesQuery> = {},
+): ExportarLogsAsignacionesQuery {
+  return { formato: "csv", ...overrides }
+}
+
+function buildExportSkills(
+  overrides: Partial<ExportarLogsSkillsQuery> = {},
+): ExportarLogsSkillsQuery {
+  return { formato: "csv", ...overrides }
+}
+
+function buildExportModulos(
+  overrides: Partial<ExportarLogsModulosQuery> = {},
+): ExportarLogsModulosQuery {
+  return { formato: "csv", ...overrides }
+}
+
+function buildExportAjustes(
+  overrides: Partial<ExportarLogsAjustesPlanQuery> = {},
+): ExportarLogsAjustesPlanQuery {
+  return { formato: "csv", ...overrides }
+}
+
+function buildExportConsultas(
+  overrides: Partial<ExportarLogsConsultasQuery> = {},
+): ExportarLogsConsultasQuery {
+  return { formato: "csv", ...overrides }
+}
+
+describe("LogsService.contarYListarCambiosCursoParaExportar", () => {
+  let prisma: PrismaMock
+  let service: LogsService
+
+  beforeEach(() => {
+    prisma = buildPrismaMock()
+    service = new LogsService(prisma as unknown as PrismaService)
+  })
+
+  it("fetch sin paginacion (sin skip) + take = LIMITE_FILAS_EXPORTACION + DESC", async () => {
+    prisma.logCambioCurso.findMany.mockResolvedValue([buildFilaCurso()])
+    prisma.logCambioCurso.count.mockResolvedValue(3)
+
+    const out = await service.contarYListarCambiosCursoParaExportar(buildExportCursos())
+
+    const call = prisma.logCambioCurso.findMany.mock.calls[0]?.[0] as {
+      readonly take: number
+      readonly orderBy: { readonly fecha: "desc" }
+      readonly where: Record<string, unknown>
+      readonly skip?: number
+    }
+    expect(call.take).toBe(LIMITE_FILAS_EXPORTACION)
+    expect(call.orderBy).toEqual({ fecha: "desc" })
+    expect(call.skip).toBeUndefined()
+    expect(out.total).toBe(3)
+    expect(out.filas).toHaveLength(1)
+    expect(out.filas[0]?.cursoTitulo).toBe("Curso demo")
+  })
+
+  it("filtros AND aplicados al where (cursoId + accion + autorUsuarioId)", async () => {
+    prisma.logCambioCurso.findMany.mockResolvedValue([])
+    prisma.logCambioCurso.count.mockResolvedValue(0)
+
+    await service.contarYListarCambiosCursoParaExportar(
+      buildExportCursos({
+        cursoId: "aaaaaaaa-0000-0000-0000-000000000001",
+        accion: "PUBLICACION",
+        autorUsuarioId: "ffffffff-0000-0000-0000-000000000001",
+      }),
+    )
+
+    const call = prisma.logCambioCurso.findMany.mock.calls[0]?.[0] as {
+      readonly where: Record<string, unknown>
+    }
+    expect(call.where).toEqual({
+      cursoId: "aaaaaaaa-0000-0000-0000-000000000001",
+      accion: "PUBLICACION",
+      autorUsuarioId: "ffffffff-0000-0000-0000-000000000001",
+    })
+  })
+
+  it("total mayor a 50k retorna sin filtrar (controller decide el 400)", async () => {
+    prisma.logCambioCurso.findMany.mockResolvedValue([buildFilaCurso()])
+    prisma.logCambioCurso.count.mockResolvedValue(100_000)
+
+    const out = await service.contarYListarCambiosCursoParaExportar(buildExportCursos())
+
+    expect(out.total).toBe(100_000)
+  })
+})
+
+describe("LogsService.contarYListarHistoricoAsignacionParaExportar", () => {
+  let prisma: PrismaMock
+  let service: LogsService
+
+  beforeEach(() => {
+    prisma = buildPrismaMock()
+    service = new LogsService(prisma as unknown as PrismaService)
+  })
+
+  it("fetch sin skip + count separado", async () => {
+    prisma.historicoEstadoAsignacion.findMany.mockResolvedValue([buildFilaHistorico()])
+    prisma.historicoEstadoAsignacion.count.mockResolvedValue(5)
+
+    const out = await service.contarYListarHistoricoAsignacionParaExportar(
+      buildExportAsignaciones({ asignacionId: "bbbbbbbb-0000-0000-0000-000000000001" }),
+    )
+
+    const call = prisma.historicoEstadoAsignacion.findMany.mock.calls[0]?.[0] as {
+      readonly take: number
+      readonly skip?: number
+      readonly where: { readonly asignacionId: string }
+    }
+    expect(call.take).toBe(LIMITE_FILAS_EXPORTACION)
+    expect(call.skip).toBeUndefined()
+    expect(call.where.asignacionId).toBe("bbbbbbbb-0000-0000-0000-000000000001")
+    expect(out.total).toBe(5)
+  })
+})
+
+describe("LogsService.contarYListarEventosSkillParaExportar", () => {
+  let prisma: PrismaMock
+  let service: LogsService
+
+  beforeEach(() => {
+    prisma = buildPrismaMock()
+    service = new LogsService(prisma as unknown as PrismaService)
+  })
+
+  it("sin tipoEvento -> consulta ambas tablas y total = suma de counts", async () => {
+    prisma.historicoRenombradoSkill.findMany.mockResolvedValue([
+      buildFilaRenombrado({ fecha: new Date("2026-05-10T09:00:00.000Z") }),
+    ])
+    prisma.historicoRenombradoSkill.count.mockResolvedValue(3)
+    prisma.historicoCambiosAreaSkill.findMany.mockResolvedValue([
+      buildFilaCambioArea({ fecha: new Date("2026-05-11T09:00:00.000Z") }),
+    ])
+    prisma.historicoCambiosAreaSkill.count.mockResolvedValue(2)
+
+    const out = await service.contarYListarEventosSkillParaExportar(buildExportSkills())
+
+    expect(prisma.historicoRenombradoSkill.findMany).toHaveBeenCalledTimes(1)
+    expect(prisma.historicoCambiosAreaSkill.findMany).toHaveBeenCalledTimes(1)
+    expect(out.total).toBe(5)
+    expect(out.filas).toHaveLength(2)
+    expect(out.filas[0]?.tipoEvento).toBe("CAMBIO_AREA")
+    expect(out.filas[1]?.tipoEvento).toBe("RENOMBRADO")
+  })
+
+  it("tipoEvento=CAMBIO_AREA -> omite renombrados", async () => {
+    prisma.historicoCambiosAreaSkill.findMany.mockResolvedValue([buildFilaCambioArea()])
+    prisma.historicoCambiosAreaSkill.count.mockResolvedValue(7)
+
+    const out = await service.contarYListarEventosSkillParaExportar(
+      buildExportSkills({ tipoEvento: "CAMBIO_AREA" }),
+    )
+
+    expect(prisma.historicoRenombradoSkill.findMany).not.toHaveBeenCalled()
+    expect(out.total).toBe(7)
+    expect(out.filas[0]?.tipoEvento).toBe("CAMBIO_AREA")
+  })
+
+  it("cada findMany usa take=LIMITE_FILAS_EXPORTACION como defensa", async () => {
+    prisma.historicoRenombradoSkill.findMany.mockResolvedValue([])
+    prisma.historicoRenombradoSkill.count.mockResolvedValue(0)
+    prisma.historicoCambiosAreaSkill.findMany.mockResolvedValue([])
+    prisma.historicoCambiosAreaSkill.count.mockResolvedValue(0)
+
+    await service.contarYListarEventosSkillParaExportar(buildExportSkills())
+
+    const callRen = prisma.historicoRenombradoSkill.findMany.mock.calls[0]?.[0] as {
+      readonly take: number
+    }
+    const callCam = prisma.historicoCambiosAreaSkill.findMany.mock.calls[0]?.[0] as {
+      readonly take: number
+    }
+    expect(callRen.take).toBe(LIMITE_FILAS_EXPORTACION)
+    expect(callCam.take).toBe(LIMITE_FILAS_EXPORTACION)
+  })
+})
+
+describe("LogsService.contarYListarEventosModuloParaExportar", () => {
+  let prisma: PrismaMock
+  let service: LogsService
+
+  beforeEach(() => {
+    prisma = buildPrismaMock()
+    service = new LogsService(prisma as unknown as PrismaService)
+  })
+
+  it("estadoNuevo filtra al where + take=LIMITE", async () => {
+    prisma.historicoEstadoModulo.findMany.mockResolvedValue([buildFilaModulo()])
+    prisma.historicoEstadoModulo.count.mockResolvedValue(1)
+
+    const out = await service.contarYListarEventosModuloParaExportar(
+      buildExportModulos({ estadoNuevo: "ARCHIVADO" }),
+    )
+
+    const call = prisma.historicoEstadoModulo.findMany.mock.calls[0]?.[0] as {
+      readonly take: number
+      readonly where: { readonly estadoNuevo: string }
+    }
+    expect(call.take).toBe(LIMITE_FILAS_EXPORTACION)
+    expect(call.where.estadoNuevo).toBe("ARCHIVADO")
+    expect(out.total).toBe(1)
+  })
+})
+
+describe("LogsService.contarYListarAjustesPlanParaExportar", () => {
+  let prisma: PrismaMock
+  let service: LogsService
+
+  beforeEach(() => {
+    prisma = buildPrismaMock()
+    service = new LogsService(prisma as unknown as PrismaService)
+  })
+
+  it("accion + planId + seccionId combinados (AND)", async () => {
+    prisma.ajustePlan.findMany.mockResolvedValue([buildFilaAjuste()])
+    prisma.ajustePlan.count.mockResolvedValue(2)
+
+    const out = await service.contarYListarAjustesPlanParaExportar(
+      buildExportAjustes({
+        planId: "eeeeeeee-0000-0000-0000-000000000001",
+        seccionId: "22222222-0000-0000-0000-000000000003",
+        accion: "AGREGAR",
+      }),
+    )
+
+    const call = prisma.ajustePlan.findMany.mock.calls[0]?.[0] as {
+      readonly where: Record<string, unknown>
+    }
+    expect(call.where).toEqual({
+      planId: "eeeeeeee-0000-0000-0000-000000000001",
+      seccionId: "22222222-0000-0000-0000-000000000003",
+      accion: "AGREGAR",
+    })
+    expect(out.total).toBe(2)
+  })
+})
+
+describe("LogsService.contarYListarConsultasParaExportar", () => {
+  let prisma: PrismaMock
+  let service: LogsService
+
+  beforeEach(() => {
+    prisma = buildPrismaMock()
+    service = new LogsService(prisma as unknown as PrismaService)
+  })
+
+  it("endpoint y autorUsuarioId aplican al where; fetch sin skip", async () => {
+    prisma.consultaLog.findMany.mockResolvedValue([buildFilaConsulta()])
+    prisma.consultaLog.count.mockResolvedValue(4)
+
+    const out = await service.contarYListarConsultasParaExportar(
+      buildExportConsultas({
+        endpoint: "/admin/logs/cursos",
+        autorUsuarioId: "ffffffff-0000-0000-0000-000000000001",
+      }),
+    )
+
+    const call = prisma.consultaLog.findMany.mock.calls[0]?.[0] as {
+      readonly take: number
+      readonly skip?: number
+      readonly where: { readonly endpoint: string; readonly autorUsuarioId: string }
+    }
+    expect(call.take).toBe(LIMITE_FILAS_EXPORTACION)
+    expect(call.skip).toBeUndefined()
+    expect(call.where.endpoint).toBe("/admin/logs/cursos")
+    expect(call.where.autorUsuarioId).toBe("ffffffff-0000-0000-0000-000000000001")
+    expect(out.filas[0]?.queryParams).toEqual({ page: 1, pageSize: 50 })
+    expect(out.total).toBe(4)
   })
 })

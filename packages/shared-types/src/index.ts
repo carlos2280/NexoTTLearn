@@ -566,3 +566,22 @@ export type {
   LogConsultaResumen,
   ListarLogsConsultasQuery,
 } from "./admin"
+
+// Admin — Slice futuro B P-B-c: 6 exportadores CSV/XLSX de los visores
+// `/admin/logs/<dominio>`.
+export {
+  exportarLogsCursosQuerySchema,
+  exportarLogsAsignacionesQuerySchema,
+  exportarLogsSkillsQuerySchema,
+  exportarLogsModulosQuerySchema,
+  exportarLogsAjustesPlanQuerySchema,
+  exportarLogsConsultasQuerySchema,
+} from "./admin"
+export type {
+  ExportarLogsCursosQuery,
+  ExportarLogsAsignacionesQuery,
+  ExportarLogsSkillsQuery,
+  ExportarLogsModulosQuery,
+  ExportarLogsAjustesPlanQuery,
+  ExportarLogsConsultasQuery,
+} from "./admin"
