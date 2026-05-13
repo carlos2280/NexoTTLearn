@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+@import "@fontsource-variable/manrope/index.css";
 @import "@fontsource-variable/geist/index.css";
 @import "@fontsource-variable/geist-mono/index.css";
 @import "@fontsource-variable/fraunces/index.css";
@@ -49,6 +50,19 @@
   /* ---------- Color · glow rosa-coral (para mezclas de bienvenida/despedida) ---------- */
   --color-glow: #f472b6;
   --color-glow-rgb: 244 114 182;
+
+  /* ---------- Color · paleta aurora (identidad joven, moderna) ----------
+     Trío de protagonistas para gradientes cinematográficos del login,
+     momentos de "premio" (logros, certificados) y CTAs especiales.
+     Se usan SIEMPRE como gradiente — nunca planos sobre superficies grandes. */
+  --color-aurora-cyan: #22d3ee;
+  --color-aurora-cyan-rgb: 34 211 238;
+  --color-aurora-violet: #8b5cf6;
+  --color-aurora-violet-rgb: 139 92 246;
+  --color-aurora-magenta: #ec4899;
+  --color-aurora-magenta-rgb: 236 72 153;
+  --color-aurora-emerald: #34d399;
+  --color-aurora-emerald-rgb: 52 211 153;
 
   /* ---------- Color · semánticos ---------- */
   --color-success: #16a34a;
@@ -117,33 +131,19 @@
       rgb(var(--color-accent-rgb) / 0.07),
       transparent 70%
     ),
-    radial-gradient(
-      ellipse 65% 50% at 80% 80%,
-      rgb(var(--color-glow-rgb) / 0.05),
-      transparent 70%
-    );
+    radial-gradient(ellipse 65% 50% at 80% 80%, rgb(var(--color-glow-rgb) / 0.05), transparent 70%);
 
   --gradient-atmos-bienvenida: radial-gradient(
       circle at 35% 55%,
       rgb(var(--color-warmth-rgb) / 0.32),
       transparent 55%
-    ),
-    radial-gradient(
-      circle at 70% 70%,
-      rgb(var(--color-glow-rgb) / 0.22),
-      transparent 55%
-    );
+    ), radial-gradient(circle at 70% 70%, rgb(var(--color-glow-rgb) / 0.22), transparent 55%);
 
   --gradient-atmos-despedida: radial-gradient(
       circle at 50% 60%,
       rgb(var(--color-warmth-rgb) / 0.38),
       transparent 60%
-    ),
-    radial-gradient(
-      circle at 75% 30%,
-      rgb(var(--color-glow-rgb) / 0.16),
-      transparent 55%
-    );
+    ), radial-gradient(circle at 75% 30%, rgb(var(--color-glow-rgb) / 0.16), transparent 55%);
 
   /* ---------- Gradiente atmosférico global del admin ----------
      Aplicado al main scrollable. Presente, no invisible: el panel
@@ -157,11 +157,7 @@
       rgb(var(--color-accent-rgb) / 0.16),
       transparent 60%
     ),
-    radial-gradient(
-      ellipse 65% 55% at 0% 100%,
-      rgb(var(--color-glow-rgb) / 0.14),
-      transparent 65%
-    ),
+    radial-gradient(ellipse 65% 55% at 0% 100%, rgb(var(--color-glow-rgb) / 0.14), transparent 65%),
     radial-gradient(
       ellipse 70% 60% at 50% 50%,
       rgb(var(--color-warmth-rgb) / 0.05),
@@ -183,6 +179,58 @@
     rgb(var(--color-accent-rgb) / 0.08) 0%,
     rgb(var(--color-glow-rgb) / 0.06) 100%
   );
+
+  /* ---------- Gradientes aurora ----------
+     Tres intensidades para que la aurora se aplique con propósito:
+     · --gradient-aurora       → CTA principal, wordmark glow, momento de premio
+     · --gradient-aurora-soft  → halos detrás de elementos, badges, hovers
+     · --gradient-aurora-radial→ fondo cinematográfico (panel marca del login) */
+  --gradient-aurora: linear-gradient(
+    135deg,
+    rgb(var(--color-aurora-cyan-rgb) / 1) 0%,
+    rgb(var(--color-aurora-violet-rgb) / 1) 55%,
+    rgb(var(--color-aurora-magenta-rgb) / 1) 100%
+  );
+
+  --gradient-aurora-soft: linear-gradient(
+    135deg,
+    rgb(var(--color-aurora-cyan-rgb) / 0.18) 0%,
+    rgb(var(--color-aurora-violet-rgb) / 0.18) 55%,
+    rgb(var(--color-aurora-magenta-rgb) / 0.18) 100%
+  );
+
+  --gradient-aurora-radial: radial-gradient(
+      ellipse 70% 55% at 18% 28%,
+      rgb(var(--color-aurora-cyan-rgb) / 0.55),
+      transparent 65%
+    ),
+    radial-gradient(
+      ellipse 75% 60% at 72% 58%,
+      rgb(var(--color-aurora-violet-rgb) / 0.6),
+      transparent 65%
+    ),
+    radial-gradient(
+      ellipse 55% 50% at 85% 88%,
+      rgb(var(--color-aurora-magenta-rgb) / 0.5),
+      transparent 60%
+    );
+
+  /* ---------- Glow aurora para CTAs/elementos premiados ---------- */
+  --shadow-aurora-glow: 0 12px 32px rgb(var(--color-aurora-violet-rgb) / 0.32), 0 4px 12px
+    rgb(var(--color-aurora-magenta-rgb) / 0.18);
+
+  /* ---------- Vignette para contenido sobre aurora ----------
+     Oscurece la esquina inferior-izquierda donde vive el wordmark y la frase.
+     La aurora sigue brillando arriba-derecha; el texto blanco recupera contraste. */
+  --gradient-aurora-vignette: radial-gradient(
+    ellipse 70% 75% at 22% 78%,
+    rgb(0 0 0 / 0.58),
+    rgb(0 0 0 / 0.28) 38%,
+    transparent 72%
+  );
+
+  /* ---------- Text-shadow para texto blanco sobre aurora ---------- */
+  --shadow-text-aurora: 0 2px 28px rgb(0 0 0 / 0.45), 0 1px 2px rgb(0 0 0 / 0.25);
 
   /* ---------- Radius ---------- */
   --radius-sm: 4px;
@@ -211,6 +259,8 @@
   --shadow-ring-accent-soft: 0 0 0 3px rgb(var(--color-accent-rgb) / 0.12);
   --shadow-ring-danger: 0 0 0 3px rgb(var(--color-danger-rgb) / 0.18);
   --shadow-ring-danger-soft: 0 0 0 3px rgb(var(--color-danger-rgb) / 0.1);
+  --shadow-ring-aurora: 0 0 0 3px rgb(var(--color-aurora-violet-rgb) / 0.22);
+  --shadow-ring-aurora-soft: 0 0 0 3px rgb(var(--color-aurora-violet-rgb) / 0.14);
 
   /* ---------- Movimiento ---------- */
   --ease-default: cubic-bezier(0.16, 1, 0.3, 1);
@@ -227,9 +277,11 @@
   --duration-storytelling: 600ms;
   --duration-cinematic: 900ms;
 
-  /* ---------- Tipografía · familias ---------- */
-  --font-sans: "Geist Variable", "Geist", "Inter Variable", "Inter", system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* ---------- Tipografía · familias ----------
+     Manrope: geométrica, redondeada, joven — sustituto libre de Gilroy.
+     Geist queda de fallback para mantener compatibilidad mientras migramos. */
+  --font-sans: "Manrope Variable", "Manrope", "Geist Variable", "Geist", "Inter Variable", "Inter",
+    system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "Geist Mono Variable", "Geist Mono", "JetBrains Mono", ui-monospace, SFMono-Regular,
     monospace;
   --font-serif: "Fraunces Variable", "Fraunces", ui-serif, Georgia, serif;
@@ -322,6 +374,77 @@
   font-family: var(--font-sans);
   font-feature-settings: "ss01", "ss02", "ss03", "ss04", "tnum", "cv01", "cv11";
   color-scheme: light;
+}
+
+/* ============================================================
+   Modo oscuro · sobrescribe tokens semánticos
+   Los componentes leen siempre los mismos --color-*; aquí
+   redefinimos sus valores cuando html[data-theme="dark"].
+   La paleta aurora se MANTIENE: es identidad, no superficie.
+   ============================================================ */
+
+[data-theme="dark"] {
+  /* Superficies — del blanco editorial al carbón profundo */
+  --color-canvas: #0a0a0c;
+  --color-surface: #111114;
+  --color-surface-raised: #18181c;
+  --color-subtle: #1c1c22;
+  --color-muted: #26262d;
+
+  --color-border: #26262d;
+  --color-border-strong: #383841;
+  --color-border-emphasis: #525258;
+
+  /* Texto — invertido con jerarquía mantenida */
+  --color-text-primary: #fafaf9;
+  --color-text-secondary: #a8a29e;
+  --color-text-tertiary: #71717a;
+  --color-text-disabled: #3f3f46;
+
+  /* Acento — un poco más claro para AA en fondo oscuro */
+  --color-accent: #818cf8;
+  --color-accent-hover: #a5b4fc;
+  --color-accent-pressed: #6366f1;
+  --color-accent-soft: rgb(99 102 241 / 0.16);
+  --color-accent-soft-hover: rgb(99 102 241 / 0.24);
+  --color-accent-on-soft: #c7d2fe;
+
+  /* Cálido — ajustado para no quemar en fondo oscuro */
+  --color-warmth: #fbbf24;
+  --color-warmth-hover: #fcd34d;
+  --color-warmth-soft: rgb(245 158 11 / 0.16);
+  --color-warmth-soft-hover: rgb(245 158 11 / 0.24);
+  --color-warmth-on-soft: #fde68a;
+
+  /* Semánticos — versiones para fondo oscuro */
+  --color-success: #34d399;
+  --color-success-soft: rgb(16 185 129 / 0.16);
+  --color-success-on-soft: #6ee7b7;
+  --color-warning: #fbbf24;
+  --color-warning-soft: rgb(245 158 11 / 0.16);
+  --color-warning-on-soft: #fde68a;
+  --color-danger: #f87171;
+  --color-danger-soft: rgb(220 38 38 / 0.16);
+  --color-danger-on-soft: #fca5a5;
+  --color-info: #22d3ee;
+  --color-info-soft: rgb(34 211 238 / 0.16);
+  --color-info-on-soft: #67e8f9;
+
+  /* Atmósferas oscuras por paso — el escenario respira */
+  --color-atmos-credenciales: #0a0a0f;
+  --color-atmos-mfa: #0c0a12;
+  --color-atmos-cambiar-password: #0a0f0d;
+  --color-atmos-aviso-privacidad: #100a14;
+  --color-atmos-bienvenida: #140e0a;
+  --color-atmos-despedida: #18120c;
+
+  /* Sombras — más profundas porque el fondo es oscuro */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4), 0 1px 1px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 8px rgb(0 0 0 / 0.35), 0 2px 4px rgb(0 0 0 / 0.25);
+  --shadow-lg: 0 16px 32px rgb(0 0 0 / 0.45), 0 4px 8px rgb(0 0 0 / 0.25);
+  --shadow-overlay: 0 24px 48px rgb(0 0 0 / 0.6);
+
+  color-scheme: dark;
 }
 
 /* ============================================================
@@ -474,6 +597,37 @@ select:focus-visible {
   animation: nx-pulse 2s ease-out infinite;
 }
 
+/* Aurora drifting — el panel marca del login respira de forma cinematográfica.
+   Movimiento contenido (translate < 3%) + scale leve. Nada que distraiga. */
+@keyframes nx-aurora-drift {
+  0%,
+  100% {
+    transform: translate3d(0%, 0%, 0) scale(1.06);
+  }
+  33% {
+    transform: translate3d(2%, -1.5%, 0) scale(1.08);
+  }
+  66% {
+    transform: translate3d(-1.5%, 1%, 0) scale(1.06);
+  }
+}
+
+.nx-aurora-drift {
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-aurora-radial);
+  animation: nx-aurora-drift 28s var(--ease-default) infinite;
+  will-change: transform;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-aurora-drift {
+    animation: none;
+    transform: scale(1.06);
+  }
+}
+
 /* Halo respirando para CTA primaria en hero del logout */
 @keyframes nx-breathe {
   0%,
@@ -486,4 +640,173 @@ select:focus-visible {
 }
 .nx-breathe {
   animation: nx-breathe 3.6s var(--ease-default) infinite;
+}
+
+/* ============================================================
+ * Tiptap — estilos del contenido editable del builder.
+ * Aplican dentro del elemento .tiptap (ProseMirror) y dentro de
+ * .tiptap-content cuando se renderiza el HTML guardado sin editor.
+ * ============================================================ */
+.tiptap {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--color-text-primary);
+  min-height: 1.65em;
+}
+.tiptap:focus {
+  outline: none;
+}
+.tiptap p {
+  margin: 0 0 0.75em;
+}
+.tiptap p:last-child {
+  margin-bottom: 0;
+}
+.tiptap h2 {
+  font-size: 22px;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 1.2em 0 0.4em;
+}
+.tiptap h2:first-child {
+  margin-top: 0;
+}
+.tiptap h3 {
+  font-size: 18px;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 1em 0 0.3em;
+}
+.tiptap ul,
+.tiptap ol {
+  margin: 0 0 0.75em;
+  padding-left: 1.4em;
+}
+.tiptap ul {
+  list-style: disc;
+}
+.tiptap ol {
+  list-style: decimal;
+}
+.tiptap li {
+  margin: 0.15em 0;
+}
+.tiptap li p {
+  margin: 0;
+}
+.tiptap blockquote {
+  margin: 0 0 0.75em;
+  padding: 0.5em 0 0.5em 1em;
+  border-left: 3px solid var(--color-border-strong);
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+.tiptap a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.tiptap code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 0.1em 0.35em;
+  background: var(--color-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+.tiptap pre {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.75em 1em;
+  margin: 0 0 0.75em;
+  overflow-x: auto;
+}
+.tiptap pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+}
+.tiptap hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 1em 0;
+}
+.tiptap img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 0.5em 0;
+}
+.tiptap table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 0.75em;
+  table-layout: fixed;
+}
+.tiptap th,
+.tiptap td {
+  border: 1px solid var(--color-border);
+  padding: 0.45em 0.6em;
+  vertical-align: top;
+  text-align: left;
+}
+.tiptap th {
+  background: var(--color-subtle);
+  font-weight: 600;
+}
+.tiptap ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.25em;
+}
+.tiptap ul[data-type="taskList"] li {
+  display: flex;
+  gap: 0.5em;
+  align-items: flex-start;
+}
+.tiptap ul[data-type="taskList"] li > label {
+  margin-top: 0.25em;
+}
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--color-text-tertiary);
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+/* Syntax highlighting (lowlight / highlight.js tokens) — paleta sobria
+ * coherente con la identidad: índigo / cyan suave / texto secundario. */
+.tiptap pre code .hljs-keyword,
+.tiptap pre code .hljs-selector-tag,
+.tiptap pre code .hljs-built_in,
+.tiptap pre code .hljs-tag {
+  color: var(--color-accent);
+}
+.tiptap pre code .hljs-string,
+.tiptap pre code .hljs-attr,
+.tiptap pre code .hljs-template-variable {
+  color: var(--color-success-on-soft);
+}
+.tiptap pre code .hljs-number,
+.tiptap pre code .hljs-literal {
+  color: var(--color-warning-on-soft);
+}
+.tiptap pre code .hljs-comment,
+.tiptap pre code .hljs-quote {
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+.tiptap pre code .hljs-title,
+.tiptap pre code .hljs-name,
+.tiptap pre code .hljs-function {
+  color: var(--color-aurora-violet);
 }
