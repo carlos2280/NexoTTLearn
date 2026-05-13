@@ -1,5 +1,5 @@
-import { useAuditoriaReciente } from "@/features/admin/hooks/use-auditoria-reciente"
 import { construirEventosPulso } from "@/features/admin/dashboard/lib/eventos-pulso.builder"
+import { useAuditoriaReciente } from "@/features/admin/hooks/use-auditoria-reciente"
 import { Banner } from "@/shared/components/ui/banner"
 import { Button } from "@/shared/components/ui/button"
 import { Card } from "@/shared/components/ui/card"

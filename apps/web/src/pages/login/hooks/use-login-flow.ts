@@ -57,6 +57,7 @@ export function useLoginFlow(): UseLoginFlowResult {
   }, [continuarConPerfil])
 
   const onLoginExitoso = useCallback(
+    // biome-ignore lint/suspicious/useAwait: contrato uniforme — todos los callbacks del flujo (onMfaExitoso, onCambioPasswordExitoso, onAvisoAceptado) devuelven Promise<void>; mantener este sync rompería la simetría del UseLoginFlowResult.
     async (resp: LoginResponse): Promise<void> => {
       if (resp.mfaRequired) {
         setMfaChallenge({
