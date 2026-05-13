@@ -807,12 +807,14 @@ export class PlanPersonalService {
       seccionTitulo: s.titulo,
     }))
 
-    // El JSON persistido puede ser cualquier shape antiguo. Sólo lo parseamos
-    // cuando lo vamos a entregar (rol ADMIN, D-S7-D2): el PARTICIPANTE no
-    // recibe `fichaSnapshot` y no debe romper si la fila es legacy (seed
-    // antiguo, migración pendiente).
+    // El JSON persistido puede ser de un shape antiguo o estar ausente. Sólo
+    // lo parseamos cuando lo vamos a entregar (rol ADMIN, D-S7-D2): el
+    // PARTICIPANTE no recibe `fichaSnapshot` y no debe romper si la fila es
+    // legacy (seed antiguo, migración pendiente). Para ADMIN: si el snapshot
+    // está corrupto o ausente, lanzamos 422 con código documentado en vez de
+    // un 500 genérico — el admin sabrá que debe recalcular el plan.
     const fichaSnapshot =
-      rol === RolUsuario.ADMIN ? fichaSnapshotV1Schema.parse(plan.fichaSnapshot) : undefined
+      rol === RolUsuario.ADMIN ? this.parseFichaSnapshotOrThrow(plan.fichaSnapshot) : undefined
 
     return toPlanResponse({
       planId: plan.id,
@@ -831,6 +833,34 @@ export class PlanPersonalService {
       porSeccion,
       rol,
     })
+  }
+
+  /**
+   * Parsea `fichaSnapshot` para entregárselo a un ADMIN. Si la columna es
+   * `null` (plan creado por seeders antiguos o nunca recalculado) o el JSON
+   * persistido no matchea `fichaSnapshotV1Schema`, lanza 422 con código
+   * `fichaSnapshotInvalida` — un 500 ZodError no diagnostica nada al cliente.
+   *
+   * El admin puede llamar a `POST /plan/recalcular` para regenerar un
+   * snapshot v1 válido.
+   */
+  private parseFichaSnapshotOrThrow(raw: Prisma.JsonValue | null) {
+    if (raw === null || raw === undefined) {
+      throw new UnprocessableEntityException({
+        code: apiErrorCodes.fichaSnapshotInvalida,
+        message:
+          "El plan no tiene fichaSnapshot persistido. Ejecuta /plan/recalcular para regenerarlo.",
+      })
+    }
+    const parsed = fichaSnapshotV1Schema.safeParse(raw)
+    if (!parsed.success) {
+      throw new UnprocessableEntityException({
+        code: apiErrorCodes.fichaSnapshotInvalida,
+        message:
+          "El fichaSnapshot persistido no cumple el schema v1. Ejecuta /plan/recalcular para regenerarlo.",
+      })
+    }
+    return parsed.data
   }
 
   private async obtenerAvance(

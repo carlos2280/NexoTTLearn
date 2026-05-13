@@ -600,6 +600,52 @@ describe("PlanPersonalService.obtener (visibilidad)", () => {
       response: { code: apiErrorCodes.planNoEncontrado },
     })
   })
+
+  function mockPlanConFichaSnapshot(fichaSnapshot: unknown): void {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      colaboradorId: COLABORADOR_ID,
+    })
+    prisma.planEstudio.findUnique.mockResolvedValue({
+      id: "plan-1",
+      asignacionId: ASIGNACION_ID,
+      fechaCalculo: new Date("2026-05-11T10:00:00Z"),
+      fichaSnapshot,
+      estaDesactualizado: false,
+    })
+    prisma.itemPlan.findMany.mockResolvedValue([])
+    prisma.seccion.findMany.mockResolvedValue([])
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
+  }
+
+  it("ADMIN con fichaSnapshot null -> 422 fichaSnapshotInvalida", async () => {
+    mockPlanConFichaSnapshot(null)
+    await expect(service.obtener(ASIGNACION_ID, ADMIN)).rejects.toMatchObject({
+      response: { code: apiErrorCodes.fichaSnapshotInvalida },
+    })
+  })
+
+  it("ADMIN con fichaSnapshot corrupto -> 422 fichaSnapshotInvalida", async () => {
+    mockPlanConFichaSnapshot({ generadoPor: "seed-demo" })
+    await expect(service.obtener(ASIGNACION_ID, ADMIN)).rejects.toMatchObject({
+      response: { code: apiErrorCodes.fichaSnapshotInvalida },
+    })
+  })
+
+  it("PARTICIPANTE con fichaSnapshot null -> 200 (no se entrega snapshot)", async () => {
+    mockPlanConFichaSnapshot(null)
+    prisma.usuario.findUnique.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
+    const res = (await service.obtener(ASIGNACION_ID, PARTICIPANTE)) as PlanResponseParticipante
+    expect(Object.hasOwn(res, "fichaSnapshot")).toBe(false)
+  })
+
+  it("PARTICIPANTE con fichaSnapshot corrupto -> 200 (no se entrega snapshot)", async () => {
+    mockPlanConFichaSnapshot({ generadoPor: "seed-demo" })
+    prisma.usuario.findUnique.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
+    const res = (await service.obtener(ASIGNACION_ID, PARTICIPANTE)) as PlanResponseParticipante
+    expect(Object.hasOwn(res, "fichaSnapshot")).toBe(false)
+  })
 })
 
 describe("PlanPersonalService.calcularSiAsignado (cierre TODO S7)", () => {
