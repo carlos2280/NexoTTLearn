@@ -1,6 +1,6 @@
+import { DUR, EASE } from "@/shared/lib/motion"
 import { motion, useReducedMotion } from "framer-motion"
 import type { ReactNode } from "react"
-import { DUR, EASE } from "@/shared/lib/motion"
 import type { PasoLogin } from "../login.types"
 import { EscenarioMarca } from "./escenario-marca"
 

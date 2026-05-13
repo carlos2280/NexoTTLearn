@@ -1,7 +1,7 @@
 import { AdminShell } from "@/features/admin/layout/components/admin-shell"
 import { AsignacionesPage } from "@/pages/admin/asignaciones/asignaciones.page"
 import { CatalogoPage } from "@/pages/admin/catalogo/catalogo.page"
-import { ModuloDetallePage } from "@/pages/admin/catalogo/modulo-detalle/modulo-detalle.page"
+import { ModuloBuilderPage } from "@/pages/admin/catalogo/modulo-builder/modulo-builder.page"
 import { CursoDetallePage } from "@/pages/admin/cursos/curso-detalle.page"
 import { CursosPage } from "@/pages/admin/cursos/cursos.page"
 import { InicioPage } from "@/pages/admin/inicio/inicio.page"
@@ -40,6 +40,20 @@ export function AppRoutes() {
           </GuardSesion>
         }
       />
+      {/*
+        Builder de módulo: pantalla inmersiva fuera de AdminShell (sin menú
+        lateral). Es la ÚNICA vista del detalle de módulo.
+      */}
+      <Route
+        path="/admin/catalogo/modulos/:moduloId"
+        element={
+          <GuardSesion>
+            <GuardRol permitidos={["ADMIN"]} redirigirA={RUTAS.bandeja}>
+              <ModuloBuilderPage />
+            </GuardRol>
+          </GuardSesion>
+        }
+      />
       <Route
         path={RUTAS.admin.inicio}
         element={
@@ -52,7 +66,6 @@ export function AppRoutes() {
       >
         <Route index={true} element={<InicioPage />} />
         <Route path="catalogo" element={<CatalogoPage />} />
-        <Route path="catalogo/modulos/:moduloId" element={<ModuloDetallePage />} />
         <Route path="cursos" element={<CursosPage />} />
         <Route path="cursos/:cursoId" element={<CursoDetallePage />} />
         <Route path="cursos/:cursoId/asignaciones" element={<AsignacionesPage />} />

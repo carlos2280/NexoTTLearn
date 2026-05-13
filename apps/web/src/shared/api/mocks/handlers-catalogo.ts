@@ -365,6 +365,15 @@ const handleListarModulos: MockHandler = (req) => {
   return paginar(filtrados, page, pageSize)
 }
 
+const handleObtenerModulo: MockHandler = (req) => {
+  const id = extractIdDeRuta(req.path, "/catalogo/modulos/")
+  const modulo = dbModulos.find((m) => m.id === id)
+  if (!modulo) {
+    throw new ApiError(404, "NO_ENCONTRADO", "Módulo no encontrado.")
+  }
+  return modulo
+}
+
 function buscarModuloIndice(id: string): number {
   return dbModulos.findIndex((m) => m.id === id)
 }
@@ -563,6 +572,7 @@ export const handlersCatalogo = [
   defineRoute("POST", /^\/catalogo\/skills\/[^/?]+\/preview-cambio-area$/, handlePreviewCambioArea),
   defineRoute("POST", /^\/catalogo\/skills\/[^/?]+\/area$/, handleCambiarAreaSkill),
   defineRoute("GET", /^\/catalogo\/modulos(\?.*)?$/, handleListarModulos),
+  defineRoute("GET", /^\/catalogo\/modulos\/[^/?]+$/, handleObtenerModulo),
   defineRoute("POST", /^\/catalogo\/modulos$/, handleCrearModulo),
   defineRoute("PATCH", /^\/catalogo\/modulos\/[^/?]+$/, handleActualizarModulo),
   defineRoute("DELETE", /^\/catalogo\/modulos\/[^/?]+$/, handleEliminarModulo),

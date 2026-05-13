@@ -1,5 +1,5 @@
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { DUR, EASE } from "@/shared/lib/motion"
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { LoginShell } from "./components/login-shell"
 import { PasoAvisoPrivacidad } from "./components/paso-aviso-privacidad"
 import { PasoBienvenida } from "./components/paso-bienvenida"
