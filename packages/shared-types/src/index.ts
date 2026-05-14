@@ -100,6 +100,33 @@ export type {
   ColaboradorAfectadoBloque,
   PreviewImpactoEliminarBloque,
 } from "./catalogo/bloques/bloque.schema"
+// Contenido por tipo de bloque — schemas Zod de `Bloque.contenido` (jsonb).
+// Fuente unica de verdad usada por editor, backend (validacion al crear/editar)
+// y motor de autocorreccion. Los evaluables se re-exportan desde aqui para que
+// el llamante tenga un solo punto de entrada.
+export {
+  contenidoParrafoSchema,
+  contenidoTipSchema,
+  varianteTipSchema,
+  contenidoCodigoIlustrativoSchema,
+  contenidoVideoSchema,
+  proveedorVideoSchema,
+  contenidoRecursoSchema,
+  subtipoRecursoSchema,
+  contenidoBloquePorTipo,
+  schemaContenidoBloquePorTipo,
+  validarContenidoBloque,
+} from "./catalogo/bloques/contenido"
+export type {
+  ContenidoParrafo,
+  ContenidoTip,
+  VarianteTip,
+  ContenidoCodigoIlustrativo,
+  ContenidoVideo,
+  ProveedorVideo,
+  ContenidoRecurso,
+  SubtipoRecurso,
+} from "./catalogo/bloques/contenido"
 export { listarClientesQuerySchema } from "./catalogo/clientes/listar-clientes.schema"
 export type { ListarClientesQuery } from "./catalogo/clientes/listar-clientes.schema"
 export type {
@@ -306,17 +333,40 @@ export type {
   PatchResultadoEntrevistaRequest,
 } from "./asignaciones"
 
-// Intentos de bloque — Slice 7 P7b (D-S7-C1..C6).
+// Intentos de bloque — Slice 7 P7b (D-S7-C1..C6) + codigo (CODIGO_PREGUNTAS).
 export {
   contenidoQuizSchema,
+  preguntaQuizSchema,
+  tipoPreguntaQuizSchema,
+  contenidoCodigoPreguntasSchema,
+  contenidoCodigoTestsSchema,
+  testStdinStdoutSchema,
+  lenguajeEjecutableSchema,
   crearIntentoBloqueSchema,
+  respuestaPreguntaSchema,
+  respuestasIntentoSchema,
   intentoBloqueResponseSchema,
   listarIntentosBloqueQuerySchema,
   listarIntentosCursoBloqueQuerySchema,
 } from "./intentos-bloque"
 export type {
   ContenidoQuiz,
+  PreguntaQuiz,
+  PreguntaOpcionUnica,
+  PreguntaOpcionMultiple,
+  PreguntaVerdaderoFalso,
+  PreguntaRespuestaCorta,
+  OpcionQuiz,
+  TipoPreguntaQuiz,
+  SolucionVisible,
+  NormalizacionRespuestaCorta,
+  ContenidoCodigoPreguntas,
+  ContenidoCodigoTests,
+  TestStdinStdout,
+  LenguajeEjecutable,
   CrearIntentoBloqueInput,
+  RespuestaPregunta,
+  RespuestasIntento,
   IntentoBloqueResponse,
   ListarIntentosBloqueQuery,
   ListarIntentosCursoBloqueQuery,

@@ -27,6 +27,43 @@ const ADMIN_EMAIL = "catalogo-admin-p3c-bc@nttdata.test"
 const ADMIN_PASSWORD = "Catalogo1234!"
 const FIXTURE_SUFFIX = "-p3c-e2e-bc"
 
+// Contenidos validos minimos para los tipos usados en este e2e. El backend
+// valida el shape de `Bloque.contenido` contra los schemas Zod oficiales
+// (packages/shared-types/src/catalogo/bloques/contenido/), por lo que ya no
+// es admisible enviar shapes inventados como `{ texto: "..." }`.
+const CONTENIDO_PARRAFO_VACIO = { html: "", textoPlano: "", tiempoLecturaMin: 0 } as const
+const CONTENIDO_PARRAFO_V1 = {
+  html: "<p>v1</p>",
+  textoPlano: "v1",
+  tiempoLecturaMin: 1,
+} as const
+const CONTENIDO_PARRAFO_COSMETICO = {
+  html: "<p>v1-cosmetico</p>",
+  textoPlano: "v1-cosmetico",
+  tiempoLecturaMin: 1,
+} as const
+
+function buildContenidoQuiz(enunciado: string): Record<string, unknown> {
+  return {
+    intentosMax: null,
+    solucionVisible: "al_aprobar",
+    ordenAleatorio: false,
+    notaMinima: 60,
+    preguntas: [
+      {
+        id: "p1",
+        tipo: "OPCION_UNICA",
+        enunciado,
+        pesoPunto: 1,
+        opciones: [
+          { id: "a", texto: "A", esCorrecta: true },
+          { id: "b", texto: "B", esCorrecta: false },
+        ],
+      },
+    ],
+  }
+}
+
 interface ModuloApp {
   // biome-ignore lint/style/useNamingConvention: la clase Nest es PascalCase.
   AppModule: Type<unknown>
@@ -221,7 +258,7 @@ describe.runIf(RUN_E2E)("catalogo-admin bloques + clientes e2e (P3c)", () => {
         tipo: "QUIZ",
         esEvaluable: true,
         skillQueMideId: skillActivaId,
-        contenido: { preguntas: [] },
+        contenido: buildContenidoQuiz("Pregunta 1"),
       })
     expect(res.status).toBe(201)
     const body = res.body as { id: string; version: number; estado: string }
@@ -239,7 +276,7 @@ describe.runIf(RUN_E2E)("catalogo-admin bloques + clientes e2e (P3c)", () => {
     const res = await agente
       .post(`/api/v1/catalogo/secciones/${seccionId}/bloques`)
       .set("X-XSRF-TOKEN", csrf)
-      .send({ tipo: "QUIZ", esEvaluable: true, contenido: {} })
+      .send({ tipo: "QUIZ", esEvaluable: true, contenido: buildContenidoQuiz("Pregunta 1") })
     expect(res.status).toBe(400)
     expect((res.body as { code: string }).code).toBe("INVALID_BODY")
   })
@@ -251,14 +288,14 @@ describe.runIf(RUN_E2E)("catalogo-admin bloques + clientes e2e (P3c)", () => {
       .send({
         tipo: "PARRAFO",
         esEvaluable: false,
-        contenido: { texto: "v1" },
+        contenido: CONTENIDO_PARRAFO_V1,
       })
     const bloqueId = (creado.body as { id: string; version: number }).id
 
     const res = await agente
       .patch(`/api/v1/catalogo/bloques/${bloqueId}`)
       .set("X-XSRF-TOKEN", csrf)
-      .send({ tipoEdicion: "COSMETICO", contenido: { texto: "v1-cosmetico" } })
+      .send({ tipoEdicion: "COSMETICO", contenido: CONTENIDO_PARRAFO_COSMETICO })
     expect(res.status).toBe(200)
     const body = res.body as { versionAnterior: number; versionNueva: number; tipoEdicion: string }
     expect(body.tipoEdicion).toBe("COSMETICO")
@@ -273,14 +310,14 @@ describe.runIf(RUN_E2E)("catalogo-admin bloques + clientes e2e (P3c)", () => {
         tipo: "QUIZ",
         esEvaluable: true,
         skillQueMideId: skillActivaId,
-        contenido: { preguntas: [] },
+        contenido: buildContenidoQuiz("v1"),
       })
     const bloqueId = (creado.body as { id: string }).id
 
     const sinMotivo = await agente
       .patch(`/api/v1/catalogo/bloques/${bloqueId}`)
       .set("X-XSRF-TOKEN", csrf)
-      .send({ tipoEdicion: "CAMBIA_EVALUACION", contenido: { preguntas: [{ q: "1" }] } })
+      .send({ tipoEdicion: "CAMBIA_EVALUACION", contenido: buildContenidoQuiz("v2") })
     expect(sinMotivo.status).toBe(422)
     expect((sinMotivo.body as { code: string }).code).toBe("MOTIVO_REQUERIDO")
 
@@ -288,7 +325,7 @@ describe.runIf(RUN_E2E)("catalogo-admin bloques + clientes e2e (P3c)", () => {
       .patch(`/api/v1/catalogo/bloques/${bloqueId}`)
       .set("X-XSRF-TOKEN", csrf)
       .set("X-Motivo", "ajuste de rubrica")
-      .send({ tipoEdicion: "CAMBIA_EVALUACION", contenido: { preguntas: [{ q: "1" }] } })
+      .send({ tipoEdicion: "CAMBIA_EVALUACION", contenido: buildContenidoQuiz("v3") })
     expect(conMotivo.status).toBe(200)
     const body = conMotivo.body as {
       tipoEdicion: string
@@ -315,7 +352,7 @@ describe.runIf(RUN_E2E)("catalogo-admin bloques + clientes e2e (P3c)", () => {
     const creado = await agente
       .post(`/api/v1/catalogo/secciones/${seccionId}/bloques`)
       .set("X-XSRF-TOKEN", csrf)
-      .send({ tipo: "PARRAFO", esEvaluable: false, contenido: { texto: "x" } })
+      .send({ tipo: "PARRAFO", esEvaluable: false, contenido: CONTENIDO_PARRAFO_VACIO })
     const bloqueId = (creado.body as { id: string }).id
 
     const res = await agente

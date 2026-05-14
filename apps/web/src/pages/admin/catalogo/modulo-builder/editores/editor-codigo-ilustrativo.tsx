@@ -1,6 +1,9 @@
 import { Field } from "@/shared/components/ui/field"
 import { Textarea } from "@/shared/components/ui/textarea"
-import type { BloqueDetalleResponse } from "@nexott-learn/shared-types"
+import {
+  type BloqueDetalleResponse,
+  contenidoCodigoIlustrativoSchema,
+} from "@nexott-learn/shared-types"
 import { useRef, useState } from "react"
 import { tipoBloqueMeta } from "../bloque-tipo-meta"
 import { CodigoTextarea } from "./shared/codigo-textarea"
@@ -18,12 +21,17 @@ interface Borrador {
   readonly descripcion: string
 }
 
+/**
+ * Hidrata el borrador desde `bloque.contenido`. Si el JSON no cumple el
+ * contrato oficial (`contenidoCodigoIlustrativoSchema`) cae al estado
+ * canonico (lenguaje typescript + codigo y descripcion vacios).
+ */
 function leerInicial(contenido: Record<string, unknown> | null): Borrador {
-  return {
-    lenguaje: typeof contenido?.lenguaje === "string" ? contenido.lenguaje : "typescript",
-    codigo: typeof contenido?.codigo === "string" ? contenido.codigo : "",
-    descripcion: typeof contenido?.descripcion === "string" ? contenido.descripcion : "",
+  const result = contenidoCodigoIlustrativoSchema.safeParse(contenido)
+  if (result.success) {
+    return result.data
   }
+  return { lenguaje: "typescript", codigo: "", descripcion: "" }
 }
 
 export function EditorCodigoIlustrativo({ bloque }: EditorCodigoIlustrativoProps) {

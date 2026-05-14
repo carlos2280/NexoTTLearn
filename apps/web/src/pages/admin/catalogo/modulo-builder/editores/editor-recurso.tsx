@@ -2,7 +2,7 @@ import { Field } from "@/shared/components/ui/field"
 import { Input } from "@/shared/components/ui/input"
 import { Textarea } from "@/shared/components/ui/textarea"
 import { cn } from "@/shared/lib/cn"
-import type { BloqueDetalleResponse } from "@nexott-learn/shared-types"
+import { type BloqueDetalleResponse, contenidoRecursoSchema } from "@nexott-learn/shared-types"
 import { ExternalLink, Paperclip } from "lucide-react"
 import { useRef, useState } from "react"
 import { tipoBloqueMeta } from "../bloque-tipo-meta"
@@ -23,14 +23,23 @@ interface Borrador {
   readonly abrirNuevaPestana: boolean
 }
 
+/**
+ * Hidrata el borrador desde `bloque.contenido`. Si el JSON no cumple el
+ * contrato oficial (`contenidoRecursoSchema`) cae al estado canonico
+ * (subtipo `enlace`, campos vacios, abrirNuevaPestana = true).
+ */
 function leerInicial(contenido: Record<string, unknown> | null): Borrador {
-  const subtipo = contenido?.subtipo === "adjunto" ? "adjunto" : "enlace"
-  const url = typeof contenido?.url === "string" ? contenido.url : ""
-  const titulo = typeof contenido?.titulo === "string" ? contenido.titulo : ""
-  const descripcion = typeof contenido?.descripcion === "string" ? contenido.descripcion : ""
-  const abrirNuevaPestana =
-    typeof contenido?.abrirNuevaPestana === "boolean" ? contenido.abrirNuevaPestana : true
-  return { subtipo, url, titulo, descripcion, abrirNuevaPestana }
+  const result = contenidoRecursoSchema.safeParse(contenido)
+  if (result.success) {
+    return result.data
+  }
+  return {
+    subtipo: "enlace",
+    url: "",
+    titulo: "",
+    descripcion: "",
+    abrirNuevaPestana: true,
+  }
 }
 
 export function EditorRecurso({ bloque }: EditorRecursoProps) {

@@ -1,5 +1,8 @@
-import type { TipoBloque } from "@nexott-learn/shared-types"
-import type { BloqueDetalleResponse } from "@nexott-learn/shared-types"
+import {
+  type BloqueDetalleResponse,
+  contenidoParrafoSchema,
+  type TipoBloque,
+} from "@nexott-learn/shared-types"
 import type { Editor } from "@tiptap/react"
 import { Clock } from "lucide-react"
 import { useRef, useState } from "react"
@@ -25,13 +28,18 @@ interface BorradorParrafo {
   readonly textoPlano: string
 }
 
+/**
+ * Hidrata el borrador desde `bloque.contenido`. Valida contra el schema
+ * oficial (`contenidoParrafoSchema`); si el JSON persistido no cumple el
+ * contrato (caso de bloques antiguos del seeder), cae al estado vacio
+ * canonico para que el admin pueda reescribir sin que el editor explote.
+ */
 function leerInicial(contenido: Record<string, unknown> | null): BorradorParrafo {
-  if (!contenido) {
-    return { html: "", textoPlano: "" }
+  const result = contenidoParrafoSchema.safeParse(contenido)
+  if (result.success) {
+    return { html: result.data.html, textoPlano: result.data.textoPlano }
   }
-  const html = typeof contenido.html === "string" ? contenido.html : ""
-  const textoPlano = typeof contenido.textoPlano === "string" ? contenido.textoPlano : ""
-  return { html, textoPlano }
+  return { html: "", textoPlano: "" }
 }
 
 const REGEX_SLASH = /^\/(\w*)$/

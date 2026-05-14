@@ -1,5 +1,5 @@
 import { cn } from "@/shared/lib/cn"
-import type { BloqueDetalleResponse } from "@nexott-learn/shared-types"
+import { type BloqueDetalleResponse, contenidoTipSchema } from "@nexott-learn/shared-types"
 import { CheckCircle2, Info, type LucideIcon, TriangleAlert } from "lucide-react"
 import { useRef, useState } from "react"
 import { tipoBloqueMeta } from "../bloque-tipo-meta"
@@ -44,16 +44,17 @@ interface Borrador {
   readonly html: string
 }
 
+/**
+ * Hidrata el borrador desde `bloque.contenido`. Si el JSON no cumple
+ * el contrato oficial (`contenidoTipSchema`), cae al estado canonico
+ * (variante `info` + html vacio).
+ */
 function leerInicial(contenido: Record<string, unknown> | null): Borrador {
-  if (!contenido) {
-    return { variante: "info", html: "" }
+  const result = contenidoTipSchema.safeParse(contenido)
+  if (result.success) {
+    return result.data
   }
-  const variante =
-    contenido.variante === "warning" || contenido.variante === "exito"
-      ? (contenido.variante as VarianteTip)
-      : "info"
-  const html = typeof contenido.html === "string" ? contenido.html : ""
-  return { variante, html }
+  return { variante: "info", html: "" }
 }
 
 export function EditorTip({ bloque }: EditorTipProps) {

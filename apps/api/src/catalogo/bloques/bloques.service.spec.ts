@@ -65,17 +65,50 @@ const SEC_ID = "11111111-1111-1111-1111-111111111111"
 const BLO_ID = "22222222-2222-2222-2222-222222222222"
 const SKILL_ID = "33333333-3333-3333-3333-333333333333"
 
-function buildDetalleRow(overrides: Partial<{ estado: EstadoBloque; version: number }> = {}) {
+// Contenidos validos minimos por tipo. Sirven para tests que NO testean
+// el contenido en si, solo otras ramas del service. Cualquier contenido
+// que llegue al `tx.bloque.create/update` ya pasa por
+// `validarContenidoBloque` (Fase 2), asi que tiene que ser real.
+const CONTENIDO_PARRAFO_VACIO = { html: "", textoPlano: "", tiempoLecturaMin: 0 }
+const CONTENIDO_QUIZ_MIN = {
+  intentosMax: null,
+  solucionVisible: "al_aprobar" as const,
+  ordenAleatorio: false,
+  notaMinima: 60,
+  preguntas: [
+    {
+      id: "p1",
+      tipo: "OPCION_UNICA" as const,
+      enunciado: "?",
+      pesoPunto: 1,
+      opciones: [
+        { id: "a", texto: "A", esCorrecta: true },
+        { id: "b", texto: "B", esCorrecta: false },
+      ],
+    },
+  ],
+}
+
+function buildDetalleRow(
+  overrides: Partial<{
+    estado: EstadoBloque
+    version: number
+    tipo: TipoBloque
+    contenido: Record<string, unknown>
+  }> = {},
+) {
+  const tipo = overrides.tipo ?? TipoBloque.QUIZ
+  const evaluable = tipo === TipoBloque.QUIZ || tipo === TipoBloque.CODIGO_PREGUNTAS
   return {
     id: BLO_ID,
     seccionId: SEC_ID,
     orden: 1,
-    tipo: TipoBloque.QUIZ,
-    esEvaluable: true,
-    skillQueMideId: SKILL_ID,
+    tipo,
+    esEvaluable: evaluable,
+    skillQueMideId: evaluable ? SKILL_ID : null,
     estado: overrides.estado ?? EstadoBloque.ACTIVO,
     version: overrides.version ?? 1,
-    contenido: { preguntas: [] } as Record<string, unknown>,
+    contenido: overrides.contenido ?? CONTENIDO_QUIZ_MIN,
     createdAt: FECHA,
     updatedAt: FECHA,
   }
@@ -162,7 +195,7 @@ describe("BloquesService.crear", () => {
           tipo: TipoBloque.QUIZ,
           esEvaluable: true,
           skillQueMideId: SKILL_ID,
-          contenido: { preguntas: [] },
+          contenido: CONTENIDO_QUIZ_MIN,
         },
         ADMIN_ID,
       ),
@@ -180,7 +213,7 @@ describe("BloquesService.crear", () => {
         tipo: TipoBloque.QUIZ,
         esEvaluable: true,
         skillQueMideId: SKILL_ID,
-        contenido: { preguntas: [] },
+        contenido: CONTENIDO_QUIZ_MIN,
       },
       ADMIN_ID,
     )
@@ -190,6 +223,50 @@ describe("BloquesService.crear", () => {
     )
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ accion: "BLOQUE_CREADO" }))
   })
+
+  it("contenido invalido para el tipo: 400 CONTENIDO_BLOQUE_INVALIDO antes del tx", async () => {
+    prisma.seccion.findUnique.mockResolvedValue({ id: SEC_ID })
+    await expect(
+      service.crear(
+        SEC_ID,
+        {
+          tipo: TipoBloque.PARRAFO,
+          esEvaluable: false,
+          // Falta `html`, `textoPlano`, `tiempoLecturaMin` — shape inventado.
+          contenido: { texto: "hola" },
+        },
+        ADMIN_ID,
+      ),
+    ).rejects.toMatchObject({
+      response: { code: apiErrorCodes.contenidoBloqueInvalido },
+    })
+    // El tx no debe correr — la validacion va ANTES.
+    expect(prisma.bloque.create).not.toHaveBeenCalled()
+    expect(audit.record).not.toHaveBeenCalled()
+  })
+
+  it("PARRAFO con contenido vacio valido (estado inicial del editor): 201", async () => {
+    prisma.seccion.findUnique.mockResolvedValue({ id: SEC_ID })
+    prisma.bloque.aggregate.mockResolvedValue({ _max: { orden: 0 } })
+    prisma.bloque.create.mockResolvedValue(
+      buildDetalleRow({ tipo: TipoBloque.PARRAFO, contenido: CONTENIDO_PARRAFO_VACIO }),
+    )
+    const res = await service.crear(
+      SEC_ID,
+      {
+        tipo: TipoBloque.PARRAFO,
+        esEvaluable: false,
+        contenido: CONTENIDO_PARRAFO_VACIO,
+      },
+      ADMIN_ID,
+    )
+    expect(res.id).toBe(BLO_ID)
+    expect(prisma.bloque.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ tipo: TipoBloque.PARRAFO, orden: 1 }),
+      }),
+    )
+  })
 })
 
 describe("BloquesService.patch", () => {
@@ -198,13 +275,19 @@ describe("BloquesService.patch", () => {
       id: BLO_ID,
       version: 3,
       estado: EstadoBloque.ACTIVO,
-      esEvaluable: true,
-      skillQueMideId: SKILL_ID,
+      esEvaluable: false,
+      skillQueMideId: null,
+      tipo: TipoBloque.PARRAFO,
     })
-    prisma.bloque.update.mockResolvedValue(buildDetalleRow({ version: 3 }))
+    prisma.bloque.update.mockResolvedValue(
+      buildDetalleRow({ version: 3, tipo: TipoBloque.PARRAFO, contenido: CONTENIDO_PARRAFO_VACIO }),
+    )
     const res = await service.patch(
       BLO_ID,
-      { tipoEdicion: "COSMETICO", contenido: { texto: "nuevo" } },
+      {
+        tipoEdicion: "COSMETICO",
+        contenido: { html: "<p>nuevo</p>", textoPlano: "nuevo", tiempoLecturaMin: 0 },
+      },
       undefined,
       ADMIN_ID,
     )
@@ -220,6 +303,30 @@ describe("BloquesService.patch", () => {
     )
   })
 
+  it("COSMETICO con contenido invalido para el tipo: 400 CONTENIDO_BLOQUE_INVALIDO", async () => {
+    prisma.bloque.findUnique.mockResolvedValue({
+      id: BLO_ID,
+      version: 3,
+      estado: EstadoBloque.ACTIVO,
+      esEvaluable: false,
+      skillQueMideId: null,
+      tipo: TipoBloque.PARRAFO,
+    })
+    await expect(
+      service.patch(
+        BLO_ID,
+        // Falta `tiempoLecturaMin` y campo extra `texto` — shape invalido.
+        { tipoEdicion: "COSMETICO", contenido: { html: "", textoPlano: "", texto: "viejo" } },
+        undefined,
+        ADMIN_ID,
+      ),
+    ).rejects.toMatchObject({
+      response: { code: apiErrorCodes.contenidoBloqueInvalido },
+    })
+    expect(prisma.bloque.update).not.toHaveBeenCalled()
+    expect(audit.record).not.toHaveBeenCalled()
+  })
+
   it("CAMBIA_EVALUACION sin motivo: 422 MOTIVO_REQUERIDO", async () => {
     prisma.bloque.findUnique.mockResolvedValue({
       id: BLO_ID,
@@ -227,11 +334,12 @@ describe("BloquesService.patch", () => {
       estado: EstadoBloque.ACTIVO,
       esEvaluable: true,
       skillQueMideId: SKILL_ID,
+      tipo: TipoBloque.QUIZ,
     })
     await expect(
       service.patch(
         BLO_ID,
-        { tipoEdicion: "CAMBIA_EVALUACION", contenido: {} },
+        { tipoEdicion: "CAMBIA_EVALUACION", contenido: CONTENIDO_QUIZ_MIN },
         undefined,
         ADMIN_ID,
       ),
@@ -243,14 +351,17 @@ describe("BloquesService.patch", () => {
       id: BLO_ID,
       version: 5,
       estado: EstadoBloque.ACTIVO,
-      esEvaluable: true,
-      skillQueMideId: SKILL_ID,
+      esEvaluable: false,
+      skillQueMideId: null,
+      tipo: TipoBloque.PARRAFO,
     })
-    prisma.bloque.update.mockResolvedValue(buildDetalleRow({ version: 6 }))
+    prisma.bloque.update.mockResolvedValue(
+      buildDetalleRow({ version: 6, tipo: TipoBloque.PARRAFO, contenido: CONTENIDO_PARRAFO_VACIO }),
+    )
     prisma.intentoBloque.updateMany.mockResolvedValue({ count: 0 })
     const res = await service.patch(
       BLO_ID,
-      { tipoEdicion: "CAMBIA_EVALUACION", contenido: {} },
+      { tipoEdicion: "CAMBIA_EVALUACION", contenido: CONTENIDO_PARRAFO_VACIO },
       "ajuste de rubrica",
       ADMIN_ID,
     )
@@ -281,11 +392,16 @@ describe("BloquesService.patch", () => {
       estado: EstadoBloque.ACTIVO,
       esEvaluable: false,
       skillQueMideId: null,
+      tipo: TipoBloque.PARRAFO,
     })
     await expect(
       service.patch(
         BLO_ID,
-        { tipoEdicion: "CAMBIA_EVALUACION", contenido: {}, esEvaluable: true },
+        {
+          tipoEdicion: "CAMBIA_EVALUACION",
+          contenido: CONTENIDO_PARRAFO_VACIO,
+          esEvaluable: true,
+        },
         "motivo",
         ADMIN_ID,
       ),
@@ -300,6 +416,7 @@ describe("BloquesService.patch", () => {
       estado: EstadoBloque.ACTIVO,
       esEvaluable: true,
       skillQueMideId: SKILL_ID,
+      tipo: TipoBloque.QUIZ,
     })
     // Dentro del tx: bloque sigue ACTIVO, pero la skill paso a ARCHIVADA.
     prisma.bloque.findUnique.mockResolvedValueOnce({
@@ -311,7 +428,11 @@ describe("BloquesService.patch", () => {
     await expect(
       service.patch(
         BLO_ID,
-        { tipoEdicion: "CAMBIA_EVALUACION", contenido: {}, skillQueMideId: SKILL_ID },
+        {
+          tipoEdicion: "CAMBIA_EVALUACION",
+          contenido: CONTENIDO_QUIZ_MIN,
+          skillQueMideId: SKILL_ID,
+        },
         "ajuste de rubrica",
         ADMIN_ID,
       ),
@@ -328,9 +449,15 @@ describe("BloquesService.patch", () => {
       estado: EstadoBloque.ELIMINADO,
       esEvaluable: false,
       skillQueMideId: null,
+      tipo: TipoBloque.PARRAFO,
     })
     await expect(
-      service.patch(BLO_ID, { tipoEdicion: "COSMETICO", contenido: {} }, undefined, ADMIN_ID),
+      service.patch(
+        BLO_ID,
+        { tipoEdicion: "COSMETICO", contenido: CONTENIDO_PARRAFO_VACIO },
+        undefined,
+        ADMIN_ID,
+      ),
     ).rejects.toBeInstanceOf(ConflictException)
   })
 })

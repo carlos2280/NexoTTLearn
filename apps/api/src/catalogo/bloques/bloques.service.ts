@@ -15,6 +15,8 @@ import {
   PatchBloqueInput,
   PreviewImpactoEliminarBloque,
   ReordenarBloquesInput,
+  TipoBloque,
+  validarContenidoBloque,
 } from "@nexott-learn/shared-types"
 import { AccionAuditoria, EstadoBloque, EstadoSkill, Prisma } from "@prisma/client"
 import { AuditLogService } from "../../common/audit/audit-log.service"
@@ -172,6 +174,7 @@ export class BloquesService {
         message: "Seccion no encontrada.",
       })
     }
+    this.validarContenidoOrThrow(input.tipo, input.contenido)
     const fila = await this.prisma.$transaction(async (tx) => {
       if (input.skillQueMideId) {
         await this.validarSkillActiva(tx, input.skillQueMideId)
@@ -223,6 +226,24 @@ export class BloquesService {
     return toBloqueDetalleResponse(fila)
   }
 
+  /**
+   * Valida que `contenido` cumpla el contrato Zod del `tipo` indicado.
+   * Defensa en profundidad: el editor ya valida antes de mutar, pero el
+   * backend NO confia en el cliente — D-CAT y 16b §16b.1 ("el contrato
+   * es de los dos lados; el backend valida al guardar"). Lanza 400 con
+   * detalle Zod estructurado si falla.
+   */
+  private validarContenidoOrThrow(tipo: TipoBloque, contenido: unknown): void {
+    const result = validarContenidoBloque(tipo, contenido)
+    if (!result.success) {
+      throw new BadRequestException({
+        code: apiErrorCodes.contenidoBloqueInvalido,
+        message: `El contenido no cumple el contrato del bloque tipo ${tipo}.`,
+        details: { issues: result.error.issues },
+      })
+    }
+  }
+
   private async validarSkillActiva(
     tx: Prisma.TransactionClient | PrismaService,
     skillId: string,
@@ -263,7 +284,14 @@ export class BloquesService {
   ): Promise<PatchBloqueResultado> {
     const actual = await this.prisma.bloque.findUnique({
       where: { id: bloqueId },
-      select: { id: true, version: true, estado: true, esEvaluable: true, skillQueMideId: true },
+      select: {
+        id: true,
+        version: true,
+        estado: true,
+        esEvaluable: true,
+        skillQueMideId: true,
+        tipo: true,
+      },
     })
     if (!actual) {
       throw new NotFoundException({
@@ -279,6 +307,7 @@ export class BloquesService {
     }
 
     if (input.tipoEdicion === "COSMETICO") {
+      this.validarContenidoOrThrow(actual.tipo, input.contenido)
       const fila = await this.prisma.bloque.update({
         where: { id: bloqueId },
         data: { contenido: input.contenido as Prisma.InputJsonObject },
@@ -348,6 +377,7 @@ export class BloquesService {
         if (input.skillQueMideId) {
           await this.validarSkillActiva(tx, input.skillQueMideId)
         }
+        this.validarContenidoOrThrow(actual.tipo, input.contenido)
         const versionAnt = enTx.version
         const versionNueva = versionAnt + 1
 

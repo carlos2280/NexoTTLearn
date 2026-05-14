@@ -1,7 +1,7 @@
 import { Field } from "@/shared/components/ui/field"
 import { Input } from "@/shared/components/ui/input"
 import { Textarea } from "@/shared/components/ui/textarea"
-import type { BloqueDetalleResponse } from "@nexott-learn/shared-types"
+import { type BloqueDetalleResponse, contenidoVideoSchema } from "@nexott-learn/shared-types"
 import { useRef, useState } from "react"
 import { tipoBloqueMeta } from "../bloque-tipo-meta"
 import { IndicadorGuardado } from "./shared/indicador-guardado"
@@ -54,18 +54,18 @@ function urlEmbed(url: string, proveedor: Proveedor): string | null {
   return null
 }
 
+/**
+ * Hidrata el borrador desde `bloque.contenido`. Si el JSON no cumple el
+ * contrato oficial (`contenidoVideoSchema`) cae al estado canonico:
+ * proveedor `otro`, URL/notas vacias, marcador al 90% (mismo default
+ * que usaba la implementacion previa).
+ */
 function leerInicial(contenido: Record<string, unknown> | null): Borrador {
-  const url = typeof contenido?.url === "string" ? contenido.url : ""
-  const proveedor =
-    contenido?.proveedor === "youtube" ||
-    contenido?.proveedor === "vimeo" ||
-    contenido?.proveedor === "loom"
-      ? (contenido.proveedor as Proveedor)
-      : "otro"
-  const marcar =
-    typeof contenido?.marcarAlPorcentaje === "number" ? contenido.marcarAlPorcentaje : 90
-  const notas = typeof contenido?.notas === "string" ? contenido.notas : ""
-  return { url, proveedor, marcarAlPorcentaje: marcar, notas }
+  const result = contenidoVideoSchema.safeParse(contenido)
+  if (result.success) {
+    return result.data
+  }
+  return { url: "", proveedor: "otro", marcarAlPorcentaje: 90, notas: "" }
 }
 
 export function EditorVideo({ bloque }: EditorVideoProps) {
