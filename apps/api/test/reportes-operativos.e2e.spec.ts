@@ -298,7 +298,9 @@ describe.runIf(RUN_E2E)("reportes operativos e2e (P11b)", () => {
   })
 
   it("E4 centro-revision — TODAS devuelve listas vacias cuando no hay pendientes", async () => {
-    const res = await agenteAdmin.get("/api/v1/reportes/centro-revision").expect(200)
+    const res = await agenteAdmin
+      .get(`/api/v1/reportes/centro-revision?cursoId=${cursoId}`)
+      .expect(200)
     expect(res.body.totales).toEqual({ transversales: 0, entrevistasIa: 0 })
   })
 

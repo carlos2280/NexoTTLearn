@@ -122,23 +122,30 @@ describe.runIf(RUN_E2E)("intentos-bloque e2e (P7b — FIX-P7-cierre)", () => {
   let colabPart2Id: string
   let throttlerStorageFake: { reset: () => void }
 
-  // Contenido de bloque QUIZ — 1 pregunta, opcion B correcta, peso 1.
+  // Contenido de bloque QUIZ — 1 pregunta de opcion unica, "b" correcta, peso 1.
   const contenidoQuiz = {
+    intentosMax: null,
+    solucionVisible: "al_aprobar",
+    ordenAleatorio: false,
+    notaMinima: 60,
     preguntas: [
       {
         id: "q1",
+        tipo: "OPCION_UNICA",
         enunciado: "¿Capital de Francia?",
         opciones: [
-          { id: "a", texto: "Madrid" },
-          { id: "b", texto: "Paris" },
-          { id: "c", texto: "Roma" },
+          { id: "a", texto: "Madrid", esCorrecta: false },
+          { id: "b", texto: "Paris", esCorrecta: true },
+          { id: "c", texto: "Roma", esCorrecta: false },
         ],
-        respuestaCorrectaId: "b",
         pesoPunto: 1,
       },
     ],
   }
-  const respuestasCorrectas = { preguntas: [{ preguntaId: "q1", opcionElegidaId: "b" }] }
+  const respuestasCorrectas = {
+    tipo: "QUIZ",
+    preguntas: [{ preguntaId: "q1", tipo: "OPCION_UNICA", opcionElegidaId: "b" }],
+  }
 
   beforeAll(async () => {
     prisma = new PrismaClient()
@@ -453,7 +460,10 @@ describe.runIf(RUN_E2E)("intentos-bloque e2e (P7b — FIX-P7-cierre)", () => {
     expect((res.body as { code: string }).code).toBe("IDEMPOTENCY_KEY_REQUERIDA")
   })
 
-  it("POST /intentos-bloque sobre bloque CODIGO_TESTS: 422 tipoBloqueNoSoportadoMvp", async () => {
+  it("POST /intentos-bloque sobre bloque CODIGO_TESTS: 409 bloqueNoEvaluable", async () => {
+    // CODIGO_TESTS es contenido auxiliar del admin (los pares stdin/stdout
+    // del reto hermano) y nunca acepta intentos directos. El participante
+    // envia codigo al bloque `CODIGO_PREGUNTAS` emparejado.
     const key = randomUUID()
     const res = await agentePart
       .post("/api/v1/intentos-bloque")
@@ -464,8 +474,8 @@ describe.runIf(RUN_E2E)("intentos-bloque e2e (P7b — FIX-P7-cierre)", () => {
         cursoId,
         respuestas: respuestasCorrectas,
       })
-    expect(res.status).toBe(422)
-    expect((res.body as { code: string }).code).toBe("TIPO_BLOQUE_NO_SOPORTADO_MVP")
+    expect(res.status).toBe(409)
+    expect((res.body as { code: string }).code).toBe("BLOQUE_NO_EVALUABLE")
   })
 
   it("POST /intentos-bloque genera transicion ASIGNADO→EN_PROGRESO con histórico", async () => {

@@ -3,7 +3,6 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  UnprocessableEntityException,
 } from "@nestjs/common"
 import {
   type CrearIntentoBloqueInput,
@@ -27,12 +26,13 @@ import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
 import { NotaSkillService } from "../nota-skill/nota-skill.service"
+import { CodigoEvaluadorService } from "./codigo-evaluador.service"
 import {
   calcularNotaQuiz,
   parsearContenidoQuiz,
   toIntentoResponse,
 } from "./intentos-bloque.helpers"
-import { SELECT_INTENTO_FIELDS } from "./intentos-bloque.types"
+import { type CalculoQuizResultado, SELECT_INTENTO_FIELDS } from "./intentos-bloque.types"
 
 const IDEMPOTENCY_SCOPE = "intento-bloque"
 const HTTP_CREATED = 201
@@ -83,6 +83,7 @@ export class IntentosBloqueService {
     private readonly prisma: PrismaService,
     private readonly idempotency: IdempotencyService,
     private readonly notaSkill: NotaSkillService,
+    private readonly codigoEvaluador: CodigoEvaluadorService,
   ) {}
 
   // =========================================================================
@@ -124,24 +125,31 @@ export class IntentosBloqueService {
         message: "El bloque no es evaluable.",
       })
     }
-    if (bloque.tipo === TipoBloque.CODIGO_PREGUNTAS || bloque.tipo === TipoBloque.CODIGO_TESTS) {
-      // TODO(post-MVP): auto-correccion CODIGO_* requiere sandbox (D-S7-C1).
-      throw new UnprocessableEntityException({
-        code: apiErrorCodes.tipoBloqueNoSoportadoMvp,
-        message: `Tipo de bloque ${bloque.tipo} no soportado para auto-correccion en MVP.`,
-        details: { tipoActual: bloque.tipo },
-      })
-    }
-    if (bloque.tipo !== TipoBloque.QUIZ) {
+    if (bloque.tipo === TipoBloque.CODIGO_TESTS) {
+      // CODIGO_TESTS es contenido auxiliar del admin; nunca recibe intentos.
+      // El participante envia codigo al CODIGO_PREGUNTAS asociado.
       throw new ConflictException({
         code: apiErrorCodes.bloqueNoEvaluable,
-        message: "Solo se aceptan intentos en bloques QUIZ.",
+        message: "CODIGO_TESTS no acepta intentos directos.",
+      })
+    }
+    if (bloque.tipo !== TipoBloque.QUIZ && bloque.tipo !== TipoBloque.CODIGO_PREGUNTAS) {
+      throw new ConflictException({
+        code: apiErrorCodes.bloqueNoEvaluable,
+        message: "Solo se aceptan intentos en bloques QUIZ o CODIGO_PREGUNTAS.",
       })
     }
     if (bloque.skillQueMideId === null) {
       throw new ConflictException({
         code: apiErrorCodes.bloqueSinSkillMedida,
         message: "El bloque evaluable no tiene skill asociada.",
+      })
+    }
+    // El `tipo` del wrapper de respuestas debe coincidir con el tipo de bloque.
+    if (input.body.respuestas.tipo !== bloque.tipo) {
+      throw new BadRequestException({
+        code: apiErrorCodes.invalidBody,
+        message: `El tipo de respuestas (${input.body.respuestas.tipo}) no coincide con el bloque (${bloque.tipo}).`,
       })
     }
 
@@ -216,8 +224,12 @@ export class IntentosBloqueService {
       })
     }
 
-    const contenido = parsearContenidoQuiz(bloque.contenido)
-    const calculo = calcularNotaQuiz(contenido, input.body.respuestas.preguntas)
+    // Calculo de la nota — FUERA de la TX (sandbox hace I/O HTTP en el caso
+    // CODIGO_PREGUNTAS; jamas hacer I/O externa dentro de Prisma $transaction).
+    const { calculo, respuestasPersistidas } = await this.calcularYEnriquecer({
+      bloque,
+      respuestas: input.body.respuestas,
+    })
 
     const ejecucion = await this.idempotency.runOnce<IntentoBloqueResponse>({
       scope: IDEMPOTENCY_SCOPE,
@@ -238,7 +250,7 @@ export class IntentosBloqueService {
             skillId: bloque.skillQueMideId as string,
             cursoId: curso.id,
             nota: new Prisma.Decimal(calculo.nota),
-            respuestas: input.body.respuestas as unknown as Prisma.InputJsonValue,
+            respuestas: respuestasPersistidas as unknown as Prisma.InputJsonValue,
             versionBloque: bloque.version,
             esMejorIntento: false,
             estaInvalidado: false,
@@ -465,6 +477,64 @@ export class IntentosBloqueService {
   // =========================================================================
   // Helpers internos
   // =========================================================================
+
+  /**
+   * Calcula la nota del intento y produce el JSON enriquecido que se persiste
+   * en `IntentoBloque.respuestas`. Enruta por tipo de bloque:
+   *  - QUIZ: parsea contenido, corre `calcularNotaQuiz` (sincrono). El JSON
+   *    persistido es el wrapper de respuestas tal cual lo envio el cliente.
+   *  - CODIGO_PREGUNTAS: delega al `CodigoEvaluadorService` (async: sandbox).
+   *    El JSON persistido incluye `codigoEnviado`, `lenguaje`, `resultadosTests`
+   *    y los conteos de puntos — todo lo que el participante/admin verá luego.
+   */
+  private async calcularYEnriquecer(input: {
+    readonly bloque: {
+      readonly id: string
+      readonly seccionId: string
+      readonly tipo: TipoBloque
+      readonly contenido: Prisma.JsonValue
+    }
+    readonly respuestas: CrearIntentoBloqueInput["respuestas"]
+  }): Promise<{
+    readonly calculo: CalculoQuizResultado
+    readonly respuestasPersistidas: Record<string, unknown>
+  }> {
+    if (input.bloque.tipo === TipoBloque.QUIZ && input.respuestas.tipo === "QUIZ") {
+      const contenido = parsearContenidoQuiz(input.bloque.contenido)
+      const calculo = calcularNotaQuiz(contenido, input.respuestas.preguntas)
+      return {
+        calculo,
+        respuestasPersistidas: { ...input.respuestas },
+      }
+    }
+    if (
+      input.bloque.tipo === TipoBloque.CODIGO_PREGUNTAS &&
+      input.respuestas.tipo === "CODIGO_PREGUNTAS"
+    ) {
+      const resultado = await this.codigoEvaluador.evaluar({
+        bloque: input.bloque,
+        codigoEnviado: input.respuestas.codigoEnviado,
+        resultadosReportados: input.respuestas.resultadosTests,
+      })
+      return {
+        calculo: resultado.calculo,
+        respuestasPersistidas: {
+          tipo: "CODIGO_PREGUNTAS",
+          lenguaje: resultado.lenguaje,
+          codigoEnviado: input.respuestas.codigoEnviado,
+          resultadosTests: resultado.resultadosTests,
+          puntosObtenidos: resultado.calculo.puntosObtenidos,
+          puntosTotales: resultado.calculo.puntosTotales,
+        },
+      }
+    }
+    // Combinacion imposible tras los pre-checks; el `BadRequestException`
+    // previo cubre el caso (tipoBloque vs tipoRespuesta divergentes).
+    throw new BadRequestException({
+      code: apiErrorCodes.invalidBody,
+      message: `Tipo de bloque ${input.bloque.tipo} con respuestas ${input.respuestas.tipo} no soportado.`,
+    })
+  }
 
   private async resolverColaboradorIdParticipante(usuario: SesionUsuario): Promise<string | null> {
     const usuarioConColab = await this.prisma.usuario.findUnique({

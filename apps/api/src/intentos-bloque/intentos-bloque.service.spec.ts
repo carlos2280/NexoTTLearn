@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common"
 import { Test, type TestingModule } from "@nestjs/testing"
+import type { CrearIntentoBloqueInput } from "@nexott-learn/shared-types"
 import {
   EstadoAsignado,
   EstadoCurso,
@@ -19,6 +20,7 @@ import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
 import type { SesionUsuario } from "../common/types/sesion.types"
 import { NotaSkillService } from "../nota-skill/nota-skill.service"
+import { CodigoEvaluadorService } from "./codigo-evaluador.service"
 import { IntentosBloqueService } from "./intentos-bloque.service"
 
 const COLABORADOR_ID = "f0000000-0000-0000-0000-000000000001"
@@ -37,61 +39,70 @@ const PARTICIPANTE: SesionUsuario = { usuarioId: USUARIO_ID, rol: RolUsuario.PAR
 const ADMIN: SesionUsuario = { usuarioId: USUARIO_ID, rol: RolUsuario.ADMIN }
 
 const CONTENIDO_QUIZ_OK = {
+  intentosMax: null,
+  solucionVisible: "al_aprobar",
+  ordenAleatorio: false,
+  notaMinima: 60,
   preguntas: [
     {
       id: "p1",
+      tipo: "OPCION_UNICA",
       enunciado: "1+1?",
       opciones: [
-        { id: "o1", texto: "1" },
-        { id: "o2", texto: "2" },
+        { id: "o1", texto: "1", esCorrecta: false },
+        { id: "o2", texto: "2", esCorrecta: true },
       ],
-      respuestaCorrectaId: "o2",
       pesoPunto: 1,
     },
     {
       id: "p2",
+      tipo: "OPCION_UNICA",
       enunciado: "2+2?",
       opciones: [
-        { id: "o3", texto: "3" },
-        { id: "o4", texto: "4" },
+        { id: "o3", texto: "3", esCorrecta: false },
+        { id: "o4", texto: "4", esCorrecta: true },
       ],
-      respuestaCorrectaId: "o4",
       pesoPunto: 1,
     },
     {
       id: "p3",
+      tipo: "OPCION_UNICA",
       enunciado: "3+3?",
       opciones: [
-        { id: "o5", texto: "5" },
-        { id: "o6", texto: "6" },
+        { id: "o5", texto: "5", esCorrecta: false },
+        { id: "o6", texto: "6", esCorrecta: true },
       ],
-      respuestaCorrectaId: "o6",
       pesoPunto: 2,
     },
   ],
 }
 
-const RESPUESTAS_TODAS_CORRECTAS = {
+type Respuestas = CrearIntentoBloqueInput["respuestas"]
+
+const RESPUESTAS_TODAS_CORRECTAS: Respuestas = {
+  tipo: "QUIZ",
   preguntas: [
-    { preguntaId: "p1", opcionElegidaId: "o2" },
-    { preguntaId: "p2", opcionElegidaId: "o4" },
-    { preguntaId: "p3", opcionElegidaId: "o6" },
+    { preguntaId: "p1", tipo: "OPCION_UNICA", opcionElegidaId: "o2" },
+    { preguntaId: "p2", tipo: "OPCION_UNICA", opcionElegidaId: "o4" },
+    { preguntaId: "p3", tipo: "OPCION_UNICA", opcionElegidaId: "o6" },
   ],
 }
 
-const RESPUESTAS_NINGUNA = {
+const RESPUESTAS_NINGUNA: Respuestas = {
+  tipo: "QUIZ",
   preguntas: [
-    { preguntaId: "p1", opcionElegidaId: "o1" },
-    { preguntaId: "p2", opcionElegidaId: "o3" },
-    { preguntaId: "p3", opcionElegidaId: "o5" },
+    { preguntaId: "p1", tipo: "OPCION_UNICA", opcionElegidaId: "o1" },
+    { preguntaId: "p2", tipo: "OPCION_UNICA", opcionElegidaId: "o3" },
+    { preguntaId: "p3", tipo: "OPCION_UNICA", opcionElegidaId: "o5" },
   ],
 }
 
-const RESPUESTAS_DOS_DE_TRES_CON_PESOS = {
+const RESPUESTAS_DOS_DE_TRES_CON_PESOS: Respuestas = {
+  tipo: "QUIZ",
   preguntas: [
-    { preguntaId: "p1", opcionElegidaId: "o2" },
-    { preguntaId: "p2", opcionElegidaId: "o3" },
-    { preguntaId: "p3", opcionElegidaId: "o6" },
+    { preguntaId: "p1", tipo: "OPCION_UNICA", opcionElegidaId: "o2" },
+    { preguntaId: "p2", tipo: "OPCION_UNICA", opcionElegidaId: "o3" },
+    { preguntaId: "p3", tipo: "OPCION_UNICA", opcionElegidaId: "o6" },
   ],
 }
 
@@ -209,6 +220,13 @@ let notaSkill: { recalcularConFuentes: ReturnType<typeof vi.fn> }
 let service: IntentosBloqueService
 let moduleRef: TestingModule
 
+// Stub minimo del CodigoEvaluadorService — los tests del QUIZ no lo invocan,
+// pero el constructor del service lo exige. Si algun dia testeamos CODIGO_PREGUNTAS
+// aqui, le inyectamos un mock real.
+const codigoEvaluadorStub = {
+  evaluar: vi.fn(),
+}
+
 beforeEach(async () => {
   prisma = buildPrismaMock()
   idempotency = {
@@ -222,17 +240,23 @@ beforeEach(async () => {
   notaSkill = {
     recalcularConFuentes: vi.fn().mockResolvedValue({ notaActual: null }),
   }
+  codigoEvaluadorStub.evaluar.mockReset()
   moduleRef = await Test.createTestingModule({
     providers: [
       {
         provide: IntentosBloqueService,
-        useFactory: (p: PrismaService, i: IdempotencyService, n: NotaSkillService) =>
-          new IntentosBloqueService(p, i, n),
-        inject: [PrismaService, IdempotencyService, NotaSkillService],
+        useFactory: (
+          p: PrismaService,
+          i: IdempotencyService,
+          n: NotaSkillService,
+          c: CodigoEvaluadorService,
+        ) => new IntentosBloqueService(p, i, n, c),
+        inject: [PrismaService, IdempotencyService, NotaSkillService, CodigoEvaluadorService],
       },
       { provide: PrismaService, useValue: prisma },
       { provide: IdempotencyService, useValue: idempotency },
       { provide: NotaSkillService, useValue: notaSkill },
+      { provide: CodigoEvaluadorService, useValue: codigoEvaluadorStub },
     ],
   }).compile()
   service = moduleRef.get(IntentosBloqueService)
@@ -360,7 +384,7 @@ describe("IntentosBloqueService.crear — validaciones", () => {
     ).rejects.toBeInstanceOf(ConflictException)
   })
 
-  it("422 tipoBloqueNoSoportadoMvp para CODIGO_PREGUNTAS", async () => {
+  it("400 INVALID_BODY si respuestas.tipo no coincide con bloque.tipo (QUIZ vs CODIGO_PREGUNTAS)", async () => {
     configurarBloqueOk(prisma)
     prisma.bloque.findUnique.mockResolvedValue({
       id: BLOQUE_ID,
@@ -372,6 +396,7 @@ describe("IntentosBloqueService.crear — validaciones", () => {
       version: 1,
       contenido: CONTENIDO_QUIZ_OK,
     })
+    // Bloque CODIGO_PREGUNTAS pero el cliente manda respuestas tipo QUIZ.
     await expect(
       service.crear({
         body: { bloqueId: BLOQUE_ID, cursoId: CURSO_ID, respuestas: RESPUESTAS_TODAS_CORRECTAS },
@@ -379,10 +404,7 @@ describe("IntentosBloqueService.crear — validaciones", () => {
         usuario: PARTICIPANTE,
       }),
     ).rejects.toMatchObject({
-      response: {
-        code: apiErrorCodes.tipoBloqueNoSoportadoMvp,
-        details: { tipoActual: "CODIGO_PREGUNTAS" },
-      },
+      response: { code: apiErrorCodes.invalidBody },
     })
   })
 
