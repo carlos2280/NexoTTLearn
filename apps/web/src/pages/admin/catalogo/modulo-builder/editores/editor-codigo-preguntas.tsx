@@ -2,7 +2,6 @@ import { Banner } from "@/shared/components/ui/banner"
 import { Field } from "@/shared/components/ui/field"
 import { Input } from "@/shared/components/ui/input"
 import { Textarea } from "@/shared/components/ui/textarea"
-import { cn } from "@/shared/lib/cn"
 import type { BloqueDetalleResponse } from "@nexott-learn/shared-types"
 import { useRef, useState } from "react"
 import { CodeEditor } from "./shared/code-editor"
@@ -19,8 +18,6 @@ interface Borrador {
   readonly enunciado: string
   readonly esqueletoInicial: string
   readonly tiempoLimiteSeg: number
-  readonly modoSimple: boolean
-  readonly rubrica: string
 }
 
 function leerInicial(contenido: Record<string, unknown> | null): Borrador {
@@ -30,16 +27,9 @@ function leerInicial(contenido: Record<string, unknown> | null): Borrador {
     esqueletoInicial:
       typeof contenido?.esqueletoInicial === "string" ? contenido.esqueletoInicial : "",
     tiempoLimiteSeg:
-      typeof contenido?.tiempoLimiteSeg === "number" ? contenido.tiempoLimiteSeg : 300,
-    modoSimple: typeof contenido?.modoSimple === "boolean" ? contenido.modoSimple : true,
-    rubrica: typeof contenido?.rubrica === "string" ? contenido.rubrica : "",
+      typeof contenido?.tiempoLimiteSeg === "number" ? contenido.tiempoLimiteSeg : 30,
   }
 }
-
-const CHIP_BASE =
-  "inline-flex cursor-pointer items-center gap-1.5 rounded-pill border px-3 py-1.5 text-caption transition-[background-color,border-color,color,box-shadow] duration-fast ease-default"
-const CHIP_ACTIVO = "border-border-strong bg-subtle font-medium text-text-primary shadow-xs"
-const CHIP_INACTIVO = "border-border bg-surface text-text-secondary hover:bg-subtle/60"
 
 export function EditorCodigoPreguntas({ bloque }: EditorCodigoPreguntasProps) {
   const inicial = leerInicial(bloque.contenido)
@@ -66,47 +56,18 @@ export function EditorCodigoPreguntas({ bloque }: EditorCodigoPreguntasProps) {
       titulo="Reto de código — enunciado"
       descripcion={
         <>
-          Define el problema y el código inicial que verá el participante. Si activas modo simple,
-          lo corriges tú manualmente. Si lo desactivas, añade un bloque <em>Tests del reto</em> a
-          continuación para corrección automática.
+          Define el problema y el código inicial que verá el participante. Añade a continuación un
+          bloque <em>Tests del reto</em> en la misma sección para que el sandbox del navegador
+          auto-corrija con tus pares stdin → stdout.
         </>
       }
       estadoGuardado={auto.estado}
     >
-      <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Modo">
-        {(
-          [
-            {
-              id: true,
-              etiqueta: "Modo simple",
-              ayuda: "Corrección manual con rúbrica.",
-            },
-            {
-              id: false,
-              etiqueta: "Modo avanzado",
-              ayuda: "Tests automáticos en un bloque hermano.",
-            },
-          ] as const
-        ).map((m) => {
-          const activo = datos.modoSimple === m.id
-          return (
-            <label
-              key={String(m.id)}
-              title={m.ayuda}
-              className={cn(CHIP_BASE, activo ? CHIP_ACTIVO : CHIP_INACTIVO)}
-            >
-              <input
-                type="radio"
-                name="codigo-modo"
-                checked={activo}
-                onChange={() => actualizar({ modoSimple: m.id })}
-                className="sr-only"
-              />
-              {m.etiqueta}
-            </label>
-          )
-        })}
-      </div>
+      <Banner tone="info">
+        Todo reto de código se evalúa automáticamente. Si tu evaluación es conceptual (arquitectura,
+        diseño, decisiones) modélala como <strong>Quiz</strong>; este tipo es solo para retos con
+        tests stdin/stdout.
+      </Banner>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Lenguaje">
@@ -118,7 +79,7 @@ export function EditorCodigoPreguntas({ bloque }: EditorCodigoPreguntasProps) {
             />
           )}
         </Field>
-        <Field label="Tiempo límite de ejecución" hint="Solo aplica en modo avanzado.">
+        <Field label="Tiempo límite por test" hint="Entre 1 y 120 segundos.">
           {(attrs) => (
             <div className="flex items-center gap-2">
               <Input
@@ -129,7 +90,7 @@ export function EditorCodigoPreguntas({ bloque }: EditorCodigoPreguntasProps) {
                 value={datos.tiempoLimiteSeg}
                 onChange={(e) =>
                   actualizar({
-                    tiempoLimiteSeg: Math.max(1, Number(e.target.value) || 300),
+                    tiempoLimiteSeg: Math.max(1, Math.min(120, Number(e.target.value) || 30)),
                   })
                 }
               />
@@ -167,27 +128,10 @@ export function EditorCodigoPreguntas({ bloque }: EditorCodigoPreguntasProps) {
         )}
       </Field>
 
-      {datos.modoSimple ? (
-        <Field
-          label="Rúbrica de evaluación"
-          hint="Sólo la ves tú al corregir manualmente. Por bullets."
-        >
-          {(attrs) => (
-            <Textarea
-              {...attrs}
-              rows={4}
-              value={datos.rubrica}
-              onChange={(e) => actualizar({ rubrica: e.target.value })}
-              placeholder="- Solución correcta (50%)\n- Eficiencia justificada (30%)\n- Estilo (20%)"
-            />
-          )}
-        </Field>
-      ) : (
-        <Banner tone="info">
-          En modo avanzado, añade un bloque <strong>Tests del reto</strong> en esta misma sección
-          para definir los tests automáticos que evaluarán al participante.
-        </Banner>
-      )}
+      <Banner tone="info">
+        Añade un bloque <strong>Tests del reto</strong> en esta sección. Sin él los participantes no
+        pueden ejecutar nada y el módulo no puede publicarse.
+      </Banner>
     </EditorBloqueShell>
   )
 }

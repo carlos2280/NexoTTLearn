@@ -15,8 +15,6 @@ const CONTENIDO_PREGUNTAS_OK = {
   enunciado: "Suma dos numeros leidos por stdin separados por espacio.",
   esqueletoInicial: "// completa aqui",
   tiempoLimiteSeg: 5,
-  modoSimple: false,
-  rubrica: "",
 }
 
 const TESTS_OK = [
@@ -245,28 +243,6 @@ describe("CodigoEvaluadorService", () => {
           id: BLOQUE_PREGUNTAS_ID,
           seccionId: SECCION_ID,
           contenido: { campos: "vacios" },
-        },
-        codigoEnviado: "// x",
-        resultadosReportados: [reportado("t1", true), reportado("t2", true), reportado("t3", true)],
-      }),
-    ).rejects.toBeInstanceOf(InternalServerErrorException)
-  })
-
-  it("500 si modoSimple=true (no auto-corregible)", async () => {
-    const prisma = buildPrismaMock({
-      codigoPreguntasId: BLOQUE_PREGUNTAS_ID,
-      solucionReferencia: "",
-      tests: TESTS_OK,
-    })
-    const moduleRef = await buildModule(prisma)
-    const evaluador = moduleRef.get(CodigoEvaluadorService)
-
-    await expect(
-      evaluador.evaluar({
-        bloque: {
-          id: BLOQUE_PREGUNTAS_ID,
-          seccionId: SECCION_ID,
-          contenido: { ...CONTENIDO_PREGUNTAS_OK, modoSimple: true },
         },
         codigoEnviado: "// x",
         resultadosReportados: [reportado("t1", true), reportado("t2", true), reportado("t3", true)],

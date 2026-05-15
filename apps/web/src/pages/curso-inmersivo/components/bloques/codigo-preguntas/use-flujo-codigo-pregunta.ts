@@ -30,8 +30,9 @@ interface OutputFlujo {
 
 /**
  * Orquesta el flujo "ejecutar tests en el navegador → enviar resultados al
- * backend → mostrar nota". Cuando `modoSimple=true` o no hay tests asociados,
- * `puedeEjecutar` es false y el componente debe mostrar el aviso correspondiente.
+ * backend → mostrar nota". Si el bloque no trae `CODIGO_TESTS` hermano,
+ * `puedeEjecutar` es false: significa que la sección está mal configurada
+ * (el backend debe rechazar ese estado al publicar el módulo).
  */
 export function useFlujoCodigoPregunta(input: InputFlujo): OutputFlujo {
   const [codigo, setCodigo] = useState<string>(input.contenido.esqueletoInicial)
@@ -40,7 +41,7 @@ export function useFlujoCodigoPregunta(input: InputFlujo): OutputFlujo {
   const ejecutor = useEjecutarCodigo()
   const crear = useCrearIntentoBloque()
 
-  const puedeEjecutar = !input.contenido.modoSimple && input.contenidoTests !== null
+  const puedeEjecutar = input.contenidoTests !== null
 
   const reset = (): void => {
     setCodigo(input.contenido.esqueletoInicial)

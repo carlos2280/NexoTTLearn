@@ -66,7 +66,6 @@ export class CodigoEvaluadorService {
    *
    * Errores 500 (responsabilidad del editor del admin):
    *  - El contenido del CODIGO_PREGUNTAS no parsea (`contenidoBloqueInvalido`).
-   *  - `modoSimple=true` — sin auto-correccion posible.
    *  - El lenguaje no es ejecutable (no soportado por los runners del cliente).
    *  - No hay CODIGO_TESTS hermano que apunte a este bloque.
    *  - El contenido del CODIGO_TESTS no parsea.
@@ -86,12 +85,6 @@ export class CodigoEvaluadorService {
     readonly lenguaje: LenguajeEjecutable
   }> {
     const contenido = this.parsearContenidoPreguntas(input.bloque.contenido)
-    if (contenido.modoSimple) {
-      throw new InternalServerErrorException({
-        code: apiErrorCodes.contenidoBloqueInvalido,
-        message: "CODIGO_PREGUNTAS en modoSimple no admite auto-correccion.",
-      })
-    }
     const lenguajeParse = lenguajeEjecutableSchema.safeParse(contenido.lenguaje)
     if (!lenguajeParse.success) {
       throw new InternalServerErrorException({

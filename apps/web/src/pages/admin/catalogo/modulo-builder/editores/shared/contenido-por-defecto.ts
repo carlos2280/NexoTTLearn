@@ -45,9 +45,7 @@ export function contenidoPorDefecto(tipo: TipoBloque): Record<string, unknown> {
         lenguaje: "typescript",
         enunciado: "",
         esqueletoInicial: "",
-        tiempoLimiteSeg: 300,
-        modoSimple: true,
-        rubrica: "",
+        tiempoLimiteSeg: 30,
       }
     case "CODIGO_TESTS":
       return {

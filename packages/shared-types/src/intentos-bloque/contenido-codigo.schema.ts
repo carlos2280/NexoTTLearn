@@ -6,8 +6,10 @@ import { z } from "zod"
  *
  * Modelo (definido por el editor del admin):
  *  - `CODIGO_PREGUNTAS` es el reto en sí (enunciado + esqueleto + lenguaje).
- *    Se evalúa automáticamente cuando `modoSimple=false` y existe un bloque
- *    hermano `CODIGO_TESTS` que apunta a él via `codigoPreguntasId`.
+ *    Siempre se evalúa automáticamente: exige un bloque hermano
+ *    `CODIGO_TESTS` que apunte a él vía `codigoPreguntasId`. No existe un
+ *    "modo simple / revisión manual"; los retos que no se prestan a tests
+ *    stdin/stdout deben modelarse como QUIZ.
  *  - `CODIGO_TESTS` aporta los pares stdin→stdout que se ejecutan contra el
  *    código del participante. El propio bloque NO es evaluable (no acumula
  *    nota): es contenido auxiliar del admin.
@@ -32,8 +34,6 @@ export const contenidoCodigoPreguntasSchema = z
     enunciado: z.string().min(1).max(20_000),
     esqueletoInicial: z.string().max(50_000).default(""),
     tiempoLimiteSeg: z.number().int().min(1).max(120).default(30),
-    modoSimple: z.boolean().default(true),
-    rubrica: z.string().max(10_000).default(""),
   })
   .strict()
 export type ContenidoCodigoPreguntas = z.infer<typeof contenidoCodigoPreguntasSchema>

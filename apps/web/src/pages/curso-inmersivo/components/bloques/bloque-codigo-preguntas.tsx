@@ -27,11 +27,11 @@ const NOTA_APROBADO_DEFAULT = 60
  * Bloque CODIGO_PREGUNTAS — reto de código.
  *
  *  - Layout split: enunciado a la izquierda · editor + resultados a la derecha.
- *  - Auto-corregible (`modoSimple=false` + bloque CODIGO_TESTS hermano):
- *    ejecuta los tests en el navegador (Pyodide / Web Worker) y persiste el
- *    intento con los resultados que el backend recalcula.
- *  - Rúbrica (`modoSimple=true`): muestra la rúbrica y avisa de revisión
- *    manual; el envío automático no aplica.
+ *  - Siempre auto-corregible: el bloque exige un `CODIGO_TESTS` hermano con
+ *    pares stdin/stdout. El backend ejecuta los tests en el navegador
+ *    (Pyodide / Web Worker) y persiste el intento con la nota recalculada.
+ *  - Si la sección está mal configurada (sin `CODIGO_TESTS` hermano) el
+ *    botón queda deshabilitado; el admin debe arreglarlo desde el builder.
  */
 export function BloqueCodigoPreguntas({
   bloqueId,
@@ -85,7 +85,7 @@ function RetoActivo({
         notaAprobado={NOTA_APROBADO_DEFAULT}
       />
       <div className="grid gap-5 lg:grid-cols-[1fr_minmax(0,1.4fr)]">
-        <PanelEnunciado contenido={contenido} puedeEjecutar={flujo.puedeEjecutar} />
+        <PanelEnunciado contenido={contenido} />
         <div className="flex flex-col gap-3">
           <CodeEditorNexott
             value={flujo.codigo}

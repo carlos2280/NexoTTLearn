@@ -132,6 +132,13 @@ export type ResultadoPublicacion =
  * El helper NO consulta BD. La cobertura D82 (skill -> modulo habilitado) se
  * pre-calcula por el service via `calcularSkillsSinCobertura` y se pasa como
  * `skillsSinCobertura`.
+ *
+ * TODO (post-MVP): añadir validacion "todo CODIGO_PREGUNTAS de un modulo
+ * habilitado debe tener su CODIGO_TESTS hermano (mismo seccion_id) que
+ * apunte a el via `contenido.codigoPreguntasId`". Hoy se confia en el editor
+ * admin + el runtime (que deshabilita el boton cuando falta hermano). Si
+ * llegara a publicarse un curso con retos huerfanos, los participantes no
+ * pueden ejecutar pero el curso sigue siendo valido conceptualmente.
  */
 export interface CursoPublicacionSnapshot {
   readonly clienteId: string | null

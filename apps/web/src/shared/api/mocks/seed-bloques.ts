@@ -193,10 +193,7 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
       esqueletoInicial:
         // biome-ignore lint/nursery/noSecrets: código de ejemplo NestJS para ejercicio, no un secreto real
         "@Injectable()\nexport class TenantGuard implements CanActivate {\n  canActivate(ctx: ExecutionContext): boolean {\n    // tu codigo aqui\n  }\n}",
-      tiempoLimiteSeg: 300,
-      modoSimple: false,
-      rubrica:
-        "- Lee el header desde request.headers (40%)\n- Manejo correcto de header ausente (40%)\n- Tipado estricto (20%)",
+      tiempoLimiteSeg: 30,
     },
     { esEvaluable: true, skillQueMideId: ID_SKILL_NEST },
   ),

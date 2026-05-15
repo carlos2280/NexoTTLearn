@@ -69,8 +69,6 @@ const CONTENIDO_VALIDO_POR_TIPO = new Map<TipoBloque, Record<string, unknown>>([
       enunciado: "Resuelve esto",
       esqueletoInicial: "",
       tiempoLimiteSeg: 30,
-      modoSimple: true,
-      rubrica: "Revisar a mano",
     },
   ],
   [
@@ -254,15 +252,14 @@ describe("schemas individuales — invariantes especificas", () => {
   it("CODIGO_PREGUNTAS: lenguaje vacio falla; cualquier string no-vacio pasa", () => {
     // El schema acepta cualquier string >= 1; la restriccion a js/ts/py solo
     // aplica al EVALUAR via sandbox (ver 16b §16b.6). Esto permite que el editor
-    // ofrezca lenguajes adicionales en modoSimple (correccion manual).
+    // ofrezca lenguajes adicionales aunque solo los 3 soportados sean
+    // ejecutables.
     expect(
       contenidoCodigoPreguntasSchema.safeParse({
         lenguaje: "",
         enunciado: "?",
         esqueletoInicial: "",
         tiempoLimiteSeg: 30,
-        modoSimple: true,
-        rubrica: "",
       }).success,
     ).toBe(false)
     expect(
@@ -271,8 +268,6 @@ describe("schemas individuales — invariantes especificas", () => {
         enunciado: "?",
         esqueletoInicial: "",
         tiempoLimiteSeg: 30,
-        modoSimple: true,
-        rubrica: "",
       }).success,
     ).toBe(true)
   })
