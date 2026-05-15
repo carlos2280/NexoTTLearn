@@ -29,6 +29,10 @@ export function useCrearIntentoBloque(): UseMutationResult<
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["me"] })
       queryClient.invalidateQueries({ queryKey: ["asignaciones"] })
+      // Plan del participante: contiene el flag `completada` por seccion y el
+      // % de avance global. Sin esta invalidacion el sidebar del curso
+      // inmersivo no repinta la seccion como completada al volver a entrar.
+      queryClient.invalidateQueries({ queryKey: ["plan-personal"] })
     },
   })
 }
