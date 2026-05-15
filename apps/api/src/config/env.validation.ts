@@ -115,6 +115,18 @@ const envSchema = z
       .default("true")
       .transform((value) => value.toLowerCase() === "true"),
     // ---------------------------------------------------------------------
+    // Sandbox de ejecucion de codigo (CODIGO_PREGUNTAS + CODIGO_TESTS).
+    //   SANDBOX_PROVIDER  — `piston` (real) o `mock` (tests).
+    //   SANDBOX_URL       — endpoint HTTP del sandbox (Piston: http://piston:2000).
+    //   SANDBOX_TIMEOUT_MS — timeout total de la llamada al sandbox.
+    // ---------------------------------------------------------------------
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    SANDBOX_PROVIDER: z.enum(["piston", "mock"]).default("mock"),
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    SANDBOX_URL: z.string().url().default("http://localhost:2000"),
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    SANDBOX_TIMEOUT_MS: z.coerce.number().int().positive().default(20_000),
+    // ---------------------------------------------------------------------
     // Notificaciones (Slice 10 P10a — D-S10-B3/B4).
     //   NOTIF_PURGA_CRON  — expresion cron de 5 campos para
     //                       ArchivarNotificacionesCron. Default: cada dia 03:00.

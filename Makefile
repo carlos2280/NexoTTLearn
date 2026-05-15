@@ -53,13 +53,34 @@ clean: kill ## Limpia node_modules, dist y .turbo
 .PHONY: db-up
 db-up: ## Levanta Postgres en Docker
 	@printf "$(C_BLUE)→ Levantando Postgres…$(C_RESET)\n"
-	docker compose up -d
+	docker compose up -d postgres
 	@printf "$(C_GREEN)✓ Postgres listo en localhost:5435$(C_RESET)\n"
 
 .PHONY: db-down
 db-down: ## Detiene Postgres
 	@printf "$(C_YELLOW)→ Deteniendo Postgres…$(C_RESET)\n"
 	docker compose down
+
+.PHONY: sandbox-up
+sandbox-up: ## Levanta Piston (sandbox de codigo) e instala JS/TS/Python
+	@printf "$(C_BLUE)→ Levantando Piston…$(C_RESET)\n"
+	docker compose up -d piston
+	@printf "$(C_BLUE)→ Esperando healthy…$(C_RESET)\n"
+	@for i in $$(seq 1 30); do \
+	  if curl -sf http://localhost:2000/api/v2/runtimes > /dev/null 2>&1; then break; fi; \
+	  sleep 1; \
+	done
+	@printf "$(C_BLUE)→ Instalando runtimes (idempotente)…$(C_RESET)\n"
+	@for pkg in '{"language":"node","version":"20.11.1"}' '{"language":"typescript","version":"5.0.3"}' '{"language":"python","version":"3.12.0"}'; do \
+	  curl -s -X POST http://localhost:2000/api/v2/packages -H "Content-Type: application/json" -d "$$pkg" > /dev/null; \
+	done
+	@printf "$(C_GREEN)✓ Piston listo en localhost:2000$(C_RESET)\n"
+	@curl -s http://localhost:2000/api/v2/runtimes | head -c 200; echo
+
+.PHONY: sandbox-down
+sandbox-down: ## Detiene Piston
+	@printf "$(C_YELLOW)→ Deteniendo Piston…$(C_RESET)\n"
+	docker compose stop piston
 
 .PHONY: db-migrate
 db-migrate: ## Aplica migraciones Prisma
@@ -68,6 +89,18 @@ db-migrate: ## Aplica migraciones Prisma
 .PHONY: db-seed
 db-seed: ## Ejecuta seed (admin@nexott.local / Admin1234!)
 	pnpm db:seed
+
+.PHONY: db-seed-amsa
+db-seed-amsa: ## Pueble la BD con la demo AMSA (curso fullstack React+Django, 3 admins + 13 colabs)
+	cd apps/api && pnpm db:seed:amsa
+
+.PHONY: demo-amsa
+demo-amsa: ## ⚠ Reset destructivo + migrate + seed base + seed AMSA (entorno de demo limpio)
+	@printf "$(C_RED)⚠  Esto borrará TODOS los datos y cargará la demo AMSA desde cero.$(C_RESET)\n"
+	cd apps/api && pnpm exec prisma migrate reset --force --skip-seed
+	cd apps/api && pnpm db:seed
+	cd apps/api && pnpm db:seed:amsa
+	@printf "$(C_GREEN)✓ Demo AMSA lista. Levanta la app con 'make dev'.$(C_RESET)\n"
 
 .PHONY: db-studio
 db-studio: ## Abre Prisma Studio
