@@ -35,13 +35,18 @@ export function CanvasSeccion({ seccionActiva, modo, cursoId, colaboradorId }: C
     [bloques.data],
   )
 
-  // Auto-scroll al top al cambiar de sección.
+  // Auto-scroll al top SOLO cuando el id de la seccion cambia. Antes
+  // dependiamos del objeto `seccionActiva` completo: como el hook
+  // `useSeccionActiva` reconstruye la referencia en cada refetch del plan
+  // (Tanstack Query trae datos nuevos tras un intento), el efecto disparaba
+  // scroll al top tras enviar un quiz/codigo, expulsando al participante.
+  const seccionActivaId = seccionActiva?.seccionId ?? null
   useEffect(() => {
-    if (!seccionActiva) {
+    if (seccionActivaId === null) {
       return
     }
     mainRef.current?.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" })
-  }, [seccionActiva, reducedMotion])
+  }, [seccionActivaId, reducedMotion])
 
   if (!seccionActiva) {
     return (

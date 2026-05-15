@@ -33,6 +33,14 @@ export function useCrearIntentoBloque(): UseMutationResult<
       // % de avance global. Sin esta invalidacion el sidebar del curso
       // inmersivo no repinta la seccion como completada al volver a entrar.
       queryClient.invalidateQueries({ queryKey: ["plan-personal"] })
+      // Disponibilidad de transversal y entrevista IA: la regla de
+      // desbloqueo (D42, ENCADENADO) depende del % de avance del plan.
+      // Cuando el intento cierra el 100%, el card "Proyecto transversal"
+      // debe pasar de "Completa tu plan para desbloquearlo" a disponible
+      // sin que el participante tenga que recargar la pagina. Lo mismo
+      // aplica a "Entrevista IA" cuando el transversal queda aprobado.
+      queryClient.invalidateQueries({ queryKey: ["transversal"] })
+      queryClient.invalidateQueries({ queryKey: ["entrevista-ia"] })
     },
   })
 }
