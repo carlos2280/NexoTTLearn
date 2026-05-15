@@ -78,14 +78,18 @@ async function ejecutarPython(
   const pyodide = await obtenerPyodide()
   let stdout = ""
   let stderr = ""
+  // IMPORTANTE: Pyodide entrega los chunks a `batched` SIN el salto de linea
+  // final (lo strippea internamente). Si concatenamos sin re-anadirlo, todas
+  // las lineas quedan pegadas (`print(1); print(2)` -> `"12"` en vez de
+  // `"1\n2"`). Re-anadimos `\n` aqui para preservar la semantica de stdout.
   pyodide.setStdout({
     batched: (chunk: string) => {
-      stdout += chunk
+      stdout += `${chunk}\n`
     },
   })
   pyodide.setStderr({
     batched: (chunk: string) => {
-      stderr += chunk
+      stderr += `${chunk}\n`
     },
   })
   pyodide.setStdin({ stdin: () => solicitud.stdin })
