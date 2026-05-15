@@ -8,25 +8,36 @@ import { CursosPage } from "@/pages/admin/cursos/cursos.page"
 import { InicioPage } from "@/pages/admin/inicio/inicio.page"
 import { PersonasPage } from "@/pages/admin/personas/personas.page"
 import { ProximamentePage } from "@/pages/admin/proximamente/proximamente.page"
+import { AvanceCursoPage } from "@/pages/admin/reportes/avance-curso/avance-curso.page"
+import { BrechasDetectadasPage } from "@/pages/admin/reportes/brechas-detectadas/brechas-detectadas.page"
+import { DetalleColaboradorPage } from "@/pages/admin/reportes/detalle-colaborador/detalle-colaborador.page"
+import { EficaciaPlataformaPage } from "@/pages/admin/reportes/eficacia-plataforma/eficacia-plataforma.page"
+import { HistoricoClientePage } from "@/pages/admin/reportes/historico-cliente/historico-cliente.page"
+import { InventarioSkillsPage } from "@/pages/admin/reportes/inventario-skills/inventario-skills.page"
+import { ReportesPage } from "@/pages/admin/reportes/reportes.page"
+import { ReutilizacionCatalogoPage } from "@/pages/admin/reportes/reutilizacion-catalogo/reutilizacion-catalogo.page"
 import { BandejaPage } from "@/pages/bandeja/bandeja.page"
+import { CatalogoPage as CatalogoParticipantePage } from "@/pages/catalogo/catalogo.page"
 import { CuentaPage } from "@/pages/cuenta/cuenta.page"
-import { CursoDetallePage as CursoDetalleParticipantePage } from "@/pages/curso-detalle/curso-detalle.page"
+import { CursoInmersivoPage } from "@/pages/curso-inmersivo/curso-inmersivo.page"
 import { LoginPage } from "@/pages/login/login.page"
 import { LogoutPage } from "@/pages/logout/logout.page"
 import { MisCursosPage } from "@/pages/mis-cursos/mis-cursos.page"
 import { ParticipanteProximamentePage } from "@/pages/participante-proximamente/participante-proximamente.page"
+import { PlaygroundPage } from "@/pages/playground/playground.page"
 import { RUTAS } from "@/shared/constants/rutas"
 import { Navigate, Route, Routes } from "react-router-dom"
 import { GuardRol } from "./guard-rol"
 import { GuardSesion } from "./guard-sesion"
 
-const SEGMENTOS_ADMIN: readonly string[] = ["reportes", "sistema"]
+const SEGMENTOS_ADMIN: readonly string[] = ["sistema"]
 
 export function AppRoutes() {
   return (
     <Routes>
       <Route path={RUTAS.login} element={<LoginPage />} />
       <Route path={RUTAS.logout} element={<LogoutPage />} />
+      <Route path={RUTAS.playground} element={<PlaygroundPage />} />
       <Route
         element={
           <GuardSesion>
@@ -36,10 +47,22 @@ export function AppRoutes() {
       >
         <Route path={RUTAS.bandeja} element={<BandejaPage />} />
         <Route path={RUTAS.participante.misCursos} element={<MisCursosPage />} />
-        <Route path="/cursos/:cursoId" element={<CursoDetalleParticipantePage />} />
         <Route path={RUTAS.participante.miFicha} element={<ParticipanteProximamentePage />} />
-        <Route path={RUTAS.participante.catalogo} element={<ParticipanteProximamentePage />} />
+        <Route path={RUTAS.participante.catalogo} element={<CatalogoParticipantePage />} />
       </Route>
+      {/*
+        Curso inmersivo del participante: pantalla a pantalla completa fuera
+        del ParticipanteShell — espejo del builder admin pero para consumir,
+        no editar. Es el corazón del producto (D-INMERSIVO-1).
+      */}
+      <Route
+        path="/cursos/:cursoId"
+        element={
+          <GuardSesion>
+            <CursoInmersivoPage />
+          </GuardSesion>
+        }
+      />
       <Route
         path={RUTAS.cuenta}
         element={
@@ -84,6 +107,14 @@ export function AppRoutes() {
         <Route path="cursos/:cursoId" element={<CursoDetallePage />} />
         <Route path="cursos/:cursoId/asignaciones" element={<AsignacionesPage />} />
         <Route path="personas" element={<PersonasPage />} />
+        <Route path="reportes" element={<ReportesPage />} />
+        <Route path="reportes/eficacia-plataforma" element={<EficaciaPlataformaPage />} />
+        <Route path="reportes/inventario-skills" element={<InventarioSkillsPage />} />
+        <Route path="reportes/avance-curso" element={<AvanceCursoPage />} />
+        <Route path="reportes/historico-cliente" element={<HistoricoClientePage />} />
+        <Route path="reportes/detalle-colaborador" element={<DetalleColaboradorPage />} />
+        <Route path="reportes/brechas-detectadas" element={<BrechasDetectadasPage />} />
+        <Route path="reportes/reutilizacion-catalogo" element={<ReutilizacionCatalogoPage />} />
         {SEGMENTOS_ADMIN.map((segmento) => (
           <Route key={segmento} path={segmento} element={<ProximamentePage />} />
         ))}
