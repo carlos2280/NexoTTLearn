@@ -26,6 +26,8 @@ export type { PaginacionQuery, Paginated } from "./catalogo/paginacion"
 export { listarAreasQuerySchema } from "./catalogo/areas/listar-areas.schema"
 export type { ListarAreasQuery } from "./catalogo/areas/listar-areas.schema"
 export type { AreaResponse } from "./catalogo/areas/area-response"
+export { AREA_CODIGOS, areaCodigoSchema } from "./catalogo/areas/area-codigo"
+export type { AreaCodigo } from "./catalogo/areas/area-codigo"
 export { crearAreaSchema, actualizarAreaSchema } from "./catalogo/areas/area.schema"
 export type { CrearAreaInput, ActualizarAreaInput } from "./catalogo/areas/area.schema"
 export { listarSkillsQuerySchema, estadoSkillSchema } from "./catalogo/skills/listar-skills.schema"
@@ -323,6 +325,8 @@ export type {
   MotivoRechazoAsignacion,
   CrearAsignacionesBatchResponse,
   CursoDisponibleVoluntario,
+  AreaTagEmbed,
+  SkillDestacadaEmbed,
   CrearAsignacionesBatchRequest,
   AutoInscripcionRequest,
   ListarAsignacionesQuery,
@@ -345,6 +349,7 @@ export {
   crearIntentoBloqueSchema,
   respuestaPreguntaSchema,
   respuestasIntentoSchema,
+  resultadoTestReportadoSchema,
   intentoBloqueResponseSchema,
   listarIntentosBloqueQuerySchema,
   listarIntentosCursoBloqueQuerySchema,
@@ -367,6 +372,7 @@ export type {
   CrearIntentoBloqueInput,
   RespuestaPregunta,
   RespuestasIntento,
+  ResultadoTestReportado,
   IntentoBloqueResponse,
   ListarIntentosBloqueQuery,
   ListarIntentosCursoBloqueQuery,
@@ -562,6 +568,42 @@ export type {
   MeCursosQuery,
   ExportarFichaQuery,
   FormatoExportFicha,
+} from "./colaboradores"
+
+// Colaboradores — arbol unificado de curso (modo asignado/voluntario/preview).
+export type {
+  ModoCursoParticipante,
+  CursoArbolCabecera,
+  CursoArbolSeccion,
+  CursoArbolModulo,
+  CursoArbolResponse,
+} from "./colaboradores"
+
+// Colaboradores — bandeja del participante (D-BANDEJA-1).
+export {
+  BANDEJA_TOP_NOVEDADES,
+  BANDEJA_TOP_PENDIENTES,
+  UMBRAL_ASIGNACION_NUEVA_HORAS,
+  UMBRAL_DEADLINE_CERCANO_DIAS,
+  UMBRAL_DEADLINE_CRITICO_AVANCE,
+  UMBRAL_VENTANA_AVISOS_DIAS,
+} from "./colaboradores"
+export type {
+  BandejaCursoPendiente,
+  MeBandejaContadores,
+  MeBandejaResponse,
+  ResultadoCierreVisible,
+  SiguienteAccion,
+  SiguienteAccionAsignacionNueva,
+  SiguienteAccionCasoReabierto,
+  SiguienteAccionContinuarCurso,
+  SiguienteAccionDeadlineCritico,
+  SiguienteAccionEntrevistaIaDisponible,
+  SiguienteAccionExplorarVoluntariado,
+  SiguienteAccionResultadoCierre,
+  SiguienteAccionTransversalDisponible,
+  TipoSiguienteAccion,
+  TonoDeadline,
 } from "./colaboradores"
 
 // Colaboradores — admin: listar paginado + exportar para /admin/personas.

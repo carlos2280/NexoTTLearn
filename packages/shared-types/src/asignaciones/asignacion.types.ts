@@ -79,8 +79,35 @@ export interface AsignacionDetallada extends Asignacion {
 }
 
 /**
+ * Pintura compacta de un area embebida en payloads externos (D-CAT-AREA-1).
+ * `codigo` es el slug estable que el frontend usa para resolver tinta + glow
+ * (token CSS `--color-area-<codigo>` / `--shadow-glow-area-<codigo>`).
+ */
+export interface AreaTagEmbed {
+  readonly id: string
+  readonly nombre: string
+  readonly codigo: string
+}
+
+/**
+ * Skill destacada embebida en el item del catalogo de voluntariado para que el
+ * participante pueda decidir "este curso me suma" sin abrir nada. El `areaCodigo`
+ * permite pintar el chip con la tinta correspondiente.
+ */
+export interface SkillDestacadaEmbed {
+  readonly id: string
+  readonly etiquetaVisible: string
+  readonly areaCodigo: string
+}
+
+/**
  * Item de la bandeja del participante en `GET /cursos/disponibles-voluntario`.
  * D90: no se exponen nombres de otros voluntarios — solo el contador agregado.
+ *
+ * `areaPrincipal` = la `CursoAreaExigida` con mayor `peso` (desempate por
+ * nombre asc). `areasSecundarias` = el resto ordenadas por peso desc, max 2.
+ * `skillsDestacadas` = top 4 de `CursoSkillExigida` por `notaMinima` desc
+ * (desempate alfabetico por etiqueta). Estos calculos viven en el service.
  */
 export interface CursoDisponibleVoluntario {
   readonly cursoId: string
@@ -92,6 +119,9 @@ export interface CursoDisponibleVoluntario {
   readonly fechaInicio: string
   readonly fechaDeadline: string
   readonly voluntariosInscritos: number
+  readonly areaPrincipal: AreaTagEmbed
+  readonly areasSecundarias: readonly AreaTagEmbed[]
+  readonly skillsDestacadas: readonly SkillDestacadaEmbed[]
 }
 
 /**

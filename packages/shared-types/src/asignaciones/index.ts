@@ -20,6 +20,8 @@ export type {
   MotivoRechazoAsignacion,
   CrearAsignacionesBatchResponse,
   CursoDisponibleVoluntario,
+  AreaTagEmbed,
+  SkillDestacadaEmbed,
 } from "./asignacion.types"
 
 export { crearAsignacionesBatchRequestSchema } from "./crear.schema"
