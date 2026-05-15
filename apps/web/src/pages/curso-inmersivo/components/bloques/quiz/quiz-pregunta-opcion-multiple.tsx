@@ -1,5 +1,6 @@
 import { cn } from "@/shared/lib/cn"
 import type { PreguntaOpcionMultiple } from "@nexott-learn/shared-types"
+import { Check, X } from "lucide-react"
 
 interface QuizPreguntaOpcionMultipleProps {
   readonly pregunta: PreguntaOpcionMultiple
@@ -55,9 +56,41 @@ export function QuizPreguntaOpcionMultiple({
               className="mt-0.5 h-4 w-4 accent-accent"
             />
             <span className="flex-1 text-body-sm text-text-primary">{opcion.texto}</span>
+            <EtiquetaResultado correcta={correcta} errada={errada} elegida={elegida} />
           </label>
         )
       })}
     </fieldset>
   )
+}
+
+interface EtiquetaResultadoProps {
+  readonly correcta: boolean
+  readonly errada: boolean
+  readonly elegida: boolean
+}
+
+/**
+ * Pista visual a la derecha de la opcion cuando se revela la solucion. En
+ * opcion multiple distinguimos "Correcta · No marcada" (la perdiste) de
+ * "Correcta · Marcada" (acertaste).
+ */
+function EtiquetaResultado({ correcta, errada, elegida }: EtiquetaResultadoProps) {
+  if (correcta) {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 font-mono text-[10px] text-success uppercase tracking-wider">
+        <Check className="h-3.5 w-3.5" aria-hidden={true} />
+        {elegida ? "Correcta · Marcada" : "Correcta · No marcada"}
+      </span>
+    )
+  }
+  if (errada) {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 font-mono text-[10px] text-danger uppercase tracking-wider">
+        <X className="h-3.5 w-3.5" aria-hidden={true} />
+        Tu respuesta
+      </span>
+    )
+  }
+  return null
 }

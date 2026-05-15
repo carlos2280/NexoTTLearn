@@ -1,5 +1,6 @@
 import { cn } from "@/shared/lib/cn"
 import type { PreguntaOpcionUnica } from "@nexott-learn/shared-types"
+import { Check, X } from "lucide-react"
 
 interface QuizPreguntaOpcionUnicaProps {
   readonly pregunta: PreguntaOpcionUnica
@@ -13,7 +14,8 @@ interface QuizPreguntaOpcionUnicaProps {
 /**
  * Pregunta de opción única (radio buttons). Cuando `mostrarSolucion` está
  * activo, marca con tinte success la correcta y con danger la elegida si
- * fue incorrecta. Mientras se contesta, solo destaca la selección actual.
+ * fue incorrecta, ambas con icono y label explicito ("Correcta" / "Tu
+ * respuesta"). Mientras se contesta, solo destaca la selección actual.
  */
 export function QuizPreguntaOpcionUnica({
   pregunta,
@@ -51,9 +53,41 @@ export function QuizPreguntaOpcionUnica({
               className="mt-0.5 h-4 w-4 accent-accent"
             />
             <span className="flex-1 text-body-sm text-text-primary">{opcion.texto}</span>
+            <EtiquetaResultado correcta={correcta} errada={errada} elegida={elegida} />
           </label>
         )
       })}
     </fieldset>
   )
+}
+
+interface EtiquetaResultadoProps {
+  readonly correcta: boolean
+  readonly errada: boolean
+  readonly elegida: boolean
+}
+
+/**
+ * Pista visual a la derecha de la opcion cuando se revela la solucion. Solo
+ * aparece si hay algo que comunicar (correcta o errada). Mantiene el resto
+ * de opciones limpias.
+ */
+function EtiquetaResultado({ correcta, errada, elegida }: EtiquetaResultadoProps) {
+  if (correcta) {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 font-mono text-[10px] text-success uppercase tracking-wider">
+        <Check className="h-3.5 w-3.5" aria-hidden={true} />
+        {elegida ? "Tu respuesta · Correcta" : "Correcta"}
+      </span>
+    )
+  }
+  if (errada) {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 font-mono text-[10px] text-danger uppercase tracking-wider">
+        <X className="h-3.5 w-3.5" aria-hidden={true} />
+        Tu respuesta
+      </span>
+    )
+  }
+  return null
 }
