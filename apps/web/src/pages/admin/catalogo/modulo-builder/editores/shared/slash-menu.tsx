@@ -1,3 +1,4 @@
+import { Kbd } from "@/shared/components/ui/kbd"
 import { cn } from "@/shared/lib/cn"
 import type { TipoBloque } from "@nexott-learn/shared-types"
 import { useEffect, useRef, useState } from "react"
@@ -96,7 +97,7 @@ export function SlashMenu({ filtro, posicion, onElegir, onCerrar }: SlashMenuPro
         role="listbox"
         tabIndex={-1}
         style={{ position: "fixed", left, top, width: anchoMenu }}
-        className="z-overlay rounded-md border border-border bg-surface px-3 py-2 text-caption text-text-tertiary shadow-md"
+        className="z-overlay rounded-xl border border-border bg-surface px-4 py-3 text-body-sm text-text-tertiary shadow-overlay"
       >
         Sin resultados para «{filtro}».
       </div>
@@ -110,13 +111,12 @@ export function SlashMenu({ filtro, posicion, onElegir, onCerrar }: SlashMenuPro
       role="listbox"
       tabIndex={-1}
       style={{ position: "fixed", left, top, width: anchoMenu }}
-      className="z-overlay overflow-hidden rounded-md border border-border bg-surface shadow-md"
+      className="z-overlay overflow-hidden rounded-xl border border-border bg-surface shadow-overlay"
     >
-      <ul className="max-h-72 overflow-y-auto py-1">
+      <ul className="max-h-72 overflow-y-auto p-1">
         {tipos.map((t, idx) => {
           const meta = tipoBloqueMeta(t)
-          const icono = meta.icono
-          const Icono = icono
+          const Icono = meta.icono
           const activo = idx === indiceActivo
           return (
             <li key={t}>
@@ -128,14 +128,15 @@ export function SlashMenu({ filtro, posicion, onElegir, onCerrar }: SlashMenuPro
                 onMouseEnter={() => setIndiceActivo(idx)}
                 onClick={() => onElegir(t)}
                 className={cn(
-                  "flex w-full items-center gap-3 px-3 py-2 text-left transition-colors",
-                  activo ? "bg-accent-soft text-accent-on-soft" : "hover:bg-subtle",
+                  "flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left",
+                  "transition-[background-color,color,box-shadow] duration-fast ease-default",
+                  activo ? "bg-subtle shadow-xs" : "hover:bg-subtle/60",
                 )}
               >
                 <span
                   className={cn(
                     "flex h-8 w-8 shrink-0 items-center justify-center rounded-md",
-                    activo ? "bg-surface text-accent" : "bg-subtle text-text-secondary",
+                    activo ? "bg-accent-soft text-accent" : "bg-subtle text-text-tertiary",
                   )}
                 >
                   <Icono className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
@@ -153,8 +154,20 @@ export function SlashMenu({ filtro, posicion, onElegir, onCerrar }: SlashMenuPro
           )
         })}
       </ul>
-      <div className="border-border border-t bg-subtle/40 px-3 py-1.5 text-caption text-text-tertiary">
-        ↑↓ navegar · ↵ elegir · Esc cerrar
+      <div className="flex items-center justify-between gap-2 border-border border-t bg-subtle/40 px-3 py-2 font-mono text-caption text-text-tertiary">
+        <span className="inline-flex items-center gap-1.5">
+          <Kbd>↑</Kbd>
+          <Kbd>↓</Kbd>
+          <span>navegar</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <Kbd>↵</Kbd>
+          <span>elegir</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <Kbd>esc</Kbd>
+          <span>cerrar</span>
+        </span>
       </div>
     </div>
   )

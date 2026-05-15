@@ -61,7 +61,11 @@ export function TiptapEditor({
     <div className="flex flex-col gap-3">
       <TiptapToolbar editor={editor} variante={variante} />
       <div
-        className="rounded-md border border-border bg-surface px-4 py-3"
+        className={cn(
+          "rounded-lg border border-border-strong bg-surface px-5 py-4 shadow-xs",
+          "transition-[border-color,box-shadow] duration-base ease-default",
+          "focus-within:border-aurora-violet focus-within:shadow-ring-aurora-soft",
+        )}
         style={{ minHeight: altoMin }}
       >
         <EditorContent editor={editor} />

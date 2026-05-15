@@ -3,10 +3,9 @@ import { EmptyState } from "@/shared/components/ui/empty-state"
 import type { BloqueDetalleResponse } from "@nexott-learn/shared-types"
 import { HelpCircle, Plus } from "lucide-react"
 import { useMemo, useRef, useState } from "react"
-import { tipoBloqueMeta } from "../bloque-tipo-meta"
 import { type ConfigQuiz, QuizConfig, type SolucionVisible } from "./quiz/quiz-config"
 import { type PreguntaQuiz, QuizPregunta, preguntaVacia } from "./quiz/quiz-pregunta"
-import { IndicadorGuardado } from "./shared/indicador-guardado"
+import { EditorBloqueShell } from "./shared/editor-bloque-shell"
 import { useAutoGuardarBloque } from "./shared/use-auto-guardar-bloque"
 
 interface EditorQuizProps {
@@ -49,7 +48,6 @@ function leerInicial(contenido: Record<string, unknown> | null): BorradorQuiz {
 }
 
 export function EditorQuiz({ bloque }: EditorQuizProps) {
-  const meta = tipoBloqueMeta(bloque.tipo)
   const inicial = useMemo(() => leerInicial(bloque.contenido), [bloque.contenido])
   const [datos, setDatos] = useState<BorradorQuiz>(inicial)
   const datosRef = useRef<BorradorQuiz>(inicial)
@@ -97,19 +95,12 @@ export function EditorQuiz({ bloque }: EditorQuizProps) {
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <span className="nx-eyebrow text-text-tertiary">Bloque · {meta.etiqueta}</span>
-          <h2 className="text-h2 text-text-primary">Quiz de selección</h2>
-          <p className="max-w-xl text-body-sm text-text-secondary">
-            Preguntas con una opción correcta. Auto-corregido. La nota es el porcentaje de preguntas
-            correctas sobre el total.
-          </p>
-        </div>
-        <IndicadorGuardado estado={auto.estado} />
-      </header>
-
+    <EditorBloqueShell
+      bloque={bloque}
+      titulo="Quiz de selección"
+      descripcion="Preguntas con una opción correcta. Auto-corregido. La nota es el porcentaje de preguntas correctas sobre el total."
+      estadoGuardado={auto.estado}
+    >
       <QuizConfig config={datos.config} onCambiar={actualizarConfig} />
 
       <div className="flex flex-col gap-3">
@@ -145,6 +136,6 @@ export function EditorQuiz({ bloque }: EditorQuizProps) {
           </ol>
         )}
       </div>
-    </div>
+    </EditorBloqueShell>
   )
 }

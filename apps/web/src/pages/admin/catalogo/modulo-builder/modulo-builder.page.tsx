@@ -20,7 +20,9 @@ import { useBuilderSeleccion } from "./hooks/use-builder-seleccion"
 export function ModuloBuilderPage() {
   return (
     <ProveedorGuardadoBuilder>
-      <ContenidoBuilder />
+      <div className="nx-motion-immersive">
+        <ContenidoBuilder />
+      </div>
     </ProveedorGuardadoBuilder>
   )
 }
@@ -49,7 +51,12 @@ function ContenidoBuilder() {
   if (datos.isLoading) {
     return (
       <div className="flex h-screen flex-col">
-        <div className="h-14 border-border border-b bg-surface" />
+        <div className="relative h-16 shrink-0 bg-surface">
+          <div
+            aria-hidden={true}
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-[image:var(--gradient-aurora)] opacity-25"
+          />
+        </div>
         <div className="flex flex-1 gap-0">
           <Skeleton className="h-full w-[260px] rounded-none" />
           <div className="flex flex-1 items-center justify-center">
@@ -65,6 +72,7 @@ function ContenidoBuilder() {
     return (
       <div className="flex h-screen items-center justify-center bg-canvas">
         <EmptyState
+          tono="panel"
           icono={Library}
           titulo="Módulo no encontrado"
           descripcion="El módulo que intentas abrir no existe o ha sido eliminado."

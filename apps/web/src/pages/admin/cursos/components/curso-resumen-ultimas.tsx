@@ -1,5 +1,6 @@
 import { BadgeEstadoAsignacion } from "@/pages/admin/asignaciones/components/badge-estado-asignacion"
 import { Card } from "@/shared/components/ui/card"
+import { tiempoRelativo } from "@/shared/lib/tiempo-relativo"
 import type { Asignacion } from "@nexott-learn/shared-types"
 
 interface CursoResumenUltimasProps {
@@ -7,8 +8,8 @@ interface CursoResumenUltimasProps {
   readonly max?: number
 }
 
-function fechaCorta(iso: string): string {
-  return new Date(iso).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })
+function fechaAbsoluta(iso: string): string {
+  return new Date(iso).toLocaleString("es-ES", { dateStyle: "long", timeStyle: "short" })
 }
 
 export function CursoResumenUltimas({ asignaciones, max = 5 }: CursoResumenUltimasProps) {
@@ -41,9 +42,13 @@ export function CursoResumenUltimas({ asignaciones, max = 5 }: CursoResumenUltim
               </div>
               <div className="flex shrink-0 items-center gap-3">
                 <BadgeEstadoAsignacion asignacion={a} />
-                <span className="tabular text-caption text-text-tertiary">
-                  {fechaCorta(a.updatedAt)}
-                </span>
+                <time
+                  dateTime={a.updatedAt}
+                  title={fechaAbsoluta(a.updatedAt)}
+                  className="tabular text-caption text-text-tertiary"
+                >
+                  {tiempoRelativo(a.updatedAt)}
+                </time>
               </div>
             </li>
           ))}

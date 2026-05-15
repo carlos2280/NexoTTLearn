@@ -1,4 +1,5 @@
 import { Badge } from "@/shared/components/ui/badge"
+import { tiempoRelativo } from "@/shared/lib/tiempo-relativo"
 import type {
   BloqueDetalleResponse,
   ModuloResponse,
@@ -19,20 +20,25 @@ interface BuilderPropiedadesProps {
 }
 
 /**
- * Panel derecho de propiedades. Cambia segun lo seleccionado:
- *  - modulo seleccionado (default) -> propiedades globales del modulo
- *  - seccion -> orden, modulo padre, fecha
- *  - bloque -> tipo, evaluable, skill, version
+ * Panel derecho de propiedades. Cambia según lo seleccionado:
+ * - módulo (default) → propiedades globales
+ * - sección → orden + actualización
+ * - bloque → tipo, versión, estado + edición evaluativa
  *
- * En B0 todos los campos son de SOLO LECTURA. La edicion llega en lotes
- * posteriores.
+ * Las etiquetas son eyebrow tipográfico (uppercase + tracking). Los valores
+ * numéricos van en mono tabular (consistencia con PageHeaderStat). Las
+ * fechas en tiempo relativo (hace X min) — nunca absolutas.
  */
 export function BuilderPropiedades(props: BuilderPropiedadesProps) {
   const { seleccion, modulo, totalSecciones, totalBloques, seccion, bloque } = props
+
+  const subtitulo = obtenerSubtitulo(seleccion, bloque)
+
   return (
     <aside className="flex h-full w-[300px] shrink-0 flex-col border-border border-l bg-surface">
-      <div className="border-border border-b px-4 py-2.5">
+      <div className="flex flex-col gap-0.5 border-border border-b px-4 py-3">
         <span className="nx-eyebrow text-text-tertiary">Propiedades</span>
+        <span className="text-body-sm text-text-secondary">{subtitulo}</span>
       </div>
       <div className="flex-1 overflow-y-auto p-4">
         {seleccion.tipo === "modulo" ? (
@@ -49,6 +55,19 @@ export function BuilderPropiedades(props: BuilderPropiedadesProps) {
   )
 }
 
+function obtenerSubtitulo(seleccion: Seleccion, bloque: BloqueDetalleResponse | undefined): string {
+  if (seleccion.tipo === "modulo") {
+    return "Módulo"
+  }
+  if (seleccion.tipo === "seccion") {
+    return "Sección"
+  }
+  if (bloque) {
+    return `Bloque · ${tipoBloqueMeta(bloque.tipo).etiqueta}`
+  }
+  return "Bloque"
+}
+
 function Fila({
   etiqueta,
   children,
@@ -57,11 +76,19 @@ function Fila({
   readonly children: ReactNode
 }) {
   return (
-    <div className="flex flex-col gap-1 py-2">
-      <span className="text-caption text-text-tertiary">{etiqueta}</span>
+    <div className="flex flex-col gap-1">
+      <span className="nx-eyebrow text-text-tertiary">{etiqueta}</span>
       <div className="text-body-sm text-text-primary">{children}</div>
     </div>
   )
+}
+
+function Numero({ children }: { readonly children: ReactNode }) {
+  return <span className="tabular font-mono text-text-primary">{children}</span>
+}
+
+function FechaRelativa({ iso }: { readonly iso: string }) {
+  return <span className="tabular font-mono text-text-tertiary">{tiempoRelativo(iso)}</span>
 }
 
 function PropsModulo({
@@ -74,8 +101,7 @@ function PropsModulo({
   readonly totalBloques: number
 }) {
   return (
-    <div className="flex flex-col divide-y divide-border">
-      <Fila etiqueta="Tipo">Módulo</Fila>
+    <div className="flex flex-col gap-4">
       <Fila etiqueta="Estado">
         {modulo.estado === "ACTIVO" ? (
           <Badge tono="success" conPunto={true}>
@@ -88,10 +114,10 @@ function PropsModulo({
         )}
       </Fila>
       <Fila etiqueta="Secciones">
-        <span className="tabular">{totalSecciones}</span>
+        <Numero>{totalSecciones}</Numero>
       </Fila>
       <Fila etiqueta="Bloques">
-        <span className="tabular">{totalBloques}</span>
+        <Numero>{totalBloques}</Numero>
       </Fila>
       {modulo.descripcion ? (
         <Fila etiqueta="Descripción">
@@ -104,14 +130,13 @@ function PropsModulo({
 
 function PropsSeccion({ seccion }: { readonly seccion: SeccionResponse }) {
   return (
-    <div className="flex flex-col divide-y divide-border">
-      <Fila etiqueta="Tipo">Sección</Fila>
+    <div className="flex flex-col gap-4">
       <Fila etiqueta="Título">{seccion.titulo}</Fila>
       <Fila etiqueta="Orden en módulo">
-        <span className="tabular">{seccion.orden}</span>
+        <Numero>{seccion.orden}</Numero>
       </Fila>
       <Fila etiqueta="Actualizada">
-        <span className="text-text-secondary">{new Date(seccion.updatedAt).toLocaleString()}</span>
+        <FechaRelativa iso={seccion.updatedAt} />
       </Fila>
     </div>
   )
@@ -120,14 +145,14 @@ function PropsSeccion({ seccion }: { readonly seccion: SeccionResponse }) {
 function PropsBloque({ bloque }: { readonly bloque: BloqueDetalleResponse }) {
   const meta = tipoBloqueMeta(bloque.tipo)
   return (
-    <div className="flex flex-col">
-      <div className="flex flex-col divide-y divide-border">
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4">
         <Fila etiqueta="Tipo">{meta.etiqueta}</Fila>
         <Fila etiqueta="Orden en sección">
-          <span className="tabular">{bloque.orden}</span>
+          <Numero>{bloque.orden}</Numero>
         </Fila>
         <Fila etiqueta="Versión">
-          <span className="tabular">v{bloque.version}</span>
+          <Numero>v{bloque.version}</Numero>
         </Fila>
         <Fila etiqueta="Estado">
           {bloque.estado === "ACTIVO" ? (
@@ -141,7 +166,7 @@ function PropsBloque({ bloque }: { readonly bloque: BloqueDetalleResponse }) {
           )}
         </Fila>
         <Fila etiqueta="Actualizado">
-          <span className="text-text-secondary">{new Date(bloque.updatedAt).toLocaleString()}</span>
+          <FechaRelativa iso={bloque.updatedAt} />
         </Fila>
       </div>
       <EditarEvaluacionBloque bloque={bloque} />

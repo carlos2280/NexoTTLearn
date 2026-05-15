@@ -59,8 +59,8 @@ export function TabModulos() {
             <option value="ARCHIVADO">Archivados</option>
           </Select>
         </div>
-        <Button variant="primary" size="sm" onClick={() => orq.abrir("crear")}>
-          <Plus className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
+        <Button variant="primary" size="md" onClick={() => orq.abrir("crear")}>
+          <Plus className="h-4 w-4" strokeWidth={1.75} aria-hidden={true} />
           Nuevo módulo
         </Button>
       </div>

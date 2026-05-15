@@ -78,11 +78,11 @@ export function QuizPregunta({
   }
 
   return (
-    <li className="rounded-lg border border-border bg-surface">
+    <li className="rounded-lg border border-border bg-surface shadow-xs">
       <button
         type="button"
         onClick={onAlternar}
-        className="flex w-full items-center gap-2 px-4 py-3 text-left"
+        className="flex w-full items-center gap-2 rounded-lg px-4 py-3 text-left transition-colors duration-fast ease-default hover:bg-subtle/40"
       >
         <span className="text-text-tertiary">
           {expandida ? (
@@ -172,7 +172,12 @@ export function QuizPregunta({
           />
 
           <div className="flex justify-end">
-            <Button variant="ghost" size="sm" onClick={onEliminar}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onEliminar}
+              className="text-danger-on-soft hover:bg-danger-soft"
+            >
               <Trash2 className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
               Eliminar pregunta
             </Button>

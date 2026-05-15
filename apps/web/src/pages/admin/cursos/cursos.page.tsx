@@ -2,6 +2,7 @@ import { useListarClientes } from "@/features/catalogo/hooks/use-listar-clientes
 import { useListarCursos } from "@/features/cursos/hooks/use-listar-cursos"
 import { DataTable } from "@/shared/components/ui/data-table"
 import { MenuAcciones } from "@/shared/components/ui/menu-acciones"
+import { PageHeader, PageHeaderStat } from "@/shared/components/ui/page-header"
 import { Pagination } from "@/shared/components/ui/pagination"
 import { Tabs } from "@/shared/components/ui/tabs"
 import type { EstadoCurso } from "@nexott-learn/shared-types"
@@ -62,15 +63,20 @@ export function CursosPage() {
     setPage(1)
   }
 
+  const total = data?.meta.total ?? 0
+  const hayFiltroExtra = busqueda.length >= 2 || clienteId !== ""
+  const etiquetaTotal = hayFiltroExtra
+    ? "coinciden con el filtro"
+    : `cursos en ${etiquetaTab(estadoTab).toLowerCase()}`
+
   return (
     <div className="mx-auto flex max-w-[1280px] flex-col gap-6">
-      <header className="flex flex-col gap-2">
-        <span className="nx-eyebrow text-text-tertiary">Administración</span>
-        <h1 className="text-h1 text-text-primary">Cursos</h1>
-        <p className="max-w-2xl text-body text-text-secondary">
-          Crea cursos en borrador, publícalos, sigue su avance y archívalos cuando termine su ciclo.
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="Administración"
+        titulo="Cursos"
+        descripcion="Crea cursos en borrador, publícalos, sigue su avance y archívalos cuando termine su ciclo."
+        stat={<PageHeaderStat valor={total} etiqueta={etiquetaTotal} />}
+      />
 
       <Tabs<EstadoCurso>
         items={ORDEN_TABS.map((id) => ({

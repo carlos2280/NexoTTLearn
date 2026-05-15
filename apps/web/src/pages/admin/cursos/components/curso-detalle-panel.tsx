@@ -8,12 +8,11 @@ export type TabDetalle = "resumen" | "asignados" | "configuracion"
 interface CursoDetallePanelProps {
   readonly tab: TabDetalle
   readonly curso: CursoDetalle & Partial<Pick<CursoConfiguracionResponse, "umbralesLogro">>
-  readonly nombreCliente: string | undefined
 }
 
-export function CursoDetallePanel({ tab, curso, nombreCliente }: CursoDetallePanelProps) {
+export function CursoDetallePanel({ tab, curso }: CursoDetallePanelProps) {
   if (tab === "resumen") {
-    return <CursoDetalleResumen curso={curso} nombreCliente={nombreCliente} />
+    return <CursoDetalleResumen curso={curso} />
   }
   if (tab === "asignados") {
     return <AsignacionesVista cursoId={curso.id} nombreCurso={curso.titulo} />

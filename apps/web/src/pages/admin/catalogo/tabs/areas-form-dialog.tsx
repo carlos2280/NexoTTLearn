@@ -3,7 +3,13 @@ import { Button } from "@/shared/components/ui/button"
 import { Dialog, DialogFooter } from "@/shared/components/ui/dialog"
 import { Field } from "@/shared/components/ui/field"
 import { Input } from "@/shared/components/ui/input"
-import type { AreaResponse, CrearAreaInput } from "@nexott-learn/shared-types"
+import { Select } from "@/shared/components/ui/select"
+import {
+  AREA_CODIGOS,
+  type AreaCodigo,
+  type AreaResponse,
+  type CrearAreaInput,
+} from "@nexott-learn/shared-types"
 import { type FormEvent, useEffect, useState } from "react"
 
 interface AreasFormDialogProps {
@@ -22,6 +28,17 @@ interface ErroresForm {
 const MAX_NOMBRE = 80
 const MAX_DESCRIPCION = 280
 
+const ETIQUETAS_CODIGO: Readonly<Record<AreaCodigo, string>> = {
+  frontend: "Frontend",
+  backend: "Backend",
+  cloud: "Cloud",
+  data: "Data",
+  mobile: "Mobile",
+  devops: "DevOps",
+  qa: "QA / Testing",
+  soft: "Soft skills",
+}
+
 export function AreasFormDialog({
   abierto,
   onCambiarAbierto,
@@ -30,12 +47,14 @@ export function AreasFormDialog({
   enviando,
 }: AreasFormDialogProps) {
   const [nombre, setNombre] = useState("")
+  const [codigo, setCodigo] = useState<AreaCodigo>("frontend")
   const [descripcion, setDescripcion] = useState("")
   const [errores, setErrores] = useState<ErroresForm>({})
 
   useEffect(() => {
     if (abierto) {
       setNombre(area?.nombre ?? "")
+      setCodigo(area?.codigo ?? "frontend")
       setDescripcion(area?.descripcion ?? "")
       setErrores({})
     }
@@ -56,6 +75,7 @@ export function AreasFormDialog({
     try {
       await onGuardar({
         nombre: valor,
+        codigo,
         descripcion: descripcion.trim().length === 0 ? undefined : descripcion.trim(),
       })
     } catch (err) {
@@ -88,6 +108,20 @@ export function AreasFormDialog({
               autoFocus={true}
               hasError={Boolean(errores.nombre)}
             />
+          )}
+        </Field>
+        <Field
+          label="Tinta visual"
+          hint="Familia de color que pintará las cards y skill chips del área."
+        >
+          {(p) => (
+            <Select {...p} value={codigo} onChange={(e) => setCodigo(e.target.value as AreaCodigo)}>
+              {AREA_CODIGOS.map((c) => (
+                <option key={c} value={c}>
+                  {ETIQUETAS_CODIGO[c]}
+                </option>
+              ))}
+            </Select>
           )}
         </Field>
         <Field label="Descripción" hint={`${descripcion.length}/${MAX_DESCRIPCION} caracteres`}>

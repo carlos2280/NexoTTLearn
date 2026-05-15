@@ -1,7 +1,8 @@
 import { useActualizarEntrevistaIaCurso } from "@/features/cursos/hooks/use-mutaciones-config-curso"
+import { Switch } from "@/shared/components/ui/switch"
 import type { CursoDetalle } from "@nexott-learn/shared-types"
-import { MessageSquare } from "lucide-react"
 import { useEffect, useState } from "react"
+import { AYUDAS_CONFIG_CURSO } from "./ayudas"
 import { CampoNumero } from "./campo-numero"
 import { ConfigCard } from "./config-card"
 import { ConfigEntrevistaCampos, type EntrevistaParametros } from "./config-entrevista-campos"
@@ -32,6 +33,7 @@ export function ConfigEntrevistaIa({ curso, bloqueado }: ConfigEntrevistaIaProps
     activo: curso.entrevistaIaId !== null,
   }
   const [form, setForm] = useState<FormEntrevista>(inicialPorCurso)
+  const [solicitudGuardar, setSolicitudGuardar] = useState(0)
 
   useEffect(() => {
     setForm({ ...INICIAL, activo: curso.entrevistaIaId !== null })
@@ -62,24 +64,27 @@ export function ConfigEntrevistaIa({ curso, bloqueado }: ConfigEntrevistaIaProps
 
   return (
     <ConfigCard
+      id="config-entrevista"
       titulo="Entrevista IA"
       descripcion="Configura la entrevista con IA: filosofía, profundidad, duración y tono."
-      icono={MessageSquare}
+      ayuda={AYUDAS_CONFIG_CURSO.entrevista}
       exigeMotivo={curso.estado !== "BORRADOR"}
       modificado={modificado}
       enviando={mutacion.isPending}
       deshabilitado={bloqueado}
       onGuardar={guardar}
+      onCancelar={() => setForm({ ...INICIAL, activo: curso.entrevistaIaId !== null })}
+      solicitudGuardar={solicitudGuardar}
     >
-      <label className="inline-flex items-center gap-2 text-body-sm">
-        <input
-          type="checkbox"
-          checked={form.activo}
-          onChange={(e) => setForm((f) => ({ ...f, activo: e.target.checked }))}
-          className="h-4 w-4 rounded border-border-strong"
-        />
-        Activar entrevista IA
-      </label>
+      <Switch
+        checked={form.activo}
+        onCambio={(v) => {
+          setForm((f) => ({ ...f, activo: v }))
+          setSolicitudGuardar((s) => s + 1)
+        }}
+        label="Activar entrevista IA"
+        descripcion="Conversación final donde la IA evalúa al colaborador sobre lo aprendido."
+      />
       {form.activo ? (
         <>
           <CampoNumero

@@ -1,8 +1,8 @@
 import { useActualizarUmbralesLogroCurso } from "@/features/cursos/hooks/use-mutaciones-config-curso"
-import { Button } from "@/shared/components/ui/button"
+import { Switch } from "@/shared/components/ui/switch"
 import type { CursoConfiguracionResponse, CursoDetalle } from "@nexott-learn/shared-types"
-import { Award } from "lucide-react"
 import { useEffect, useState } from "react"
+import { AYUDAS_CONFIG_CURSO } from "./ayudas"
 import { CampoNumero } from "./campo-numero"
 import { ConfigCard } from "./config-card"
 
@@ -42,6 +42,7 @@ export function ConfigUmbralesLogro({ curso, bloqueado }: ConfigUmbralesLogroPro
   const inicial = desdeCurso(curso)
   const [form, setForm] = useState<FormUmbrales>(inicial.form)
   const [usaDefault, setUsaDefault] = useState<boolean>(inicial.usaDefault)
+  const [solicitudGuardar, setSolicitudGuardar] = useState(0)
 
   useEffect(() => {
     const calc = desdeCurso(curso)
@@ -66,33 +67,31 @@ export function ConfigUmbralesLogro({ curso, bloqueado }: ConfigUmbralesLogroPro
 
   return (
     <ConfigCard
+      id="config-umbrales"
       titulo="Umbrales de logro"
       descripcion="Cortes excelencia ≥ sólido ≥ en-desarrollo. Vacío usa los defaults del sistema."
-      icono={Award}
+      ayuda={AYUDAS_CONFIG_CURSO.umbrales}
       exigeMotivo={curso.estado !== "BORRADOR"}
       modificado={modificado && (usaDefault || monotonia)}
       enviando={mutacion.isPending}
       deshabilitado={bloqueado}
       onGuardar={guardar}
+      onCancelar={() => {
+        const init = desdeCurso(curso)
+        setForm(init.form)
+        setUsaDefault(init.usaDefault)
+      }}
+      solicitudGuardar={solicitudGuardar}
     >
-      <div className="flex items-center gap-2">
-        <Button
-          variant={usaDefault ? "primary" : "secondary"}
-          size="sm"
-          type="button"
-          onClick={() => setUsaDefault(true)}
-        >
-          Usar defaults
-        </Button>
-        <Button
-          variant={usaDefault ? "secondary" : "primary"}
-          size="sm"
-          type="button"
-          onClick={() => setUsaDefault(false)}
-        >
-          Sobrescribir
-        </Button>
-      </div>
+      <Switch
+        checked={!usaDefault}
+        onCambio={(v) => {
+          setUsaDefault(!v)
+          setSolicitudGuardar((s) => s + 1)
+        }}
+        label="Sobrescribir defaults"
+        descripcion="Si está desactivado, se usan los cortes del sistema (90 / 70 / 50)."
+      />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <CampoNumero
           label="Excelencia (%)"

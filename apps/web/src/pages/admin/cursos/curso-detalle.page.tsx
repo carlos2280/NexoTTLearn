@@ -48,6 +48,7 @@ export function CursoDetallePage() {
     return (
       <div className="mx-auto max-w-[640px]">
         <EmptyState
+          tono="panel"
           icono={BookOpen}
           titulo="Curso no encontrado"
           descripcion="El curso que intentas abrir no existe o no tienes acceso."
@@ -98,7 +99,7 @@ export function CursoDetallePage() {
       />
 
       <section role="tabpanel" aria-label={TABS.find((t) => t.id === tab)?.etiqueta}>
-        <CursoDetallePanel tab={tab} curso={curso} nombreCliente={nombreCliente} />
+        <CursoDetallePanel tab={tab} curso={curso} />
       </section>
 
       <CursosDialogos orq={orq} clientes={clientes} cargandoClientes={clientesQuery.isLoading} />

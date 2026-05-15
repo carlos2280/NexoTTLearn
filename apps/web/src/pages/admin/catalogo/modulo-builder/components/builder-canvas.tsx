@@ -1,5 +1,6 @@
+import { Banner } from "@/shared/components/ui/banner"
+import { PageHeader } from "@/shared/components/ui/page-header"
 import type { BloqueDetalleResponse, SeccionResponse, TipoBloque } from "@nexott-learn/shared-types"
-import { Boxes, MousePointer2 } from "lucide-react"
 import { tipoBloqueMeta } from "../bloque-tipo-meta"
 import { EditorCodigoIlustrativo } from "../editores/editor-codigo-ilustrativo"
 import { EditorCodigoPreguntas } from "../editores/editor-codigo-preguntas"
@@ -20,8 +21,11 @@ interface BuilderCanvasProps {
 }
 
 /**
- * Canvas central del builder. En B0 muestra solo el contexto del item
- * seleccionado y un placeholder. Los editores reales por tipo llegan en B1+.
+ * Canvas central del builder.
+ *
+ * Sin selección → vista editorial del módulo (PageHeader canónico).
+ * Sección o bloque → header contextual + editor real (si existe) o
+ * banner-info de "próximamente". Sin border-dashed, sin placeholders ruidosos.
  */
 export function BuilderCanvas({
   seleccion,
@@ -31,10 +35,7 @@ export function BuilderCanvas({
   onCrearBloqueDirecto,
 }: BuilderCanvasProps) {
   return (
-    <section
-      className="flex h-full min-w-0 flex-1 flex-col overflow-y-auto"
-      style={{ backgroundImage: "var(--gradient-admin-canvas)" }}
-    >
+    <section className="flex h-full min-w-0 flex-1 flex-col overflow-y-auto bg-canvas">
       <div className="mx-auto w-full max-w-[720px] px-8 py-12">
         {seleccion.tipo === "modulo" ? <EstadoVacioModulo titulo={tituloModulo} /> : null}
         {seleccion.tipo === "seccion" && seccion ? <ContextoSeccion seccion={seccion} /> : null}
@@ -48,17 +49,12 @@ export function BuilderCanvas({
 
 function EstadoVacioModulo({ titulo }: { readonly titulo: string }) {
   return (
-    <div className="flex flex-col items-center gap-4 py-16 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-subtle text-text-tertiary">
-        <MousePointer2 className="h-6 w-6" strokeWidth={1.5} aria-hidden={true} />
-      </div>
-      <div className="flex flex-col gap-1">
-        <h2 className="text-h2 text-text-primary">{titulo}</h2>
-        <p className="max-w-md text-body-sm text-text-secondary">
-          Selecciona una sección o un bloque en el árbol de la izquierda para empezar a editar. Las
-          propiedades del módulo viven en el panel derecho.
-        </p>
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        eyebrow="Módulo"
+        titulo={titulo}
+        descripcion="Selecciona una sección o un bloque en el árbol para empezar a editar. Las propiedades del módulo viven en el panel derecho."
+      />
     </div>
   )
 }
@@ -67,15 +63,13 @@ function ContextoSeccion({ seccion }: { readonly seccion: SeccionResponse }) {
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
-        <span className="nx-eyebrow text-text-tertiary">Sección {seccion.orden}</span>
+        <span className="nx-eyebrow text-text-tertiary">Sección · {seccion.orden}</span>
         <h2 className="text-h2 text-text-primary">{seccion.titulo}</h2>
       </header>
-      <div className="flex flex-col gap-2 rounded-lg border border-border border-dashed bg-surface p-6 text-text-tertiary">
-        <p className="text-body-sm">
-          El editor de sección llega en un lote próximo. Aquí podrás describir la sección, asociar
-          skills y reordenar sus bloques.
-        </p>
-      </div>
+      <Banner tone="info">
+        El editor de sección llega próximamente. Mientras tanto, gestiona los bloques desde el
+        árbol.
+      </Banner>
     </div>
   )
 }
@@ -117,7 +111,7 @@ function ContextoBloque({
   return (
     <div className="flex flex-col gap-6">
       <header className="flex items-start gap-4">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-subtle text-text-secondary">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
           <Icono className="h-5 w-5" strokeWidth={1.5} aria-hidden={true} />
         </span>
         <div className="flex flex-col gap-1">
@@ -126,14 +120,7 @@ function ContextoBloque({
           <p className="text-body-sm text-text-secondary">{meta.descripcionCorta}</p>
         </div>
       </header>
-      <div className="flex flex-col gap-3 rounded-lg border border-border border-dashed bg-surface p-6">
-        <div className="flex items-center gap-2 text-text-tertiary">
-          <Boxes className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
-          <span className="text-body-sm">
-            El editor de {meta.etiqueta.toLowerCase()} llega en un lote próximo.
-          </span>
-        </div>
-      </div>
+      <Banner tone="info">El editor de {meta.etiqueta.toLowerCase()} llega próximamente.</Banner>
     </div>
   )
 }

@@ -26,6 +26,7 @@ export const SEED_AREAS: AreaResponse[] = [
   {
     id: ID_AREA_BACKEND,
     nombre: "Backend",
+    codigo: "backend",
     descripcion: "Servicios, APIs, datos, infra.",
     createdAt: ahora,
     updatedAt: ahora,
@@ -33,6 +34,7 @@ export const SEED_AREAS: AreaResponse[] = [
   {
     id: ID_AREA_FRONTEND,
     nombre: "Frontend",
+    codigo: "frontend",
     descripcion: "Web, móvil, experiencia.",
     createdAt: ahora,
     updatedAt: ahora,
@@ -40,6 +42,7 @@ export const SEED_AREAS: AreaResponse[] = [
   {
     id: ID_AREA_DATOS,
     nombre: "Datos",
+    codigo: "data",
     descripcion: "Analítica, pipelines, BI.",
     createdAt: ahora,
     updatedAt: ahora,
@@ -47,6 +50,7 @@ export const SEED_AREAS: AreaResponse[] = [
   {
     id: ID_AREA_CLOUD,
     nombre: "Cloud & DevOps",
+    codigo: "cloud",
     descripcion: "AWS, Azure, GCP, IaC, CI/CD.",
     createdAt: ahora,
     updatedAt: ahora,
@@ -54,6 +58,7 @@ export const SEED_AREAS: AreaResponse[] = [
   {
     id: ID_AREA_PRODUCTO,
     nombre: "Producto",
+    codigo: "soft",
     descripcion: "Discovery, gestión, métricas.",
     createdAt: ahora,
     updatedAt: ahora,
@@ -61,6 +66,7 @@ export const SEED_AREAS: AreaResponse[] = [
   {
     id: ID_AREA_CALIDAD,
     nombre: "Calidad",
+    codigo: "qa",
     descripcion: "Testing automatizado, QA, performance.",
     createdAt: ahora,
     updatedAt: ahora,

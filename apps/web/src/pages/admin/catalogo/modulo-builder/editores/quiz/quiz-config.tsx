@@ -25,30 +25,39 @@ const SOLUCION_OPCIONES: ReadonlyArray<{
   { id: "al_cerrar", etiqueta: "Al cerrar curso" },
 ]
 
+const CHIP_BASE =
+  "inline-flex cursor-pointer items-center gap-1.5 rounded-pill border px-3 py-1.5 text-caption transition-[background-color,border-color,color,box-shadow] duration-fast ease-default"
+const CHIP_ACTIVO = "border-border-strong bg-subtle font-medium text-text-primary shadow-xs"
+const CHIP_INACTIVO = "border-border bg-surface text-text-secondary hover:bg-subtle/60"
+
 export function QuizConfig({ config, onCambiar }: QuizConfigProps) {
   const intentosIlimitados = config.intentosMax === null
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">
+    <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4 shadow-xs">
       <span className="nx-eyebrow text-text-tertiary">Configuración del quiz</span>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Intentos del participante">
           {() => (
-            <div className="flex items-center gap-3">
-              <label className="inline-flex items-center gap-2 text-body-sm text-text-secondary">
+            <div className="flex items-center gap-2">
+              <label className={cn(CHIP_BASE, intentosIlimitados ? CHIP_ACTIVO : CHIP_INACTIVO)}>
                 <input
                   type="radio"
+                  name="quiz-intentos-modo"
                   checked={intentosIlimitados}
                   onChange={() => onCambiar({ ...config, intentosMax: null })}
+                  className="sr-only"
                 />
                 Ilimitados
               </label>
-              <label className="inline-flex items-center gap-2 text-body-sm text-text-secondary">
+              <label className={cn(CHIP_BASE, !intentosIlimitados ? CHIP_ACTIVO : CHIP_INACTIVO)}>
                 <input
                   type="radio"
+                  name="quiz-intentos-modo"
                   checked={!intentosIlimitados}
                   onChange={() => onCambiar({ ...config, intentosMax: 3 })}
+                  className="sr-only"
                 />
                 Máximo
               </label>
@@ -65,6 +74,7 @@ export function QuizConfig({ config, onCambiar }: QuizConfigProps) {
                   })
                 }
                 className="w-20"
+                aria-label="Número máximo de intentos"
               />
             </div>
           )}
@@ -86,7 +96,7 @@ export function QuizConfig({ config, onCambiar }: QuizConfigProps) {
                   })
                 }
               />
-              <span className="text-body-sm text-text-tertiary">/ 100</span>
+              <span className="tabular font-mono text-body-sm text-text-tertiary">/ 100</span>
             </div>
           )}
         </Field>
@@ -98,15 +108,7 @@ export function QuizConfig({ config, onCambiar }: QuizConfigProps) {
             {SOLUCION_OPCIONES.map((opt) => {
               const activo = config.solucionVisible === opt.id
               return (
-                <label
-                  key={opt.id}
-                  className={cn(
-                    "cursor-pointer rounded-pill border px-3 py-1.5 text-caption transition-colors",
-                    activo
-                      ? "border-accent bg-accent-soft text-accent-on-soft"
-                      : "border-border bg-surface text-text-secondary hover:bg-subtle",
-                  )}
-                >
+                <label key={opt.id} className={cn(CHIP_BASE, activo ? CHIP_ACTIVO : CHIP_INACTIVO)}>
                   <input
                     type="radio"
                     name="quiz-solucion-visible"

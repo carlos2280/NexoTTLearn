@@ -109,6 +109,7 @@ const handleCrearArea: MockHandler = (req) => {
   const nueva: AreaResponse = {
     id: nuevoUuid("nuev"),
     nombre: input.nombre.trim(),
+    codigo: input.codigo,
     descripcion: input.descripcion?.trim() ?? null,
     createdAt: ahora,
     updatedAt: ahora,

@@ -1,7 +1,8 @@
 import { useActualizarPesosCurso } from "@/features/cursos/hooks/use-mutaciones-config-curso"
 import type { CursoDetalle } from "@nexott-learn/shared-types"
-import { Scale } from "lucide-react"
 import { useEffect, useState } from "react"
+import { AYUDAS_CONFIG_CURSO } from "./ayudas"
+import { BarraSumaSegmentos } from "./barra-suma-segmentos"
 import { CampoNumero } from "./campo-numero"
 import { ConfigCard } from "./config-card"
 
@@ -59,15 +60,17 @@ export function ConfigPesos({ curso, bloqueado }: ConfigPesosProps) {
 
   return (
     <ConfigCard
+      id="config-pesos"
       titulo="Pesos del curso"
       descripcion="Distribuye 100% entre bloques, transversal y entrevista. Umbral No-cumple en [0, 100]."
-      icono={Scale}
+      ayuda={AYUDAS_CONFIG_CURSO.pesos}
       exigeMotivo={curso.estado !== "BORRADOR"}
       modificado={modificado && sumaValida}
       enviando={mutacion.isPending}
       deshabilitado={bloqueado}
       mensajeDeshabilitado={bloqueado ? "Sólo editable en BORRADOR o ACTIVO." : undefined}
       onGuardar={guardar}
+      onCancelar={() => setForm(desdeCurso(curso))}
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <CampoNumero
@@ -86,13 +89,13 @@ export function ConfigPesos({ curso, bloqueado }: ConfigPesosProps) {
           onCambio={(v) => setForm((f) => ({ ...f, entrevista: v }))}
         />
       </div>
-      <p
-        className={
-          sumaValida ? "text-caption text-text-tertiary" : "text-caption text-danger-on-soft"
-        }
-      >
-        Suma: {suma.toFixed(2)}% {sumaValida ? "✓" : "(debe ser 100)"}
-      </p>
+      <BarraSumaSegmentos
+        tramos={[
+          { id: "bloques", valor: form.bloques, etiqueta: "Bloques" },
+          { id: "transversal", valor: form.transversal, etiqueta: "Transversal" },
+          { id: "entrevista", valor: form.entrevista, etiqueta: "Entrevista" },
+        ]}
+      />
       <CampoNumero
         label="Umbral No-cumple (%)"
         valor={form.umbralNoCumple}

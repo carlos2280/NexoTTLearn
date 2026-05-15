@@ -1,7 +1,9 @@
 import { useActualizarTransversalCurso } from "@/features/cursos/hooks/use-mutaciones-config-curso"
+import { Switch } from "@/shared/components/ui/switch"
 import type { CursoDetalle } from "@nexott-learn/shared-types"
-import { Hammer } from "lucide-react"
 import { useEffect, useState } from "react"
+import { AYUDAS_CONFIG_CURSO } from "./ayudas"
+import { BarraSumaSegmentos } from "./barra-suma-segmentos"
 import { CampoNumero } from "./campo-numero"
 import { ConfigCard } from "./config-card"
 
@@ -36,6 +38,7 @@ export function ConfigTransversal({ curso, bloqueado }: ConfigTransversalProps) 
   const mutacion = useActualizarTransversalCurso()
   const inicialPorCurso: FormTransversal = { ...INICIAL, activo: curso.transversalId !== null }
   const [form, setForm] = useState<FormTransversal>(inicialPorCurso)
+  const [solicitudGuardar, setSolicitudGuardar] = useState(0)
 
   useEffect(() => {
     setForm({ ...INICIAL, activo: curso.transversalId !== null })
@@ -72,24 +75,27 @@ export function ConfigTransversal({ curso, bloqueado }: ConfigTransversalProps) 
 
   return (
     <ConfigCard
+      id="config-transversal"
       titulo="Proyecto transversal"
       descripcion="Activa el proyecto transversal y reparte 100% entre capas (tests / cualitativa / comprensión)."
-      icono={Hammer}
+      ayuda={AYUDAS_CONFIG_CURSO.transversal}
       exigeMotivo={curso.estado !== "BORRADOR"}
       modificado={modificado && sumaValida}
       enviando={mutacion.isPending}
       deshabilitado={bloqueado}
       onGuardar={guardar}
+      onCancelar={() => setForm({ ...INICIAL, activo: curso.transversalId !== null })}
+      solicitudGuardar={solicitudGuardar}
     >
-      <label className="inline-flex items-center gap-2 text-body-sm">
-        <input
-          type="checkbox"
-          checked={form.activo}
-          onChange={(e) => setForm((f) => ({ ...f, activo: e.target.checked }))}
-          className="h-4 w-4 rounded border-border-strong"
-        />
-        Activar proyecto transversal
-      </label>
+      <Switch
+        checked={form.activo}
+        onCambio={(v) => {
+          setForm((f) => ({ ...f, activo: v }))
+          setSolicitudGuardar((s) => s + 1)
+        }}
+        label="Activar proyecto transversal"
+        descripcion="Se evalúa en 3 capas: tests automáticos, análisis cualitativo y comprensión."
+      />
       {form.activo ? (
         <>
           <CampoNumero
@@ -114,13 +120,13 @@ export function ConfigTransversal({ curso, bloqueado }: ConfigTransversalProps) 
               onCambio={(v) => setForm((f) => ({ ...f, pesoCapaComprension: v }))}
             />
           </div>
-          <p
-            className={
-              sumaValida ? "text-caption text-text-tertiary" : "text-caption text-danger-on-soft"
-            }
-          >
-            Suma capas: {sumaCapas.toFixed(2)}% {sumaValida ? "✓" : "(debe ser 100)"}
-          </p>
+          <BarraSumaSegmentos
+            tramos={[
+              { id: "tests", valor: form.pesoCapaTests, etiqueta: "Tests" },
+              { id: "cualitativa", valor: form.pesoCapaCualitativa, etiqueta: "Cualitativa" },
+              { id: "comprension", valor: form.pesoCapaComprension, etiqueta: "Comprensión" },
+            ]}
+          />
         </>
       ) : null}
     </ConfigCard>

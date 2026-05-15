@@ -42,14 +42,19 @@ function Boton({ icono: Icono, etiqueta, activo, deshabilitado, onClick }: Boton
       aria-label={etiqueta}
       title={etiqueta}
       className={cn(
-        "inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors",
+        "inline-flex h-8 w-8 items-center justify-center rounded-md",
+        "transition-[background-color,color,box-shadow] duration-fast ease-default",
         "disabled:cursor-not-allowed disabled:opacity-40",
         activo
-          ? "bg-accent-soft text-accent-on-soft"
-          : "text-text-secondary hover:bg-subtle hover:text-text-primary",
+          ? "bg-subtle text-text-primary shadow-xs"
+          : "text-text-secondary hover:bg-subtle/60 hover:text-text-primary",
       )}
     >
-      <Icono className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
+      <Icono
+        className={cn("h-4 w-4", activo ? "text-accent" : "")}
+        strokeWidth={1.5}
+        aria-hidden={true}
+      />
     </button>
   )
 }
@@ -91,7 +96,7 @@ export function TiptapToolbar({ editor, variante = "completa" }: TiptapToolbarPr
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-0.5 rounded-md border border-border bg-surface p-1">
+    <div className="flex flex-wrap items-center gap-0.5 rounded-lg border border-border bg-surface p-1 shadow-xs">
       <Boton
         icono={Bold}
         etiqueta="Negrita"

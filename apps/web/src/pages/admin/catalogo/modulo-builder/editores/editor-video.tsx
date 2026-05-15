@@ -1,10 +1,10 @@
+import { Badge } from "@/shared/components/ui/badge"
 import { Field } from "@/shared/components/ui/field"
 import { Input } from "@/shared/components/ui/input"
 import { Textarea } from "@/shared/components/ui/textarea"
 import { type BloqueDetalleResponse, contenidoVideoSchema } from "@nexott-learn/shared-types"
 import { useRef, useState } from "react"
-import { tipoBloqueMeta } from "../bloque-tipo-meta"
-import { IndicadorGuardado } from "./shared/indicador-guardado"
+import { EditorBloqueShell } from "./shared/editor-bloque-shell"
 import { useAutoGuardarBloque } from "./shared/use-auto-guardar-bloque"
 
 interface EditorVideoProps {
@@ -54,12 +54,13 @@ function urlEmbed(url: string, proveedor: Proveedor): string | null {
   return null
 }
 
-/**
- * Hidrata el borrador desde `bloque.contenido`. Si el JSON no cumple el
- * contrato oficial (`contenidoVideoSchema`) cae al estado canonico:
- * proveedor `otro`, URL/notas vacias, marcador al 90% (mismo default
- * que usaba la implementacion previa).
- */
+const ETIQUETA_PROVEEDOR: Record<Proveedor, string> = {
+  youtube: "YouTube",
+  vimeo: "Vimeo",
+  loom: "Loom",
+  otro: "Sin detectar",
+}
+
 function leerInicial(contenido: Record<string, unknown> | null): Borrador {
   const result = contenidoVideoSchema.safeParse(contenido)
   if (result.success) {
@@ -69,7 +70,6 @@ function leerInicial(contenido: Record<string, unknown> | null): Borrador {
 }
 
 export function EditorVideo({ bloque }: EditorVideoProps) {
-  const meta = tipoBloqueMeta(bloque.tipo)
   const inicial = leerInicial(bloque.contenido)
   const [datos, setDatos] = useState<Borrador>(inicial)
   const datosRef = useRef<Borrador>(inicial)
@@ -89,21 +89,15 @@ export function EditorVideo({ bloque }: EditorVideoProps) {
   }
 
   const embed = urlEmbed(datos.url, datos.proveedor)
+  const proveedorEtiqueta = ETIQUETA_PROVEEDOR[datos.proveedor]
 
   return (
-    <div className="flex flex-col gap-5">
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <span className="nx-eyebrow text-text-tertiary">Bloque · {meta.etiqueta}</span>
-          <h2 className="text-h2 text-text-primary">Vídeo embebido</h2>
-          <p className="max-w-xl text-body-sm text-text-secondary">
-            Inserta un vídeo de YouTube, Vimeo o Loom mediante su URL pública. El participante lo
-            verá embebido sin salir del módulo.
-          </p>
-        </div>
-        <IndicadorGuardado estado={auto.estado} />
-      </header>
-
+    <EditorBloqueShell
+      bloque={bloque}
+      titulo="Vídeo embebido"
+      descripcion="Inserta un vídeo de YouTube, Vimeo o Loom mediante su URL pública. El participante lo verá embebido sin salir del módulo."
+      estadoGuardado={auto.estado}
+    >
       <Field label="URL del vídeo" hint="YouTube, Vimeo o Loom. Pega el enlace público.">
         {(attrs) => (
           <Input
@@ -120,13 +114,14 @@ export function EditorVideo({ bloque }: EditorVideoProps) {
       </Field>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Proveedor detectado">
-          {() => (
-            <div className="inline-flex h-10 items-center rounded-md border border-border bg-subtle px-3 text-body-sm text-text-secondary capitalize">
-              {datos.proveedor}
-            </div>
-          )}
-        </Field>
+        <div className="flex flex-col gap-1.5">
+          <span className="nx-eyebrow text-text-tertiary">Proveedor detectado</span>
+          <div>
+            <Badge tono={datos.proveedor === "otro" ? "neutro" : "acento"} conPunto={true}>
+              {proveedorEtiqueta}
+            </Badge>
+          </div>
+        </div>
         <Field
           label="Marcar como visto al alcanzar"
           hint="Porcentaje del vídeo que el participante debe ver para completar el bloque."
@@ -145,7 +140,7 @@ export function EditorVideo({ bloque }: EditorVideoProps) {
                   })
                 }
               />
-              <span className="text-body-sm text-text-tertiary">%</span>
+              <span className="tabular font-mono text-body-sm text-text-tertiary">%</span>
             </div>
           )}
         </Field>
@@ -166,7 +161,7 @@ export function EditorVideo({ bloque }: EditorVideoProps) {
       <div className="flex flex-col gap-2">
         <span className="nx-eyebrow text-text-tertiary">Vista previa</span>
         {embed ? (
-          <div className="aspect-video w-full overflow-hidden rounded-lg border border-border bg-canvas">
+          <div className="aspect-video w-full overflow-hidden rounded-lg border border-border bg-canvas shadow-xs">
             <iframe
               key={embed}
               src={embed}
@@ -177,13 +172,13 @@ export function EditorVideo({ bloque }: EditorVideoProps) {
             />
           </div>
         ) : (
-          <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-border border-dashed bg-subtle text-body-sm text-text-tertiary">
+          <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-border bg-subtle/60 text-body-sm text-text-tertiary">
             {datos.url
               ? "No se pudo extraer el ID del vídeo de esta URL."
               : "Pega una URL para ver la previa aquí."}
           </div>
         )}
       </div>
-    </div>
+    </EditorBloqueShell>
   )
 }

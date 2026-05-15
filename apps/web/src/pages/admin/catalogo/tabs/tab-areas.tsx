@@ -76,10 +76,10 @@ export function TabAreas() {
         />
         <Button
           variant="primary"
-          size="sm"
+          size="md"
           onClick={() => setDialog({ modo: "crear", area: null })}
         >
-          <Plus className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
+          <Plus className="h-4 w-4" strokeWidth={1.75} aria-hidden={true} />
           Nueva área
         </Button>
       </div>

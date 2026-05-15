@@ -2,7 +2,7 @@ import { Badge } from "@/shared/components/ui/badge"
 import { Button } from "@/shared/components/ui/button"
 import { RUTAS } from "@/shared/constants/rutas"
 import type { ModuloResponse } from "@nexott-learn/shared-types"
-import { ChevronLeft, Eye } from "lucide-react"
+import { ChevronLeft } from "lucide-react"
 import { Link } from "react-router-dom"
 import { useGuardadoBuilder } from "../contexto-guardado"
 import { IndicadorGuardado } from "../editores/shared/indicador-guardado"
@@ -12,25 +12,27 @@ interface BuilderTopbarProps {
 }
 
 /**
- * Barra superior del builder inmersivo. Minimalista: salida, identidad del
- * modulo, badge de estado, indicador de guardado y accesos a "vista previa"
- * y "balance" (deshabilitados en B0).
+ * Barra superior del builder inmersivo.
+ *
+ * Lenguaje del shell admin: h-16, firma aurora 1px en el borde inferior,
+ * sin divisores duros. Salida con breadcrumb hacia el origen ("Catálogo"),
+ * título del módulo con peso editorial, estado a su lado y guardado a la
+ * derecha como información sutil (no CTA).
  */
 export function BuilderTopbar({ modulo }: BuilderTopbarProps) {
   const { estado } = useGuardadoBuilder()
+
   return (
-    <header className="flex h-14 shrink-0 items-center gap-4 border-border border-b bg-surface px-4">
+    <header className="relative flex h-16 shrink-0 items-center gap-4 bg-surface px-4 lg:px-6">
       <Button asChild={true} variant="ghost" size="sm">
-        <Link to={RUTAS.admin.catalogo} aria-label="Salir del builder">
-          <ChevronLeft className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
-          Salir
+        <Link to={RUTAS.admin.catalogo} aria-label="Volver al catálogo">
+          <ChevronLeft className="h-4 w-4" strokeWidth={1.75} aria-hidden={true} />
+          Catálogo
         </Link>
       </Button>
 
-      <div className="h-5 w-px bg-border" aria-hidden={true} />
-
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <h1 className="truncate font-medium text-body-sm text-text-primary">{modulo.titulo}</h1>
+        <h1 className="truncate font-medium text-body text-text-primary">{modulo.titulo}</h1>
         {modulo.estado === "ACTIVO" ? (
           <Badge tono="success" conPunto={true}>
             Activo
@@ -44,12 +46,10 @@ export function BuilderTopbar({ modulo }: BuilderTopbarProps) {
 
       <IndicadorGuardado estado={estado} />
 
-      <div className="h-5 w-px bg-border" aria-hidden={true} />
-
-      <Button variant="ghost" size="sm" disabled={true} title="Vista previa — próximamente">
-        <Eye className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
-        Vista previa
-      </Button>
+      <div
+        aria-hidden={true}
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-[image:var(--gradient-aurora)] opacity-25"
+      />
     </header>
   )
 }

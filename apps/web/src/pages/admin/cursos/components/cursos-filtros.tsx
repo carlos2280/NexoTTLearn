@@ -1,8 +1,10 @@
 import { Button } from "@/shared/components/ui/button"
 import { SearchField } from "@/shared/components/ui/search-field"
 import { Select } from "@/shared/components/ui/select"
+import { Tooltip } from "@/shared/components/ui/tooltip"
+import { cn } from "@/shared/lib/cn"
 import type { ClienteResponse } from "@nexott-learn/shared-types"
-import { Plus } from "lucide-react"
+import { Archive, Plus } from "lucide-react"
 
 interface CursosFiltrosProps {
   readonly busqueda: string
@@ -53,21 +55,45 @@ export function CursosFiltros({
           ))}
         </Select>
         {mostrarToggleArchivados ? (
-          <label className="inline-flex items-center gap-2 text-body-sm text-text-secondary">
-            <input
-              type="checkbox"
-              checked={incluirArchivados}
-              onChange={(e) => onIncluirArchivados(e.target.checked)}
-              className="h-4 w-4 rounded border-border-strong"
-            />
-            Incluir archivados
-          </label>
+          <ToggleArchivados
+            activo={incluirArchivados}
+            onAlternar={() => onIncluirArchivados(!incluirArchivados)}
+          />
         ) : null}
       </div>
-      <Button variant="primary" size="sm" onClick={onNuevoCurso}>
-        <Plus className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
+      <Button variant="primary" size="md" onClick={onNuevoCurso}>
+        <Plus className="h-4 w-4" strokeWidth={1.75} aria-hidden={true} />
         Nuevo curso
       </Button>
     </div>
+  )
+}
+
+interface ToggleArchivadosProps {
+  readonly activo: boolean
+  readonly onAlternar: () => void
+}
+
+function ToggleArchivados({ activo, onAlternar }: ToggleArchivadosProps) {
+  return (
+    <Tooltip contenido={activo ? "Ocultar archivados" : "Incluir archivados"} side="bottom">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={activo}
+        aria-label={activo ? "Ocultar cursos archivados" : "Incluir cursos archivados"}
+        onClick={onAlternar}
+        className={cn(
+          "inline-flex h-9 w-9 items-center justify-center rounded-pill",
+          "border shadow-xs transition-[background-color,border-color,box-shadow,color] duration-base ease-default",
+          "focus-visible:border-aurora-violet focus-visible:shadow-ring-aurora-soft focus-visible:outline-none",
+          activo
+            ? "border-accent/40 bg-accent-soft text-accent"
+            : "border-border-strong bg-surface text-text-secondary hover:border-border-emphasis hover:text-text-primary hover:shadow-sm",
+        )}
+      >
+        <Archive className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
+      </button>
+    </Tooltip>
   )
 }

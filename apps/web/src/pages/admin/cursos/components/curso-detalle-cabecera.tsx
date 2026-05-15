@@ -112,10 +112,20 @@ export function CursoDetalleCabecera({
           {nombreCliente ? (
             <span className="text-body-sm text-text-secondary">{nombreCliente}</span>
           ) : null}
-          <span className="tabular text-body-sm text-text-tertiary">
-            Deadline: {formatearFecha(curso.fechaDeadline)}
-            {textoDias ? ` · ${textoDias}` : ""}
-          </span>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-body-sm text-text-tertiary">
+            <span className="tabular">
+              <span className="nx-eyebrow mr-1.5">Inicio</span>
+              {formatearFecha(curso.fechaInicio)}
+            </span>
+            <span aria-hidden={true} className="opacity-50">
+              ·
+            </span>
+            <span className="tabular">
+              <span className="nx-eyebrow mr-1.5">Deadline</span>
+              {formatearFecha(curso.fechaDeadline)}
+              {textoDias ? <span className="ml-1.5">· {textoDias}</span> : null}
+            </span>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="secondary" size="sm" onClick={onVerLog}>

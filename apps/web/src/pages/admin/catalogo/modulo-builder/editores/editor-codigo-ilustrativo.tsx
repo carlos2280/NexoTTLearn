@@ -5,9 +5,8 @@ import {
   contenidoCodigoIlustrativoSchema,
 } from "@nexott-learn/shared-types"
 import { useRef, useState } from "react"
-import { tipoBloqueMeta } from "../bloque-tipo-meta"
-import { CodigoTextarea } from "./shared/codigo-textarea"
-import { IndicadorGuardado } from "./shared/indicador-guardado"
+import { CodeEditor } from "./shared/code-editor"
+import { EditorBloqueShell } from "./shared/editor-bloque-shell"
 import { SelectLenguaje } from "./shared/select-lenguaje"
 import { useAutoGuardarBloque } from "./shared/use-auto-guardar-bloque"
 
@@ -21,11 +20,6 @@ interface Borrador {
   readonly descripcion: string
 }
 
-/**
- * Hidrata el borrador desde `bloque.contenido`. Si el JSON no cumple el
- * contrato oficial (`contenidoCodigoIlustrativoSchema`) cae al estado
- * canonico (lenguaje typescript + codigo y descripcion vacios).
- */
 function leerInicial(contenido: Record<string, unknown> | null): Borrador {
   const result = contenidoCodigoIlustrativoSchema.safeParse(contenido)
   if (result.success) {
@@ -35,7 +29,6 @@ function leerInicial(contenido: Record<string, unknown> | null): Borrador {
 }
 
 export function EditorCodigoIlustrativo({ bloque }: EditorCodigoIlustrativoProps) {
-  const meta = tipoBloqueMeta(bloque.tipo)
   const inicial = leerInicial(bloque.contenido)
   const [datos, setDatos] = useState<Borrador>(inicial)
   const datosRef = useRef<Borrador>(inicial)
@@ -55,19 +48,12 @@ export function EditorCodigoIlustrativo({ bloque }: EditorCodigoIlustrativoProps
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <span className="nx-eyebrow text-text-tertiary">Bloque · {meta.etiqueta}</span>
-          <h2 className="text-h2 text-text-primary">Snippet ilustrativo</h2>
-          <p className="max-w-xl text-body-sm text-text-secondary">
-            Trozo de código sólo para ilustrar un concepto. No se evalúa: el participante lo lee y
-            avanza.
-          </p>
-        </div>
-        <IndicadorGuardado estado={auto.estado} />
-      </header>
-
+    <EditorBloqueShell
+      bloque={bloque}
+      titulo="Snippet ilustrativo"
+      descripcion="Trozo de código sólo para ilustrar un concepto. No se evalúa: el participante lo lee y avanza."
+      estadoGuardado={auto.estado}
+    >
       <Field label="Lenguaje" hint="Determina el resaltado al renderizar.">
         {(attrs) => (
           <SelectLenguaje
@@ -80,10 +66,11 @@ export function EditorCodigoIlustrativo({ bloque }: EditorCodigoIlustrativoProps
 
       <Field label="Código">
         {(attrs) => (
-          <CodigoTextarea
+          <CodeEditor
             id={attrs.id}
             value={datos.codigo}
             onValueChange={(v) => actualizar({ codigo: v })}
+            lenguaje={datos.lenguaje}
             rows={12}
             placeholder="// Tu código de ejemplo aquí…"
           />
@@ -101,6 +88,6 @@ export function EditorCodigoIlustrativo({ bloque }: EditorCodigoIlustrativoProps
           />
         )}
       </Field>
-    </div>
+    </EditorBloqueShell>
   )
 }

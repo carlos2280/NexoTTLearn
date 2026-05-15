@@ -6,10 +6,9 @@ import { Select } from "@/shared/components/ui/select"
 import type { BloqueDetalleResponse } from "@nexott-learn/shared-types"
 import { FlaskConical, Plus } from "lucide-react"
 import { useMemo, useRef, useState } from "react"
-import { tipoBloqueMeta } from "../bloque-tipo-meta"
 import { CodigoTestFila, type TestUnit, testVacio } from "./codigo-tests/codigo-test-fila"
-import { CodigoTextarea } from "./shared/codigo-textarea"
-import { IndicadorGuardado } from "./shared/indicador-guardado"
+import { CodeEditor } from "./shared/code-editor"
+import { EditorBloqueShell } from "./shared/editor-bloque-shell"
 import { useAutoGuardarBloque } from "./shared/use-auto-guardar-bloque"
 
 interface EditorCodigoTestsProps {
@@ -33,13 +32,11 @@ function leerInicial(contenido: Record<string, unknown> | null): Borrador {
 }
 
 export function EditorCodigoTests({ bloque }: EditorCodigoTestsProps) {
-  const meta = tipoBloqueMeta(bloque.tipo)
   const inicial = useMemo(() => leerInicial(bloque.contenido), [bloque.contenido])
   const [datos, setDatos] = useState<Borrador>(inicial)
   const datosRef = useRef<Borrador>(inicial)
   const [expandidoId, setExpandidoId] = useState<string | null>(inicial.tests[0]?.id ?? null)
 
-  // Hermanos CODIGO_PREGUNTAS en la misma sección para el select.
   const hermanosQuery = useListarBloques({
     page: 1,
     pageSize: 100,
@@ -83,19 +80,12 @@ export function EditorCodigoTests({ bloque }: EditorCodigoTestsProps) {
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <span className="nx-eyebrow text-text-tertiary">Bloque · {meta.etiqueta}</span>
-          <h2 className="text-h2 text-text-primary">Tests automáticos</h2>
-          <p className="max-w-xl text-body-sm text-text-secondary">
-            Pares entrada → salida esperada que se ejecutan contra el código del participante. La
-            nota es el porcentaje de tests pasados.
-          </p>
-        </div>
-        <IndicadorGuardado estado={auto.estado} />
-      </header>
-
+    <EditorBloqueShell
+      bloque={bloque}
+      titulo="Tests automáticos"
+      descripcion="Pares entrada → salida esperada que se ejecutan contra el código del participante. La nota es el porcentaje de tests pasados."
+      estadoGuardado={auto.estado}
+    >
       <Field
         label="Reto asociado"
         hint="Elige el bloque «Reto de código» de esta misma sección al que pertenecen estos tests."
@@ -121,10 +111,11 @@ export function EditorCodigoTests({ bloque }: EditorCodigoTestsProps) {
         hint="No visible para el participante. Sirve para auto-validar tus tests."
       >
         {(attrs) => (
-          <CodigoTextarea
+          <CodeEditor
             id={attrs.id}
             value={datos.solucionReferencia}
             onValueChange={(v) => actualizar({ ...datos, solucionReferencia: v })}
+            lenguaje="typescript"
             rows={10}
             placeholder="// Tu solución de referencia…"
           />
@@ -162,6 +153,6 @@ export function EditorCodigoTests({ bloque }: EditorCodigoTestsProps) {
           </ol>
         )}
       </div>
-    </div>
+    </EditorBloqueShell>
   )
 }

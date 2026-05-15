@@ -159,12 +159,12 @@ export function BuilderArbol({
 
       <nav className="flex-1 overflow-y-auto px-1.5 py-2" aria-label="Árbol del módulo">
         {arbol.length === 0 ? (
-          <div className="flex flex-col gap-2 px-2 py-4">
-            <p className="text-caption text-text-tertiary">
+          <div className="flex flex-col gap-3 px-2 py-6">
+            <p className="text-body-sm text-text-secondary">
               Aún no hay secciones. Empieza creando la primera.
             </p>
             <Button variant="secondary" size="sm" onClick={onCrearSeccion}>
-              <Plus className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
+              <Plus className="h-4 w-4" strokeWidth={1.75} aria-hidden={true} />
               Nueva sección
             </Button>
           </div>
@@ -199,10 +199,6 @@ export function BuilderArbol({
           </DndContext>
         )}
       </nav>
-
-      <div className="border-border border-t px-3 py-2.5 text-caption text-text-tertiary">
-        Arrastra con ⋮ · ESC para deseleccionar
-      </div>
     </aside>
   )
 }
@@ -246,10 +242,11 @@ function FilaSeccion(props: FilaSeccionProps) {
     <li ref={sortable.setNodeRef} style={style} className="flex flex-col">
       <div
         className={cn(
-          "group flex items-center gap-1 rounded-md py-1.5 pr-1 pl-0.5 text-body-sm transition-colors",
+          "group flex items-center gap-1 rounded-md py-1.5 pr-1 pl-0.5 text-body-sm",
+          "transition-[background-color,color,box-shadow] duration-fast ease-default",
           seccionActiva
-            ? "border-accent border-l-2 bg-accent-soft pl-[2px] text-accent-on-soft"
-            : "border-transparent border-l-2 text-text-primary hover:bg-subtle",
+            ? "bg-subtle font-medium text-text-primary shadow-xs"
+            : "text-text-primary hover:bg-subtle/60",
         )}
       >
         <button
@@ -257,7 +254,7 @@ function FilaSeccion(props: FilaSeccionProps) {
           {...sortable.attributes}
           {...sortable.listeners}
           aria-label="Arrastrar sección"
-          className="flex h-5 w-4 shrink-0 cursor-grab items-center justify-center text-text-tertiary hover:text-text-secondary active:cursor-grabbing"
+          className="flex h-5 w-4 shrink-0 cursor-grab items-center justify-center text-text-tertiary opacity-0 transition-opacity duration-fast ease-default hover:text-text-secondary active:cursor-grabbing group-hover:opacity-100"
         >
           <GripVertical className="h-3.5 w-3.5" strokeWidth={1.5} aria-hidden={true} />
         </button>
@@ -325,9 +322,9 @@ function FilaSeccion(props: FilaSeccionProps) {
             <button
               type="button"
               onClick={() => onCrearBloque(item.seccion.id)}
-              className="mt-0.5 flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-caption text-text-tertiary transition-colors hover:bg-subtle hover:text-text-secondary"
+              className="mt-0.5 flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-body-sm text-text-secondary transition-[background-color,color] duration-fast ease-default hover:bg-subtle hover:text-accent [&_svg]:text-text-tertiary [&_svg]:transition-colors [&_svg]:duration-fast hover:[&_svg]:text-accent"
             >
-              <Plus className="h-3.5 w-3.5" strokeWidth={1.5} aria-hidden={true} />
+              <Plus className="h-4 w-4" strokeWidth={1.75} aria-hidden={true} />
               Añadir bloque
             </button>
           </div>
@@ -360,8 +357,9 @@ function FilaBloque({ bloque, activo, onSeleccionar, onEliminar }: FilaBloquePro
       ref={sortable.setNodeRef}
       style={style}
       className={cn(
-        "group flex items-center gap-1 rounded-md px-0.5 py-1 transition-colors",
-        activo ? "bg-accent-soft text-accent-on-soft" : "text-text-secondary hover:bg-subtle",
+        "group flex items-center gap-1 rounded-md px-0.5 py-1",
+        "transition-[background-color,color,box-shadow] duration-fast ease-default",
+        activo ? "bg-subtle text-text-primary shadow-xs" : "text-text-secondary hover:bg-subtle/60",
       )}
     >
       <button
@@ -370,7 +368,7 @@ function FilaBloque({ bloque, activo, onSeleccionar, onEliminar }: FilaBloquePro
         {...sortable.listeners}
         aria-label="Arrastrar bloque"
         // biome-ignore lint/nursery/useSortedClasses: orden intencional — cursor-grab primero para legibilidad del grupo de interacción
-        className="flex h-5 w-4 shrink-0 cursor-grab items-center justify-center text-text-tertiary opacity-0 hover:text-text-secondary group-hover:opacity-100 active:cursor-grabbing"
+        className="flex h-5 w-4 shrink-0 cursor-grab items-center justify-center text-text-tertiary opacity-0 transition-opacity duration-fast ease-default hover:text-text-secondary group-hover:opacity-100 active:cursor-grabbing"
       >
         <GripVertical className="h-3 w-3" strokeWidth={1.5} aria-hidden={true} />
       </button>
@@ -379,9 +377,17 @@ function FilaBloque({ bloque, activo, onSeleccionar, onEliminar }: FilaBloquePro
         onClick={onSeleccionar}
         className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-caption"
       >
-        <Icono className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} aria-hidden={true} />
+        <Icono
+          className={cn("h-3.5 w-3.5 shrink-0", activo ? "text-accent" : "text-text-tertiary")}
+          strokeWidth={1.5}
+          aria-hidden={true}
+        />
         <span className="truncate">{meta.etiqueta}</span>
-        <span className="tabular ml-auto shrink-0 text-text-tertiary">v{bloque.version}</span>
+        {bloque.version > 1 ? (
+          <span className="tabular ml-auto shrink-0 font-mono text-text-tertiary">
+            v{bloque.version}
+          </span>
+        ) : null}
       </button>
       <MenuAcciones
         etiquetaAria={`Acciones de bloque ${meta.etiqueta}`}

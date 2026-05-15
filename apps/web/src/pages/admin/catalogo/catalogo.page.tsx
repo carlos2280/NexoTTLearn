@@ -1,3 +1,4 @@
+import { PageHeader } from "@/shared/components/ui/page-header"
 import { Tabs } from "@/shared/components/ui/tabs"
 import { Building2, FolderTree, Library, Sparkles } from "lucide-react"
 import { useSearchParams } from "react-router-dom"
@@ -37,14 +38,11 @@ export function CatalogoPage() {
 
   return (
     <div className="mx-auto flex max-w-[1280px] flex-col gap-8">
-      <header className="flex flex-col gap-2">
-        <span className="nx-eyebrow text-text-tertiary">Catálogo formativo</span>
-        <h1 className="text-h1 text-text-primary">Catálogo</h1>
-        <p className="max-w-2xl text-body text-text-secondary">
-          La cantera del aprendizaje: áreas, skills, módulos y clientes. Todo lo que el resto de la
-          plataforma usa para armar cursos.
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="Catálogo formativo"
+        titulo="Catálogo"
+        descripcion="La cantera del aprendizaje: áreas, skills, módulos y clientes. Todo lo que el resto de la plataforma usa para armar cursos."
+      />
       <Tabs<TabCatalogo>
         items={TABS_CATALOGO.map((id) => {
           const Icono = ICONO_TAB[id]

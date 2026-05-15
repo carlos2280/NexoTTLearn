@@ -3,7 +3,7 @@ import { Field } from "@/shared/components/ui/field"
 import { Input } from "@/shared/components/ui/input"
 import { cn } from "@/shared/lib/cn"
 import { ChevronDown, ChevronRight, Eye, EyeOff, Trash2 } from "lucide-react"
-import { CodigoTextarea } from "../shared/codigo-textarea"
+import { CodeEditor } from "../shared/code-editor"
 
 export interface TestUnit {
   readonly id: string
@@ -31,11 +31,11 @@ export function CodigoTestFila({
   onEliminar,
 }: CodigoTestFilaProps) {
   return (
-    <li className="rounded-lg border border-border bg-surface">
+    <li className="rounded-lg border border-border bg-surface shadow-xs">
       <button
         type="button"
         onClick={onAlternar}
-        className="flex w-full items-center gap-2 px-4 py-3 text-left"
+        className="flex w-full items-center gap-2 rounded-lg px-4 py-3 text-left transition-colors duration-fast ease-default hover:bg-subtle/40"
       >
         <span className="text-text-tertiary">
           {expandido ? (
@@ -79,22 +79,24 @@ export function CodigoTestFila({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Entrada">
               {(attrs) => (
-                <CodigoTextarea
+                <CodeEditor
                   id={attrs.id}
                   value={test.entrada}
                   onValueChange={(v) => onCambiar({ ...test, entrada: v })}
                   rows={5}
+                  compacto={true}
                   placeholder="[]"
                 />
               )}
             </Field>
             <Field label="Salida esperada">
               {(attrs) => (
-                <CodigoTextarea
+                <CodeEditor
                   id={attrs.id}
                   value={test.salidaEsperada}
                   onValueChange={(v) => onCambiar({ ...test, salidaEsperada: v })}
                   rows={5}
+                  compacto={true}
                   placeholder="0"
                 />
               )}
@@ -111,7 +113,12 @@ export function CodigoTestFila({
               />
               Visible para el participante
             </label>
-            <Button variant="ghost" size="sm" onClick={onEliminar}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onEliminar}
+              className="text-danger-on-soft hover:bg-danger-soft"
+            >
               <Trash2 className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
               Eliminar test
             </Button>
