@@ -7,7 +7,7 @@ interface PasoBienvenidaProps {
 
 export function PasoBienvenida({ usuario }: PasoBienvenidaProps) {
   const reducedMotion = useReducedMotion()
-  const ease: [number, number, number, number] = [0.16, 1, 0.3, 1]
+  const ease: [number, number, number, number] = [0.22, 1, 0.36, 1]
 
   return (
     <div className="relative flex flex-col items-start gap-6 lg:gap-8">

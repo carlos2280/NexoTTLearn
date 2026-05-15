@@ -39,11 +39,11 @@ export function SidePeek({
     <DialogPrimitiveRoot open={abierto} onOpenChange={onCambiarAbierto}>
       <DialogPrimitivePortal>
         <DialogPrimitiveOverlay
-          className="fixed inset-0 bg-text-primary/30 backdrop-blur-sm"
+          className="nx-motion-overlay fixed inset-0 bg-text-primary/30 backdrop-blur-sm"
           style={{ zIndex: 180 }}
         />
         <DialogPrimitiveContent
-          className={`fixed top-0 right-0 flex h-full w-full ${ANCHO_CLASE[ancho]} flex-col border-border border-l bg-surface shadow-overlay outline-none`}
+          className={`nx-motion-drawer fixed top-0 right-0 flex h-full w-full ${ANCHO_CLASE[ancho]} flex-col border-border border-l bg-surface shadow-overlay outline-none`}
           style={{ zIndex: 180 }}
         >
           <header className="flex shrink-0 items-start justify-between gap-3 border-border border-b px-6 py-4">

@@ -26,13 +26,13 @@ const schema = z
   })
 
 const stagger = (i: number) => ({
-  initial: { opacity: 0, y: 12 },
+  initial: { opacity: 0, y: 14 },
   animate: { opacity: 1, y: 0 },
   transition: {
     type: "spring" as const,
-    stiffness: 80,
+    stiffness: 120,
     damping: 18,
-    mass: 0.6,
+    mass: 0.7,
     delay: 0.3 + i * 0.07,
   },
 })
@@ -78,12 +78,12 @@ export function PasoCambiarPassword({ onExito }: PasoCambiarPasswordProps) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate={true}>
-      <motion.header {...motionProps(0)} className="flex flex-col gap-1.5">
+      <motion.header {...motionProps(0)} className="flex flex-col gap-2">
         <span className="nx-eyebrow text-aurora-violet">Primer acceso</span>
-        <h2 className="text-h1 text-text-primary">
+        <h2 className="text-h1 text-text-primary sm:text-display-md">
           Define tu contraseña<span className="text-aurora-violet">.</span>
         </h2>
-        <p className="text-body-sm text-text-secondary">Es la llave a tu ficha de skills.</p>
+        <p className="text-body-lg text-text-secondary">Es la llave a tu ficha de skills.</p>
       </motion.header>
 
       {apiError ? (

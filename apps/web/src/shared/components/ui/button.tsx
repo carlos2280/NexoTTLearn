@@ -9,33 +9,45 @@ const buttonStyles = tv({
     "cursor-pointer rounded-pill font-medium",
     "transition-[background-color,background-position,border-color,color,box-shadow,transform] duration-base ease-default",
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-    "active:scale-[0.98]",
-    "disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100",
+    "active:scale-[0.98] active:translate-y-0",
+    "disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 disabled:hover:translate-y-0",
   ],
   variants: {
     variant: {
+      // Primary — índigo del trabajo. Lift sutil + glow multi-layer al hover.
+      // text-white explícito (no text-accent-text) porque la variable de tema
+      // a veces no genera utility en Tailwind v4 y el texto cae a herencia.
       primary: [
-        "bg-accent text-accent-text",
-        "shadow-accent-glow hover:shadow-accent-glow-lg",
+        "bg-accent [color:#fff]",
+        "shadow-accent-glow hover:shadow-accent-glow-lg hover:-translate-y-0.5",
         "hover:bg-accent-hover active:bg-accent-pressed",
       ],
-      // Aurora — CTA "premium" para momentos cumbre (login, publicar, completar)
+      // Aurora — CTA "premium" para momentos cumbre (login, publicar, completar).
       // Gradiente cyan → violet → magenta + halo aurora. La posición del fondo
-      // se desplaza al hover para sensación de "el color respira".
+      // se desplaza al hover + lift para sensación de "el color respira y emerge".
       aurora: [
-        "relative text-white",
+        "relative [color:#fff]",
         "bg-[image:var(--gradient-aurora)] bg-[length:180%_180%] bg-[position:0%_50%]",
-        "shadow-aurora-glow",
-        "hover:bg-[position:100%_50%] hover:shadow-[0_16px_44px_rgb(var(--color-aurora-violet-rgb)/0.4)]",
+        "shadow-aurora-glow hover:-translate-y-0.5",
+        "hover:bg-[position:100%_50%] hover:shadow-[0_18px_46px_rgb(var(--color-aurora-violet-rgb)/0.42)]",
         "focus-visible:outline-aurora-violet",
       ],
+      // Secondary — acción alternativa. Hover sube color de borde + lift.
       secondary: [
         "bg-surface text-text-primary",
         "border border-border-strong",
-        "hover:bg-subtle hover:border-border-emphasis",
+        "hover:bg-subtle hover:border-border-emphasis hover:-translate-y-0.5 hover:shadow-sm",
       ],
+      // Ghost — sin elevación; solo cambio de fondo.
       ghost: ["bg-transparent text-text-primary", "hover:bg-subtle"],
-      danger: ["bg-danger text-white", "hover:opacity-90"],
+      // Danger — destructiva. Lift sutil para confirmar peso de la acción.
+      danger: [
+        "bg-danger [color:#fff]",
+        "shadow-[0_8px_24px_rgb(var(--color-danger-rgb)/0.22)]",
+        "hover:opacity-95 hover:-translate-y-0.5",
+        "hover:shadow-[0_12px_32px_rgb(var(--color-danger-rgb)/0.32)]",
+      ],
+      // Link — texto. No lift, no shadow.
       link: [
         "bg-transparent text-accent p-0 h-auto",
         "hover:text-accent-hover underline-offset-4 hover:underline",

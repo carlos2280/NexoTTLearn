@@ -5,13 +5,25 @@ import { forwardRef } from "react"
 import { type VariantProps, tv } from "tailwind-variants"
 
 const cardStyles = tv({
-  base: ["rounded-lg bg-surface", "transition-all duration-base ease-default"],
+  base: ["rounded-2xl bg-surface", "transition-all duration-base ease-default"],
   variants: {
     tono: {
-      plano: "border border-border",
-      elevado: "border border-border shadow-sm hover:shadow-md",
+      // Card neutra estándar — el caballo de batalla del dashboard.
+      plano: "border border-border shadow-[var(--shadow-card-resting)]",
+      // Elevada — la que pide atención. Sombra multi-layer del sistema nuevo.
+      elevado:
+        "border border-border shadow-[var(--shadow-card-resting)] hover:shadow-[var(--shadow-card-elevated)]",
+      // Acento — fondo soft de índigo. Acción primaria sutil.
       acento: "border border-accent-soft-hover bg-accent-soft",
+      // Hueco — para "vacío", drop zones, placeholders.
       hueco: "border border-border border-dashed bg-canvas",
+      // Hero — momento cumbre. Gradient sutil + borde accent + sombra elevada.
+      // Para "tu siguiente paso", KPI hero, certificación, "listo para presentarse".
+      hero: [
+        "border border-accent/20",
+        "bg-[image:var(--gradient-card-acento)]",
+        "shadow-[var(--shadow-card-elevated)]",
+      ],
     },
     densidad: {
       compacta: "p-4",
@@ -20,7 +32,12 @@ const cardStyles = tv({
       none: "p-0",
     },
     interactiva: {
-      true: "cursor-pointer hover:-translate-y-0.5 hover:border-border-strong focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2",
+      true: [
+        "cursor-pointer",
+        "hover:-translate-y-0.5 hover:border-border-strong",
+        "hover:shadow-[var(--shadow-card-elevated)]",
+        "focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2",
+      ],
       false: "",
     },
   },

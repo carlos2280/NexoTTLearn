@@ -43,7 +43,7 @@ export function MenuAcciones({ etiquetaAria, grupos, trigger }: MenuAccionesProp
         <DropdownContent
           align="end"
           sideOffset={6}
-          className="min-w-[200px] rounded-md border border-border bg-surface p-1 shadow-md"
+          className="nx-motion-popover min-w-[200px] rounded-md border border-border bg-surface p-1 shadow-md"
           style={{ zIndex: 250 }}
         >
           {grupos.map((grupo, indice) => (

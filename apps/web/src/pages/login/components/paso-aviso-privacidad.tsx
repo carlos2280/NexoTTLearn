@@ -13,14 +13,14 @@ interface PasoAvisoPrivacidadProps {
 }
 
 const stagger = (i: number) => ({
-  initial: { opacity: 0, y: 12 },
+  initial: { opacity: 0, y: 14 },
   animate: { opacity: 1, y: 0 },
   transition: {
     type: "spring" as const,
-    stiffness: 80,
+    stiffness: 120,
     damping: 18,
-    mass: 0.6,
-    delay: 0.3 + i * 0.08,
+    mass: 0.7,
+    delay: 0.3 + i * 0.07,
   },
 })
 

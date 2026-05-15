@@ -9,6 +9,12 @@ interface PaginationProps {
   readonly className?: string
 }
 
+/**
+ * Pagination NexoTT.
+ *
+ * Identidad: tipografía mono en contadores, botones generosos con micro-shadow
+ * resting + hover lift, focus halo aurora. Sin botones diminutos tipo Bootstrap.
+ */
 export function Pagination({ page, pageSize, total, onCambiarPage, className }: PaginationProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const haySiguiente = page < totalPages
@@ -20,7 +26,8 @@ export function Pagination({ page, pageSize, total, onCambiarPage, className }: 
     <nav
       aria-label="Paginación"
       className={cn(
-        "flex items-center justify-between gap-3 px-1 pt-3 text-caption text-text-secondary",
+        "flex items-center justify-between gap-3 px-1 pt-3",
+        "font-mono text-caption text-text-tertiary",
         className,
       )}
     >
@@ -29,29 +36,52 @@ export function Pagination({ page, pageSize, total, onCambiarPage, className }: 
           ? "Sin resultados"
           : `${inicio.toLocaleString("es-ES")}–${fin.toLocaleString("es-ES")} de ${total.toLocaleString("es-ES")}`}
       </span>
-      <div className="flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => onCambiarPage(page - 1)}
+      <div className="flex items-center gap-2">
+        <PagBoton
+          direccion="anterior"
           disabled={!hayAnterior}
-          aria-label="Página anterior"
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-surface text-text-secondary transition-colors duration-fast ease-default hover:border-border-strong hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <ChevronLeft className="h-3.5 w-3.5" strokeWidth={1.5} aria-hidden={true} />
-        </button>
-        <span className="tabular px-2 text-text-tertiary">
-          {page} / {totalPages}
+          onClick={() => onCambiarPage(page - 1)}
+        />
+        <span className="tabular px-1 text-text-secondary">
+          <span className="text-text-primary">{page}</span>
+          <span className="px-1 text-text-tertiary">/</span>
+          <span>{totalPages}</span>
         </span>
-        <button
-          type="button"
-          onClick={() => onCambiarPage(page + 1)}
+        <PagBoton
+          direccion="siguiente"
           disabled={!haySiguiente}
-          aria-label="Página siguiente"
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-surface text-text-secondary transition-colors duration-fast ease-default hover:border-border-strong hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <ChevronRight className="h-3.5 w-3.5" strokeWidth={1.5} aria-hidden={true} />
-        </button>
+          onClick={() => onCambiarPage(page + 1)}
+        />
       </div>
     </nav>
+  )
+}
+
+interface PagBotonProps {
+  readonly direccion: "anterior" | "siguiente"
+  readonly disabled: boolean
+  readonly onClick: () => void
+}
+
+function PagBoton({ direccion, disabled, onClick }: PagBotonProps) {
+  const Icon = direccion === "anterior" ? ChevronLeft : ChevronRight
+  const aria = direccion === "anterior" ? "Página anterior" : "Página siguiente"
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={aria}
+      className={cn(
+        "inline-flex h-9 w-9 items-center justify-center rounded-xl",
+        "border border-border bg-surface text-text-secondary shadow-xs",
+        "transition-[border-color,box-shadow,transform,color] duration-base ease-default",
+        "hover:-translate-y-px hover:border-border-strong hover:text-text-primary hover:shadow-sm",
+        "focus-visible:border-aurora-violet focus-visible:shadow-ring-aurora-soft focus-visible:outline-none",
+        "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-xs",
+      )}
+    >
+      <Icon className="h-4 w-4" strokeWidth={1.75} aria-hidden={true} />
+    </button>
   )
 }

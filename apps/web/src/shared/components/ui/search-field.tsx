@@ -36,13 +36,16 @@ export function SearchField({
   return (
     <div
       className={cn(
-        "group inline-flex h-9 w-full max-w-sm items-center gap-2 rounded-md border border-border bg-surface px-3",
-        "transition-colors duration-fast ease-default focus-within:border-accent focus-within:shadow-ring-accent-soft",
+        "group/search inline-flex h-9 w-full max-w-sm items-center gap-2 rounded-lg",
+        "border border-border-strong bg-surface px-3 shadow-xs",
+        "transition-[border-color,box-shadow] duration-base ease-default",
+        "hover:border-border-emphasis hover:shadow-sm",
+        "focus-within:border-aurora-violet focus-within:shadow-ring-aurora-soft",
         className,
       )}
     >
       <Search
-        className="h-4 w-4 shrink-0 text-text-tertiary"
+        className="h-4 w-4 shrink-0 text-text-tertiary transition-colors duration-base ease-default group-focus-within/search:text-aurora-violet"
         strokeWidth={1.5}
         aria-hidden={true}
       />
@@ -62,7 +65,7 @@ export function SearchField({
             setInterno("")
             onCambio("")
           }}
-          className="inline-flex h-5 w-5 items-center justify-center rounded-pill text-text-tertiary hover:bg-subtle hover:text-text-secondary"
+          className="inline-flex h-5 w-5 items-center justify-center rounded-pill text-text-tertiary transition-colors duration-fast ease-default hover:bg-subtle hover:text-text-secondary"
         >
           <X className="h-3.5 w-3.5" strokeWidth={1.5} aria-hidden={true} />
         </button>

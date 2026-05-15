@@ -50,18 +50,19 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
           data-disabled={disabled || undefined}
           className={cn(
             // Contenedor — la "card" del campo
-            "group/field relative flex items-center gap-3 rounded-xl border bg-surface px-4 py-2.5",
-            "border-border-strong",
-            "transition-[border-color,box-shadow,background-color] duration-base ease-default",
-            // Hover sutil
-            "hover:border-border-emphasis",
-            // Focus-within → halo aurora
+            "group/field relative flex items-center gap-3 rounded-xl border bg-surface px-4 py-3",
+            "border-border-strong shadow-xs",
+            "transition-[border-color,box-shadow,background-color,transform] duration-base ease-default",
+            // Hover sutil — sube ligeramente el peso del borde
+            "hover:border-border-emphasis hover:shadow-sm",
+            // Focus-within → halo aurora (firma del producto)
             "focus-within:border-aurora-violet focus-within:shadow-ring-aurora-soft",
             // Error
             "data-[invalid]:border-danger data-[invalid]:focus-within:border-danger",
             "data-[invalid]:focus-within:shadow-ring-danger-soft",
             // Disabled
             "data-[disabled]:cursor-not-allowed data-[disabled]:bg-subtle data-[disabled]:opacity-60",
+            "data-[disabled]:hover:border-border-strong data-[disabled]:hover:shadow-xs",
             containerClassName,
           )}
         >

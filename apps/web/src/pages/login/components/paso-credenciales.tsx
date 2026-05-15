@@ -21,14 +21,14 @@ interface PasoCredencialesProps {
 }
 
 const stagger = (i: number) => ({
-  initial: { opacity: 0, y: 12 },
+  initial: { opacity: 0, y: 14 },
   animate: { opacity: 1, y: 0 },
   transition: {
     type: "spring" as const,
-    stiffness: 80,
+    stiffness: 120,
     damping: 18,
-    mass: 0.6,
-    delay: 0.35 + i * 0.08,
+    mass: 0.7,
+    delay: 0.32 + i * 0.07,
   },
 })
 
@@ -67,13 +67,15 @@ export function PasoCredenciales({ onExito }: PasoCredencialesProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-6" noValidate={true}>
-      <motion.header {...motionProps(0)} className="flex flex-col gap-1.5">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-7" noValidate={true}>
+      <motion.header {...motionProps(0)} className="flex flex-col gap-2">
         <span className="nx-eyebrow text-aurora-violet">Acceso · Colaboradores</span>
-        <h2 className="text-h1 text-text-primary">
+        <h2 className="text-display-md text-text-primary">
           Bienvenido<span className="text-aurora-violet">.</span>
         </h2>
-        <p className="text-body-sm text-text-secondary">Tu próximo curso te está esperando.</p>
+        <p className="max-w-[340px] text-body-lg text-text-secondary">
+          Tu próximo curso te está esperando.
+        </p>
       </motion.header>
 
       {apiError ? (
@@ -114,10 +116,19 @@ export function PasoCredenciales({ onExito }: PasoCredencialesProps) {
         />
       </motion.div>
 
-      <motion.div {...motionProps(3)} className="pt-1">
+      <motion.div {...motionProps(3)} className="flex flex-col gap-3 pt-1">
         <Button type="submit" fullWidth={true} isLoading={mutation.isPending}>
           Ingresar
         </Button>
+        <p className="text-center text-caption text-text-tertiary">
+          ¿Problemas para entrar?{" "}
+          <a
+            href="mailto:soporte.nexott@nttdata.com"
+            className="font-medium text-accent transition-colors duration-fast hover:text-accent-hover"
+          >
+            Escribe a soporte
+          </a>
+        </p>
       </motion.div>
     </form>
   )

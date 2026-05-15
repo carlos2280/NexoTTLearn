@@ -16,14 +16,14 @@ interface PasoMfaProps {
 }
 
 const stagger = (i: number) => ({
-  initial: { opacity: 0, y: 12 },
+  initial: { opacity: 0, y: 14 },
   animate: { opacity: 1, y: 0 },
   transition: {
     type: "spring" as const,
-    stiffness: 80,
+    stiffness: 120,
     damping: 18,
-    mass: 0.6,
-    delay: 0.3 + i * 0.08,
+    mass: 0.7,
+    delay: 0.3 + i * 0.07,
   },
 })
 
@@ -57,12 +57,12 @@ export function PasoMfa({ challenge, onExito, onReiniciar }: PasoMfaProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      <motion.header {...motionProps(0)} className="flex flex-col gap-1.5">
+      <motion.header {...motionProps(0)} className="flex flex-col gap-2">
         <span className="nx-eyebrow text-aurora-violet">Doble verificación</span>
-        <h2 className="text-h1 text-text-primary">
+        <h2 className="text-display-md text-text-primary">
           Solo tú<span className="text-aurora-violet">.</span>
         </h2>
-        <p className="text-body-sm text-text-secondary">
+        <p className="max-w-[340px] text-body-lg text-text-secondary">
           Ingresa el código de 6 dígitos de tu app autenticadora.
         </p>
       </motion.header>

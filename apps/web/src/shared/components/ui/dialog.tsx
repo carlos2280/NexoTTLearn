@@ -37,33 +37,37 @@ export function Dialog({
     <DialogPrimitiveRoot open={abierto} onOpenChange={onCambiarAbierto}>
       <DialogPrimitivePortal>
         <DialogPrimitiveOverlay
-          className="fixed inset-0 bg-text-primary/30 backdrop-blur-sm"
+          className="nx-motion-overlay fixed inset-0 bg-text-primary/30 backdrop-blur-sm"
           style={{ zIndex: 200 }}
         />
-        <DialogPrimitiveContent
-          className={`-translate-x-1/2 fixed top-[12vh] left-1/2 w-full ${ANCHO_CLASE[ancho]} rounded-lg border border-border bg-surface shadow-overlay outline-none`}
+        <div
+          className="pointer-events-none fixed inset-0 flex items-center justify-center px-4 py-8"
           style={{ zIndex: 200 }}
         >
-          <header className="flex items-start justify-between gap-3 border-border border-b px-6 py-4">
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <DialogPrimitiveTitle className="text-h3 text-text-primary">
-                {titulo}
-              </DialogPrimitiveTitle>
-              {descripcion ? (
-                <DialogPrimitiveDescription className="text-body-sm text-text-secondary">
-                  {descripcion}
-                </DialogPrimitiveDescription>
-              ) : null}
-            </div>
-            <DialogPrimitiveClose
-              aria-label="Cerrar"
-              className="-mt-1 -mr-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-tertiary transition-colors duration-fast ease-default hover:bg-subtle hover:text-text-primary"
-            >
-              <X className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
-            </DialogPrimitiveClose>
-          </header>
-          <div className="px-6 py-5">{children}</div>
-        </DialogPrimitiveContent>
+          <DialogPrimitiveContent
+            className={`nx-motion-dialog pointer-events-auto flex max-h-[calc(100vh-4rem)] w-full ${ANCHO_CLASE[ancho]} flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-overlay outline-none`}
+          >
+            <header className="flex shrink-0 items-start justify-between gap-3 border-border border-b px-6 py-4">
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <DialogPrimitiveTitle className="text-h3 text-text-primary">
+                  {titulo}
+                </DialogPrimitiveTitle>
+                {descripcion ? (
+                  <DialogPrimitiveDescription className="text-body-sm text-text-secondary">
+                    {descripcion}
+                  </DialogPrimitiveDescription>
+                ) : null}
+              </div>
+              <DialogPrimitiveClose
+                aria-label="Cerrar"
+                className="-mt-1 -mr-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-tertiary transition-colors duration-fast ease-default hover:bg-subtle hover:text-text-primary"
+              >
+                <X className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
+              </DialogPrimitiveClose>
+            </header>
+            <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+          </DialogPrimitiveContent>
+        </div>
       </DialogPrimitivePortal>
     </DialogPrimitiveRoot>
   )
