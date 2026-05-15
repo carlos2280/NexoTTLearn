@@ -16,7 +16,7 @@ const CURSOS: readonly CursoMock[] = [
   {
     id: "1",
     area: "backend",
-    titulo: "Backend Python + FastAPI",
+    titulo: "Backend + FastAPI",
     cliente: "Banco Atlas",
     skills: 6,
     horas: 24,

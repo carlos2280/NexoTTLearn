@@ -256,13 +256,13 @@ const MOCK_AREAS_VOL: ReadonlyArray<{
   readonly nombre: string
   readonly codigo: string
 }> = [
-  { id: "area-mock-fe", nombre: "Frontend Web", codigo: "frontend" },
-  { id: "area-mock-be", nombre: "Backend Python", codigo: "backend" },
+  { id: "area-mock-fe", nombre: "Frontend", codigo: "frontend" },
+  { id: "area-mock-be", nombre: "Backend", codigo: "backend" },
   { id: "area-mock-qa", nombre: "Calidad y Testing", codigo: "qa" },
   { id: "area-mock-dv", nombre: "DevOps Azure", codigo: "devops" },
 ]
 
-const AREA_FALLBACK = { id: "area-mock-fe", nombre: "Frontend Web", codigo: "frontend" }
+const AREA_FALLBACK = { id: "area-mock-fe", nombre: "Frontend", codigo: "frontend" }
 
 function areaPorIndice(i: number): { id: string; nombre: string; codigo: string } {
   return MOCK_AREAS_VOL[i % MOCK_AREAS_VOL.length] ?? AREA_FALLBACK

@@ -37,7 +37,7 @@ export function PgBotonesBanners() {
               Los colaboradores asignados ya pueden empezar.
             </Banner>
             <Banner tone="warning" titulo="Deadline en 7 días">
-              El curso "Backend Python" cierra el 21 de mayo. Revisa pendientes.
+              El curso "Backend" cierra el 21 de mayo. Revisa pendientes.
             </Banner>
             <Banner tone="danger" titulo="Módulo archivado deja skill huérfana">
               "Pandas básico" se archivó y 2 cursos activos quedan sin cubrir python.pandas.
