@@ -56,6 +56,7 @@ interface MockPrisma {
   }
   intentoEntrevistaIASeccionBase: { createMany: ReturnType<typeof vi.fn> }
   intentoEntrevistaIANotaArea: { upsert: ReturnType<typeof vi.fn> }
+  intentoTransversal: { findMany: ReturnType<typeof vi.fn> }
   skill: {
     findMany: ReturnType<typeof vi.fn>
     findUnique: ReturnType<typeof vi.fn>
@@ -78,7 +79,13 @@ function buildPrismaMock(): MockPrisma {
       findUnique: vi.fn().mockResolvedValue({
         id: ASIGNACION_ID,
         colaboradorId: COLABORADOR_ID,
-        curso: { id: CURSO_ID, entrevistaIaId: ENTREVISTA_IA_ID },
+        curso: {
+          id: CURSO_ID,
+          entrevistaIaId: ENTREVISTA_IA_ID,
+          transversalId: null,
+          desbloqueo: "ENCADENADO",
+          fechaDesbloqueo: null,
+        },
       }),
       findUniqueOrThrow: vi.fn().mockResolvedValue({ colaboradorId: COLABORADOR_ID }),
     },
@@ -93,6 +100,7 @@ function buildPrismaMock(): MockPrisma {
     },
     intentoEntrevistaIASeccionBase: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
     intentoEntrevistaIANotaArea: { upsert: vi.fn().mockResolvedValue({}) },
+    intentoTransversal: { findMany: vi.fn().mockResolvedValue([]) },
     skill: {
       findMany: vi.fn().mockResolvedValue([{ id: SKILL_ID, areaId: AREA_ID }]),
       findUnique: vi.fn().mockResolvedValue({ areaId: AREA_ID }),
@@ -263,7 +271,13 @@ describe("E13 GET disponibilidad", () => {
     prisma.asignacionCurso.findUnique.mockResolvedValue({
       id: ASIGNACION_ID,
       colaboradorId: COLABORADOR_ID,
-      curso: { id: CURSO_ID, entrevistaIaId: null },
+      curso: {
+        id: CURSO_ID,
+        entrevistaIaId: null,
+        transversalId: null,
+        desbloqueo: "ENCADENADO",
+        fechaDesbloqueo: null,
+      },
     })
     const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN_SESION)
     expect(r.disponible).toBe(false)
@@ -304,6 +318,87 @@ describe("E13 GET disponibilidad", () => {
     expect(r.disponible).toBe(true)
     expect(r.razon).toBe("DISPONIBLE")
     expect(r.maxPorHora).toBe(5)
+  })
+
+  it("TRANSVERSAL_NO_APROBADO si el curso encadenado tiene transversal sin aprobar", async () => {
+    const { service, prisma } = buildService()
+    const transversalId = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      colaboradorId: COLABORADOR_ID,
+      curso: {
+        id: CURSO_ID,
+        entrevistaIaId: ENTREVISTA_IA_ID,
+        transversalId: transversalId,
+        desbloqueo: "ENCADENADO",
+        fechaDesbloqueo: null,
+      },
+    })
+    // Sin intentos transversal finalizados → no aprobado.
+    prisma.intentoTransversal.findMany.mockResolvedValue([])
+    const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN_SESION)
+    expect(r.disponible).toBe(false)
+    expect(r.razon).toBe("TRANSVERSAL_NO_APROBADO")
+  })
+
+  it("DISPONIBLE si el transversal del curso encadenado ya esta aprobado", async () => {
+    const { service, prisma } = buildService()
+    const transversalId = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      colaboradorId: COLABORADOR_ID,
+      curso: {
+        id: CURSO_ID,
+        entrevistaIaId: ENTREVISTA_IA_ID,
+        transversalId: transversalId,
+        desbloqueo: "ENCADENADO",
+        fechaDesbloqueo: null,
+      },
+    })
+    prisma.intentoTransversal.findMany.mockResolvedValue([
+      { aprobado: true, fecha: new Date("2026-05-01T10:00:00Z") },
+    ])
+    const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN_SESION)
+    expect(r.disponible).toBe(true)
+    expect(r.razon).toBe("DISPONIBLE")
+  })
+
+  it("SIEMPRE: disponible aunque el plan no este completo", async () => {
+    const { service, prisma } = buildService()
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      colaboradorId: COLABORADOR_ID,
+      curso: {
+        id: CURSO_ID,
+        entrevistaIaId: ENTREVISTA_IA_ID,
+        transversalId: null,
+        desbloqueo: "SIEMPRE",
+        fechaDesbloqueo: null,
+      },
+    })
+    prisma.planEstudio.findUnique.mockResolvedValue(null)
+    const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN_SESION)
+    expect(r.disponible).toBe(true)
+    expect(r.razon).toBe("DISPONIBLE")
+  })
+
+  it("FECHA_NO_ALCANZADA: DESDE_FECHA antes de la fecha configurada", async () => {
+    const { service, prisma } = buildService()
+    const futuro = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      colaboradorId: COLABORADOR_ID,
+      curso: {
+        id: CURSO_ID,
+        entrevistaIaId: ENTREVISTA_IA_ID,
+        transversalId: null,
+        desbloqueo: "DESDE_FECHA",
+        fechaDesbloqueo: futuro,
+      },
+    })
+    const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN_SESION)
+    expect(r.disponible).toBe(false)
+    expect(r.razon).toBe("FECHA_NO_ALCANZADA")
   })
 })
 
@@ -361,7 +456,13 @@ describe("E14 POST crear intento (snapshot + idempotency)", () => {
     prisma.asignacionCurso.findUnique.mockResolvedValue({
       id: ASIGNACION_ID,
       colaboradorId: COLABORADOR_ID,
-      curso: { id: CURSO_ID, entrevistaIaId: null },
+      curso: {
+        id: CURSO_ID,
+        entrevistaIaId: null,
+        transversalId: null,
+        desbloqueo: "ENCADENADO",
+        fechaDesbloqueo: null,
+      },
     })
     await expect(
       service.crearIntento({
@@ -405,6 +506,30 @@ describe("E14 POST crear intento (snapshot + idempotency)", () => {
     const { service, prisma } = setupCrearIntentoHappy()
     prisma.planEstudio.findUnique.mockReset()
     prisma.planEstudio.findUnique.mockResolvedValue(null)
+    await expect(
+      service.crearIntento({
+        asignacionId: ASIGNACION_ID,
+        idempotencyKey: "key-1",
+        usuario: PART_SESION,
+      }),
+    ).rejects.toThrow(ConflictException)
+  })
+
+  it("ENTREVISTA_IA_TRANSVERSAL_NO_APROBADO si el curso encadenado tiene transversal pendiente", async () => {
+    const { service, prisma } = setupCrearIntentoHappy()
+    const transversalId = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      colaboradorId: COLABORADOR_ID,
+      curso: {
+        id: CURSO_ID,
+        entrevistaIaId: ENTREVISTA_IA_ID,
+        transversalId: transversalId,
+        desbloqueo: "ENCADENADO",
+        fechaDesbloqueo: null,
+      },
+    })
+    prisma.intentoTransversal.findMany.mockResolvedValue([])
     await expect(
       service.crearIntento({
         asignacionId: ASIGNACION_ID,
@@ -758,7 +883,13 @@ describe("EntrevistaIaService P11.5a — ENTREVISTA_IA_DISPONIBLE en crearIntent
         return Promise.resolve({
           id: ASIGNACION_ID,
           colaboradorId: COLABORADOR_ID,
-          curso: { id: CURSO_ID, entrevistaIaId: ENTREVISTA_IA_ID },
+          curso: {
+            id: CURSO_ID,
+            entrevistaIaId: ENTREVISTA_IA_ID,
+            transversalId: null,
+            desbloqueo: "ENCADENADO",
+            fechaDesbloqueo: null,
+          },
         })
       },
     )

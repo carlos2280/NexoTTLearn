@@ -18,7 +18,14 @@ import {
   IntentoEntrevistaIaParticipanteResponse,
   ListarIntentosEntrevistaIaQuery,
 } from "@nexott-learn/shared-types"
-import { OrigenNotaSkill, Prisma, RolUsuario, TipoEventoNotif } from "@prisma/client"
+import {
+  DesbloqueoCurso,
+  OrigenNotaSkill,
+  Prisma,
+  RolUsuario,
+  TipoEventoNotif,
+} from "@prisma/client"
+import { transversalAprobado } from "../asignaciones/asignaciones.helpers"
 import { AiService } from "../common/ai/ai.service"
 import { TurnoTranscripcion } from "../common/ai/ai.types"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
@@ -47,6 +54,8 @@ const HTTP_OK = 200
 const HTTP_CREATED = 201
 const RATE_LIMIT_VENTANA_MS = 60 * 60 * 1000 // 1 hora
 const RATE_LIMIT_MAX = 5
+
+type RazonDisponibilidadGate = "PLAN_INCOMPLETO" | "TRANSVERSAL_NO_APROBADO" | "FECHA_NO_ALCANZADA"
 
 /**
  * Service del modulo `entrevista-ia` (Slice 8 P8c — 9 endpoints).
@@ -165,20 +174,83 @@ export class EntrevistaIaService {
         maxPorHora: RATE_LIMIT_MAX,
       }
     }
-    const planCompleto = await this.planEstaCompleto(asignacionId)
-    if (!planCompleto) {
-      return {
-        disponible: false,
-        razon: "PLAN_INCOMPLETO",
-        intentosUsadosHoy,
-        maxPorHora: RATE_LIMIT_MAX,
-      }
+    const gate = await this.evaluarGateDesbloqueo(asignacion, asignacionId)
+    if (gate !== null) {
+      return { ...gate, intentosUsadosHoy, maxPorHora: RATE_LIMIT_MAX }
     }
     return {
       disponible: true,
       razon: "DISPONIBLE",
       intentosUsadosHoy,
       maxPorHora: RATE_LIMIT_MAX,
+    }
+  }
+
+  /**
+   * Aplica el gate de desbloqueo del curso (D43/D44). Devuelve `null` si todo
+   * ok; en caso contrario retorna el `disponible:false` con su razon.
+   *
+   *  - `SIEMPRE`        → sin requisitos previos.
+   *  - `DESDE_FECHA`    → bloquea hasta `fechaDesbloqueo`.
+   *  - `ENCADENADO`     → exige plan completo y, si el curso tiene transversal
+   *                       configurado, que ese transversal este aprobado por
+   *                       el colaborador (politica "ultimo aprobado").
+   */
+  private async evaluarGateDesbloqueo(
+    asignacion: {
+      readonly colaboradorId: string
+      readonly curso: {
+        readonly transversalId: string | null
+        readonly desbloqueo: DesbloqueoCurso
+        readonly fechaDesbloqueo: Date | null
+      }
+    },
+    asignacionId: string,
+  ): Promise<{ readonly disponible: false; readonly razon: RazonDisponibilidadGate } | null> {
+    const { desbloqueo, fechaDesbloqueo, transversalId } = asignacion.curso
+    if (desbloqueo === DesbloqueoCurso.SIEMPRE) {
+      return null
+    }
+    if (desbloqueo === DesbloqueoCurso.DESDE_FECHA) {
+      const fechaAlcanzada = fechaDesbloqueo !== null && Date.now() >= fechaDesbloqueo.getTime()
+      return fechaAlcanzada ? null : { disponible: false, razon: "FECHA_NO_ALCANZADA" }
+    }
+    // ENCADENADO
+    if (!(await this.planEstaCompleto(asignacionId))) {
+      return { disponible: false, razon: "PLAN_INCOMPLETO" }
+    }
+    if (transversalId !== null) {
+      const aprobado = await transversalAprobado(this.prisma, {
+        colaboradorId: asignacion.colaboradorId,
+        transversalId,
+      })
+      if (!aprobado) {
+        return { disponible: false, razon: "TRANSVERSAL_NO_APROBADO" }
+      }
+    }
+    return null
+  }
+
+  private errorPorGate(razon: RazonDisponibilidadGate): {
+    readonly code: string
+    readonly message: string
+  } {
+    switch (razon) {
+      case "PLAN_INCOMPLETO":
+        return {
+          code: apiErrorCodes.planIncompletoParaEntrevista,
+          message: "El plan personal debe estar completo para iniciar la entrevista IA.",
+        }
+      case "TRANSVERSAL_NO_APROBADO":
+        return {
+          code: apiErrorCodes.entrevistaIaTransversalNoAprobado,
+          message: "Debes aprobar el proyecto transversal antes de iniciar la entrevista IA.",
+        }
+      case "FECHA_NO_ALCANZADA":
+        return {
+          code: apiErrorCodes.entrevistaIaFechaNoAlcanzada,
+          message: "La entrevista IA aun no esta disponible: no se alcanzo la fecha de desbloqueo.",
+        }
     }
   }
 
@@ -221,11 +293,9 @@ export class EntrevistaIaService {
         message: "Ya existe un intento de entrevista IA EN_PROGRESO.",
       })
     }
-    if (!(await this.planEstaCompleto(input.asignacionId))) {
-      throw new ConflictException({
-        code: apiErrorCodes.planIncompletoParaEntrevista,
-        message: "El plan personal debe estar completo para iniciar la entrevista IA.",
-      })
+    const gate = await this.evaluarGateDesbloqueo(asignacion, input.asignacionId)
+    if (gate !== null) {
+      throw new ConflictException(this.errorPorGate(gate.razon))
     }
 
     // Construir snapshots fuera de la TX (lecturas pesadas; los snapshots se
@@ -785,7 +855,13 @@ export class EntrevistaIaService {
   ): Promise<{
     readonly id: string
     readonly colaboradorId: string
-    readonly curso: { readonly id: string; readonly entrevistaIaId: string | null }
+    readonly curso: {
+      readonly id: string
+      readonly entrevistaIaId: string | null
+      readonly transversalId: string | null
+      readonly desbloqueo: DesbloqueoCurso
+      readonly fechaDesbloqueo: Date | null
+    }
   }> {
     const asignacion = await this.prisma.asignacionCurso.findUnique({
       where: { id: asignacionId },
@@ -793,7 +869,13 @@ export class EntrevistaIaService {
         id: true,
         colaboradorId: true,
         curso: {
-          select: { id: true, entrevistaIaId: true },
+          select: {
+            id: true,
+            entrevistaIaId: true,
+            transversalId: true,
+            desbloqueo: true,
+            fechaDesbloqueo: true,
+          },
         },
       },
     })

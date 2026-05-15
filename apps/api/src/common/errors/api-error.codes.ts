@@ -167,6 +167,8 @@ export const apiErrorCodes = {
   conflictIntentoEntrevistaYaAnulado: "CONFLICT_INTENTO_ENTREVISTA_YA_ANULADO",
   planIncompletoParaEntrevista: "PLAN_INCOMPLETO_PARA_ENTREVISTA",
   planVacioParaEntrevista: "PLAN_VACIO_PARA_ENTREVISTA",
+  entrevistaIaTransversalNoAprobado: "ENTREVISTA_IA_TRANSVERSAL_NO_APROBADO",
+  entrevistaIaFechaNoAlcanzada: "ENTREVISTA_IA_FECHA_NO_ALCANZADA",
   entrevistaIaNoConfigurada: "ENTREVISTA_IA_NO_CONFIGURADA",
   rubricaNoConfigurada: "RUBRICA_NO_CONFIGURADA",
   rateLimitEntrevistaIa: "RATE_LIMIT_ENTREVISTA_IA",

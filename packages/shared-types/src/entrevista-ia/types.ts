@@ -11,6 +11,8 @@ export type EstadoIntentoEntrevistaIa = z.infer<typeof estadoIntentoEntrevistaIa
 export const razonDisponibilidadEntrevistaIaSchema = z.enum([
   "DISPONIBLE",
   "PLAN_INCOMPLETO",
+  "TRANSVERSAL_NO_APROBADO",
+  "FECHA_NO_ALCANZADA",
   "RATE_LIMIT_HORA",
   "INTENTO_EN_CURSO",
   "ENTREVISTA_IA_NO_CONFIGURADA",

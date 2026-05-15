@@ -194,7 +194,7 @@ export async function evaluarCondicionesListo(
  * el colaborador segun politica "ultimo aprobado" (D-S8-C5). Si la skill no
  * etiqueta al transversal, igual cuenta si `aprobado=true`.
  */
-async function transversalAprobado(
+export async function transversalAprobado(
   prisma: PrismaService,
   input: {
     readonly colaboradorId: string
