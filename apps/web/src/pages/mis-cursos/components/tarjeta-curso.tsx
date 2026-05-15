@@ -1,10 +1,10 @@
 import { type TonoDeadline, formatearDeadline } from "@/features/me/lib/deadline-curso"
-import { Badge } from "@/shared/components/ui/badge"
 import { Button } from "@/shared/components/ui/button"
 import { RUTAS } from "@/shared/constants/rutas"
 import { cn } from "@/shared/lib/cn"
-import type { EstadoAsignado, EstadoVoluntario, MeCursoResumen } from "@nexott-learn/shared-types"
+import type { MeCursoResumen } from "@nexott-learn/shared-types"
 import { useNavigate } from "react-router-dom"
+import { tonoEstado } from "../mis-cursos.types"
 
 interface TarjetaCursoProps {
   readonly curso: MeCursoResumen
@@ -16,72 +16,91 @@ const CLASES_DEADLINE: Record<TonoDeadline, string> = {
   vencido: "text-danger",
 }
 
-const ETIQUETA_ESTADO_ASIGNADO: ReadonlyMap<EstadoAsignado, string> = new Map([
-  ["ASIGNADO", "Asignado"],
-  ["EN_PROGRESO", "En progreso"],
-  ["LISTO", "Listo"],
-  ["APTO", "Apto"],
-  ["NO_APTO", "No apto"],
-  ["RETIRADO", "Retirado"],
-])
-
-const ETIQUETA_ESTADO_VOLUNTARIO: ReadonlyMap<EstadoVoluntario, string> = new Map([
-  ["INSCRITO", "Inscrito"],
-  ["EN_PROGRESO", "En progreso"],
-  ["LISTO", "Listo"],
-  ["COMPLETADO", "Completado"],
-  ["RETIRADO", "Retirado"],
-])
-
 export function TarjetaCurso({ curso }: TarjetaCursoProps) {
   const navigate = useNavigate()
   const deadline = formatearDeadline(curso.fechaDeadline)
   const esVoluntario = curso.rol === "VOLUNTARIO"
-  const estadoTexto =
-    (esVoluntario
-      ? curso.estadoVoluntario && ETIQUETA_ESTADO_VOLUNTARIO.get(curso.estadoVoluntario)
-      : curso.estadoAsignado && ETIQUETA_ESTADO_ASIGNADO.get(curso.estadoAsignado)) ?? "—"
+  const tono = tonoEstado(curso)
+  const colorEstado = `var(--color-state-${tono.slug})`
 
   return (
-    <article className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <h3 className="truncate text-h3 text-text-primary">{curso.cursoTitulo}</h3>
-          <div className="flex items-center gap-2">
-            <Badge tono={esVoluntario ? "contorno" : "acento"}>
-              {esVoluntario ? "Voluntario" : "Asignado"}
-            </Badge>
-            <span className="text-caption text-text-secondary">{estadoTexto}</span>
-          </div>
+    <article
+      className="group hover:-translate-y-0.5 relative flex flex-col gap-4 overflow-hidden rounded-2xl border border-border bg-surface p-5 transition-all duration-base ease-out"
+      style={{ boxShadow: "var(--shadow-card-resting)" }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.boxShadow = "var(--shadow-card-elevated)"
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow = "var(--shadow-card-resting)"
+      }}
+    >
+      <span
+        aria-hidden="true"
+        className="absolute top-0 right-0 left-0 h-[2px]"
+        style={{ background: colorEstado }}
+      />
+
+      <header className="flex flex-col gap-2">
+        <h3 className="line-clamp-2 text-h3 text-text-primary">{curso.cursoTitulo}</h3>
+        <ChipEstado slug={tono.slug} etiqueta={tono.etiqueta} color={colorEstado} />
+      </header>
+
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-caption text-text-tertiary">Avance</span>
+          <span className="tabular font-medium font-mono text-caption text-text-secondary">
+            {curso.porcentajeAvance}%
+          </span>
         </div>
+        <div aria-hidden={true} className="h-1 w-full overflow-hidden rounded-pill bg-subtle">
+          <div
+            className="h-full rounded-pill bg-accent transition-all duration-slow ease-default"
+            style={{ width: `${curso.porcentajeAvance}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="mt-auto flex items-center justify-between gap-3 pt-1">
+        <span className="text-caption text-text-tertiary">
+          {esVoluntario ? "Voluntario" : "Asignado"}
+          <span className="text-text-disabled"> · </span>
+          <span className={cn(CLASES_DEADLINE[deadline.tono])}>
+            {esVoluntario && deadline.tono === "lejos"
+              ? "ritmo libre"
+              : `${deadline.textoFecha} · ${deadline.textoRelativo}`}
+          </span>
+        </span>
         <Button
-          variant="secondary"
+          variant="ghost"
           size="sm"
           onClick={() => navigate(RUTAS.participante.cursoDetalle(curso.cursoId))}
           aria-label={`Continuar con ${curso.cursoTitulo}`}
         >
           Continuar
         </Button>
-      </header>
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-caption text-text-tertiary">Avance</span>
-          <span className="tabular text-caption text-text-secondary">
-            {curso.porcentajeAvance}%
-          </span>
-        </div>
-        <div aria-hidden={true} className="h-1.5 w-full overflow-hidden rounded-pill bg-subtle">
-          <div
-            className="h-full rounded-pill bg-accent"
-            style={{ width: `${curso.porcentajeAvance}%` }}
-          />
-        </div>
       </div>
-      <footer className={cn("text-caption", CLASES_DEADLINE[deadline.tono])}>
-        {esVoluntario && deadline.tono === "lejos"
-          ? "Sin deadline · ritmo libre"
-          : `Deadline ${deadline.textoFecha} · ${deadline.textoRelativo}`}
-      </footer>
     </article>
+  )
+}
+
+interface ChipEstadoProps {
+  readonly slug: string
+  readonly etiqueta: string
+  readonly color: string
+}
+
+function ChipEstado({ slug, etiqueta, color }: ChipEstadoProps) {
+  return (
+    <span
+      className="inline-flex w-fit items-center gap-1.5 rounded-pill border px-2.5 py-1 font-medium text-caption"
+      style={{
+        background: `var(--color-state-${slug}-soft)`,
+        borderColor: `rgb(var(--color-state-${slug}-rgb) / 0.3)`,
+        color: `var(--color-state-${slug}-on-soft)`,
+      }}
+    >
+      <span className="h-1.5 w-1.5 rounded-pill" style={{ background: color }} />
+      {etiqueta}
+    </span>
   )
 }

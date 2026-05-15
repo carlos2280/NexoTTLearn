@@ -1,4 +1,6 @@
 import type { ApiError } from "@/shared/api/api-error"
+import { Banner } from "@/shared/components/ui/banner"
+import { Button } from "@/shared/components/ui/button"
 import { EmptyState } from "@/shared/components/ui/empty-state"
 import { Pagination } from "@/shared/components/ui/pagination"
 import { RUTAS } from "@/shared/constants/rutas"
@@ -28,29 +30,27 @@ export function ResultadoMisCursos({
     return <MisCursosSkeleton />
   }
   if (error) {
-    return (
-      <div className="rounded-md border border-danger/30 bg-danger-soft p-4 text-body-sm text-danger-on-soft">
-        No pudimos cargar tus cursos. Reintenta en un momento.
-      </div>
-    )
+    return <Banner tone="danger">No pudimos cargar tus cursos. Reintenta en un momento.</Banner>
   }
   if (!data || data.data.length === 0) {
     return <EmptyMisCursos filtros={filtros} />
   }
   return (
-    <>
-      <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {data.data.map((curso) => (
           <TarjetaCurso key={curso.asignacionId} curso={curso} />
         ))}
       </div>
-      <Pagination
-        page={data.meta.page}
-        pageSize={data.meta.pageSize}
-        total={data.meta.total}
-        onCambiarPage={onCambiarPage}
-      />
-    </>
+      {data.meta.total > data.meta.pageSize ? (
+        <Pagination
+          page={data.meta.page}
+          pageSize={data.meta.pageSize}
+          total={data.meta.total}
+          onCambiarPage={onCambiarPage}
+        />
+      ) : null}
+    </div>
   )
 }
 
@@ -64,18 +64,14 @@ function EmptyMisCursos({ filtros }: { readonly filtros: FiltrosMisCursos }) {
       titulo="No hay cursos que coincidan"
       descripcion={
         sinFiltros
-          ? "Aún no tienes cursos. Cuando el administrador te asigne uno, aparecerá aquí. Mientras tanto, puedes inscribirte por tu cuenta a cualquiera de los cursos abiertos."
+          ? "Aún no tienes cursos. Cuando el administrador te asigne uno aparecerá aquí. Mientras tanto, puedes inscribirte por tu cuenta a cualquiera de los cursos abiertos."
           : "Prueba a quitar algún filtro para ver más resultados."
       }
       accion={
         sinFiltros ? (
-          <button
-            type="button"
-            onClick={() => navigate(RUTAS.participante.catalogo)}
-            className="text-accent text-body-sm underline-offset-4 hover:underline"
-          >
+          <Button variant="link" onClick={() => navigate(RUTAS.participante.catalogo)}>
             Explorar catálogo
-          </button>
+          </Button>
         ) : undefined
       }
     />

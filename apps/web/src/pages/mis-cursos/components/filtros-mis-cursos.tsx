@@ -30,45 +30,47 @@ export function FiltrosMisCursosForm({
   const rolId = useId()
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="flex flex-col gap-1">
-        <label htmlFor={estadoId} className="text-caption text-text-tertiary">
-          Estado
-        </label>
-        <div className="w-44">
-          <Select
-            id={estadoId}
-            compact={true}
-            value={filtros.estado}
-            onChange={(e) => onEstadoChange(e.target.value as FiltroEstadoCurso)}
-          >
-            {OPCIONES_ESTADO.map((opcion) => (
-              <option key={opcion.value} value={opcion.value}>
-                {opcion.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-      </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor={rolId} className="text-caption text-text-tertiary">
-          Rol
-        </label>
-        <div className="w-44">
-          <Select
-            id={rolId}
-            compact={true}
-            value={filtros.rol}
-            onChange={(e) => onRolChange(e.target.value as FiltroRolAsignacion)}
-          >
-            {OPCIONES_ROL.map((opcion) => (
-              <option key={opcion.value} value={opcion.value}>
-                {opcion.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-      </div>
+    <div className="flex flex-wrap items-center gap-2">
+      <FiltroPill
+        id={estadoId}
+        etiqueta="Estado"
+        value={filtros.estado}
+        opciones={OPCIONES_ESTADO}
+        onChange={(v) => onEstadoChange(v as FiltroEstadoCurso)}
+      />
+      <FiltroPill
+        id={rolId}
+        etiqueta="Rol"
+        value={filtros.rol}
+        opciones={OPCIONES_ROL}
+        onChange={(v) => onRolChange(v as FiltroRolAsignacion)}
+      />
     </div>
+  )
+}
+
+interface FiltroPillProps {
+  readonly id: string
+  readonly etiqueta: string
+  readonly value: string
+  readonly opciones: readonly { readonly value: string; readonly label: string }[]
+  readonly onChange: (value: string) => void
+}
+
+function FiltroPill({ id, etiqueta, value, opciones, onChange }: FiltroPillProps) {
+  return (
+    <label
+      htmlFor={id}
+      className="inline-flex items-center gap-2 rounded-pill border border-border bg-surface px-3 py-1 transition-colors duration-base ease-default focus-within:border-aurora-violet hover:border-border-strong"
+    >
+      <span className="nx-eyebrow text-text-tertiary">{etiqueta}</span>
+      <Select id={id} variant="ghost" value={value} onChange={(e) => onChange(e.target.value)}>
+        {opciones.map((opcion) => (
+          <option key={opcion.value} value={opcion.value}>
+            {opcion.label}
+          </option>
+        ))}
+      </Select>
+    </label>
   )
 }

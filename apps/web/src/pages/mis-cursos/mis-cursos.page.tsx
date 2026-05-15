@@ -1,4 +1,5 @@
 import { useMisCursos } from "@/features/me/hooks/use-mis-cursos"
+import { PageHeader, PageHeaderStat } from "@/shared/components/ui/page-header"
 import { FiltrosMisCursosForm } from "./components/filtros-mis-cursos"
 import { ResultadoMisCursos } from "./components/resultado-mis-cursos"
 import { useFiltrosMisCursos } from "./hooks/use-filtros-mis-cursos"
@@ -14,14 +15,20 @@ export function MisCursosPage() {
   })
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-h2 text-text-primary">Mis cursos</h1>
-        <p className="text-body text-text-secondary">
-          Cursos asignados y voluntariados. Filtra por estado o rol para acotar la vista.
-        </p>
-      </header>
+    <div className="flex flex-col gap-8">
+      <PageHeader
+        eyebrow="Mi formación"
+        titulo="Mis cursos"
+        descripcion="Cursos asignados y voluntariados. El estado y el avance se actualizan en tiempo real."
+        stat={
+          query.data ? (
+            <PageHeaderStat valor={query.data.meta.total} etiqueta="cursos en total" />
+          ) : undefined
+        }
+      />
+
       <FiltrosMisCursosForm filtros={filtros} onEstadoChange={setEstado} onRolChange={setRol} />
+
       <ResultadoMisCursos
         isLoading={query.isLoading}
         error={query.error}
