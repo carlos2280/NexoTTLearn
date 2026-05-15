@@ -32,13 +32,13 @@ export function CentroRevision() {
           <EstadoVacio />
         ) : (
           <>
-            <ul className="flex flex-col divide-y divide-border p-2">
+            <ul className="flex flex-col gap-2 p-3">
               {casos.map((caso, i) => (
                 <FilaCaso key={caso.id} caso={caso} indice={i} />
               ))}
             </ul>
             {sobrantes > 0 ? (
-              <div className="border-border border-t px-4 py-2 text-caption text-text-tertiary">
+              <div className="border-border border-t px-5 py-3 text-caption text-text-tertiary">
                 +{sobrantes} pendientes adicionales
               </div>
             ) : null}

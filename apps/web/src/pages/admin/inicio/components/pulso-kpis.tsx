@@ -1,132 +1,94 @@
 import { useKpisCursos } from "@/features/admin/dashboard/hooks/use-kpis-cursos"
-import { Card } from "@/shared/components/ui/card"
-import { Sparkline } from "@/shared/components/ui/sparkline"
+import { KpiCard } from "@/shared/components/ui/kpi-card"
 import { DUR, EASE } from "@/shared/lib/motion"
 import { motion, useReducedMotion } from "framer-motion"
-import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react"
 import type { KpiPulso, TonoKpi } from "../inicio.types"
 
-type DireccionDelta = "sube" | "baja" | "estable"
-
-const TONO_DELTA: Record<DireccionDelta, TonoKpi> = {
-  sube: "success",
-  baja: "danger",
-  estable: "acento",
+const TONO_KPI_A_SPARKLINE: Record<TonoKpi, "acento" | "success" | "warning" | "danger"> = {
+  acento: "acento",
+  success: "success",
+  warning: "warning",
+  danger: "danger",
 }
 
-const CHIP_ICONO_POR_TONO: Record<TonoKpi, string> = {
-  acento: "bg-accent-soft text-accent-on-soft",
-  success: "bg-success-soft text-success-on-soft",
-  warning: "bg-warning-soft text-warning-on-soft",
-  danger: "bg-danger-soft text-danger-on-soft",
-}
-
-function direccionDelta(delta: number): DireccionDelta {
-  if (delta > 0) {
-    return "sube"
+function tonoSparklinePorDelta(delta: number | undefined): "acento" | "success" | "danger" {
+  if (delta === undefined || delta === 0) {
+    return "acento"
   }
-  if (delta < 0) {
-    return "baja"
-  }
-  return "estable"
+  return delta > 0 ? "success" : "danger"
 }
 
-function formateaDelta(delta: number): string {
-  if (delta === 0) {
-    return "estable"
-  }
-  return delta > 0 ? `+${delta}` : `${delta}`
-}
-
-function DeltaChip({ delta }: { readonly delta: number }) {
-  const direccion = direccionDelta(delta)
-  const Icono = direccion === "sube" ? ArrowUpRight : direccion === "baja" ? ArrowDownRight : Minus
-  const colorClase =
-    direccion === "sube"
-      ? "text-success-on-soft"
-      : direccion === "baja"
-        ? "text-danger-on-soft"
-        : "text-text-tertiary"
-  return (
-    <span className={`tabular inline-flex items-center gap-0.5 text-caption ${colorClase}`}>
-      <Icono className="h-3.5 w-3.5" strokeWidth={2} aria-hidden={true} />
-      {formateaDelta(delta)}
-    </span>
-  )
-}
-
-interface PulsoKpiCardProps {
+interface PulsoKpiSlotProps {
   readonly kpi: KpiPulso
   readonly indice: number
   readonly esHero: boolean
 }
 
-function PulsoKpiCard({ kpi, indice, esHero }: PulsoKpiCardProps) {
-  const Icono = kpi.icono
+function PulsoKpiSlot({ kpi, indice, esHero }: PulsoKpiSlotProps) {
   const reduceMotion = useReducedMotion()
-  const delay = reduceMotion ? 0 : 0.1 + indice * 0.07
-  const tieneSparkline = kpi.serie && kpi.serie.length >= 2
-  const tieneDelta = kpi.delta !== undefined
+  const delay = reduceMotion ? 0 : 0.08 + indice * 0.07
+  const tono =
+    kpi.delta !== undefined ? tonoSparklinePorDelta(kpi.delta) : TONO_KPI_A_SPARKLINE[kpi.tono]
 
   return (
     <motion.div
       initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: DUR.slow, delay, ease: EASE.default }}
+      className="h-full"
     >
-      <Card
-        tono="plano"
-        className="group hover:-translate-y-0.5 relative flex h-full flex-col gap-4 overflow-hidden transition-all duration-base ease-default hover:border-border-strong hover:shadow-sm"
-        style={esHero ? { backgroundImage: "var(--gradient-card-acento)" } : undefined}
-      >
-        <div className="flex items-start justify-between gap-2">
-          <span className="flex items-center gap-2.5">
-            <span
-              className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${CHIP_ICONO_POR_TONO[kpi.tono]}`}
-            >
-              <Icono className="h-4 w-4" strokeWidth={1.75} aria-hidden={true} />
-            </span>
-            <span className="nx-eyebrow text-text-secondary">{kpi.etiqueta}</span>
-          </span>
-          {tieneDelta ? <DeltaChip delta={kpi.delta ?? 0} /> : null}
-        </div>
-
-        <div className="flex items-end justify-between gap-3">
-          <span className="tabular text-display-md text-text-primary leading-none tracking-tight">
-            {kpi.valor.toLocaleString("es-ES")}
-            {kpi.sufijo ? (
-              <span className="ml-1 text-body text-text-tertiary">{kpi.sufijo}</span>
-            ) : null}
-          </span>
-          {tieneSparkline && kpi.serie ? (
-            <Sparkline
-              puntos={kpi.serie}
-              tono={TONO_DELTA[direccionDelta(kpi.delta ?? 0)]}
-              ancho={88}
-              alto={28}
-            />
-          ) : null}
-        </div>
-
-        <p className="text-caption text-text-tertiary">{kpi.nota}</p>
-      </Card>
+      <KpiCard
+        variant={esHero ? "hero" : "compact"}
+        eyebrow={kpi.etiqueta}
+        value={kpi.valor}
+        unit={kpi.sufijo}
+        delta={kpi.delta}
+        serie={kpi.serie}
+        tono={tono}
+        footer={kpi.nota}
+        icon={kpi.icono}
+        className="h-full"
+      />
     </motion.div>
+  )
+}
+
+function KpiSkeleton({ esHero }: { readonly esHero: boolean }) {
+  return (
+    <div
+      className={
+        esHero
+          ? "h-[200px] animate-pulse rounded-2xl border border-accent/15 bg-accent-soft/40"
+          : "h-[180px] animate-pulse rounded-2xl border border-border bg-subtle"
+      }
+    />
   )
 }
 
 export function PulsoKpis() {
   const { kpis, isLoading } = useKpisCursos()
 
+  if (isLoading) {
+    return (
+      <section
+        aria-label="Pulso del sistema"
+        className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr_1fr_1fr]"
+      >
+        {Array.from({ length: 4 }, (_, i) => (
+          <KpiSkeleton key={`skeleton-${i + 1}`} esHero={i === 0} />
+        ))}
+      </section>
+    )
+  }
+
   return (
     <section
       aria-label="Pulso del sistema"
-      className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+      className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr_1fr_1fr]"
     >
-      {isLoading
-        ? Array.from({ length: 4 }, (_, i) => (
-            <Card key={`skeleton-${i + 1}`} tono="plano" className="h-[148px] animate-pulse" />
-          ))
-        : kpis.map((kpi, i) => <PulsoKpiCard key={kpi.id} kpi={kpi} indice={i} esHero={i === 0} />)}
+      {kpis.map((kpi, i) => (
+        <PulsoKpiSlot key={kpi.id} kpi={kpi} indice={i} esHero={i === 0} />
+      ))}
     </section>
   )
 }

@@ -52,8 +52,8 @@ export function HeroBienvenida() {
           <p className="font-serif text-h2 text-text-secondary italic leading-snug">
             Tu equipo está{" "}
             <span
-              className="text-accent"
-              style={{ textShadow: "0 1px 24px rgb(var(--color-accent-rgb) / 0.35)" }}
+              className="text-aurora-violet"
+              style={{ textShadow: "0 1px 24px rgb(var(--color-aurora-violet-rgb) / 0.35)" }}
             >
               aprendiendo
             </span>

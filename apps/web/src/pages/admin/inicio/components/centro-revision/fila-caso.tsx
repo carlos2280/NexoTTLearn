@@ -22,12 +22,6 @@ const COLOR_PUNTO_PRIORIDAD: Record<PrioridadCaso, string> = {
   normal: "bg-text-tertiary",
 }
 
-const BORDE_PRIORIDAD: Record<PrioridadCaso, string> = {
-  urgente: "border-l-danger",
-  alta: "border-l-warning",
-  normal: "border-l-border-strong",
-}
-
 interface FilaCasoProps {
   readonly caso: CasoRevision
   readonly indice: number
@@ -46,7 +40,7 @@ export function FilaCaso({ caso, indice }: FilaCasoProps) {
     >
       <button
         type="button"
-        className={`flex w-full items-start gap-4 rounded-md border-l-[3px] py-3 pr-3 pl-3 text-left transition-colors duration-fast ease-default hover:bg-subtle focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 ${BORDE_PRIORIDAD[caso.prioridad]}`}
+        className="flex w-full items-start gap-4 rounded-xl px-4 py-4 text-left transition-colors duration-fast ease-default hover:bg-subtle focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
       >
         <span className="mt-2 flex h-2 w-2 shrink-0 items-center justify-center" aria-hidden={true}>
           <span className={`block h-2 w-2 rounded-pill ${COLOR_PUNTO_PRIORIDAD[caso.prioridad]}`} />

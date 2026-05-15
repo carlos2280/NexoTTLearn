@@ -18,12 +18,15 @@ const ICONO_POR_TIPO: Record<TipoEvento, LucideIcon> = {
   alerta: Bell,
 }
 
+// Iconos en TODOS los eventos monocromáticos (text-tertiary sobre bg-surface).
+// La forma del icono comunica el tipo — el color no aporta más, solo ruido.
+// Excepción: `alerta` mantiene una tinta cálida porque sí requiere atención.
 const TONO_POR_TIPO: Record<TipoEvento, string> = {
-  publicacion: "bg-accent-soft text-accent-on-soft",
-  matricula: "bg-info-soft text-info-on-soft",
-  evaluacion: "bg-success-soft text-success-on-soft",
-  sistema: "bg-subtle text-text-secondary",
-  alerta: "bg-warning-soft text-warning-on-soft",
+  publicacion: "bg-surface text-text-tertiary",
+  matricula: "bg-surface text-text-tertiary",
+  evaluacion: "bg-surface text-text-tertiary",
+  sistema: "bg-surface text-text-tertiary",
+  alerta: "bg-surface text-warning",
 }
 
 interface FilaEventoProps {
@@ -49,7 +52,7 @@ function FilaEvento({ evento, indice, esUltimo, esPrimero }: FilaEventoProps) {
         <span aria-hidden={true} className="absolute top-10 bottom-0 left-[26px] w-px bg-border" />
       )}
       <span
-        className={`relative z-10 mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-2 ring-surface ${TONO_POR_TIPO[evento.tipo]}`}
+        className={`relative z-10 mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border ring-2 ring-surface ${TONO_POR_TIPO[evento.tipo]}`}
       >
         <Icono className="h-3.5 w-3.5" strokeWidth={1.5} aria-hidden={true} />
       </span>

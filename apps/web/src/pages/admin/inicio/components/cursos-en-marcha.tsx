@@ -1,13 +1,13 @@
 import { useCursosDashboard } from "@/features/admin/dashboard/hooks/use-cursos-dashboard"
-import { Badge } from "@/shared/components/ui/badge"
 import { Button } from "@/shared/components/ui/button"
 import { Card } from "@/shared/components/ui/card"
 import { Section } from "@/shared/components/ui/section"
 import { RUTAS } from "@/shared/constants/rutas"
+import { cn } from "@/shared/lib/cn"
 import { DUR, EASE } from "@/shared/lib/motion"
 import type { CursoResumen } from "@nexott-learn/shared-types"
 import { motion, useReducedMotion } from "framer-motion"
-import { CalendarClock, Flag } from "lucide-react"
+import { ArrowUpRight, Calendar } from "lucide-react"
 import { Link } from "react-router-dom"
 
 const MAX_VISIBLES = 6
@@ -17,7 +17,6 @@ function formatearFecha(iso: string): string {
   return new Date(iso).toLocaleDateString("es-ES", {
     day: "2-digit",
     month: "short",
-    year: "numeric",
   })
 }
 
@@ -32,16 +31,44 @@ function calcularProgreso(inicioIso: string, deadlineIso: string): number {
   return Math.max(0, Math.min(100, Math.round(pct)))
 }
 
-function TarjetaCurso({
-  curso,
-  indice,
-}: { readonly curso: CursoResumen; readonly indice: number }) {
+function calcularDiasRestantes(deadlineIso: string): number {
+  return Math.ceil((new Date(deadlineIso).getTime() - Date.now()) / MS_POR_DIA)
+}
+
+function urgenciaDeDias(dias: number): "vencido" | "urgente" | "proximo" | "lejos" {
+  if (dias < 0) {
+    return "vencido"
+  }
+  if (dias <= 3) {
+    return "urgente"
+  }
+  if (dias <= 14) {
+    return "proximo"
+  }
+  return "lejos"
+}
+
+interface TarjetaCursoProps {
+  readonly curso: CursoResumen
+  readonly indice: number
+}
+
+function TarjetaCurso({ curso, indice }: TarjetaCursoProps) {
   const reduceMotion = useReducedMotion()
   const delay = reduceMotion ? 0 : 0.05 + indice * 0.07
   const progreso = calcularProgreso(curso.fechaInicio, curso.fechaDeadline)
-  const diasRestantes = Math.ceil(
-    (new Date(curso.fechaDeadline).getTime() - Date.now()) / MS_POR_DIA,
-  )
+  const diasRestantes = calcularDiasRestantes(curso.fechaDeadline)
+  const urgencia = urgenciaDeDias(diasRestantes)
+
+  const etiquetaDias =
+    urgencia === "vencido" ? "Vencido" : diasRestantes === 0 ? "Hoy" : `${diasRestantes}d`
+
+  const colorDias =
+    urgencia === "vencido" || urgencia === "urgente"
+      ? "text-danger-on-soft"
+      : urgencia === "proximo"
+        ? "text-warning-on-soft"
+        : "text-text-tertiary"
 
   return (
     <motion.div
@@ -49,46 +76,43 @@ function TarjetaCurso({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: DUR.storytelling, delay, ease: EASE.default }}
     >
-      <Card
-        tono="plano"
-        interactiva={true}
-        className="group flex h-full flex-col gap-4 overflow-hidden hover:border-accent-soft-hover hover:shadow-sm"
-        asChild={true}
-      >
-        <Link to={RUTAS.admin.cursoDetalle(curso.id)}>
-          <header className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <Badge tono="info" conPunto={true}>
-                Activo
-              </Badge>
-              <span className="tabular text-caption text-text-tertiary">
-                {diasRestantes > 0 ? `${diasRestantes} d restantes` : "vencido"}
-              </span>
+      <Card tono="plano" interactiva={true} densidad="none" asChild={true}>
+        <Link
+          to={RUTAS.admin.cursoDetalle(curso.id)}
+          className="group flex h-full flex-col gap-4 p-5"
+        >
+          <header className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <span className="nx-eyebrow text-text-tertiary">En curso</span>
+              <h3 className="line-clamp-2 text-h3 text-text-primary leading-tight transition-colors group-hover:text-accent">
+                {curso.titulo}
+              </h3>
             </div>
-            <h3 className="line-clamp-2 text-body text-text-primary transition-colors group-hover:text-accent">
-              {curso.titulo}
-            </h3>
+            <ArrowUpRight
+              className="group-hover:-translate-y-0.5 mt-1 h-4 w-4 shrink-0 text-text-tertiary transition-all duration-fast ease-default group-hover:translate-x-0.5 group-hover:text-accent"
+              strokeWidth={1.5}
+              aria-hidden={true}
+            />
           </header>
 
-          <div className="flex flex-col gap-1.5 text-caption text-text-secondary">
+          <div className="flex items-center gap-3 text-caption text-text-secondary">
             <span className="inline-flex items-center gap-1.5">
-              <Flag className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} aria-hidden={true} />
-              Inicio: {formatearFecha(curso.fechaInicio)}
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <CalendarClock
-                className="h-3.5 w-3.5 shrink-0"
-                strokeWidth={1.5}
-                aria-hidden={true}
-              />
-              Deadline: {formatearFecha(curso.fechaDeadline)}
+              <Calendar className="h-3 w-3 shrink-0" strokeWidth={1.5} aria-hidden={true} />
+              {formatearFecha(curso.fechaInicio)} → {formatearFecha(curso.fechaDeadline)}
             </span>
           </div>
 
-          <div className="mt-auto flex flex-col gap-1.5">
-            <div className="flex items-center justify-between text-caption text-text-tertiary">
-              <span>Avance temporal</span>
-              <span className="tabular">{progreso}%</span>
+          <div className="mt-auto flex flex-col gap-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="nx-eyebrow text-text-tertiary">Avance temporal</span>
+              <div className="flex items-baseline gap-2">
+                <span className="tabular font-mono font-semibold text-body-sm text-text-primary">
+                  {progreso}%
+                </span>
+                <span className={cn("tabular font-mono text-caption", colorDias)}>
+                  {etiquetaDias}
+                </span>
+              </div>
             </div>
             <div aria-hidden={true} className="relative h-1 overflow-hidden rounded-pill bg-subtle">
               <div
@@ -133,7 +157,10 @@ export function CursosEnMarcha() {
       {isLoading ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 3 }, (_, i) => (
-            <Card key={`skeleton-${i + 1}`} tono="plano" className="h-[140px] animate-pulse" />
+            <div
+              key={`skeleton-${i + 1}`}
+              className="h-[160px] animate-pulse rounded-2xl border border-border bg-subtle"
+            />
           ))}
         </div>
       ) : activos.length === 0 ? (
