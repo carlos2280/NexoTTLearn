@@ -15,9 +15,9 @@ import {
   RolAsignacion as RolAsignacionPrisma,
 } from "@prisma/client"
 import { z } from "zod"
+import { umbralAprobacionBloque } from "../catalogo/bloques/umbral-aprobacion"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
-import { UMBRAL_BLOQUE_DEFAULT } from "../plan-personal/plan-personal.constants"
 
 const idempotencyKeyUuidSchema = z.string().uuid()
 
@@ -286,7 +286,7 @@ async function calcularPlanCompleto(prisma: PrismaService, asignacionId: string)
           id: true,
           bloques: {
             where: { estado: "ACTIVO", esEvaluable: true },
-            select: { id: true },
+            select: { id: true, tipo: true, contenido: true },
           },
         },
       },
@@ -333,7 +333,8 @@ async function calcularPlanCompleto(prisma: PrismaService, asignacionId: string)
     }
     const todosCumplen = bloques.every((b) => {
       const nota = intentoPorBloque.get(b.id)
-      return nota !== undefined && nota >= UMBRAL_BLOQUE_DEFAULT
+      const umbral = umbralAprobacionBloque(b.tipo, b.contenido)
+      return nota !== undefined && nota >= umbral
     })
     if (!todosCumplen) {
       return false

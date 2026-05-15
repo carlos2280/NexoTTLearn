@@ -374,7 +374,7 @@ describe("calcularAvance (% al vuelo)", () => {
   it("4 de 12 -> 33.33% (redondeo a 2 decimales)", () => {
     const obligatorias = Array.from({ length: 12 }).map((_, i) => ({
       seccionId: `s${i}`,
-      bloques: [{ id: `b${i}` }],
+      bloques: [{ id: `b${i}`, umbralAprobacion: 60 }],
     }))
     const { avancePlan } = calcularAvance({
       seccionesObligatorias: obligatorias,
@@ -1413,13 +1413,14 @@ describe("PlanPersonalService.obtenerPorcentajeAvance (FIX-P11b-avance §5.128)"
       { seccionId: SECCION_ID_2 },
     ])
     prisma.seccion.findMany.mockResolvedValueOnce([
-      { id: SECCION_ID_1, bloques: [{ id: "b1" }] },
-      { id: SECCION_ID_2, bloques: [{ id: "b2" }] },
+      { id: SECCION_ID_1, bloques: [{ id: "b1", tipo: "QUIZ", contenido: {} }] },
+      { id: SECCION_ID_2, bloques: [{ id: "b2", tipo: "QUIZ", contenido: {} }] },
     ])
     prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValueOnce({
       colaboradorId: COLABORADOR_ID,
     })
-    // Solo b1 supera el umbral del motor (UMBRAL_BLOQUE_DEFAULT) -> 1/2 = 50%.
+    // Solo b1 tiene mejor-intento; b2 queda sin intento -> 1/2 = 50%.
+    // El umbral se resuelve via `umbralAprobacionBloque` desde el contenido.
     prisma.intentoBloque.findMany.mockResolvedValueOnce([
       { bloqueId: "b1", nota: new Prisma.Decimal(80) },
     ])

@@ -26,7 +26,6 @@ import type {
   SkillSnapshotItem,
 } from "@nexott-learn/shared-types"
 import { CaracterItemPlan, Prisma, RazonItemPlan, RolUsuario } from "@prisma/client"
-import { UMBRAL_BLOQUE_DEFAULT } from "./plan-personal.constants"
 import type {
   AvancePlan,
   AvanceSeccion,
@@ -269,7 +268,17 @@ function clasificarSeccion(
 
 interface SeccionConBloques {
   readonly seccionId: string
-  readonly bloques: ReadonlyArray<{ readonly id: string }>
+  readonly bloques: ReadonlyArray<{
+    readonly id: string
+    /**
+     * Umbral de aprobacion del bloque (0-100). Lo computa el service llamando
+     * a `umbralAprobacionBloque(tipo, contenido)` antes de invocar este helper.
+     * Concentra la fuente de verdad por tipo: QUIZ -> `contenido.notaMinima`,
+     * CODIGO_PREGUNTAS -> 60. Evita la antigua constante global de 70 que
+     * chocaba con el `notaMinima` del propio bloque (doble fuente de verdad).
+     */
+    readonly umbralAprobacion: number
+  }>
 }
 
 interface IntentoMejorVigente {
@@ -295,7 +304,8 @@ interface CalcularAvanceInput {
  * Calculo de % avance al vuelo (D-S7-B6). Una seccion obligatoria se considera
  * completada cuando:
  *  - Tiene bloques evaluables activos: todos los bloques tienen mejor-intento
- *    vigente con `nota >= UMBRAL_BLOQUE_DEFAULT` (P7b conectara el umbral real).
+ *    vigente con `nota >= bloque.umbralAprobacion` (el umbral lo aporta el
+ *    propio bloque via `umbralAprobacionBloque(tipo, contenido)`).
  *  - No tiene bloques evaluables: existe fila `AperturaSeccion` para la
  *    asignacion+seccion (D94 §9.6).
  * Si no hay obligatorias -> porcentaje 100 (vacuamente cumplido).
@@ -321,7 +331,7 @@ export function calcularAvance(input: CalcularAvanceInput): {
     } else {
       for (const bloque of seccion.bloques) {
         const intento = intentosPorBloque.get(bloque.id)
-        if (intento && intento.notaNum >= UMBRAL_BLOQUE_DEFAULT) {
+        if (intento && intento.notaNum >= bloque.umbralAprobacion) {
           completados += 1
         }
       }

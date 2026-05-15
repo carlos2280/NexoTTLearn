@@ -24,8 +24,10 @@ import {
   type RazonItemPlan as PrismaRazonItemPlan,
   RolAsignacion,
   RolUsuario,
+  TipoBloque,
   TipoEventoNotif,
 } from "@prisma/client"
+import { umbralAprobacionBloque } from "../catalogo/bloques/umbral-aprobacion"
 import { AuditLogService } from "../common/audit/audit-log.service"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
@@ -782,7 +784,7 @@ export class PlanPersonalService {
         modulo: { select: { id: true, titulo: true } },
         bloques: {
           where: { estado: "ACTIVO", esEvaluable: true },
-          select: { id: true },
+          select: { id: true, tipo: true, contenido: true },
         },
       },
     })
@@ -870,10 +872,28 @@ export class PlanPersonalService {
     itemsObligatorios: ReadonlyArray<{ readonly seccionId: string }>,
     secciones: ReadonlyArray<{
       readonly id: string
-      readonly bloques: ReadonlyArray<{ readonly id: string }>
+      readonly bloques: ReadonlyArray<{
+        readonly id: string
+        readonly tipo: TipoBloque
+        readonly contenido: Prisma.JsonValue
+      }>
     }>,
   ): ReturnType<typeof calcularAvance> extends infer R ? Promise<Awaited<R>> : never {
-    const seccionPorId = new Map(secciones.map((s) => [s.id, s]))
+    // Resuelve el umbral por bloque a partir de su contenido. Los bloques
+    // viajan al helper `calcularAvance` ya enriquecidos con `umbralAprobacion`
+    // para evitar que el helper conozca el contrato JSONB del contenido.
+    const seccionPorId = new Map(
+      secciones.map((s) => [
+        s.id,
+        {
+          id: s.id,
+          bloques: s.bloques.map((b) => ({
+            id: b.id,
+            umbralAprobacion: umbralAprobacionBloque(b.tipo, b.contenido),
+          })),
+        },
+      ]),
+    )
     const seccionesObligatorias = itemsObligatorios.map((it) => {
       const s = seccionPorId.get(it.seccionId)
       return {
@@ -1205,7 +1225,7 @@ export class PlanPersonalService {
         id: true,
         bloques: {
           where: { estado: "ACTIVO", esEvaluable: true },
-          select: { id: true },
+          select: { id: true, tipo: true, contenido: true },
         },
       },
     })
@@ -1252,7 +1272,7 @@ export class PlanPersonalService {
         id: true,
         bloques: {
           where: { estado: "ACTIVO", esEvaluable: true },
-          select: { id: true },
+          select: { id: true, tipo: true, contenido: true },
         },
       },
     })
