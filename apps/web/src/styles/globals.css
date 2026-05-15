@@ -29,6 +29,11 @@
   --color-text-tertiary: #a8a29e;
   --color-text-disabled: #d6d3d1;
 
+  /* Tinta sobre fondo de color (CTAs primary/aurora/danger, logo sobre aurora,
+     etc.). NO se override en dark: el blanco mantiene contraste tanto en light
+     como en dark sobre superficies de color saturadas. */
+  --color-on-color: #ffffff;
+
   /* ---------- Color · acento primario (índigo / trabajo) ---------- */
   --color-accent: #4f46e5;
   --color-accent-hover: #4338ca;
@@ -886,8 +891,67 @@
   --color-diff-removed-text: #fca5a5;
 
   /* Sombras de card en dark — el border interno se ve */
+  --shadow-card-resting: 0 1px 2px rgb(0 0 0 / 0.4), 0 0 0 1px rgb(56 56 65 / 0.4);
   --shadow-card-elevated: 0 20px 40px rgb(0 0 0 / 0.5), 0 8px 16px rgb(0 0 0 / 0.3), 0 0 0 1px
     rgb(56 56 65 / 0.6);
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.5);
+  --shadow-hover-up: 0 12px 24px rgb(0 0 0 / 0.5);
+
+  /* ============================================================
+     *-rgb que cambian con el tema.
+     Crítico: las composiciones `rgb(var(--color-X-rgb) / alpha)`
+     leen el rgb (no el color directo). Sin override aquí, las
+     sombras, glows y bordes con alpha quedan con el rgb claro
+     sobre fondo oscuro y se ven desviados o invisibles.
+     Tras este override, --shadow-glow-area-*, --shadow-accent-glow*,
+     y cualquier rgb compuesto recalculan automáticamente.
+     ============================================================ */
+  --color-accent-rgb: 129 140 248; /* #818cf8 */
+  --color-success-rgb: 52 211 153; /* #34d399 */
+  --color-warning-rgb: 251 191 36; /* #fbbf24 */
+  --color-danger-rgb: 248 113 113; /* #f87171 */
+  --color-info-rgb: 34 211 238; /* #22d3ee */
+  --color-warmth-rgb: 251 191 36; /* #fbbf24 — más cálido en dark */
+
+  --color-area-frontend-rgb: 34 211 238;
+  --color-area-backend-rgb: 129 140 248;
+  --color-area-cloud-rgb: 56 189 248;
+  --color-area-data-rgb: 192 132 252;
+  --color-area-mobile-rgb: 251 113 133;
+  --color-area-devops-rgb: 251 146 60;
+  --color-area-qa-rgb: 163 230 53;
+  --color-area-soft-rgb: 251 191 36;
+
+  --color-state-pendiente-rgb: 161 161 170;
+  --color-state-progreso-rgb: 129 140 248;
+  --color-state-en-desarrollo-rgb: 251 191 36;
+  --color-state-solido-rgb: 52 211 153;
+  --color-state-apto-rgb: 74 222 128;
+  --color-state-no-apto-rgb: 248 113 113;
+  --color-state-completado-rgb: 34 211 238;
+
+  /* Glows un punto más intensos en dark para que respiren sobre el carbón */
+  --shadow-glow-area-frontend: 0 8px 32px rgb(var(--color-area-frontend-rgb) / 0.32);
+  --shadow-glow-area-backend: 0 8px 32px rgb(var(--color-area-backend-rgb) / 0.32);
+  --shadow-glow-area-cloud: 0 8px 32px rgb(var(--color-area-cloud-rgb) / 0.32);
+  --shadow-glow-area-data: 0 8px 32px rgb(var(--color-area-data-rgb) / 0.32);
+  --shadow-glow-area-mobile: 0 8px 32px rgb(var(--color-area-mobile-rgb) / 0.32);
+  --shadow-glow-area-devops: 0 8px 32px rgb(var(--color-area-devops-rgb) / 0.32);
+  --shadow-glow-area-qa: 0 8px 32px rgb(var(--color-area-qa-rgb) / 0.32);
+  --shadow-glow-area-soft: 0 8px 32px rgb(var(--color-area-soft-rgb) / 0.32);
+  --shadow-accent-glow: 0 8px 24px rgb(var(--color-accent-rgb) / 0.32);
+  --shadow-accent-glow-lg: 0 14px 36px rgb(var(--color-accent-rgb) / 0.4);
+
+  /* Dataviz series — más brillantes para fondo oscuro */
+  --color-chart-1: #818cf8;
+  --color-chart-2: #34d399;
+  --color-chart-3: #fbbf24;
+  --color-chart-4: #22d3ee;
+  --color-chart-5: #c084fc;
+  --color-chart-6: #fb7185;
+  --color-chart-delta-up: #34d399;
+  --color-chart-delta-down: #f87171;
+  --color-chart-delta-flat: #71717a;
 
   color-scheme: dark;
 }

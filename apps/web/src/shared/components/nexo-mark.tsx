@@ -45,7 +45,7 @@ function AuroraSolidMark({ tamano, className, gradId }: RenderProps) {
       <rect width="32" height="32" rx={radio} fill={`url(#${gradId})`} />
       <path
         d={PATH_N}
-        stroke="#ffffff"
+        stroke="var(--color-on-color)"
         strokeWidth="2.6"
         strokeLinecap="round"
         strokeLinejoin="round"

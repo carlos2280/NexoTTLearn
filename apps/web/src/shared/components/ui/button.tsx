@@ -15,18 +15,14 @@ const buttonStyles = tv({
   variants: {
     variant: {
       // Primary — índigo del trabajo. Lift sutil + glow multi-layer al hover.
-      // text-white explícito (no text-accent-text) porque la variable de tema
-      // a veces no genera utility en Tailwind v4 y el texto cae a herencia.
       primary: [
-        "bg-accent [color:#fff]",
+        "bg-accent text-[var(--color-on-color)]",
         "shadow-accent-glow hover:shadow-accent-glow-lg hover:-translate-y-0.5",
         "hover:bg-accent-hover active:bg-accent-pressed",
       ],
       // Aurora — CTA "premium" para momentos cumbre (login, publicar, completar).
-      // Gradiente cyan → violet → magenta + halo aurora. La posición del fondo
-      // se desplaza al hover + lift para sensación de "el color respira y emerge".
       aurora: [
-        "relative [color:#fff]",
+        "relative text-[var(--color-on-color)]",
         "bg-[image:var(--gradient-aurora)] bg-[length:180%_180%] bg-[position:0%_50%]",
         "shadow-aurora-glow hover:-translate-y-0.5",
         "hover:bg-[position:100%_50%] hover:shadow-[0_18px_46px_rgb(var(--color-aurora-violet-rgb)/0.42)]",
@@ -42,7 +38,7 @@ const buttonStyles = tv({
       ghost: ["bg-transparent text-text-primary", "hover:bg-subtle"],
       // Danger — destructiva. Lift sutil para confirmar peso de la acción.
       danger: [
-        "bg-danger [color:#fff]",
+        "bg-danger text-[var(--color-on-color)]",
         "shadow-[0_8px_24px_rgb(var(--color-danger-rgb)/0.22)]",
         "hover:opacity-95 hover:-translate-y-0.5",
         "hover:shadow-[0_12px_32px_rgb(var(--color-danger-rgb)/0.32)]",

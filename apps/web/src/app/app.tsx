@@ -1,3 +1,4 @@
+import { ThemeSync } from "@/shared/components/ui/theme-toggle"
 import { BrowserRouter } from "react-router-dom"
 import { Toaster } from "sonner"
 import { QueryProvider } from "./providers/query.provider"
@@ -6,6 +7,7 @@ import { AppRoutes } from "./router/routes"
 export function App() {
   return (
     <QueryProvider>
+      <ThemeSync />
       <BrowserRouter>
         <AppRoutes />
         <Toaster
