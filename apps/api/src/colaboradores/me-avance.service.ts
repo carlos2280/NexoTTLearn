@@ -10,8 +10,15 @@ import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { PlanPersonalService } from "../plan-personal/plan-personal.service"
 
-const UMBRAL_COLOR_VERDE = 70
-const UMBRAL_COLOR_AMARILLO = 50
+/**
+ * Fallback de `umbralNoCumple` (cap. 9.1) cuando el curso no lo define
+ * explicitamente. Mismo default que usa `Curso.umbralNoCumple` por convencion.
+ * El color de cada skill exigida se calcula contra su `notaMinima` y este
+ * umbral, no contra constantes globales (lo que antes confundia: una nota
+ * MUY por debajo del minimo del curso aparecia "amarilla" porque el umbral
+ * global era 50, no el del curso).
+ */
+const UMBRAL_NO_CUMPLE_FALLBACK = 10
 
 const UMBRAL_EXCELENCIA_FINAL = 85
 const UMBRAL_SOLIDO_FINAL = 70
@@ -128,16 +135,26 @@ export class MeAvanceService {
     cursoId: string,
     colaboradorId: string,
   ): Promise<readonly MeAvancePorSkill[]> {
-    const exigidas = await this.prisma.cursoSkillExigida.findMany({
-      where: { cursoId },
-      select: {
-        skillId: true,
-        skill: { select: { id: true, etiquetaVisible: true } },
-      },
-    })
+    const [curso, exigidas] = await Promise.all([
+      this.prisma.curso.findUnique({
+        where: { id: cursoId },
+        select: { umbralNoCumple: true },
+      }),
+      this.prisma.cursoSkillExigida.findMany({
+        where: { cursoId },
+        select: {
+          skillId: true,
+          notaMinima: true,
+          skill: { select: { id: true, etiquetaVisible: true } },
+        },
+      }),
+    ])
     if (exigidas.length === 0) {
       return []
     }
+    const umbralNoCumple = curso?.umbralNoCumple
+      ? Number(curso.umbralNoCumple.toString())
+      : UMBRAL_NO_CUMPLE_FALLBACK
     const notas = await this.prisma.notaSkill.findMany({
       where: {
         colaboradorId,
@@ -149,11 +166,12 @@ export class MeAvanceService {
       const nota = notas.find((n) => n.skillId === exigida.skillId)
       const notaActual =
         nota?.notaActual === null || nota?.notaActual === undefined ? null : Number(nota.notaActual)
+      const notaMinima = Number(exigida.notaMinima.toString())
       return {
         skillId: exigida.skillId,
         etiqueta: exigida.skill.etiquetaVisible,
         notaActual,
-        claseColor: claseColorPorNota(notaActual),
+        claseColor: claseColorPorNota(notaActual, notaMinima, umbralNoCumple),
       }
     })
   }
@@ -207,14 +225,34 @@ export class MeAvanceService {
   }
 }
 
-function claseColorPorNota(nota: number | null): ClaseColorSkill {
-  if (nota === null || nota < UMBRAL_COLOR_AMARILLO) {
+/**
+ * Color del chip de skill exigida segun la nota actual vs la exigencia del
+ * curso (cap. 9.1):
+ *  - VERDE: nota >= notaMinima (cumple la exigencia).
+ *  - AMARILLO: notaMinima - umbralNoCumple <= nota < notaMinima (cerca).
+ *  - ROJO: nota === null o nota < notaMinima - umbralNoCumple (sin evidencia
+ *    o lejos del minimo).
+ *
+ * Reemplaza un calculo antiguo con constantes globales (50/70) que no
+ * consideraba la `notaMinima` del curso. Esto producia inconsistencias como
+ * "nota 59 sobre minimo 70 aparecia amarilla" (un colaborador 11 puntos por
+ * debajo del minimo no esta "cerca").
+ */
+function claseColorPorNota(
+  nota: number | null,
+  notaMinima: number,
+  umbralNoCumple: number,
+): ClaseColorSkill {
+  if (nota === null) {
     return "rojo"
   }
-  if (nota < UMBRAL_COLOR_VERDE) {
+  if (nota >= notaMinima) {
+    return "verde"
+  }
+  if (nota >= notaMinima - umbralNoCumple) {
     return "amarillo"
   }
-  return "verde"
+  return "rojo"
 }
 
 interface SnapshotConAsignaciones {

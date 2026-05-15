@@ -7,6 +7,7 @@ import { MeAvanceService } from "./me-avance.service"
 interface PrismaMock {
   usuario: { findUnique: ReturnType<typeof vi.fn> }
   asignacionCurso: { findUnique: ReturnType<typeof vi.fn> }
+  curso: { findUnique: ReturnType<typeof vi.fn> }
   cursoFotografiaCierre: { findUnique: ReturnType<typeof vi.fn> }
   cursoSkillExigida: { findMany: ReturnType<typeof vi.fn> }
   notaSkill: { findMany: ReturnType<typeof vi.fn> }
@@ -25,6 +26,7 @@ function buildPrismaMock(): PrismaMock {
   return {
     usuario: { findUnique: vi.fn() },
     asignacionCurso: { findUnique: vi.fn() },
+    curso: { findUnique: vi.fn().mockResolvedValue({ umbralNoCumple: 10 }) },
     cursoFotografiaCierre: { findUnique: vi.fn() },
     cursoSkillExigida: { findMany: vi.fn().mockResolvedValue([]) },
     notaSkill: { findMany: vi.fn().mockResolvedValue([]) },
