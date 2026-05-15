@@ -54,14 +54,14 @@ interface Props {
 export function BadgeEstadoAsignacion({ asignacion }: Props) {
   if (asignacion.rol === "ASIGNADO" && asignacion.estadoAsignado) {
     return (
-      <Badge tono={tonoAsignado(asignacion.estadoAsignado)} conPunto={true}>
+      <Badge tono={tonoAsignado(asignacion.estadoAsignado)}>
         {etiqueta(asignacion.estadoAsignado)}
       </Badge>
     )
   }
   if (asignacion.rol === "VOLUNTARIO" && asignacion.estadoVoluntario) {
     return (
-      <Badge tono={tonoVoluntario(asignacion.estadoVoluntario)} conPunto={true}>
+      <Badge tono={tonoVoluntario(asignacion.estadoVoluntario)}>
         {etiqueta(asignacion.estadoVoluntario)}
       </Badge>
     )

@@ -125,22 +125,31 @@ function SkillsBloque({ isLoading, error, data }: SkillsBloqueProps) {
   }
   return (
     <ul className="flex flex-col gap-2">
-      {data.porArea.map((area) => (
-        <li
-          key={area.areaId}
-          className="flex items-center justify-between rounded-lg border border-border bg-surface px-4 py-3"
-        >
-          <div className="flex flex-col gap-0.5">
-            <span className="font-medium text-body-sm text-text-primary">{area.nombre}</span>
-            <span className="text-caption text-text-tertiary">
-              {area.skillsConNota} de {area.skillsTotales} skills con nota
-            </span>
-          </div>
-          <span className="tabular font-medium text-aurora-violet text-h3">
-            {area.promedio === null ? "—" : area.promedio.toFixed(1)}
-          </span>
-        </li>
-      ))}
+      {data.porArea.map((area) => {
+        const cobertura =
+          area.skillsTotales > 0 ? (area.skillsConNota / area.skillsTotales) * 100 : 0
+        return (
+          <li
+            key={area.areaId}
+            className="flex flex-col gap-2 rounded-lg border border-border bg-surface px-4 py-3"
+          >
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="font-medium text-body-sm text-text-primary">{area.nombre}</span>
+              <span className="tabular font-medium font-mono text-h3 text-text-primary">
+                {area.promedio === null ? "—" : area.promedio.toFixed(1)}
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="h-1 flex-1 overflow-hidden rounded-pill bg-subtle" aria-hidden={true}>
+                <div className="h-full rounded-pill bg-accent" style={{ width: `${cobertura}%` }} />
+              </div>
+              <span className="tabular shrink-0 text-caption text-text-tertiary">
+                {area.skillsConNota} / {area.skillsTotales}
+              </span>
+            </div>
+          </li>
+        )
+      })}
     </ul>
   )
 }

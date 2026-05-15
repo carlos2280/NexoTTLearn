@@ -16,6 +16,44 @@ function formatearFecha(iso: string | null): string {
   return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })
 }
 
+interface CeldaAccesoProps {
+  readonly usuario: ColaboradorAdminResumen["usuario"]
+}
+
+function CeldaAcceso({ usuario }: CeldaAccesoProps) {
+  if (!usuario) {
+    return <span className="text-caption text-text-tertiary">—</span>
+  }
+
+  if (usuario.bloqueado) {
+    return (
+      <Badge variant="soft" tono="danger" conPunto={true}>
+        <ShieldAlert className="h-3 w-3" aria-hidden={true} />
+        Bloqueado
+      </Badge>
+    )
+  }
+
+  if (usuario.requiereCambioPassword) {
+    return <span className="text-caption text-warning-on-soft">Cambio pwd pendiente</span>
+  }
+
+  const mfa = usuario.mfaHabilitado
+  return (
+    <span className="inline-flex items-center gap-1.5 text-caption text-text-tertiary">
+      <span
+        aria-hidden={true}
+        className={
+          mfa
+            ? "inline-block h-1.5 w-1.5 rounded-pill bg-success"
+            : "inline-block h-1.5 w-1.5 rounded-pill bg-text-tertiary"
+        }
+      />
+      {mfa ? "MFA activo" : "Sin MFA"}
+    </span>
+  )
+}
+
 export const COLUMNAS_PERSONAS: ColumnaTabla<ColaboradorAdminResumen>[] = [
   {
     id: "persona",
@@ -43,38 +81,7 @@ export const COLUMNAS_PERSONAS: ColumnaTabla<ColaboradorAdminResumen>[] = [
     id: "acceso",
     cabecera: "Acceso",
     anchoFijo: "180px",
-    accesor: (p) => {
-      if (!p.usuario) {
-        return <span className="text-caption text-text-tertiary">—</span>
-      }
-      if (p.usuario.bloqueado) {
-        return (
-          <Badge tono="danger" conPunto={true}>
-            <ShieldAlert className="h-3 w-3" aria-hidden={true} />
-            Bloqueado
-          </Badge>
-        )
-      }
-      if (p.usuario.requiereCambioPassword) {
-        return (
-          <Badge tono="warning" conPunto={true}>
-            Debe cambiar pwd
-          </Badge>
-        )
-      }
-      if (p.usuario.mfaHabilitado) {
-        return (
-          <Badge tono="info" conPunto={false}>
-            MFA activo
-          </Badge>
-        )
-      }
-      return (
-        <Badge tono="contorno" conPunto={false}>
-          Sin MFA
-        </Badge>
-      )
-    },
+    accesor: (p) => <CeldaAcceso usuario={p.usuario} />,
   },
   {
     id: "ultimoLogin",

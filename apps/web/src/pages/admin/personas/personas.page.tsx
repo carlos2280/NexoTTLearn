@@ -2,6 +2,7 @@ import { useListarPersonas } from "@/features/personas/hooks/use-listar-personas
 import { Button } from "@/shared/components/ui/button"
 import { DataTable } from "@/shared/components/ui/data-table"
 import { MenuAcciones } from "@/shared/components/ui/menu-acciones"
+import { PageHeader, PageHeaderStat } from "@/shared/components/ui/page-header"
 import { Pagination } from "@/shared/components/ui/pagination"
 import { Select } from "@/shared/components/ui/select"
 import type {
@@ -47,6 +48,13 @@ export function PersonasPage() {
   const { data, isLoading } = useListarPersonas(query)
   const orq = usePersonasOrquestacion()
 
+  const total = data?.meta.total ?? 0
+  const hayFiltros =
+    filtros.busqueda.trim().length >= 2 ||
+    filtros.rol !== "TODOS" ||
+    filtros.estadoEmpleado !== "TODOS" ||
+    filtros.bloqueado !== "TODOS"
+
   const construirExportQuery = useCallback(
     (formato: FormatoExportColaboradores): ExportarColaboradoresQuery => ({
       formato,
@@ -67,24 +75,25 @@ export function PersonasPage() {
 
   return (
     <div className="mx-auto flex max-w-[1280px] flex-col gap-8">
-      <header className="flex flex-col gap-2">
-        <span className="nx-eyebrow text-text-tertiary">Gobierno de personas</span>
-        <h1 className="text-h1 text-text-primary">
-          Personas<span className="text-aurora-violet">.</span>
-        </h1>
-        <p className="max-w-2xl text-body text-text-secondary">
-          Da de alta colaboradores, consulta sus skills y resuelve incidencias de acceso. Cada
-          acción deja motivo auditable.
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="Gobierno de personas"
+        titulo="Personas"
+        descripcion="Da de alta colaboradores, consulta sus skills y resuelve incidencias de acceso. Cada acción deja motivo auditable."
+        stat={
+          <PageHeaderStat
+            valor={total}
+            etiqueta={hayFiltros ? "coinciden con el filtro" : "colaboradores en plataforma"}
+          />
+        }
+      />
 
       <section className="flex flex-col gap-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <PersonasFiltros valor={filtros} onCambio={actualizarFiltros} />
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <PersonasExportarBoton construirQuery={construirExportQuery} />
-            <Button variant="primary" size="sm" onClick={() => orq.abrir("crear")}>
-              <Plus className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
+            <Button variant="primary" size="md" onClick={() => orq.abrir("crear")}>
+              <Plus className="h-4 w-4" strokeWidth={1.75} aria-hidden={true} />
               Nuevo colaborador
             </Button>
           </div>
@@ -108,7 +117,7 @@ export function PersonasPage() {
         />
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2 text-caption text-text-tertiary">
+          <div className="inline-flex items-center gap-2 text-caption text-text-tertiary">
             <span>Filas por página</span>
             <Select
               compact={true}
@@ -127,7 +136,7 @@ export function PersonasPage() {
           <Pagination
             page={data?.meta.page ?? page}
             pageSize={data?.meta.pageSize ?? pageSize}
-            total={data?.meta.total ?? 0}
+            total={total}
             onCambiarPage={setPage}
           />
         </div>

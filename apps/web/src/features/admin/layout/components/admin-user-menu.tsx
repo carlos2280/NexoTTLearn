@@ -5,14 +5,18 @@ import { RUTAS } from "@/shared/constants/rutas"
 import { ChevronDown, LogOut, User } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 
+interface AdminUserMenuProps {
+  readonly onAbrirCuenta: () => void
+}
+
 /**
  * Menú del usuario en el topbar del admin.
  *
- * Centraliza "Mi cuenta" + "Cerrar sesión" en un dropdown del avatar.
- * Pensado para crecer: en el futuro entrarán aquí "Tema", "Atajos",
- * "Notificaciones", etc., sin romper la composición del topbar.
+ * "Mi cuenta" abre el drawer (sin perder contexto). "Cerrar sesión" navega.
+ * Pensado para crecer: aquí entrarán en el futuro "Tema", "Atajos",
+ * "Notificaciones", sin romper la composición del topbar.
  */
-export function AdminUserMenu() {
+export function AdminUserMenu({ onAbrirCuenta }: AdminUserMenuProps) {
   const { data: usuario } = useUsuarioActual()
   const navigate = useNavigate()
 
@@ -29,7 +33,7 @@ export function AdminUserMenu() {
             id: "cuenta",
             etiqueta: "Mi cuenta",
             icono: User,
-            onClick: () => navigate(RUTAS.cuenta),
+            onClick: onAbrirCuenta,
           },
         ],
         [
@@ -45,7 +49,7 @@ export function AdminUserMenu() {
         <button
           type="button"
           aria-label={`Menú de ${usuario.nombre}`}
-          className="flex items-center gap-2 rounded-pill py-1 pr-2 pl-1 transition-colors duration-fast ease-default hover:bg-subtle focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+          className="flex cursor-pointer items-center gap-2 rounded-pill py-1 pr-2 pl-1 transition-colors duration-fast ease-default hover:bg-subtle focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
         >
           <AvatarIniciales nombre={usuario.nombre} tamano="sm" />
           <span className="hidden text-body-sm text-text-primary sm:inline">{usuario.nombre}</span>

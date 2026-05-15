@@ -29,7 +29,7 @@ export function AdminSidebar({ colapsado }: AdminSidebarProps) {
           </>
         )}
       </div>
-      <nav aria-label="Navegación principal" className="mt-8 flex flex-1 flex-col gap-6 px-3">
+      <nav aria-label="Navegación principal" className="mt-10 flex flex-1 flex-col gap-6 px-3">
         {GRUPOS.map((grupo) => (
           <div key={grupo} className="flex w-full flex-col gap-1">
             {colapsado ? null : (
