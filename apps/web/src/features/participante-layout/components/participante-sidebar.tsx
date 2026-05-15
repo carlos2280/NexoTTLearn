@@ -20,7 +20,7 @@ export function ParticipanteSidebar({ colapsado }: ParticipanteSidebarProps) {
           </>
         )}
       </div>
-      <nav aria-label="Navegación principal" className="mt-8 flex flex-1 flex-col gap-1 px-3">
+      <nav aria-label="Navegación principal" className="mt-10 flex flex-1 flex-col gap-1 px-3">
         {NAV_ITEMS.map((item) => (
           <ParticipanteNavItemRow key={item.id} item={item} colapsado={colapsado} />
         ))}

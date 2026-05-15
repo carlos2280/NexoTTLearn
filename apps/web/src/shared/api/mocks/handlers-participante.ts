@@ -251,19 +251,54 @@ function handlerMeCursos(req: MockRequest): Paginated<MeCursoResumen> {
   return paginar(filtrados, page, pageSize)
 }
 
+const MOCK_AREAS_VOL: ReadonlyArray<{
+  readonly id: string
+  readonly nombre: string
+  readonly codigo: string
+}> = [
+  { id: "area-mock-fe", nombre: "Frontend Web", codigo: "frontend" },
+  { id: "area-mock-be", nombre: "Backend Python", codigo: "backend" },
+  { id: "area-mock-qa", nombre: "Calidad y Testing", codigo: "qa" },
+  { id: "area-mock-dv", nombre: "DevOps Azure", codigo: "devops" },
+]
+
+const AREA_FALLBACK = { id: "area-mock-fe", nombre: "Frontend Web", codigo: "frontend" }
+
+function areaPorIndice(i: number): { id: string; nombre: string; codigo: string } {
+  return MOCK_AREAS_VOL[i % MOCK_AREAS_VOL.length] ?? AREA_FALLBACK
+}
+
 function handlerCursosDisponibles(req: MockRequest): Paginated<CursoDisponibleVoluntario> {
   const page = leerNumeroQuery(req.path, "page", 1)
   const pageSize = leerNumeroQuery(req.path, "pageSize", 20)
   const data: readonly CursoDisponibleVoluntario[] = Array.from(
     { length: MOCK_VOLUNTARIADO_TOTAL },
-    (_, i) => ({
-      cursoId: `curso-vol-${i + 1}`,
-      titulo: `Curso voluntariado ${i + 1}`,
-      cliente: { id: `cli-${i + 1}`, nombre: "Cliente demo" },
-      fechaInicio: diasDesdeHoy(-5),
-      fechaDeadline: diasDesdeHoy(60),
-      voluntariosInscritos: 0,
-    }),
+    (_, i) => {
+      const principal = areaPorIndice(i)
+      const secundaria = areaPorIndice(i + 1)
+      return {
+        cursoId: `curso-vol-${i + 1}`,
+        titulo: `Curso voluntariado ${i + 1}`,
+        cliente: { id: `cli-${i + 1}`, nombre: "Cliente demo" },
+        fechaInicio: diasDesdeHoy(-5),
+        fechaDeadline: diasDesdeHoy(60),
+        voluntariosInscritos: 0,
+        areaPrincipal: principal,
+        areasSecundarias: [secundaria],
+        skillsDestacadas: [
+          {
+            id: `skill-${i}-1`,
+            etiquetaVisible: "TypeScript",
+            areaCodigo: principal.codigo,
+          },
+          {
+            id: `skill-${i}-2`,
+            etiquetaVisible: "Pytest",
+            areaCodigo: secundaria.codigo,
+          },
+        ],
+      }
+    },
   )
   return paginar(data, page, pageSize)
 }

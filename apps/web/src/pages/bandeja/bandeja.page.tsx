@@ -10,38 +10,41 @@ import { useSaludo } from "./hooks/use-saludo"
 export function BandejaPage() {
   const { data: usuario, isLoading: cargandoUsuario } = useUsuarioActual()
   const { saludo } = useSaludo()
-  const {
-    cargando,
-    error,
-    cursos,
-    siguientePaso,
-    novedades,
-    totalNoLeidas,
-    totalCursosVoluntariado,
-  } = useBandejaDatos()
+  const { cargando, error, data } = useBandejaDatos()
 
   if (cargandoUsuario || cargando) {
     return <BandejaSkeleton />
   }
 
-  if (error) {
+  if (error || !data) {
     return (
-      <div className="rounded-md border border-danger/30 bg-danger-soft p-4 text-body-sm text-danger-on-soft">
+      <div className="rounded-2xl border border-danger/30 bg-danger-soft p-5 text-body-sm text-danger-on-soft">
         No pudimos cargar tu bandeja. Reintenta en un momento.
       </div>
     )
   }
 
   const nombre = usuario?.nombre ?? ""
+  // El `siguienteAccion` ya cubre el caso EXPLORAR_VOLUNTARIADO de forma cumbre;
+  // la BandaAprender se mantiene solo como acceso permanente al catálogo, y no
+  // se duplica con la cumbre para evitar dos CTAs apuntando al mismo destino.
+  const mostrarAprender = data.siguienteAccion?.tipo !== "EXPLORAR_VOLUNTARIADO"
 
   return (
-    <div className="flex flex-col gap-8">
-      <BandaSiguientePaso cursoSugerido={siguientePaso} nombreUsuario={nombre} saludo={saludo} />
-      <BandaPendientes cursos={cursos} />
-      {novedades ? (
-        <BandaNovedades notificaciones={novedades.data} totalNoLeidas={totalNoLeidas} />
+    <div className="flex flex-col gap-10">
+      <BandaSiguientePaso
+        siguienteAccion={data.siguienteAccion}
+        nombreUsuario={nombre}
+        saludo={saludo}
+      />
+      <BandaPendientes pendientes={data.pendientes} />
+      <BandaNovedades
+        notificaciones={data.novedades}
+        totalNoLeidas={data.contadores.notificacionesNoLeidas}
+      />
+      {mostrarAprender ? (
+        <BandaAprender totalCursosAbiertos={data.contadores.cursosVoluntariadoAbiertos} />
       ) : null}
-      <BandaAprender totalCursosAbiertos={totalCursosVoluntariado} />
     </div>
   )
 }

@@ -1,6 +1,5 @@
 import { useMarcarTodasLeidas } from "@/features/notificaciones/hooks/use-marcar-leida"
 import { Button } from "@/shared/components/ui/button"
-import { cn } from "@/shared/lib/cn"
 import { tiempoRelativo } from "@/shared/lib/tiempo-relativo"
 import type { NotificacionResumen } from "@nexott-learn/shared-types"
 import { obtenerCopyNotificacion } from "../lib/copy-notificacion"
@@ -22,9 +21,12 @@ export function BandaNovedades({ notificaciones, totalNoLeidas }: BandaNovedades
 
   return (
     <section aria-labelledby="banda-novedades-titulo" className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
+      <header className="flex items-baseline justify-between gap-2">
         <h2 id="banda-novedades-titulo" className="text-h3 text-text-primary">
-          Novedades <span className="text-text-tertiary">({totalNoLeidas})</span>
+          Novedades
+          <span className="ml-2 font-mono font-normal text-body-sm text-text-tertiary">
+            {totalNoLeidas} sin leer
+          </span>
         </h2>
         <Button
           variant="ghost"
@@ -34,16 +36,15 @@ export function BandaNovedades({ notificaciones, totalNoLeidas }: BandaNovedades
         >
           Marcar todo como leído
         </Button>
-      </div>
-      <ul className="flex flex-col gap-1">
+      </header>
+      <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
         {notificaciones.map((notif) => {
           const copy = obtenerCopyNotificacion(notif.tipoEvento)
           return (
             <FilaNovedad
               key={notif.id}
               notificacionId={notif.id}
-              texto={copy.texto}
-              ctaLabel={copy.cta}
+              copy={copy}
               tiempoTexto={tiempoRelativo(notif.fechaCreacion)}
               esCritico={notif.esCritico}
             />
@@ -51,7 +52,9 @@ export function BandaNovedades({ notificaciones, totalNoLeidas }: BandaNovedades
         })}
       </ul>
       {restantes > 0 ? (
-        <p className={cn("text-caption text-text-tertiary")}>+ {restantes} más sin leer</p>
+        <p className="text-caption text-text-tertiary">
+          + {restantes} más sin leer en tu bandeja completa
+        </p>
       ) : null}
     </section>
   )
