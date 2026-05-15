@@ -1,4 +1,3 @@
-import { Banner } from "@/shared/components/ui/banner"
 import { Button } from "@/shared/components/ui/button"
 import { Card } from "@/shared/components/ui/card"
 import { ClipboardList, History, Sparkles } from "lucide-react"
@@ -69,23 +68,26 @@ export function BandaEvaluacionInicial({ cursoId, nombreCurso }: BandaEvaluacion
           </div>
         </Card>
       ) : (
-        <Banner tone="info" title="Evaluación inicial pendiente" icon={ClipboardList}>
-          <div className="flex flex-col items-start gap-2">
-            <p>
-              Sin la evaluación inicial, los planes personales no consideran las notas previas de
-              cada persona.
-            </p>
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              onClick={() => setFlujoAbierto(true)}
-              className="text-white"
+        <Card tono="plano" className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div
+              aria-hidden={true}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-info-soft text-info-on-soft"
             >
-              Empezar evaluación inicial
-            </Button>
+              <ClipboardList className="h-4 w-4" strokeWidth={1.5} />
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <h3 className="text-body text-text-primary">Evaluación inicial pendiente</h3>
+              <p className="max-w-xl text-body-sm text-text-secondary">
+                Sin la evaluación inicial, los planes personales no consideran las notas previas de
+                cada persona.
+              </p>
+            </div>
           </div>
-        </Banner>
+          <Button type="button" variant="secondary" size="sm" onClick={() => setFlujoAbierto(true)}>
+            Empezar evaluación inicial
+          </Button>
+        </Card>
       )}
 
       <FlujoEvaluacionDialog

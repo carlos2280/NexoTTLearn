@@ -30,6 +30,16 @@ export function listarBloques(query: ListarBloquesQuery): Promise<Paginated<Bloq
   return httpClient.get<Paginated<BloqueResponse>>(`/catalogo/bloques${buildQueryString(query)}`)
 }
 
+/**
+ * Listado completo (sin paginar) de bloques de una sección. El endpoint
+ * `/catalogo/secciones/:seccionId/bloques` retorna `BloqueResponse[]` sin
+ * `contenido`; para renderizar el cuerpo hay que pedir el detalle por
+ * cada bloque activo (`obtenerBloque`).
+ */
+export function listarBloquesDeSeccion(seccionId: string): Promise<readonly BloqueResponse[]> {
+  return httpClient.get<readonly BloqueResponse[]>(`/catalogo/secciones/${seccionId}/bloques`)
+}
+
 export function obtenerBloque(id: string): Promise<BloqueDetalleResponse> {
   return httpClient.get<BloqueDetalleResponse>(`/catalogo/bloques/${id}`)
 }

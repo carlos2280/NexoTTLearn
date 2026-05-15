@@ -1,3 +1,6 @@
+import { CURSOS_DISPONIBLES_VOLUNTARIO_KEYS } from "@/features/cursos/hooks/use-cursos-disponibles-voluntario"
+import { MI_BANDEJA_KEY } from "@/features/me/hooks/use-mi-bandeja"
+import { MIS_CURSOS_KEY } from "@/features/me/hooks/use-mis-cursos"
 import type {
   AutoInscripcionRequest,
   CerrarCasoAsignadoRequest,
@@ -22,6 +25,21 @@ import { ASIGNACIONES_QUERY_KEY } from "./use-listar-asignaciones"
 function useInvalidar() {
   const queryClient = useQueryClient()
   return () => queryClient.invalidateQueries({ queryKey: ASIGNACIONES_QUERY_KEY })
+}
+
+/**
+ * Invalida las queries que cambian tras una auto-inscripcion del participante:
+ * el listado de asignaciones admin, su bandeja, sus cursos y el catalogo de
+ * voluntariado (el curso recien inscrito ya no debe aparecer).
+ */
+function useInvalidarAutoInscripcion() {
+  const queryClient = useQueryClient()
+  return () => {
+    queryClient.invalidateQueries({ queryKey: ASIGNACIONES_QUERY_KEY })
+    queryClient.invalidateQueries({ queryKey: MI_BANDEJA_KEY })
+    queryClient.invalidateQueries({ queryKey: MIS_CURSOS_KEY })
+    queryClient.invalidateQueries({ queryKey: CURSOS_DISPONIBLES_VOLUNTARIO_KEYS.root })
+  }
 }
 
 interface CrearBatchArgs {
@@ -123,7 +141,7 @@ interface AutoInscripcionArgs {
 }
 
 export function useAutoInscribirseEnCurso() {
-  const invalidar = useInvalidar()
+  const invalidar = useInvalidarAutoInscripcion()
   return useMutation({
     mutationFn: ({ cursoId, input }: AutoInscripcionArgs) => autoInscribirseEnCurso(cursoId, input),
     onSuccess: () => invalidar(),
