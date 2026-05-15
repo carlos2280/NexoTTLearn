@@ -103,14 +103,14 @@ async function upsertAdmin(): Promise<void> {
 async function upsertCatalogoMinimo(): Promise<void> {
   const areaBackend = await prisma.area.upsert({
     where: { nombre: "Backend" },
-    update: { descripcion: "Desarrollo del lado servidor." },
-    create: { nombre: "Backend", descripcion: "Desarrollo del lado servidor." },
+    update: { codigo: "backend", descripcion: "Desarrollo del lado servidor." },
+    create: { nombre: "Backend", codigo: "backend", descripcion: "Desarrollo del lado servidor." },
     select: { id: true },
   })
   const areaFrontend = await prisma.area.upsert({
     where: { nombre: "Frontend" },
-    update: { descripcion: "Desarrollo del lado cliente." },
-    create: { nombre: "Frontend", descripcion: "Desarrollo del lado cliente." },
+    update: { codigo: "frontend", descripcion: "Desarrollo del lado cliente." },
+    create: { nombre: "Frontend", codigo: "frontend", descripcion: "Desarrollo del lado cliente." },
     select: { id: true },
   })
 
