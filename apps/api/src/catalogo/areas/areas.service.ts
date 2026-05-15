@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from "@nestjs/common"
 import {
   ActualizarAreaInput,
+  AreaCodigo,
   AreaResponse,
   CrearAreaInput,
   ListarAreasQuery,
@@ -16,6 +17,7 @@ import { PrismaService } from "../../common/prisma/prisma.service"
 const SELECT_AREA_FIELDS = {
   id: true,
   nombre: true,
+  codigo: true,
   descripcion: true,
   createdAt: true,
   updatedAt: true,
@@ -27,6 +29,7 @@ function toAreaResponse(row: AreaRow): AreaResponse {
   return {
     id: row.id,
     nombre: row.nombre,
+    codigo: row.codigo as AreaCodigo,
     descripcion: row.descripcion,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -91,6 +94,7 @@ export class AreasService {
       const fila = await this.prisma.area.create({
         data: {
           nombre: input.nombre,
+          codigo: input.codigo,
           descripcion: input.descripcion,
         },
         select: SELECT_AREA_FIELDS,
@@ -135,6 +139,9 @@ export class AreasService {
     const data: Prisma.AreaUpdateInput = {}
     if (input.nombre !== undefined) {
       data.nombre = input.nombre
+    }
+    if (input.codigo !== undefined) {
+      data.codigo = input.codigo
     }
     if (input.descripcion !== undefined) {
       data.descripcion = input.descripcion

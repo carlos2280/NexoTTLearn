@@ -44,6 +44,7 @@ import {
   esEstadoVoluntario,
   evaluarCondicionesListo,
   literalEstado,
+  proyectarCursoDisponible,
   toAsignacion,
   toAsignacionDetallada,
 } from "./asignaciones.helpers"
@@ -388,6 +389,24 @@ export class AsignacionesService {
           fechaInicio: true,
           fechaDeadline: true,
           cliente: { select: { id: true, nombre: true } },
+          areasExigidas: {
+            select: {
+              peso: true,
+              area: { select: { id: true, nombre: true, codigo: true } },
+            },
+          },
+          skillsExigidas: {
+            select: {
+              notaMinima: true,
+              skill: {
+                select: {
+                  id: true,
+                  etiquetaVisible: true,
+                  area: { select: { codigo: true } },
+                },
+              },
+            },
+          },
           _count: {
             select: {
               asignaciones: { where: { rol: RolAsignacion.VOLUNTARIO } },
@@ -401,14 +420,7 @@ export class AsignacionesService {
       this.prisma.curso.count({ where }),
     ])
 
-    const data: CursoDisponibleVoluntario[] = rows.map((c) => ({
-      cursoId: c.id,
-      titulo: c.titulo,
-      cliente: { id: c.cliente.id, nombre: c.cliente.nombre },
-      fechaInicio: c.fechaInicio.toISOString().slice(0, 10),
-      fechaDeadline: c.fechaDeadline.toISOString().slice(0, 10),
-      voluntariosInscritos: c._count.asignaciones,
-    }))
+    const data: CursoDisponibleVoluntario[] = rows.map((c) => proyectarCursoDisponible(c))
     return buildPaginatedResponse(data, total, page, pageSize)
   }
 

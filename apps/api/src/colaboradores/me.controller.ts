@@ -9,9 +9,11 @@ import {
 } from "@nestjs/common"
 import { Throttle } from "@nestjs/throttler"
 import type {
+  CursoArbolResponse,
   ExportarFichaQuery,
   FichaResponse,
   MeAvanceCursoResponse,
+  MeBandejaResponse,
   MeCursoResumen,
   MeCursosQuery,
 } from "@nexott-learn/shared-types"
@@ -27,6 +29,8 @@ import { ZodValidationPipe } from "../common/pipes/zod-validation.pipe"
 import { SesionUsuario } from "../common/types/sesion.types"
 import { FichaService } from "./ficha/ficha.service"
 import { MeAvanceService } from "./me-avance.service"
+import { MeBandejaService } from "./me-bandeja.service"
+import { MeCursoArbolService } from "./me-curso-arbol.service"
 import { MeCursosService } from "./me-cursos.service"
 import { fichaACsv, fichaAPdf } from "./me-ficha-export.helpers"
 
@@ -49,9 +53,19 @@ export class MeController {
   constructor(
     private readonly fichaService: FichaService,
     private readonly meAvanceService: MeAvanceService,
+    private readonly meBandejaService: MeBandejaService,
+    private readonly meCursoArbolService: MeCursoArbolService,
     private readonly meCursosService: MeCursosService,
     private readonly auditLog: AuditLogService,
   ) {}
+
+  @Get("bandeja")
+  @Roles(RolUsuario.PARTICIPANTE, RolUsuario.ADMIN)
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  obtenerMiBandeja(@CurrentUser() usuario: SesionUsuario | undefined): Promise<MeBandejaResponse> {
+    const sesion = this.requireUsuario(usuario)
+    return this.meBandejaService.obtenerBandeja(sesion.usuarioId)
+  }
 
   @Get("ficha")
   @Roles(RolUsuario.PARTICIPANTE, RolUsuario.ADMIN)
@@ -122,6 +136,31 @@ export class MeController {
       })
     }
     return this.meAvanceService.obtenerAvanceDeUsuario(sesion.usuarioId, cursoId)
+  }
+
+  /**
+   * `GET /me/cursos/:cursoId/arbol` (Capa 2 catalogo) — arbol unificado del
+   * curso para el participante. Devuelve `modo` (asignado | voluntario |
+   * preview), `asignacionId` (null en preview), cabecera del curso y modulos
+   * + secciones. Sin bloques (los bloques se piden al abrir cada seccion).
+   *
+   * Reglas de visibilidad: ver `MeCursoArbolService`.
+   */
+  @Get("cursos/:cursoId/arbol")
+  @Roles(RolUsuario.PARTICIPANTE, RolUsuario.ADMIN)
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  obtenerArbolCurso(
+    @CurrentUser() usuario: SesionUsuario | undefined,
+    @Param("cursoId") cursoId: string,
+  ): Promise<CursoArbolResponse> {
+    const sesion = this.requireUsuario(usuario)
+    if (!UUID_REGEX.test(cursoId)) {
+      throw new BadRequestException({
+        code: apiErrorCodes.invalidQuery,
+        message: "cursoId no es un UUID valido.",
+      })
+    }
+    return this.meCursoArbolService.obtenerArbol(sesion.usuarioId, cursoId)
   }
 
   private requireUsuario(usuario: SesionUsuario | undefined): SesionUsuario {

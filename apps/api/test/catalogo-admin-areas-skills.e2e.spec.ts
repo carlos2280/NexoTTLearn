@@ -192,7 +192,7 @@ describe.runIf(RUN_E2E)("catalogo-admin areas + skills e2e (P3a)", () => {
     const res = await agente
       .post("/api/v1/catalogo/areas")
       .set("X-XSRF-TOKEN", csrf)
-      .send({ nombre, descripcion: "creada por e2e" })
+      .send({ nombre, codigo: "frontend", descripcion: "creada por e2e" })
     expect(res.status).toBe(201)
     const body = res.body as { id: string; nombre: string }
     expect(body.nombre).toBe(nombre)
@@ -209,13 +209,13 @@ describe.runIf(RUN_E2E)("catalogo-admin areas + skills e2e (P3a)", () => {
     const primera = await agente
       .post("/api/v1/catalogo/areas")
       .set("X-XSRF-TOKEN", csrf)
-      .send({ nombre })
+      .send({ nombre, codigo: "backend" })
     expect(primera.status).toBe(201)
 
     const segunda = await agente
       .post("/api/v1/catalogo/areas")
       .set("X-XSRF-TOKEN", csrf)
-      .send({ nombre })
+      .send({ nombre, codigo: "backend" })
     expect(segunda.status).toBe(409)
     expect((segunda.body as { code: string }).code).toBe("CONFLICT_AREA_NOMBRE_DUPLICADO")
   })
@@ -224,7 +224,7 @@ describe.runIf(RUN_E2E)("catalogo-admin areas + skills e2e (P3a)", () => {
     const area = await agente
       .post("/api/v1/catalogo/areas")
       .set("X-XSRF-TOKEN", csrf)
-      .send({ nombre: `Area-Skill${FIXTURE_SUFFIX}` })
+      .send({ nombre: `Area-Skill${FIXTURE_SUFFIX}`, codigo: "data" })
     expect(area.status).toBe(201)
     const areaId = (area.body as { id: string }).id
 
@@ -241,7 +241,7 @@ describe.runIf(RUN_E2E)("catalogo-admin areas + skills e2e (P3a)", () => {
     const area = await agente
       .post("/api/v1/catalogo/areas")
       .set("X-XSRF-TOKEN", csrf)
-      .send({ nombre: `Area-Force${FIXTURE_SUFFIX}` })
+      .send({ nombre: `Area-Force${FIXTURE_SUFFIX}`, codigo: "mobile" })
     const areaId = (area.body as { id: string }).id
 
     const base = `wizard.familia${FIXTURE_SUFFIX}.original`
@@ -275,7 +275,7 @@ describe.runIf(RUN_E2E)("catalogo-admin areas + skills e2e (P3a)", () => {
     const area = await agente
       .post("/api/v1/catalogo/areas")
       .set("X-XSRF-TOKEN", csrf)
-      .send({ nombre: `Area-Rename${FIXTURE_SUFFIX}` })
+      .send({ nombre: `Area-Rename${FIXTURE_SUFFIX}`, codigo: "devops" })
     const areaId = (area.body as { id: string }).id
 
     const skill = await agente
@@ -304,7 +304,7 @@ describe.runIf(RUN_E2E)("catalogo-admin areas + skills e2e (P3a)", () => {
     const area = await agente
       .post("/api/v1/catalogo/areas")
       .set("X-XSRF-TOKEN", csrf)
-      .send({ nombre: `Area-NoMotivo${FIXTURE_SUFFIX}` })
+      .send({ nombre: `Area-NoMotivo${FIXTURE_SUFFIX}`, codigo: "qa" })
     const areaId = (area.body as { id: string }).id
 
     const skill = await agente
@@ -325,7 +325,7 @@ describe.runIf(RUN_E2E)("catalogo-admin areas + skills e2e (P3a)", () => {
     const area = await agente
       .post("/api/v1/catalogo/areas")
       .set("X-XSRF-TOKEN", csrf)
-      .send({ nombre: `Area-Arch${FIXTURE_SUFFIX}` })
+      .send({ nombre: `Area-Arch${FIXTURE_SUFFIX}`, codigo: "soft" })
     const areaId = (area.body as { id: string }).id
 
     const skill = await agente
@@ -352,7 +352,7 @@ describe.runIf(RUN_E2E)("catalogo-admin areas + skills e2e (P3a)", () => {
     const area = await agente
       .post("/api/v1/catalogo/areas")
       .set("X-XSRF-TOKEN", csrf)
-      .send({ nombre: `Area-Del${FIXTURE_SUFFIX}` })
+      .send({ nombre: `Area-Del${FIXTURE_SUFFIX}`, codigo: "frontend" })
     const areaId = (area.body as { id: string }).id
 
     const skill = await agente

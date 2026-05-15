@@ -6,6 +6,8 @@ import { ColaboradoresService } from "./colaboradores.service"
 import { FichaEdicionService } from "./ficha/ficha-edicion.service"
 import { FichaService } from "./ficha/ficha.service"
 import { MeAvanceService } from "./me-avance.service"
+import { MeBandejaService } from "./me-bandeja.service"
+import { MeCursoArbolService } from "./me-curso-arbol.service"
 import { MeCursosService } from "./me-cursos.service"
 import { MeController } from "./me.controller"
 
@@ -29,6 +31,8 @@ import { MeController } from "./me.controller"
     FichaService,
     FichaEdicionService,
     MeAvanceService,
+    MeBandejaService,
+    MeCursoArbolService,
     MeCursosService,
   ],
   exports: [
@@ -36,6 +40,8 @@ import { MeController } from "./me.controller"
     FichaService,
     FichaEdicionService,
     MeAvanceService,
+    MeBandejaService,
+    MeCursoArbolService,
     MeCursosService,
   ],
 })

@@ -47,11 +47,17 @@ const FECHA = new Date("2026-01-01T00:00:00Z")
 const ADMIN_ID = "00000000-0000-0000-0000-00000000aaaa"
 
 function buildAreaRow(
-  overrides: Partial<{ id: string; nombre: string; descripcion: string | null }> = {},
+  overrides: Partial<{
+    id: string
+    nombre: string
+    codigo: string
+    descripcion: string | null
+  }> = {},
 ) {
   return {
     id: overrides.id ?? "area-1",
     nombre: overrides.nombre ?? "Backend",
+    codigo: overrides.codigo ?? "backend",
     descripcion: overrides.descripcion ?? "desc",
     createdAt: FECHA,
     updatedAt: FECHA,
@@ -118,7 +124,10 @@ describe("AreasService.obtenerPorIdOrThrow", () => {
 describe("AreasService.crear", () => {
   it("crea, mapea y emite audit log AREA_CREADA", async () => {
     prisma.area.create.mockResolvedValue(buildAreaRow({ id: "nuevo" }))
-    const res = await service.crear({ nombre: "Backend", descripcion: "desc" }, ADMIN_ID)
+    const res = await service.crear(
+      { nombre: "Backend", codigo: "backend", descripcion: "desc" },
+      ADMIN_ID,
+    )
     expect(res.id).toBe("nuevo")
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({ accion: "AREA_CREADA", recursoTipo: "area", recursoId: "nuevo" }),
@@ -134,7 +143,7 @@ describe("AreasService.crear", () => {
       }),
     )
     try {
-      await service.crear({ nombre: "Backend" }, ADMIN_ID)
+      await service.crear({ nombre: "Backend", codigo: "backend" }, ADMIN_ID)
       throw new Error("se esperaba 409")
     } catch (error) {
       expect(error).toBeInstanceOf(ConflictException)

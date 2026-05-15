@@ -509,6 +509,8 @@ describe("AsignacionesService.listarCursosDisponiblesVoluntario", () => {
         fechaInicio: new Date("2026-06-01T00:00:00Z"),
         fechaDeadline: new Date("2026-08-01T00:00:00Z"),
         cliente: { id: "cliente-id", nombre: "Cliente X" },
+        areasExigidas: [],
+        skillsExigidas: [],
         _count: { asignaciones: 5 },
       },
     ])
@@ -535,6 +537,65 @@ describe("AsignacionesService.listarCursosDisponiblesVoluntario", () => {
     )
     expect(res.data).toHaveLength(0)
     expect(res.meta.total).toBe(0)
+  })
+
+  it("proyecta areaPrincipal (mayor peso), areasSecundarias (max 2) y skillsDestacadas (top 4)", async () => {
+    prisma.usuario.findUnique.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
+    prisma.curso.findMany.mockResolvedValue([
+      {
+        id: CURSO_ID,
+        titulo: "Curso con areas y skills",
+        fechaInicio: new Date("2026-06-01T00:00:00Z"),
+        fechaDeadline: new Date("2026-08-01T00:00:00Z"),
+        cliente: { id: "cliente-id", nombre: "Cliente X" },
+        areasExigidas: [
+          { peso: 30, area: { id: "a-q", nombre: "QA", codigo: "qa" } },
+          { peso: 60, area: { id: "a-be", nombre: "Backend", codigo: "backend" } },
+          { peso: 10, area: { id: "a-fe", nombre: "Frontend", codigo: "frontend" } },
+          { peso: 20, area: { id: "a-dv", nombre: "DevOps", codigo: "devops" } },
+        ],
+        skillsExigidas: [
+          {
+            notaMinima: 70,
+            skill: { id: "s1", etiquetaVisible: "Python", area: { codigo: "backend" } },
+          },
+          {
+            notaMinima: 80,
+            skill: { id: "s2", etiquetaVisible: "Django", area: { codigo: "backend" } },
+          },
+          {
+            notaMinima: 60,
+            skill: { id: "s3", etiquetaVisible: "Pytest", area: { codigo: "qa" } },
+          },
+          {
+            notaMinima: 50,
+            skill: { id: "s4", etiquetaVisible: "Docker", area: { codigo: "devops" } },
+          },
+          {
+            notaMinima: 40,
+            skill: { id: "s5", etiquetaVisible: "React", area: { codigo: "frontend" } },
+          },
+        ],
+        _count: { asignaciones: 3 },
+      },
+    ])
+    prisma.curso.count.mockResolvedValue(1)
+
+    const res = await service.listarCursosDisponiblesVoluntario(
+      { page: 1, pageSize: 20 },
+      PARTICIPANTE,
+    )
+    const item = res.data[0]
+    expect(item?.areaPrincipal.codigo).toBe("backend")
+    expect(item?.areasSecundarias).toHaveLength(2)
+    expect(item?.areasSecundarias.map((a) => a.codigo)).toEqual(["qa", "devops"])
+    expect(item?.skillsDestacadas).toHaveLength(4)
+    expect(item?.skillsDestacadas.map((s) => s.etiquetaVisible)).toEqual([
+      "Django",
+      "Python",
+      "Pytest",
+      "Docker",
+    ])
   })
 })
 

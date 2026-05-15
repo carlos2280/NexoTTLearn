@@ -3,6 +3,7 @@ import {
   Asignacion,
   AsignacionDetallada,
   CondicionesListoFaltante,
+  CursoDisponibleVoluntario,
   EstadoAsignado,
   EstadoVoluntario,
   RolAsignacion,
@@ -469,5 +470,91 @@ export function toAsignacionDetallada(row: AsignacionDetalleRow): AsignacionDeta
       estadoNuevo: h.estadoNuevo,
       motivo: h.motivo,
     })),
+  }
+}
+
+const TOP_SKILLS_DESTACADAS = 4
+const MAX_AREAS_SECUNDARIAS = 2
+
+/**
+ * Shape minimo que necesita `proyectarCursoDisponible`. No usamos
+ * `Prisma.CursoGetPayload` porque acoplaria el helper a una unica firma de
+ * `select` y dificultaria reusarlo en tests.
+ */
+export interface CursoDisponibleRow {
+  readonly id: string
+  readonly titulo: string
+  readonly fechaInicio: Date
+  readonly fechaDeadline: Date
+  readonly cliente: { readonly id: string; readonly nombre: string }
+  readonly areasExigidas: ReadonlyArray<{
+    readonly peso: Prisma.Decimal | number
+    readonly area: { readonly id: string; readonly nombre: string; readonly codigo: string }
+  }>
+  readonly skillsExigidas: ReadonlyArray<{
+    readonly notaMinima: Prisma.Decimal | number
+    readonly skill: {
+      readonly id: string
+      readonly etiquetaVisible: string
+      readonly area: { readonly codigo: string }
+    }
+  }>
+  readonly _count: { readonly asignaciones: number }
+}
+
+function pesoNumero(p: Prisma.Decimal | number): number {
+  return typeof p === "number" ? p : Number(p)
+}
+
+/**
+ * Proyecta la fila completa de Prisma al contrato `CursoDisponibleVoluntario`.
+ * Reglas:
+ *  - `areaPrincipal` = la `CursoAreaExigida` con mayor `peso` (desempate
+ *    alfabetico por `area.nombre`). Si el curso no tiene areas exigidas
+ *    devuelve `null` en `areaPrincipal.id` y los demas como cadenas vacias
+ *    (no deberia pasar en cursos ACTIVO, pero el contrato exige no romper).
+ *  - `areasSecundarias` = resto ordenadas por peso desc, max 2.
+ *  - `skillsDestacadas` = top 4 por `notaMinima` desc + `etiqueta` asc.
+ */
+export function proyectarCursoDisponible(row: CursoDisponibleRow): CursoDisponibleVoluntario {
+  const areasOrdenadas = [...row.areasExigidas].sort((a, b) => {
+    const diff = pesoNumero(b.peso) - pesoNumero(a.peso)
+    if (diff !== 0) {
+      return diff
+    }
+    return a.area.nombre.localeCompare(b.area.nombre)
+  })
+  const principal = areasOrdenadas[0]?.area
+  const secundarias = areasOrdenadas
+    .slice(1, 1 + MAX_AREAS_SECUNDARIAS)
+    .map(({ area }) => ({ id: area.id, nombre: area.nombre, codigo: area.codigo }))
+
+  const skills = [...row.skillsExigidas]
+    .sort((a, b) => {
+      const diff = pesoNumero(b.notaMinima) - pesoNumero(a.notaMinima)
+      if (diff !== 0) {
+        return diff
+      }
+      return a.skill.etiquetaVisible.localeCompare(b.skill.etiquetaVisible)
+    })
+    .slice(0, TOP_SKILLS_DESTACADAS)
+    .map(({ skill }) => ({
+      id: skill.id,
+      etiquetaVisible: skill.etiquetaVisible,
+      areaCodigo: skill.area.codigo,
+    }))
+
+  return {
+    cursoId: row.id,
+    titulo: row.titulo,
+    cliente: { id: row.cliente.id, nombre: row.cliente.nombre },
+    fechaInicio: row.fechaInicio.toISOString().slice(0, 10),
+    fechaDeadline: row.fechaDeadline.toISOString().slice(0, 10),
+    voluntariosInscritos: row._count.asignaciones,
+    areaPrincipal: principal
+      ? { id: principal.id, nombre: principal.nombre, codigo: principal.codigo }
+      : { id: "", nombre: "", codigo: "" },
+    areasSecundarias: secundarias,
+    skillsDestacadas: skills,
   }
 }
