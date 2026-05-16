@@ -19,6 +19,7 @@ const RE_SEC_BLOQUES = /^\/catalogo\/secciones\/([^/]+)\/bloques$/
 const RE_SEC_BLOQUES_ORDEN = /^\/catalogo\/secciones\/([^/]+)\/bloques\/orden$/
 const RTE_LISTAR_BLOQUES = /^\/catalogo\/bloques(\?.*)?$/
 const RTE_BLOQUE = /^\/catalogo\/bloques\/[^/?]+$/
+const RTE_SEC_LISTAR_BLOQUES = /^\/catalogo\/secciones\/[^/]+\/bloques(\?.*)?$/
 const RTE_SEC_CREAR_BLOQUE = /^\/catalogo\/secciones\/[^/]+\/bloques$/
 const RTE_SEC_REORDENAR_BLOQUES = /^\/catalogo\/secciones\/[^/]+\/bloques\/orden$/
 
@@ -107,6 +108,16 @@ const handleListar: MockHandler = (req) => {
     return a.seccionId.localeCompare(b.seccionId)
   })
   return paginar(ordenados.map(aResumen), page, pageSize)
+}
+
+// -------------------- LISTAR POR SECCION --------------------
+
+const handleListarPorSeccion: MockHandler = (req) => {
+  const [, seccionId] = extractMatch(req.path, RE_SEC_BLOQUES)
+  if (!seccionId) {
+    throw new ApiError(400, "SECCION_REQUERIDA", "seccionId requerido.")
+  }
+  return bloquesPorSeccion(seccionId).map(aResumen)
 }
 
 // -------------------- OBTENER (con contenido) --------------------
@@ -276,6 +287,7 @@ const handleEliminar: MockHandler = (req) => {
 }
 
 export const handlersBloques = [
+  defineRoute("GET", RTE_SEC_LISTAR_BLOQUES, handleListarPorSeccion),
   defineRoute("GET", RTE_LISTAR_BLOQUES, handleListar),
   defineRoute("GET", RTE_BLOQUE, handleObtener),
   defineRoute("POST", RTE_SEC_REORDENAR_BLOQUES, handleReordenar),

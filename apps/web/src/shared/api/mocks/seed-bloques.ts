@@ -267,4 +267,106 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     },
     { esEvaluable: true, skillQueMideId: ID_SKILL_REACT },
   ),
+
+  // -- Curso Java Senior · "Sintaxis basica" (sec-j1-1) — lectura + tip + quiz --
+  nuevoBloque(uuid("blqJ1"), "sec-j1-1", 1, "PARRAFO", {
+    html: '<h2>Sintaxis basica de Java</h2><p>Java es un lenguaje <em>estatico</em>, orientado a objetos y con tipado nominal. Cada archivo <code>.java</code> contiene una unica clase publica con el mismo nombre que el archivo.</p><pre><code class="language-java">public class Hola {\n  public static void main(String[] args) {\n    System.out.println("Hola, mundo");\n  }\n}</code></pre>',
+    textoPlano:
+      "Sintaxis basica de Java. Java es un lenguaje estatico, orientado a objetos y con tipado nominal.",
+    tiempoLecturaMin: 3,
+  }),
+  nuevoBloque(uuid("blqJ2"), "sec-j1-1", 2, "TIP", {
+    variante: "info",
+    html: "<p>Usa <strong>var</strong> (Java 10+) para inferencia local de tipos: <code>var nombres = new ArrayList&lt;String&gt;();</code>. Sigue siendo estatico — el tipo se infiere en compilacion.</p>",
+  }),
+  nuevoBloque(
+    uuid("blqJ3"),
+    "sec-j1-1",
+    3,
+    "QUIZ",
+    {
+      intentosMax: null,
+      solucionVisible: "al_aprobar",
+      ordenAleatorio: false,
+      notaMinima: 60,
+      preguntas: [
+        {
+          id: "j1p1",
+          enunciado: "¿Cual es el tipo retornado por el operador `instanceof`?",
+          opciones: [
+            { id: "j1p1o1", texto: "Class<?>", esCorrecta: false },
+            { id: "j1p1o2", texto: "boolean", esCorrecta: true },
+            { id: "j1p1o3", texto: "Object", esCorrecta: false },
+          ],
+          explicacion:
+            "`instanceof` evalua si una referencia es de un tipo concreto y devuelve boolean.",
+        },
+      ],
+    },
+    { esEvaluable: true, skillQueMideId: ID_SKILL_NEST },
+  ),
+
+  // -- Curso Java Senior · "APIs REST con Spring" (sec-j2-2) — lectura + reto de codigo --
+  nuevoBloque(uuid("blqJ4"), "sec-j2-2", 1, "PARRAFO", {
+    html: "<h2>Endpoints REST con Spring Boot</h2><p>En Spring, un controller se declara con <code>@RestController</code> y mapea HTTP a metodos con <code>@GetMapping</code>, <code>@PostMapping</code>, etc.</p>",
+    textoPlano: "Endpoints REST con Spring Boot. Controller con @RestController y mapeos HTTP.",
+    tiempoLecturaMin: 4,
+  }),
+  nuevoBloque(uuid("blqJ5"), "sec-j2-2", 2, "CODIGO_ILUSTRATIVO", {
+    lenguaje: "java",
+    codigo:
+      // biome-ignore lint/nursery/noSecrets: snippet ilustrativo de Spring Boot para datos mock, no un secreto
+      '@RestController\n@RequestMapping("/api/usuarios")\npublic class UsuariosController {\n  private final UsuariosService service;\n\n  public UsuariosController(UsuariosService service) {\n    this.service = service;\n  }\n\n  @GetMapping("/{id}")\n  public Usuario obtener(@PathVariable String id) {\n    return service.buscarPorId(id);\n  }\n}',
+    descripcion: "Controller tipico con inyeccion por constructor y un endpoint GET.",
+  }),
+  nuevoBloque(
+    uuid("blqJ6"),
+    "sec-j2-2",
+    3,
+    "CODIGO_PREGUNTAS",
+    {
+      lenguaje: "java",
+      enunciado:
+        "Implementa el metodo `sumar(int[] valores)` que devuelva la suma de los elementos del arreglo. Si el arreglo es vacio o null, devuelve 0.",
+      esqueletoInicial:
+        "public class Calculadora {\n  public int sumar(int[] valores) {\n    // tu codigo aqui\n    return 0;\n  }\n}",
+      tiempoLimiteSeg: 30,
+    },
+    { esEvaluable: true, skillQueMideId: ID_SKILL_NEST },
+  ),
+  nuevoBloque(
+    uuid("blqJ7"),
+    "sec-j2-2",
+    4,
+    "CODIGO_TESTS",
+    {
+      codigoPreguntasId: uuid("blqJ6"),
+      solucionReferencia:
+        "public class Calculadora {\n  public int sumar(int[] valores) {\n    if (valores == null) return 0;\n    int total = 0;\n    for (int v : valores) total += v;\n    return total;\n  }\n}",
+      tests: [
+        {
+          id: "jt1",
+          descripcion: "Suma de un arreglo no vacio",
+          entrada: "new int[]{1, 2, 3, 4}",
+          salidaEsperada: "10",
+          visible: true,
+        },
+        {
+          id: "jt2",
+          descripcion: "Arreglo vacio devuelve 0",
+          entrada: "new int[]{}",
+          salidaEsperada: "0",
+          visible: true,
+        },
+        {
+          id: "jt3",
+          descripcion: "Arreglo null devuelve 0",
+          entrada: "null",
+          salidaEsperada: "0",
+          visible: false,
+        },
+      ],
+    },
+    { esEvaluable: true, skillQueMideId: ID_SKILL_NEST },
+  ),
 ]
