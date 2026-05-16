@@ -1,5 +1,6 @@
 import type {
   CursoDisponibleVoluntario,
+  MeBandejaResponse,
   MeCursoResumen,
   NotificacionBadgeResponse,
   NotificacionResumen,
@@ -7,13 +8,42 @@ import type {
 } from "@nexott-learn/shared-types"
 import { type MockRequest, defineRoute } from "./router"
 
+const RTE_ME_BANDEJA = /^\/me\/bandeja$/
 const RTE_ME_CURSOS = /^\/me\/cursos(\?.*)?$/
+const RTE_ME_FICHA_RESUMEN = /^\/me\/ficha\/resumen$/
 const RTE_NOTIFICACIONES_BADGE = /^\/notificaciones\/badge$/
 const RTE_NOTIFICACIONES = /^\/notificaciones(\?.*)?$/
 const RTE_NOTIFICACION_MARCAR_LEIDA = /^\/notificaciones\/[^/]+\/marcar-leida$/
 const RTE_NOTIFICACIONES_MARCAR_TODAS = /^\/notificaciones\/marcar-todas-leidas$/
 const RTE_CURSOS_DISPONIBLES = /^\/cursos\/disponibles-voluntario(\?.*)?$/
 const RGX_MARCAR_LEIDA_ID = /^\/notificaciones\/([^/]+)\/marcar-leida$/
+
+// TODO B-2: cuando el backend implemente `skillsPendientesCount` en
+// `MeCursoResumen`, mover al schema oficial y borrar.
+// TODO B-extra: backend debe exponer `areaPrincipal` (al menos `codigo` +
+// `nombre`) en `MeCursoResumen` para pintar color de área en bandeja y
+// listado de "Mis cursos".
+type MockMeCursoResumen = MeCursoResumen & {
+  readonly skillsPendientesCount?: number
+  readonly areaCodigo?: string | null
+  readonly areaNombre?: string | null
+}
+
+// TODO B-3: cuando el backend implemente `GET /me/ficha/resumen`, mover este
+// tipo a `@nexott-learn/shared-types` y borrar.
+interface MockFichaResumenResponse {
+  readonly totalAreasConActividad: number
+  readonly topAreas: readonly {
+    readonly areaId: string
+    readonly areaNombre: string
+    readonly areaCodigo: string
+    readonly nivelCualitativo: "solido" | "enDesarrollo" | "inicial"
+  }[]
+  readonly ultimaSkillDemostrada: {
+    readonly skillNombre: string
+    readonly fecha: string
+  } | null
+}
 
 function diasDesdeHoy(diasOffset: number): string {
   const fecha = new Date()
@@ -57,7 +87,7 @@ const stateNotificaciones: MockNotificacionState = {
   ],
 }
 
-const MOCK_MIS_CURSOS: readonly MeCursoResumen[] = [
+const MOCK_MIS_CURSOS: readonly MockMeCursoResumen[] = [
   {
     asignacionId: "asg-java-001",
     cursoId: "curso-java-senior",
@@ -69,6 +99,9 @@ const MOCK_MIS_CURSOS: readonly MeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-30),
     fechaDeadline: diasDesdeHoy(12),
     porcentajeAvance: 62,
+    skillsPendientesCount: 4, // TODO B-2: backend debe devolver este campo.
+    areaCodigo: "backend",
+    areaNombre: "Backend",
   },
   {
     asignacionId: "asg-react-002",
@@ -81,6 +114,8 @@ const MOCK_MIS_CURSOS: readonly MeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-15),
     fechaDeadline: diasDesdeHoy(27),
     porcentajeAvance: 18,
+    areaCodigo: "frontend",
+    areaNombre: "Frontend",
   },
   {
     asignacionId: "asg-bank-003",
@@ -93,6 +128,8 @@ const MOCK_MIS_CURSOS: readonly MeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-10),
     fechaDeadline: diasDesdeHoy(90),
     porcentajeAvance: 45,
+    areaCodigo: "backend",
+    areaNombre: "Backend",
   },
   {
     asignacionId: "asg-spring-004",
@@ -105,6 +142,8 @@ const MOCK_MIS_CURSOS: readonly MeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-2),
     fechaDeadline: diasDesdeHoy(60),
     porcentajeAvance: 0,
+    areaCodigo: "backend",
+    areaNombre: "Backend",
   },
   {
     asignacionId: "asg-test-005",
@@ -117,6 +156,8 @@ const MOCK_MIS_CURSOS: readonly MeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-1),
     fechaDeadline: diasDesdeHoy(45),
     porcentajeAvance: 5,
+    areaCodigo: "qa",
+    areaNombre: "QA",
   },
   {
     asignacionId: "asg-docker-006",
@@ -129,6 +170,8 @@ const MOCK_MIS_CURSOS: readonly MeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-120),
     fechaDeadline: diasDesdeHoy(-30),
     porcentajeAvance: 100,
+    areaCodigo: "devops",
+    areaNombre: "DevOps",
   },
   {
     asignacionId: "asg-sql-007",
@@ -141,6 +184,8 @@ const MOCK_MIS_CURSOS: readonly MeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-90),
     fechaDeadline: diasDesdeHoy(-15),
     porcentajeAvance: 100,
+    areaCodigo: "data",
+    areaNombre: "Data",
   },
   {
     asignacionId: "asg-archi-008",
@@ -153,6 +198,8 @@ const MOCK_MIS_CURSOS: readonly MeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-200),
     fechaDeadline: diasDesdeHoy(-60),
     porcentajeAvance: 30,
+    areaCodigo: "backend",
+    areaNombre: "Backend",
   },
   {
     asignacionId: "asg-aws-009",
@@ -165,6 +212,8 @@ const MOCK_MIS_CURSOS: readonly MeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-20),
     fechaDeadline: diasDesdeHoy(40),
     porcentajeAvance: 25,
+    areaCodigo: "cloud",
+    areaNombre: "Cloud",
   },
   {
     asignacionId: "asg-py-010",
@@ -177,6 +226,8 @@ const MOCK_MIS_CURSOS: readonly MeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-45),
     fechaDeadline: diasDesdeHoy(5),
     porcentajeAvance: 100,
+    areaCodigo: "data",
+    areaNombre: "Data",
   },
   {
     asignacionId: "asg-net-011",
@@ -189,6 +240,8 @@ const MOCK_MIS_CURSOS: readonly MeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-5),
     fechaDeadline: diasDesdeHoy(60),
     porcentajeAvance: 12,
+    areaCodigo: "cloud",
+    areaNombre: "Cloud",
   },
   {
     asignacionId: "asg-git-012",
@@ -201,6 +254,8 @@ const MOCK_MIS_CURSOS: readonly MeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-150),
     fechaDeadline: diasDesdeHoy(-80),
     porcentajeAvance: 70,
+    areaCodigo: "devops",
+    areaNombre: "DevOps",
   },
 ]
 
@@ -235,13 +290,13 @@ function leerStringQuery(path: string, clave: string): string | null {
   return new URLSearchParams(path.slice(idx + 1)).get(clave)
 }
 
-function handlerMeCursos(req: MockRequest): Paginated<MeCursoResumen> {
+function handlerMeCursos(req: MockRequest): Paginated<MockMeCursoResumen> {
   const page = leerNumeroQuery(req.path, "page", 1)
   const pageSize = leerNumeroQuery(req.path, "pageSize", 20)
   const estado = leerStringQuery(req.path, "estado")
   const rol = leerStringQuery(req.path, "rol")
 
-  let filtrados: readonly MeCursoResumen[] = MOCK_MIS_CURSOS
+  let filtrados: readonly MockMeCursoResumen[] = MOCK_MIS_CURSOS
   if (estado && estado !== "TODOS") {
     filtrados = filtrados.filter((c) => c.cursoEstado === estado)
   }
@@ -249,6 +304,59 @@ function handlerMeCursos(req: MockRequest): Paginated<MeCursoResumen> {
     filtrados = filtrados.filter((c) => c.rol === rol)
   }
   return paginar(filtrados, page, pageSize)
+}
+
+function handlerMeBandeja(_req: MockRequest): MeBandejaResponse {
+  return {
+    siguienteAccion: {
+      tipo: "CONTINUAR_CURSO",
+      asignacionId: "asg-java-001",
+      cursoId: "curso-java-senior",
+      cursoTitulo: "Java Senior",
+      porcentajeAvance: 62,
+      siguienteSeccionTitulo: "APIs REST con Spring",
+    },
+    // Bandas legacy — el nuevo diseño solo consume `siguienteAccion`.
+    pendientes: [],
+    novedades: [],
+    contadores: {
+      notificacionesNoLeidas: 0,
+      cursosVoluntariadoAbiertos: MOCK_VOLUNTARIADO_TOTAL,
+      cursosActivos: MOCK_MIS_CURSOS.filter((c) => c.cursoEstado === "ACTIVO").length,
+    },
+  }
+}
+
+// TODO B-3: backend debe implementar `GET /me/ficha/resumen` con el shape
+// definido en el_viaje_colaborador.md.
+function handlerMeFichaResumen(_req: MockRequest): MockFichaResumenResponse {
+  return {
+    totalAreasConActividad: 6,
+    topAreas: [
+      {
+        areaId: "area-backend",
+        areaNombre: "Backend",
+        areaCodigo: "backend",
+        nivelCualitativo: "solido",
+      },
+      {
+        areaId: "area-frontend",
+        areaNombre: "Frontend",
+        areaCodigo: "frontend",
+        nivelCualitativo: "enDesarrollo",
+      },
+      {
+        areaId: "area-cloud",
+        areaNombre: "Cloud",
+        areaCodigo: "cloud",
+        nivelCualitativo: "solido",
+      },
+    ],
+    ultimaSkillDemostrada: {
+      skillNombre: "Spring Boot",
+      fecha: diasDesdeHoy(-3),
+    },
+  }
 }
 
 const MOCK_AREAS_VOL: ReadonlyArray<{
@@ -348,7 +456,9 @@ function handlerMarcarTodasLeidas(): void {
 }
 
 export const handlersParticipante = [
+  defineRoute("GET", RTE_ME_BANDEJA, handlerMeBandeja),
   defineRoute("GET", RTE_ME_CURSOS, handlerMeCursos),
+  defineRoute("GET", RTE_ME_FICHA_RESUMEN, handlerMeFichaResumen),
   defineRoute("GET", RTE_NOTIFICACIONES_BADGE, handlerNotificacionesBadge),
   defineRoute("GET", RTE_NOTIFICACIONES, handlerNotificaciones),
   defineRoute("POST", RTE_NOTIFICACION_MARCAR_LEIDA, handlerMarcarLeida),
