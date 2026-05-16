@@ -107,7 +107,13 @@ describe.runIf(RUN_E2E)("auth MFA e2e", () => {
       .post("/api/v1/auth/mfa/verify")
       .send({ mfaChallengeId: challengeId, codigo })
     expect(verify.status).toBe(200)
-    expect((verify.body as { perfil: { mfaHabilitado: boolean } }).perfil.mfaHabilitado).toBe(true)
+    const verifyBody = verify.body as {
+      perfil: { mfaHabilitado: boolean }
+      csrfToken: string
+    }
+    expect(verifyBody.perfil.mfaHabilitado).toBe(true)
+    expect(typeof verifyBody.csrfToken).toBe("string")
+    expect(verifyBody.csrfToken.length).toBeGreaterThan(0)
     const setCookie = (verify.headers["set-cookie"] ?? []) as readonly string[]
     expect(setCookie.some((c) => c.startsWith("nexott.sid="))).toBe(true)
     expect(setCookie.some((c) => c.startsWith("XSRF-TOKEN="))).toBe(true)

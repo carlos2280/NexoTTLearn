@@ -89,7 +89,11 @@ const handleLogin: MockHandler = (req) => {
   }
 
   mockState.sesionActual = { usuarioId: usuario.id }
-  const response: LoginResponse = { mfaRequired: false, perfil: aSesion(usuario) }
+  const response: LoginResponse = {
+    mfaRequired: false,
+    perfil: aSesion(usuario),
+    csrfToken: `mock_csrf_${Math.random().toString(36).slice(2, 18)}`,
+  }
   return response
 }
 
@@ -127,7 +131,14 @@ const handleMfaVerify: MockHandler = (req) => {
 
   mockState.mfaChallenges.delete(challengeId)
   mockState.sesionActual = { usuarioId: challenge.usuarioId }
-  return null
+  const usuario = buscarUsuarioPorId(challenge.usuarioId)
+  if (!usuario) {
+    throw new ApiError(401, "SESION_INVALIDA", "Sesión inválida o expirada.")
+  }
+  return {
+    perfil: aSesion(usuario),
+    csrfToken: `mock_csrf_${Math.random().toString(36).slice(2, 18)}`,
+  }
 }
 
 const handleMe: MockHandler = () => {

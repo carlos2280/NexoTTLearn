@@ -145,15 +145,19 @@ describe.runIf(RUN_E2E)("auth e2e", () => {
     const body = res.body as {
       mfaRequired: boolean
       perfil: { rol: string; requiereCambioPassword: boolean }
+      csrfToken: string
     }
     expect(body.mfaRequired).toBe(false)
     expect(body.perfil.rol).toBe("ADMIN")
     expect(body.perfil.requiereCambioPassword).toBe(true)
+    expect(typeof body.csrfToken).toBe("string")
+    expect(body.csrfToken.length).toBeGreaterThan(0)
     const setCookie = (res.headers["set-cookie"] ?? []) as readonly string[]
     expect(setCookie.some((c) => c.startsWith("nexott.sid="))).toBe(true)
     expect(setCookie.some((c) => c.startsWith("XSRF-TOKEN="))).toBe(true)
     const csrf = extraerXsrfDeResponse(res)
     expect(csrf).toBeTruthy()
+    expect(csrf).toBe(body.csrfToken)
     csrfAgente = csrf as string
   })
 
