@@ -1,5 +1,6 @@
 import { Button } from "@/shared/components/ui/button"
 import { CodeEditorNexott } from "@/shared/components/ui/code-editor-nexott"
+import { cn } from "@/shared/lib/cn"
 import {
   type ContenidoCodigoPreguntas,
   type ContenidoCodigoTests,
@@ -32,6 +33,35 @@ const NOMBRE_ARCHIVO_POR_LENGUAJE: Record<string, string> = {
 
 function nombreArchivo(lenguaje: string): string {
   return NOMBRE_ARCHIVO_POR_LENGUAJE[lenguaje] ?? "solucion.txt"
+}
+
+/**
+ * Estado visual del editor para el dot del top-bar:
+ *  - `virgen`: el participante no ha tocado el esqueleto (gris).
+ *  - `paso`: la última ejecución pasó todos los tests y el código no ha
+ *    cambiado desde entonces (verde).
+ *  - `pendiente`: hay cambios sin probar, o la última ejecución tuvo fallos
+ *    (ámbar — invita a iterar).
+ */
+type EstadoEditor = "virgen" | "paso" | "pendiente"
+
+function derivarEstadoEditor(input: {
+  readonly codigo: string
+  readonly esqueletoInicial: string
+  readonly ejecucion: { readonly testsPasados: number; readonly testsTotales: number } | null
+  readonly codigoEjecutado: string | null
+}): EstadoEditor {
+  if (input.codigo === input.esqueletoInicial && input.codigoEjecutado === null) {
+    return "virgen"
+  }
+  if (
+    input.ejecucion !== null &&
+    input.codigoEjecutado === input.codigo &&
+    input.ejecucion.testsPasados === input.ejecucion.testsTotales
+  ) {
+    return "paso"
+  }
+  return "pendiente"
 }
 
 /**
@@ -81,6 +111,12 @@ function RetoActivo({ bloqueId, cursoId, contenido, contenidoTests }: RetoActivo
   const todosLosTestsPasaron = Boolean(
     flujo.ejecucion && flujo.ejecucion.testsPasados === flujo.ejecucion.testsTotales,
   )
+  const estadoEditor = derivarEstadoEditor({
+    codigo: flujo.codigo,
+    esqueletoInicial: contenido.esqueletoInicial,
+    ejecucion: flujo.ejecucion,
+    codigoEjecutado: flujo.codigoEjecutado,
+  })
   const archivo = nombreArchivo(contenido.lenguaje)
 
   return (
@@ -94,6 +130,7 @@ function RetoActivo({ bloqueId, cursoId, contenido, contenidoTests }: RetoActivo
         <TopBarIde
           archivo={archivo}
           lenguaje={contenido.lenguaje}
+          estado={estadoEditor}
           onEjecutar={flujo.ejecutar}
           puedeEjecutar={puedeAccionar}
           isEjecutando={flujo.isEjecutando}
@@ -139,12 +176,20 @@ function RetoActivo({ bloqueId, cursoId, contenido, contenidoTests }: RetoActivo
 interface TopBarIdeProps {
   readonly archivo: string
   readonly lenguaje: string
+  readonly estado: EstadoEditor
   readonly onEjecutar: () => void
   readonly puedeEjecutar: boolean
   readonly isEjecutando: boolean
 }
 
-function TopBarIde({ archivo, lenguaje, onEjecutar, puedeEjecutar, isEjecutando }: TopBarIdeProps) {
+function TopBarIde({
+  archivo,
+  lenguaje,
+  estado,
+  onEjecutar,
+  puedeEjecutar,
+  isEjecutando,
+}: TopBarIdeProps) {
   return (
     <div className="flex items-center justify-between border-border border-b bg-subtle px-4 py-3">
       <div className="flex items-center gap-3">
@@ -156,11 +201,36 @@ function TopBarIde({ archivo, lenguaje, onEjecutar, puedeEjecutar, isEjecutando 
         <span className="font-mono text-caption text-text-secondary">
           {archivo} · {lenguaje}
         </span>
+        <DotEstado estado={estado} />
       </div>
       <Button size="sm" variant="secondary" onClick={onEjecutar} disabled={!puedeEjecutar}>
         <Play className="mr-1.5 h-3 w-3 fill-current" aria-hidden={true} />
         {isEjecutando ? "Ejecutando…" : "Ejecutar tests"}
       </Button>
     </div>
+  )
+}
+
+interface DotEstadoProps {
+  readonly estado: EstadoEditor
+}
+
+const DOT_ESTADO: Record<EstadoEditor, { readonly cls: string; readonly label: string }> = {
+  virgen: { cls: "bg-border-strong", label: "Editor sin tocar" },
+  paso: { cls: "bg-state-solido", label: "Última ejecución: todos los tests pasaron" },
+  pendiente: {
+    cls: "bg-warmth",
+    label: "Tienes cambios sin probar o tests con fallos",
+  },
+}
+
+function DotEstado({ estado }: DotEstadoProps) {
+  const { cls, label } = DOT_ESTADO[estado]
+  return (
+    <span
+      className={cn("ml-1 inline-block h-1.5 w-1.5 rounded-pill", cls)}
+      title={label}
+      aria-label={label}
+    />
   )
 }
