@@ -1,22 +1,46 @@
+import { useFichaResumen } from "@/features/me/hooks/use-ficha-resumen"
 import { useMiBandeja } from "@/features/me/hooks/use-mi-bandeja"
-import type { MeBandejaResponse } from "@nexott-learn/shared-types"
+import { useMisCursos } from "@/features/me/hooks/use-mis-cursos"
+import type {
+  FichaResumenResponse,
+  MeCursoResumenConSkills,
+  SiguienteAccionConRevision,
+} from "../types"
 
 interface BandejaDatos {
   readonly cargando: boolean
   readonly error: Error | null
-  readonly data: MeBandejaResponse | null
+  readonly siguienteAccion: SiguienteAccionConRevision | null
+  readonly cursosActivos: readonly MeCursoResumenConSkills[]
+  readonly fichaResumen: FichaResumenResponse | null
 }
 
 /**
- * Wrapper de `useMiBandeja` (D-BANDEJA-1) que normaliza el shape para la
- * pagina. Toda la heuristica de "siguienteAccion" vive en el server; aqui
- * solo proyectamos el estado de la query a los flags que consume el render.
+ * Orquesta las 3 queries del nuevo diseño de bandeja (pantalla 01):
+ *
+ *  - `useMiBandeja`     → solo se consume `siguienteAccion`. El resto del
+ *                         envelope (pendientes/novedades/contadores) son
+ *                         legacy de la bandeja anterior y NO se proyecta.
+ *  - `useMisCursos`     → filtro `estado=ACTIVO` para el bloque 2.
+ *  - `useFichaResumen`  → resumen cualitativo para el bloque 3 (B-3).
+ *
+ * Cargando: true si CUALQUIERA aún carga.
+ * Error: el primero que falle se proyecta — la pantalla muestra el banner
+ * de error en lugar de bloques rotos.
  */
 export function useBandejaDatos(): BandejaDatos {
-  const { data, isLoading, error } = useMiBandeja()
+  const bandeja = useMiBandeja()
+  const cursos = useMisCursos({ estado: "ACTIVO" })
+  const ficha = useFichaResumen()
+
+  const cargando = bandeja.isLoading || cursos.isLoading || ficha.isLoading
+  const error = (bandeja.error ?? cursos.error ?? ficha.error ?? null) as Error | null
+
   return {
-    cargando: isLoading,
-    error: (error as Error | null) ?? null,
-    data: data ?? null,
+    cargando,
+    error,
+    siguienteAccion: (bandeja.data?.siguienteAccion as SiguienteAccionConRevision | null) ?? null,
+    cursosActivos: (cursos.data?.data as readonly MeCursoResumenConSkills[] | undefined) ?? [],
+    fichaResumen: (ficha.data as FichaResumenResponse | undefined) ?? null,
   }
 }
