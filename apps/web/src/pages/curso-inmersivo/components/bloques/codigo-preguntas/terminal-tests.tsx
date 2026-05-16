@@ -1,5 +1,7 @@
 import type { ResultadoEjecucionSuite, ResultadoTestUI } from "@/features/codigo-ejecucion"
 import { cn } from "@/shared/lib/cn"
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
+import { useEffect, useRef } from "react"
 
 interface TerminalTestsProps {
   readonly ejecucion: ResultadoEjecucionSuite | null
@@ -8,13 +10,33 @@ interface TerminalTestsProps {
 
 /**
  * Consola estilo VSCode integrada bajo el editor. Tres estados:
- *  - Sin ejecución previa: prompt invitando a pulsar "Ejecutar tests".
- *  - Ejecutando: prompt animado "ejecutando tests…".
- *  - Tras ejecutar: lista de tests visibles con prefijo ✓ / ✗, detalle de
- *    expected/received para los fallos, y agregado de tests ocultos sin
- *    revelar la entrada.
+ *  - Sin ejecución previa: prompt invitando a pulsar "Ejecutar tests" + cursor
+ *    parpadeante (firma de "sistema esperando input", no decoración).
+ *  - Ejecutando: prompt "ejecutando tests…" con el cursor activo.
+ *  - Tras ejecutar: lista de tests con stagger de aparición (~70ms entre
+ *    líneas), autoscroll al fondo, fallos compactos con Expected/Received.
+ *
+ * `useReducedMotion()` neutraliza tanto el stagger como el blink del cursor.
  */
 export function TerminalTests({ ejecucion, isEjecutando }: TerminalTestsProps) {
+  const reducedMotion = useReducedMotion()
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+
+  const totalResultados = ejecucion?.resultados.length ?? 0
+  useEffect(() => {
+    if (totalResultados === 0) {
+      return
+    }
+    const el = scrollRef.current
+    if (!el) {
+      return
+    }
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: reducedMotion ? "auto" : "smooth",
+    })
+  }, [totalResultados, reducedMotion])
+
   return (
     <section
       aria-label="Consola de resultados"
@@ -22,11 +44,17 @@ export function TerminalTests({ ejecucion, isEjecutando }: TerminalTestsProps) {
       style={{
         background: "var(--color-code-bg)",
         color: "var(--color-code-text)",
-        minHeight: "120px",
+        minHeight: "140px",
       }}
     >
       <CabeceraTerminal ejecucion={ejecucion} isEjecutando={isEjecutando} />
-      <CuerpoTerminal ejecucion={ejecucion} isEjecutando={isEjecutando} />
+      <div ref={scrollRef} className="max-h-[260px] overflow-y-auto pr-1">
+        <CuerpoTerminal
+          ejecucion={ejecucion}
+          isEjecutando={isEjecutando}
+          reducedMotion={Boolean(reducedMotion)}
+        />
+      </div>
     </section>
   )
 }
@@ -51,18 +79,26 @@ function CabeceraTerminal({
   )
 }
 
-function CuerpoTerminal({
-  ejecucion,
-  isEjecutando,
-}: {
+interface CuerpoTerminalProps {
   readonly ejecucion: ResultadoEjecucionSuite | null
   readonly isEjecutando: boolean
-}) {
+  readonly reducedMotion: boolean
+}
+
+function CuerpoTerminal({ ejecucion, isEjecutando, reducedMotion }: CuerpoTerminalProps) {
   if (isEjecutando) {
-    return <LineaPrompt texto="ejecutando tests…" />
+    return (
+      <LineaPrompt texto="ejecutando tests…" mostrarCursor={true} reducedMotion={reducedMotion} />
+    )
   }
   if (!ejecucion) {
-    return <LineaPrompt texto='pulsa "Ejecutar tests" para empezar' />
+    return (
+      <LineaPrompt
+        texto='pulsa "Ejecutar tests" para empezar'
+        mostrarCursor={true}
+        reducedMotion={reducedMotion}
+      />
+    )
   }
   const visibles = ejecucion.resultados.filter((r) => r.visible)
   const ocultos = ejecucion.resultados.filter((r) => !r.visible)
@@ -71,17 +107,50 @@ function CuerpoTerminal({
 
   return (
     <div className="flex flex-col gap-0.5 pt-1">
-      {visibles.map((r) => (
-        <FilaTestTerminal key={r.testId} resultado={r} />
-      ))}
+      <AnimatePresence initial={true}>
+        {visibles.map((r, i) => (
+          <motion.div
+            key={r.testId}
+            initial={reducedMotion ? false : { opacity: 0, x: -6 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{
+              duration: 0.22,
+              delay: reducedMotion ? 0 : i * 0.07,
+              ease: "easeOut",
+            }}
+          >
+            <FilaTestTerminal resultado={r} />
+          </motion.div>
+        ))}
+      </AnimatePresence>
       {ocultos.length > 0 ? (
-        <FilaOcultos totales={ocultos.length} pasados={ocultosPasados} fallados={ocultosFallados} />
+        <motion.div
+          initial={reducedMotion ? false : { opacity: 0, x: -6 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{
+            duration: 0.22,
+            delay: reducedMotion ? 0 : visibles.length * 0.07,
+            ease: "easeOut",
+          }}
+        >
+          <FilaOcultos
+            totales={ocultos.length}
+            pasados={ocultosPasados}
+            fallados={ocultosFallados}
+          />
+        </motion.div>
       ) : null}
     </div>
   )
 }
 
-function LineaPrompt({ texto }: { readonly texto: string }) {
+interface LineaPromptProps {
+  readonly texto: string
+  readonly mostrarCursor: boolean
+  readonly reducedMotion: boolean
+}
+
+function LineaPrompt({ texto, mostrarCursor, reducedMotion }: LineaPromptProps) {
   return (
     <p
       className="flex items-baseline gap-2 pt-1"
@@ -89,7 +158,34 @@ function LineaPrompt({ texto }: { readonly texto: string }) {
     >
       <span style={{ color: "var(--color-syntax-keyword)" }}>&gt;</span>
       <span>{texto}</span>
+      {mostrarCursor ? <CursorBlink reducedMotion={reducedMotion} /> : null}
     </p>
+  )
+}
+
+/**
+ * Cursor parpadeante. Es la 4ª excepción al "no animaciones infinitas" del
+ * manifiesto: no es decoración, comunica "sistema esperando input" igual que
+ * `nx-pulse-dot`. Se desactiva con reduced-motion.
+ */
+function CursorBlink({ reducedMotion }: { readonly reducedMotion: boolean }) {
+  if (reducedMotion) {
+    return (
+      <span
+        aria-hidden={true}
+        className="inline-block h-[1em] w-[7px] translate-y-[2px] align-baseline"
+        style={{ background: "var(--color-syntax-keyword)" }}
+      />
+    )
+  }
+  return (
+    <motion.span
+      aria-hidden={true}
+      className="inline-block h-[1em] w-[7px] translate-y-[2px] align-baseline"
+      style={{ background: "var(--color-syntax-keyword)" }}
+      animate={{ opacity: [1, 0, 1] }}
+      transition={{ duration: 1.1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+    />
   )
 }
 
