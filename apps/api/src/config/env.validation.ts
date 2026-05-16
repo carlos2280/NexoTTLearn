@@ -89,6 +89,15 @@ const envSchema = z
     // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
     STORAGE_ROOT: z.string().min(1).default("apps/api/storage"),
     // ---------------------------------------------------------------------
+    // Logging (nestjs-pino). LOG_LEVEL controla el threshold de pino.
+    //   - dev/test: default 'debug'.
+    //   - staging/prod: default 'info'.
+    // El transport pino-pretty se activa SOLO en NODE_ENV=development; en
+    // staging/prod los logs salen como JSON estructurado para Railway.
+    // ---------------------------------------------------------------------
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).optional(),
+    // ---------------------------------------------------------------------
     // AI provider (Slice 8 P8a — D-S8-B2). Mock por defecto: Vitest jamas
     // toca la nube. ClaudeProvider se activa en P8b cuando AI_PROVIDER=claude
     // y consume AI_API_KEY (obligatoria en ese caso — refine cruzado abajo).

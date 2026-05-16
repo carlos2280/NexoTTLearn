@@ -18,6 +18,7 @@ import { MustSetupMfaGuard } from "./common/guards/must-setup-mfa.guard"
 import { RolesGuard } from "./common/guards/roles.guard"
 import { SesionGuard } from "./common/guards/sesion.guard"
 import { IdempotencyModule } from "./common/idempotency/idempotency.module"
+import { LoggingModule } from "./common/logging/logging.module"
 import { PrismaModule } from "./common/prisma/prisma.module"
 import { StorageModule } from "./common/storage/storage.module"
 import { validateEnv } from "./config/env.validation"
@@ -61,6 +62,7 @@ import { TransversalModule } from "./transversal/transversal.module"
       cache: true,
       validate: validateEnv,
     }),
+    LoggingModule,
     ThrottlerModule.forRoot([
       { name: "short", ttl: 1000, limit: 10 },
       { name: "long", ttl: 60_000, limit: 100 },
