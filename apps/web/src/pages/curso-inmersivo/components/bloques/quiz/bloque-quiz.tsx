@@ -97,12 +97,7 @@ function QuizActivo({ bloqueId, cursoId, colaboradorId, contenido }: QuizActivoP
       className="relative flex flex-col gap-5 overflow-hidden rounded-2xl border border-border bg-surface p-6"
       style={{ boxShadow: "var(--shadow-card-resting)" }}
     >
-      <CabeceraQuiz
-        notaMinima={contenido.notaMinima}
-        totalPreguntas={total}
-        mejorNota={mejor.data?.nota ?? null}
-        aprobado={aprobado}
-      />
+      <CabeceraQuiz totalPreguntas={total} />
       <ol className="flex flex-col gap-6">
         {contenido.preguntas.map((pregunta, idx) => (
           <PreguntaItem

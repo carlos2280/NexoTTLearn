@@ -1,4 +1,3 @@
-import { useMejorIntentoBloque } from "@/features/intentos-bloque/hooks/use-mejor-intento-bloque"
 import { Button } from "@/shared/components/ui/button"
 import { CodeEditorNexott } from "@/shared/components/ui/code-editor-nexott"
 import {
@@ -16,7 +15,6 @@ import { useFlujoCodigoPregunta } from "./codigo-preguntas/use-flujo-codigo-preg
 interface BloqueCodigoPreguntasProps {
   readonly bloqueId: string
   readonly cursoId: string
-  readonly colaboradorId: string
   readonly contenido: Record<string, unknown> | null
   readonly contenidoTests: ContenidoCodigoTests | null
 }
@@ -36,7 +34,6 @@ const NOTA_APROBADO_DEFAULT = 60
 export function BloqueCodigoPreguntas({
   bloqueId,
   cursoId,
-  colaboradorId,
   contenido,
   contenidoTests,
 }: BloqueCodigoPreguntasProps) {
@@ -48,7 +45,6 @@ export function BloqueCodigoPreguntas({
     <RetoActivo
       bloqueId={bloqueId}
       cursoId={cursoId}
-      colaboradorId={colaboradorId}
       contenido={parsed.data}
       contenidoTests={contenidoTests}
     />
@@ -58,19 +54,11 @@ export function BloqueCodigoPreguntas({
 interface RetoActivoProps {
   readonly bloqueId: string
   readonly cursoId: string
-  readonly colaboradorId: string
   readonly contenido: ContenidoCodigoPreguntas
   readonly contenidoTests: ContenidoCodigoTests | null
 }
 
-function RetoActivo({
-  bloqueId,
-  cursoId,
-  colaboradorId,
-  contenido,
-  contenidoTests,
-}: RetoActivoProps) {
-  const mejor = useMejorIntentoBloque({ colaboradorId, bloqueId })
+function RetoActivo({ bloqueId, cursoId, contenido, contenidoTests }: RetoActivoProps) {
   const flujo = useFlujoCodigoPregunta({ bloqueId, cursoId, contenido, contenidoTests })
   const isPending = flujo.isEjecutando || flujo.isEnviando
 
@@ -79,11 +67,7 @@ function RetoActivo({
       className="relative flex flex-col gap-5 overflow-hidden rounded-2xl border border-border bg-surface p-6"
       style={{ boxShadow: "var(--shadow-card-resting)" }}
     >
-      <Cabecera
-        mejorNota={mejor.data?.nota ?? null}
-        lenguaje={contenido.lenguaje}
-        notaAprobado={NOTA_APROBADO_DEFAULT}
-      />
+      <Cabecera lenguaje={contenido.lenguaje} />
       <div className="grid gap-5 lg:grid-cols-[1fr_minmax(0,1.4fr)]">
         <PanelEnunciado contenido={contenido} />
         <div className="flex flex-col gap-3">
