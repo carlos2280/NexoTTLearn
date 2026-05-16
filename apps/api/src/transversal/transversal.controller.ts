@@ -39,7 +39,7 @@ import {
   finalizarTransversalBodySchema,
   listarIntentosTransversalQuerySchema,
 } from "@nexott-learn/shared-types"
-import { AccionAuditoria, EstadoCurso, RolUsuario } from "@prisma/client"
+import { AccionAuditoria, RolUsuario } from "@prisma/client"
 import { Request } from "express"
 import { AuditLogService } from "../common/audit/audit-log.service"
 import { extractContextoHttp } from "../common/audit/extract-contexto"
@@ -51,7 +51,6 @@ import { Roles } from "../common/decorators/roles.decorator"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { Paginated } from "../common/http/paginated"
 import { ZodValidationPipe } from "../common/pipes/zod-validation.pipe"
-import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
 import { requireIdempotencyKeyUuid } from "./transversal.helpers"
 import { TransversalService } from "./transversal.service"
@@ -76,7 +75,6 @@ export class TransversalController {
   constructor(
     private readonly transversal: TransversalService,
     private readonly auditLog: AuditLogService,
-    private readonly prisma: PrismaService,
   ) {}
 
   // E1
@@ -102,13 +100,10 @@ export class TransversalController {
     @Req() req: Request,
   ): Promise<EditarSkillsTransversalResponse> {
     const sesion = this.requireUsuario(usuario)
-    // X-Motivo obligatorio cuando curso ACTIVO. Lo evaluamos inline porque
-    // depende del estado del curso (no hay un guard generico que lo cubra).
-    const cursoActivo = await this.prisma.curso.findUnique({
-      where: { id: cursoId },
-      select: { estado: true },
-    })
-    const requiereMotivo = cursoActivo?.estado === EstadoCurso.ACTIVO
+    // X-Motivo obligatorio cuando curso ACTIVO. La consulta vive en el service
+    // (regla "controller no toca Prisma"); no hay un guard generico que cubra
+    // este caso porque depende del estado dinamico del curso.
+    const requiereMotivo = await this.transversal.requiereMotivoPorEstadoCurso(cursoId)
     const motivoTrim = motivo?.trim() ?? ""
     if (requiereMotivo && motivoTrim.length === 0) {
       throw new UnprocessableEntityException({

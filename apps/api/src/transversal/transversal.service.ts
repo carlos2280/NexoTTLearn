@@ -173,6 +173,20 @@ export class TransversalService {
   // E2. POST /api/v1/cursos/:cursoId/transversal/skills (admin)
   // =========================================================================
 
+  /**
+   * Resuelve si un curso esta en estado ACTIVO y por tanto exige X-Motivo.
+   * Encapsula la unica consulta de Prisma que el controller necesitaba hacer
+   * directo, manteniendo la regla "controller no toca Prisma". Devuelve `false`
+   * si el curso no existe (la validacion principal corre en `actualizarSkills`).
+   */
+  async requiereMotivoPorEstadoCurso(cursoId: string): Promise<boolean> {
+    const curso = await this.prisma.curso.findUnique({
+      where: { id: cursoId },
+      select: { estado: true },
+    })
+    return curso?.estado === EstadoCurso.ACTIVO
+  }
+
   async actualizarSkills(input: {
     readonly cursoId: string
     readonly body: EditarSkillsTransversalInput

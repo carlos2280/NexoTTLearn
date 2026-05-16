@@ -36,6 +36,15 @@ export function configurarHttp(app: INestApplication): void {
   const databaseUrl = config.get("DATABASE_URL", { infer: true })
   const allowedOrigins = config.get("ALLOWED_ORIGINS", { infer: true })
 
+  // Detras del LB de Railway hay 1 hop de proxy. Sin esto:
+  //  - req.ip es la IP del proxy (throttler agrupa todo el trafico)
+  //  - req.protocol no detecta HTTPS (rompe cookies secure)
+  //  - extractContextoHttp audita la IP del proxy en lugar del cliente.
+  const expressInstance = app.getHttpAdapter().getInstance()
+  if (typeof expressInstance.set === "function") {
+    expressInstance.set("trust proxy", 1)
+  }
+
   app.use(crearMiddlewareRequestId())
 
   app.use(
@@ -115,7 +124,6 @@ export function configurarHttp(app: INestApplication): void {
     exclude: [{ path: "api/health", method: RequestMethod.GET }],
   })
 
-  const expressInstance = app.getHttpAdapter().getInstance()
   if (typeof expressInstance.disable === "function") {
     expressInstance.disable("x-powered-by")
   }

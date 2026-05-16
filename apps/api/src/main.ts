@@ -17,6 +17,10 @@ async function bootstrap(): Promise<void> {
   const config = app.get<ConfigService<AppEnv, true>>(ConfigService)
   const port = config.get("PORT", { infer: true })
 
+  // Habilita SIGTERM/SIGINT -> OnModuleDestroy: cierra pool de Prisma, crons
+  // y sesiones limpiamente cuando Railway redepliega.
+  app.enableShutdownHooks()
+
   await app.listen(port)
   logger.log(`API escuchando en puerto ${port}`)
 }

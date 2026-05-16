@@ -2,7 +2,6 @@ import { AccionAuditoria } from "@prisma/client"
 import { Request } from "express"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AuditLogService } from "../common/audit/audit-log.service"
-import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
 import { TransversalController } from "./transversal.controller"
 import { CargarCapaResult, TransversalService } from "./transversal.service"
@@ -75,7 +74,6 @@ beforeEach(() => {
   controller = new TransversalController(
     transversal as unknown as TransversalService,
     auditLog as unknown as AuditLogService,
-    {} as unknown as PrismaService,
   )
 })
 
