@@ -1,25 +1,13 @@
-import type { ApiErrorCode } from "@nexott-learn/shared-types"
-
-interface ApiErrorOptions {
-  readonly status: number
-  readonly code: ApiErrorCode
-  readonly message: string
-  readonly fieldErrors?: Record<string, string[]>
-  readonly retryAfter?: number
-}
-
 export class ApiError extends Error {
   readonly status: number
-  readonly code: ApiErrorCode
-  readonly fieldErrors?: Record<string, string[]>
-  readonly retryAfter?: number
+  readonly code: string
+  readonly details?: unknown
 
-  constructor(options: ApiErrorOptions) {
-    super(options.message)
+  constructor(status: number, code: string, message: string, details?: unknown) {
+    super(message)
     this.name = "ApiError"
-    this.status = options.status
-    this.code = options.code
-    this.fieldErrors = options.fieldErrors
-    this.retryAfter = options.retryAfter
+    this.status = status
+    this.code = code
+    this.details = details
   }
 }

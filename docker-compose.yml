@@ -17,5 +17,33 @@ services:
       timeout: 5s
       retries: 5
 
+  # Sandbox de ejecución de código (Piston · Engineering Box).
+  # Aísla cada corrida con isolate; soporta JS, TS, Python (MVP).
+  # API HTTP en :2000 — el adaptador del backend hace POST /api/v2/execute.
+  #
+  # NOTA: `privileged: true` es requerido por isolate (subsistema de cgroups).
+  # En Railway hay que probar si lo permite; si no, este servicio se mueve a
+  # un VPS pequeño externo y la api le hace fetch via HTTP.
+  piston:
+    image: ghcr.io/engineer-man/piston
+    container_name: nexott-learn-piston
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "${PISTON_PORT:-2000}:2000"
+    volumes:
+      - piston-packages:/piston/packages
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:2000/api/v2/runtimes || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
 volumes:
   postgres-data:
+  piston-packages:

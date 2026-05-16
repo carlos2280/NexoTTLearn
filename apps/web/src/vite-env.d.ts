@@ -2,11 +2,9 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_URL?: string
-  readonly VITE_ADMIN_CONTACT_EMAIL?: string
+  readonly VITE_USE_MOCKS?: string
 }
 
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
-
-declare module "*.css"

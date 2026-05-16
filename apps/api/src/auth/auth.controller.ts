@@ -1,186 +1,255 @@
 import {
   Body,
   Controller,
+  Delete,
+  ForbiddenException,
   Get,
-  Header,
   HttpCode,
   HttpStatus,
+  InternalServerErrorException,
+  Param,
   Post,
   Req,
+  Res,
   UnauthorizedException,
-  UseGuards,
 } from "@nestjs/common"
+import { ConfigService } from "@nestjs/config"
 import { SkipThrottle, Throttle } from "@nestjs/throttler"
 import {
-  type CambiarPasswordInput,
-  type ConfirmMfaSetupInput,
-  type ConfirmMfaSetupResponse,
-  type LoginInput,
-  type LoginResult,
-  type UsuarioPublico,
-  type VerifyMfaInput,
-  type VerifyMfaResponse,
+  aceptarAvisoPrivacidadSchema,
   cambiarPasswordSchema,
-  confirmMfaSetupSchema,
+  desbloquearSchema,
   loginSchema,
-  verifyMfaSchema,
+  regenerarPasswordInicialSchema,
 } from "@nexott-learn/shared-types"
-import type { Request } from "express"
-import { UsuarioActual } from "../common/decorators/usuario-actual.decorator"
-import { SesionGuard } from "../common/guards/sesion.guard"
-import { ZodValidationPipe } from "../common/zod-validation.pipe"
-import { AuthEventosService } from "./auth-eventos.service"
+import { RolUsuario } from "@prisma/client"
+import { Request, Response } from "express"
+import { extractContextoHttp } from "../common/audit/extract-contexto"
+import { CurrentUser } from "../common/decorators/current-user.decorator"
+import { Public } from "../common/decorators/public.decorator"
+import { RequiereMotivo } from "../common/decorators/requiere-motivo.decorator"
+import { Roles } from "../common/decorators/roles.decorator"
+import { apiErrorCodes } from "../common/errors/api-error.codes"
+import { emitirCsrfToken, limpiarCookieCsrf } from "../common/http/csrf-helper"
+import { ZodValidationPipe } from "../common/pipes/zod-validation.pipe"
+import { SesionUsuario } from "../common/types/sesion.types"
+import { AppEnv } from "../config/env.validation"
 import { AuthService } from "./auth.service"
-import { extraerCliente } from "./lib/extraer-cliente"
-import { MfaService } from "./mfa/mfa.service"
-import type { UsuarioSesion } from "./tipos"
+import { LoginResponse, PerfilSesion, ResultadoRegenerarPassword } from "./auth.types"
 
-// 30 req/min por IP en /auth/* — defensivo pre-autenticacion.
-// /auth/login y MFA endpoints declaran su propio limite mas estricto.
-@Throttle({ default: { limit: 30, ttl: 60_000 } })
+const NOMBRE_COOKIE_SESION = "nexott.sid"
+
 @Controller("auth")
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
-    private readonly mfaService: MfaService,
-    private readonly eventos: AuthEventosService,
+    private readonly config: ConfigService<AppEnv, true>,
   ) {}
 
   @Post("login")
+  @Public()
+  @SkipThrottle({ short: true, long: true })
+  @Throttle({ short: { ttl: 60_000, limit: 5 } })
   @HttpCode(HttpStatus.OK)
-  @Header("Cache-Control", "no-store")
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async login(
-    @Body(new ZodValidationPipe(loginSchema)) input: LoginInput,
+    @Body(new ZodValidationPipe(loginSchema))
+    input: { email: string; password: string },
     @Req() req: Request,
-  ): Promise<LoginResult> {
-    const cliente = extraerCliente(req)
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<LoginResponse> {
     const resultado = await this.authService.validarCredenciales(
       input.email,
       input.password,
-      cliente,
+      extractContextoHttp(req),
     )
 
-    if (resultado.tipo === "mfa-verify-pendiente") {
-      const challengeId = this.mfaService.iniciarChallenge(resultado.usuarioId)
-      return {
-        status: "mfa-verify",
-        challengeId,
-        emailEnmascarado: resultado.emailEnmascarado,
-      }
+    if (resultado.tipo === "mfaPendiente") {
+      // No se emite cookie ni CSRF: la sesion se completa tras /auth/mfa/verify.
+      return { mfaRequired: true, mfaChallengeId: resultado.mfaChallengeId }
     }
 
-    if (resultado.tipo === "mfa-setup-pendiente") {
-      const setup = await this.mfaService.iniciarSetup(resultado.usuarioId, cliente)
-      return {
-        status: "mfa-setup",
-        challengeId: setup.challengeId,
-        emailEnmascarado: resultado.emailEnmascarado,
-        secret: setup.secret,
-        otpauthUri: setup.otpauthUri,
-      }
-    }
+    const { perfil } = resultado
 
     await new Promise<void>((resolve, reject) => {
-      req.login(resultado.usuario, (err) => (err ? reject(err) : resolve()))
+      req.session.regenerate((err: unknown) => {
+        if (err) {
+          reject(err instanceof Error ? err : new Error(String(err)))
+          return
+        }
+        resolve()
+      })
     })
 
-    return { status: "ok", usuario: resultado.usuario }
-  }
-
-  @Post("verify-mfa")
-  @HttpCode(HttpStatus.OK)
-  @Header("Cache-Control", "no-store")
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  async verifyMfa(
-    @Body(new ZodValidationPipe(verifyMfaSchema)) input: VerifyMfaInput,
-    @Req() req: Request,
-  ): Promise<VerifyMfaResponse> {
-    const cliente = extraerCliente(req)
-    const usuarioId = await this.mfaService.verificarChallenge(
-      input.challengeId,
-      input.code,
-      cliente,
-    )
-    const usuario = await this.authService.confirmarLoginPostMfa(usuarioId, cliente)
+    req.session.usuarioId = perfil.usuarioId
+    req.session.rol = perfil.rol
+    emitirCsrfToken(req, res, { cookieSecure: this.config.get("COOKIE_SECURE", { infer: true }) })
 
     await new Promise<void>((resolve, reject) => {
-      req.login(usuario, (err) => (err ? reject(err) : resolve()))
+      req.session.save((err: unknown) => {
+        if (err) {
+          reject(err instanceof Error ? err : new Error(String(err)))
+          return
+        }
+        resolve()
+      })
     })
 
-    return { usuario }
+    return { mfaRequired: false, perfil }
   }
 
-  @Post("confirm-mfa-setup")
-  @HttpCode(HttpStatus.OK)
-  @Header("Cache-Control", "no-store")
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  async confirmMfaSetup(
-    @Body(new ZodValidationPipe(confirmMfaSetupSchema)) input: ConfirmMfaSetupInput,
-    @Req() req: Request,
-  ): Promise<ConfirmMfaSetupResponse> {
-    const cliente = extraerCliente(req)
-    const usuarioId = await this.mfaService.confirmarSetup(input.challengeId, input.code, cliente)
-    const usuario = await this.authService.confirmarLoginPostMfa(usuarioId, cliente)
-
-    await new Promise<void>((resolve, reject) => {
-      req.login(usuario, (err) => (err ? reject(err) : resolve()))
-    })
-
-    return { usuario }
-  }
-
-  @Post("logout")
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async logout(
-    @Req() req: Request,
-    @UsuarioActual() usuario: UsuarioSesion | undefined,
-  ): Promise<void> {
-    const cliente = extraerCliente(req)
-    if (usuario) {
-      await this.eventos.registrar({
-        tipo: "LOGOUT",
-        usuarioId: usuario.id,
-        email: usuario.email,
-        ip: cliente.ip,
-        userAgent: cliente.userAgent,
+  @Get("me")
+  async me(@CurrentUser() usuario: SesionUsuario | undefined): Promise<PerfilSesion> {
+    if (!usuario) {
+      throw new UnauthorizedException({
+        code: apiErrorCodes.noAutenticado,
+        message: "Sesion invalida.",
       })
     }
+    return await this.authService.obtenerPerfil(usuario.usuarioId)
+  }
+
+  @Delete("session")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<void> {
+    const usuarioId = req.session.usuarioId
+    const contexto = extractContextoHttp(req)
     await new Promise<void>((resolve, reject) => {
-      req.logout((err) => (err ? reject(err) : resolve()))
+      req.session.destroy((err: unknown) => {
+        if (err) {
+          reject(err instanceof Error ? err : new Error(String(err)))
+          return
+        }
+        resolve()
+      })
     })
-    await new Promise<void>((resolve, reject) => {
-      req.session?.destroy((err) => (err ? reject(err) : resolve()))
-    })
+    res.clearCookie(NOMBRE_COOKIE_SESION, { path: "/" })
+    limpiarCookieCsrf(res)
+    if (usuarioId) {
+      await this.authService.registrarLogout(usuarioId, contexto)
+    }
+  }
+
+  @Delete("sesiones-otras")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async cerrarOtrasSesiones(
+    @CurrentUser() usuario: SesionUsuario | undefined,
+    @Req() req: Request,
+  ): Promise<void> {
+    if (!usuario) {
+      throw new UnauthorizedException({
+        code: apiErrorCodes.noAutenticado,
+        message: "Sesion invalida.",
+      })
+    }
+    await this.authService.invalidarOtrasSesiones(usuario.usuarioId, req.sessionID)
   }
 
   @Post("cambiar-password")
   @HttpCode(HttpStatus.NO_CONTENT)
-  @UseGuards(SesionGuard)
   async cambiarPassword(
-    @Body(new ZodValidationPipe(cambiarPasswordSchema)) input: CambiarPasswordInput,
-    @UsuarioActual() usuario: UsuarioSesion | undefined,
+    @Body(new ZodValidationPipe(cambiarPasswordSchema))
+    input: { passwordActual: string; passwordNuevo: string },
+    @CurrentUser() usuario: SesionUsuario | undefined,
     @Req() req: Request,
   ): Promise<void> {
     if (!usuario) {
-      throw new UnauthorizedException("Sesion no valida")
+      throw new UnauthorizedException({
+        code: apiErrorCodes.noAutenticado,
+        message: "Sesion invalida.",
+      })
     }
-
     await this.authService.cambiarPassword(
-      usuario.id,
+      usuario.usuarioId,
+      req.sessionID,
       input.passwordActual,
       input.passwordNuevo,
-      extraerCliente(req),
+      extractContextoHttp(req),
     )
   }
 
-  @Get("me")
-  @UseGuards(SesionGuard)
-  @SkipThrottle()
-  me(@UsuarioActual() usuario: UsuarioSesion | undefined): UsuarioPublico {
+  @Post("aceptar-aviso-privacidad")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async aceptarAviso(
+    @Body(new ZodValidationPipe(aceptarAvisoPrivacidadSchema))
+    input: { versionAviso: string },
+    @CurrentUser() usuario: SesionUsuario | undefined,
+    @Req() req: Request,
+  ): Promise<void> {
     if (!usuario) {
-      throw new UnauthorizedException("Sesion no valida")
+      throw new UnauthorizedException({
+        code: apiErrorCodes.noAutenticado,
+        message: "Sesion invalida.",
+      })
     }
-    return usuario
+    await this.authService.aceptarAvisoPrivacidad(
+      usuario.usuarioId,
+      input.versionAviso,
+      extractContextoHttp(req),
+    )
+  }
+
+  @Post("regenerar-password-inicial")
+  @Roles(RolUsuario.ADMIN)
+  @RequiereMotivo()
+  @Throttle({ short: { ttl: 60 * 60 * 1000, limit: 10 } })
+  async regenerarPasswordInicial(
+    @Body(new ZodValidationPipe(regenerarPasswordInicialSchema))
+    input: { usuarioId: string },
+    @CurrentUser() admin: SesionUsuario | undefined,
+    @Req() req: Request,
+  ): Promise<ResultadoRegenerarPassword> {
+    if (!admin) {
+      throw new InternalServerErrorException({
+        code: apiErrorCodes.errorInterno,
+        message: "Sesion invalida tras pasar guards.",
+      })
+    }
+    if (input.usuarioId === admin.usuarioId) {
+      throw new ForbiddenException({
+        code: apiErrorCodes.prohibido,
+        message: "Un administrador no puede regenerar su propia contrasena por este endpoint.",
+      })
+    }
+    return await this.authService.regenerarPasswordInicial(
+      admin.usuarioId,
+      input.usuarioId,
+      extractContextoHttp(req),
+    )
+  }
+
+  @Post("desbloquear")
+  @Roles(RolUsuario.ADMIN)
+  @RequiereMotivo()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async desbloquear(
+    @Body(new ZodValidationPipe(desbloquearSchema)) input: { usuarioId: string },
+    @CurrentUser() admin: SesionUsuario | undefined,
+    @Req() req: Request,
+  ): Promise<void> {
+    if (!admin) {
+      throw new InternalServerErrorException({
+        code: apiErrorCodes.errorInterno,
+        message: "Sesion invalida tras pasar guards.",
+      })
+    }
+    await this.authService.desbloquear(admin.usuarioId, input.usuarioId, extractContextoHttp(req))
+  }
+
+  @Delete("sesiones/:sid")
+  @Roles(RolUsuario.ADMIN)
+  @RequiereMotivo()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async eliminarSesion(
+    @Param("sid") sid: string,
+    @CurrentUser() admin: SesionUsuario | undefined,
+    @Req() req: Request,
+  ): Promise<void> {
+    if (!admin) {
+      throw new InternalServerErrorException({
+        code: apiErrorCodes.errorInterno,
+        message: "Sesion invalida tras pasar guards.",
+      })
+    }
+    await this.authService.eliminarSesion(admin.usuarioId, sid, extractContextoHttp(req))
   }
 }

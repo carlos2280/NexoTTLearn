@@ -18,6 +18,6 @@
     "isolatedModules": false,
     "verbatimModuleSyntax": false
   },
-  "include": ["src/**/*", "prisma/seed.ts", "prisma/seed/**/*"],
-  "exclude": ["node_modules", "dist", "src/admin/_legacy/**"]
+  "include": ["src/**/*", "test/**/*", "prisma/seed.ts"],
+  "exclude": ["node_modules", "dist"]
 }

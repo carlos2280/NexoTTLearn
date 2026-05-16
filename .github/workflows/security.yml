@@ -1,0 +1,46 @@
+name: Security · Audit de dependencias
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PNPM_VERSION: 10.29.1
+  NODE_VERSION: 20
+
+jobs:
+  audit:
+    name: pnpm audit (high/critical, prod)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit production dependencies (high+)
+        # Falla el job si hay CVE high o critical en deps de produccion.
+        # Las devDependencies se evaluaran post-MVP.
+        run: pnpm audit --audit-level=high --prod

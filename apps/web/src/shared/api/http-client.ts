@@ -1,41 +1,83 @@
-// En dev: el proxy de Vite redirige /api a localhost:4000 (vite.config.ts).
-// En prod: VITE_API_URL apunta al dominio absoluto de la API. Vite la inlinea en build-time.
-import { apiErrorBodySchema } from "@nexott-learn/shared-types"
 import { ApiError } from "./api-error"
+import { mockHandle } from "./mocks/router"
 
-const BASE = `${import.meta.env.VITE_API_URL ?? ""}/api`
+const BASE_URL = (import.meta.env.VITE_API_URL ?? "/api/v1") as string
+const USE_MOCKS = (import.meta.env.VITE_USE_MOCKS ?? "true") === "true"
+
+export const EVENTO_NO_AUTORIZADO = "nexott:unauthorized"
+
+const RUTAS_DONDE_401_ES_ESPERADO: readonly string[] = ["/auth/login", "/auth/mfa/verify"]
+
+function emitirNoAutorizado(path: string): void {
+  if (typeof window === "undefined") {
+    return
+  }
+  if (RUTAS_DONDE_401_ES_ESPERADO.some((r) => path.startsWith(r))) {
+    return
+  }
+  window.dispatchEvent(new CustomEvent(EVENTO_NO_AUTORIZADO))
+}
 
 interface RequestOptions {
   readonly signal?: AbortSignal
+  readonly idempotencyKey?: string
+  readonly motivo?: string
 }
 
-// Endpoints donde un 401 es estado valido (no hay sesion), no un error de
-// expiracion. /auth/me se llama desde guards y paginas publicas; /auth/login
-// devuelve 401 con INVALID_CREDENTIALS que el form maneja localmente.
-const UNAUTHORIZED_SAFE_PATHS = new Set(["/auth/me", "/auth/login"])
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") {
+    return null
+  }
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`))
+  if (!match || match[1] === undefined) {
+    return null
+  }
+  return decodeURIComponent(match[1])
+}
 
-let onUnauthorized: ((path: string) => void) | null = null
+function buildHeaders(hasBody: boolean, options?: RequestOptions): Record<string, string> {
+  const headers: Record<string, string> = {}
+  if (hasBody) {
+    headers["Content-Type"] = "application/json"
+  }
+  if (options?.idempotencyKey) {
+    headers["Idempotency-Key"] = options.idempotencyKey
+  }
+  if (options?.motivo) {
+    headers["X-Motivo"] = options.motivo
+  }
+  const xsrf = readCookie("XSRF-TOKEN")
+  if (xsrf) {
+    headers["X-XSRF-TOKEN"] = xsrf
+  }
+  return headers
+}
 
-/**
- * Registra un callback que se ejecuta cuando un 401 ocurre en un endpoint
- * que NO sea de auth publica. Tipico uso: cookie expiro mid-session, hay que
- * invalidar el cache de usuario y redirigir a /login.
- */
-export function setOnUnauthorized(handler: (path: string) => void): void {
-  onUnauthorized = handler
+function safeJsonParse(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown
+  } catch {
+    return null
+  }
 }
 
 async function request<T>(
-  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+  method: string,
   path: string,
   body?: unknown,
   options?: RequestOptions,
 ): Promise<T> {
-  const response = await fetch(`${BASE}${path}`, {
+  const headers = buildHeaders(body !== undefined, options)
+
+  if (USE_MOCKS) {
+    return mockHandle<T>({ method, path, body, headers })
+  }
+
+  const response = await fetch(`${BASE_URL}${path}`, {
     method,
     credentials: "include",
-    headers: body ? { "Content-Type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
     signal: options?.signal,
   })
 
@@ -44,45 +86,37 @@ async function request<T>(
   }
 
   const text = await response.text()
-  const data: unknown = text ? JSON.parse(text) : null
+  const data = text ? safeJsonParse(text) : null
 
   if (!response.ok) {
-    if (response.status === 401 && !UNAUTHORIZED_SAFE_PATHS.has(path)) {
-      onUnauthorized?.(path)
+    const errorData = (data ?? {}) as {
+      code?: string
+      message?: string
+      details?: unknown
     }
-    throw construirApiError(response.status, data)
+    if (response.status === 401) {
+      emitirNoAutorizado(path)
+    }
+    throw new ApiError(
+      response.status,
+      errorData.code ?? "UNKNOWN_ERROR",
+      errorData.message ?? response.statusText,
+      errorData.details,
+    )
   }
 
   return data as T
 }
 
-function construirApiError(status: number, data: unknown): ApiError {
-  const parsed = apiErrorBodySchema.safeParse(data)
-  if (parsed.success) {
-    return new ApiError({
-      status,
-      code: parsed.data.code,
-      message: parsed.data.message,
-      fieldErrors: parsed.data.fieldErrors,
-      retryAfter: parsed.data.retryAfter,
-    })
-  }
-  return new ApiError({
-    status,
-    code: "INTERNAL",
-    message: `Error ${status}`,
-  })
-}
-
 export const httpClient = {
   get: <T>(path: string, options?: RequestOptions): Promise<T> =>
     request<T>("GET", path, undefined, options),
-  post: <T>(path: string, body: unknown, options?: RequestOptions): Promise<T> =>
+  post: <T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> =>
     request<T>("POST", path, body, options),
   put: <T>(path: string, body: unknown, options?: RequestOptions): Promise<T> =>
     request<T>("PUT", path, body, options),
   patch: <T>(path: string, body: unknown, options?: RequestOptions): Promise<T> =>
     request<T>("PATCH", path, body, options),
-  delete: <T>(path: string, options?: RequestOptions): Promise<T> =>
-    request<T>("DELETE", path, undefined, options),
+  delete: <T>(path: string, options?: RequestOptions & { readonly body?: unknown }): Promise<T> =>
+    request<T>("DELETE", path, options?.body, options),
 }

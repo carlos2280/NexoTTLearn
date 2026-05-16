@@ -81,6 +81,16 @@
   },
   "overrides": [
     {
+      "include": ["apps/web/**/*.tsx", "apps/web/**/*.jsx"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noReactSpecificProps": "off"
+          }
+        }
+      }
+    },
+    {
       "include": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"],
       "linter": {
         "rules": {

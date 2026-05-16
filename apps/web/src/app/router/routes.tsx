@@ -1,79 +1,124 @@
-import { BandejaAdminPage } from "@/pages/admin/bandeja/bandeja-admin.page"
-import { CentroRevisionPage } from "@/pages/admin/centro-revision/centro-revision.page"
-import { CursoDetallePage } from "@/pages/admin/cursos/detalle/curso-detalle.page"
-import { CursoEditorPage } from "@/pages/admin/cursos/editor/curso-editor.page"
-import { ListaCursosPage } from "@/pages/admin/cursos/lista-cursos.page"
-import { CursoCandidatosPage } from "@/pages/admin/diagnostico/candidatos.page"
-import { HubDiagnosticoPage } from "@/pages/admin/diagnostico/hub.page"
-import { MantenedoresPage } from "@/pages/admin/mantenedores/mantenedores.page"
-import { FichaParticipantePage } from "@/pages/admin/seguimiento/ficha-participante.page"
-import { HubSeguimientoPage } from "@/pages/admin/seguimiento/hub.page"
-import { CambiarPasswordPage } from "@/pages/cambiar-password/cambiar-password.page"
+import { AdminShell } from "@/features/admin/layout/components/admin-shell"
+import { ParticipanteShell } from "@/features/participante-layout/components/participante-shell"
+import { AsignacionesPage } from "@/pages/admin/asignaciones/asignaciones.page"
+import { CatalogoPage } from "@/pages/admin/catalogo/catalogo.page"
+import { ModuloBuilderPage } from "@/pages/admin/catalogo/modulo-builder/modulo-builder.page"
+import { CursoDetallePage } from "@/pages/admin/cursos/curso-detalle.page"
+import { CursosPage } from "@/pages/admin/cursos/cursos.page"
+import { InicioPage } from "@/pages/admin/inicio/inicio.page"
+import { PersonasPage } from "@/pages/admin/personas/personas.page"
+import { ProximamentePage } from "@/pages/admin/proximamente/proximamente.page"
+import { AvanceCursoPage } from "@/pages/admin/reportes/avance-curso/avance-curso.page"
+import { BrechasDetectadasPage } from "@/pages/admin/reportes/brechas-detectadas/brechas-detectadas.page"
+import { DetalleColaboradorPage } from "@/pages/admin/reportes/detalle-colaborador/detalle-colaborador.page"
+import { EficaciaPlataformaPage } from "@/pages/admin/reportes/eficacia-plataforma/eficacia-plataforma.page"
+import { HistoricoClientePage } from "@/pages/admin/reportes/historico-cliente/historico-cliente.page"
+import { InventarioSkillsPage } from "@/pages/admin/reportes/inventario-skills/inventario-skills.page"
+import { ReportesPage } from "@/pages/admin/reportes/reportes.page"
+import { ReutilizacionCatalogoPage } from "@/pages/admin/reportes/reutilizacion-catalogo/reutilizacion-catalogo.page"
+import { BandejaPage } from "@/pages/bandeja/bandeja.page"
+import { CatalogoPage as CatalogoParticipantePage } from "@/pages/catalogo/catalogo.page"
+import { CuentaPage } from "@/pages/cuenta/cuenta.page"
+import { CursoInmersivoPage } from "@/pages/curso-inmersivo/curso-inmersivo.page"
 import { LoginPage } from "@/pages/login/login.page"
-import { MfaPage } from "@/pages/login/mfa.page"
-import { BandejaParticipantePage } from "@/pages/participante/bandeja/bandeja-participante.page"
-import { FichaCursoLibrePage } from "@/pages/participante/catalogo/ficha-curso-libre.page"
-import { VitrinaCatalogoPage } from "@/pages/participante/catalogo/vitrina.page"
-import { EstudioPage } from "@/pages/participante/estudio/estudio.page"
-import { MisCursosPage } from "@/pages/participante/mis-cursos/mis-cursos.page"
-import { VistaCursoPage } from "@/pages/participante/vista-curso/vista-curso.page"
-import { RecuperarPasswordPage } from "@/pages/recuperar-password/recuperar-password.page"
+import { LogoutPage } from "@/pages/logout/logout.page"
+import { MiFichaPage } from "@/pages/mi-ficha/mi-ficha.page"
+import { MisCursosPage } from "@/pages/mis-cursos/mis-cursos.page"
+import { PlaygroundPage } from "@/pages/playground/playground.page"
 import { RUTAS } from "@/shared/constants/rutas"
 import { Navigate, Route, Routes } from "react-router-dom"
-import { GuardCambioPassword } from "./guards/guard-cambio-password"
-import { GuardRol } from "./guards/guard-rol"
-import { GuardSesion } from "./guards/guard-sesion"
-import { LayoutAdmin } from "./layouts/layout-admin"
-import { LayoutParticipante } from "./layouts/layout-participante"
+import { GuardRol } from "./guard-rol"
+import { GuardSesion } from "./guard-sesion"
+
+const SEGMENTOS_ADMIN: readonly string[] = ["sistema"]
 
 export function AppRoutes() {
   return (
     <Routes>
-      {/* Publicas */}
       <Route path={RUTAS.login} element={<LoginPage />} />
-      <Route path={RUTAS.loginMfa} element={<MfaPage />} />
-      <Route path={RUTAS.recuperarPassword} element={<RecuperarPasswordPage />} />
-
-      {/* Protegidas: requieren sesion */}
-      <Route element={<GuardSesion />}>
-        {/* Cambio de password obligatorio (no pasa por GuardCambioPassword) */}
-        <Route path={RUTAS.cambiarPassword} element={<CambiarPasswordPage />} />
-
-        {/* Rutas que se bloquean si debeCambiarPassword=true */}
-        <Route element={<GuardCambioPassword />}>
-          <Route element={<GuardRol rol="ADMIN" />}>
-            {/* Editor inmersivo · full-screen sin LayoutAdmin (sin sidebar). */}
-            <Route path="/admin/cursos/:id/editor" element={<CursoEditorPage />} />
-
-            <Route element={<LayoutAdmin />}>
-              <Route path={RUTAS.admin.bandeja} element={<BandejaAdminPage />} />
-              <Route path={RUTAS.admin.cursos} element={<ListaCursosPage />} />
-              <Route path="/admin/cursos/:id" element={<CursoDetallePage />} />
-              <Route path="/admin/cursos/:id/candidatos" element={<CursoCandidatosPage />} />
-              <Route path={RUTAS.admin.diagnosticos} element={<HubDiagnosticoPage />} />
-              <Route path={RUTAS.admin.centroRevision} element={<CentroRevisionPage />} />
-              <Route path={RUTAS.admin.seguimiento} element={<HubSeguimientoPage />} />
-              <Route path="/admin/seguimiento/p/:id" element={<FichaParticipantePage />} />
-              <Route path={RUTAS.admin.mantenedores} element={<MantenedoresPage />} />
-            </Route>
-          </Route>
-
-          <Route element={<GuardRol rol="PARTICIPANTE" />}>
-            {/* Modo estudio inmersivo · full-screen sin LayoutParticipante. */}
-            <Route path="/cursos/:slug/modulo/:moduloId" element={<EstudioPage />} />
-
-            <Route element={<LayoutParticipante />}>
-              <Route path={RUTAS.participante.bandeja} element={<BandejaParticipantePage />} />
-              <Route path={RUTAS.participante.misCursos} element={<MisCursosPage />} />
-              <Route path="/cursos/:slug" element={<VistaCursoPage />} />
-              <Route path={RUTAS.participante.catalogo} element={<VitrinaCatalogoPage />} />
-              <Route path="/catalogo/:slug" element={<FichaCursoLibrePage />} />
-            </Route>
-          </Route>
-        </Route>
+      <Route path={RUTAS.logout} element={<LogoutPage />} />
+      <Route path={RUTAS.playground} element={<PlaygroundPage />} />
+      <Route
+        element={
+          <GuardSesion>
+            <ParticipanteShell />
+          </GuardSesion>
+        }
+      >
+        <Route path={RUTAS.bandeja} element={<BandejaPage />} />
+        <Route path={RUTAS.participante.misCursos} element={<MisCursosPage />} />
+        <Route path={RUTAS.participante.miFicha} element={<MiFichaPage />} />
+        <Route path={RUTAS.participante.catalogo} element={<CatalogoParticipantePage />} />
       </Route>
-
-      {/* Catch-all: redirigir a login */}
+      {/*
+        Curso inmersivo del participante: pantalla a pantalla completa fuera
+        del ParticipanteShell — espejo del builder admin pero para consumir,
+        no editar. Es el corazón del producto (D-INMERSIVO-1).
+      */}
+      <Route
+        path="/cursos/:cursoId"
+        element={
+          <GuardSesion>
+            <CursoInmersivoPage />
+          </GuardSesion>
+        }
+      />
+      <Route
+        path={RUTAS.cuenta}
+        element={
+          <GuardSesion>
+            <div className="min-h-full bg-bg px-6 py-10">
+              <CuentaPage />
+            </div>
+          </GuardSesion>
+        }
+      />
+      {/*
+        Builder de módulo: pantalla inmersiva fuera de AdminShell (sin menú
+        lateral). Es la ÚNICA vista del detalle de módulo.
+      */}
+      <Route
+        path="/admin/catalogo/modulos/:moduloId"
+        element={
+          <GuardSesion>
+            <GuardRol permitidos={["ADMIN"]} redirigirA={RUTAS.bandeja}>
+              <ModuloBuilderPage />
+            </GuardRol>
+          </GuardSesion>
+        }
+      />
+      <Route
+        path={RUTAS.admin.inicio}
+        element={
+          <GuardSesion>
+            <GuardRol permitidos={["ADMIN"]} redirigirA={RUTAS.bandeja}>
+              <AdminShell />
+            </GuardRol>
+          </GuardSesion>
+        }
+      >
+        <Route index={true} element={<InicioPage />} />
+        <Route path="catalogo" element={<CatalogoPage />} />
+        <Route
+          path="clientes"
+          element={<Navigate to="/admin/catalogo?tab=clientes" replace={true} />}
+        />
+        <Route path="cursos" element={<CursosPage />} />
+        <Route path="cursos/:cursoId" element={<CursoDetallePage />} />
+        <Route path="cursos/:cursoId/asignaciones" element={<AsignacionesPage />} />
+        <Route path="personas" element={<PersonasPage />} />
+        <Route path="reportes" element={<ReportesPage />} />
+        <Route path="reportes/eficacia-plataforma" element={<EficaciaPlataformaPage />} />
+        <Route path="reportes/inventario-skills" element={<InventarioSkillsPage />} />
+        <Route path="reportes/avance-curso" element={<AvanceCursoPage />} />
+        <Route path="reportes/historico-cliente" element={<HistoricoClientePage />} />
+        <Route path="reportes/detalle-colaborador" element={<DetalleColaboradorPage />} />
+        <Route path="reportes/brechas-detectadas" element={<BrechasDetectadasPage />} />
+        <Route path="reportes/reutilizacion-catalogo" element={<ReutilizacionCatalogoPage />} />
+        {SEGMENTOS_ADMIN.map((segmento) => (
+          <Route key={segmento} path={segmento} element={<ProximamentePage />} />
+        ))}
+      </Route>
       <Route path="*" element={<Navigate to={RUTAS.login} replace={true} />} />
     </Routes>
   )

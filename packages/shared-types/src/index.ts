@@ -1,766 +1,695 @@
-export {
-  ROLES,
-  type Rol,
-  loginSchema,
-  type LoginInput,
-  usuarioPublicoSchema,
-  type UsuarioPublico,
-  loginResponseSchema,
-  type LoginResponse,
-  cambiarPasswordSchema,
-  type CambiarPasswordInput,
-  loginResultSchema,
-  type LoginResult,
-  type MfaPendingSetup,
-  type MfaPendingVerify,
-  verifyMfaSchema,
-  type VerifyMfaInput,
-  verifyMfaResponseSchema,
-  type VerifyMfaResponse,
-  confirmMfaSetupSchema,
-  type ConfirmMfaSetupInput,
-  confirmMfaSetupResponseSchema,
-  type ConfirmMfaSetupResponse,
-} from "./auth"
+export { rolUsuarioSchema, perfilSesionSchema, AVISO_VIGENTE_VERSION } from "./auth/perfil.schema"
+export type { RolUsuario, PerfilSesion } from "./auth/perfil.schema"
+export { loginSchema, loginResponseSchema } from "./auth/login.schema"
+export type { LoginInput, LoginResponse } from "./auth/login.schema"
+export { cambiarPasswordSchema } from "./auth/cambiar-password.schema"
+export type { CambiarPasswordInput } from "./auth/cambiar-password.schema"
+export { aceptarAvisoPrivacidadSchema } from "./auth/aceptar-aviso.schema"
+export type { AceptarAvisoPrivacidadInput } from "./auth/aceptar-aviso.schema"
+export { crearColaboradorSchema } from "./auth/crear-colaborador.schema"
+export type { CrearColaboradorInput } from "./auth/crear-colaborador.schema"
+export { regenerarPasswordInicialSchema } from "./auth/regenerar-password.schema"
+export type { RegenerarPasswordInicialInput } from "./auth/regenerar-password.schema"
+export { desbloquearSchema } from "./auth/desbloquear.schema"
+export type { DesbloquearInput } from "./auth/desbloquear.schema"
+export { mfaEnableSchema } from "./auth/mfa-enable.schema"
+export type { MfaEnableInput } from "./auth/mfa-enable.schema"
+export type { MfaSetupResponse } from "./auth/mfa-setup.types"
+export { mfaVerifySchema } from "./auth/mfa-verify.schema"
+export type { MfaVerifyInput } from "./auth/mfa-verify.schema"
+export { mfaDisableSchema } from "./auth/mfa-disable.schema"
+export type { MfaDisableInput } from "./auth/mfa-disable.schema"
 
+// Catalogo P2 — schemas y tipos de respuesta para los 6 recursos del catalogo formativo.
+export { paginacionQuerySchema, booleanQuerySchema } from "./catalogo/paginacion"
+export type { PaginacionQuery, Paginated } from "./catalogo/paginacion"
+export { listarAreasQuerySchema } from "./catalogo/areas/listar-areas.schema"
+export type { ListarAreasQuery } from "./catalogo/areas/listar-areas.schema"
+export type { AreaResponse } from "./catalogo/areas/area-response"
+export { AREA_CODIGOS, areaCodigoSchema } from "./catalogo/areas/area-codigo"
+export type { AreaCodigo } from "./catalogo/areas/area-codigo"
+export { crearAreaSchema, actualizarAreaSchema } from "./catalogo/areas/area.schema"
+export type { CrearAreaInput, ActualizarAreaInput } from "./catalogo/areas/area.schema"
+export { listarSkillsQuerySchema, estadoSkillSchema } from "./catalogo/skills/listar-skills.schema"
+export type { ListarSkillsQuery, EstadoSkill } from "./catalogo/skills/listar-skills.schema"
+export type { SkillResponse, FusionSkillsResponse } from "./catalogo/skills/skill-response"
 export {
-  API_ERROR_CODES,
-  type ApiErrorCode,
-  apiErrorBodySchema,
-  type ApiErrorBody,
-} from "./api-errors"
-
+  crearSkillSchema,
+  renombrarSkillSchema,
+  skillDuplicadaCandidataSchema,
+  cambiarAreaSkillSchema,
+  fusionarSkillsSchema,
+} from "./catalogo/skills/skill.schema"
+export type {
+  CrearSkillInput,
+  RenombrarSkillInput,
+  SkillDuplicadaCandidata,
+  CambiarAreaSkillInput,
+  FusionarSkillsInput,
+  ImpactoCambioAreaSkill,
+  PreviewCambioAreaResponse,
+  ReferenciasMigradasFusion,
+} from "./catalogo/skills/skill.schema"
 export {
-  estadoAreaSchema,
-  type EstadoArea,
-  areaColorInputSchema,
-  type AreaColorInput,
-  areaSchema,
-  type Area,
-  areaConContadoresSchema,
-  type AreaConContadores,
-  areaListResponseSchema,
-  type AreaListResponse,
-  areaDeleteResponseSchema,
-  type AreaDeleteResponse,
-  listarAreasQuerySchema,
-  type ListarAreasQuery,
-  crearAreaSchema,
-  type CrearAreaInput,
-  actualizarAreaSchema,
-  type ActualizarAreaInput,
-} from "./admin-areas"
-
-export {
-  rolMantenedorSchema,
-  type RolMantenedor,
-  estadoUsuarioSchema,
-  type EstadoUsuario,
-  usuarioAdminSchema,
-  type UsuarioAdmin,
-  usuarioListResponseSchema,
-  type UsuarioListResponse,
-  listarUsuariosQuerySchema,
-  type ListarUsuariosQuery,
-  crearUsuarioSchema,
-  type CrearUsuarioInput,
-  actualizarUsuarioSchema,
-  type ActualizarUsuarioInput,
-  bloquearUsuarioSchema,
-  type BloquearUsuarioInput,
-  desbloquearUsuarioSchema,
-  type DesbloquearUsuarioInput,
-  resetPasswordUsuarioSchema,
-  type ResetPasswordUsuarioInput,
-  activarMfaUsuarioSchema,
-  type ActivarMfaUsuarioInput,
-  resetMfaUsuarioSchema,
-  type ResetMfaUsuarioInput,
-  usuarioConCredencialesSchema,
-  type UsuarioConCredenciales,
-  resetPasswordResponseSchema,
-  type ResetPasswordResponse,
-} from "./admin-usuarios"
-
-export {
-  adminDashboardResponseSchema,
-  type AdminDashboardResponse,
-  dashboardKpiSchema,
-  type DashboardKpi,
-  dashboardColaItemSchema,
-  type DashboardColaItem,
-  dashboardColaRevisionSchema,
-  type DashboardColaRevision,
-  dashboardAlertaSchema,
-  type DashboardAlerta,
-  dashboardActividadSchema,
-  type DashboardActividad,
-} from "./admin-dashboard"
-
-export {
-  TOLERANCIA_PESO,
-  TOTAL_PESO,
-  estadoCursoSchema,
-  type EstadoCurso,
-  cursoListItemSchema,
-  type CursoListItem,
-  cursoListResponseSchema,
-  type CursoListResponse,
-  cursoDetalleSchema,
-  type CursoDetalle,
-  type CursoAreaDetalle,
-  filtroEstadoCursoSchema,
-  type FiltroEstadoCurso,
-  listarCursosQuerySchema,
-  type ListarCursosQuery,
-  crearCursoInputSchema,
-  type CrearCursoInput,
-  actualizarCursoInputSchema,
-  type ActualizarCursoInput,
-  type CursoAreaInput,
-  actualizarCursoAreasInputSchema,
-  type ActualizarCursoAreasInput,
-  checklistItemIdSchema,
-  type ChecklistItemId,
-  checklistCtaTargetSchema,
-  type ChecklistCtaTarget,
-  checklistItemResultSchema,
-  type ChecklistItemResult,
-  publicarResumenSchema,
-  type PublicarResumen,
-  publicarCasoASchema,
-  type PublicarCasoA,
-  publicarCasoBSchema,
-  type PublicarCasoB,
-  publicarResponseSchema,
-  type PublicarResponse,
-  transicionEstadoCursoInputSchema,
-  type TransicionEstadoCursoInput,
-  cursoDeleteResponseSchema,
-  type CursoDeleteResponse,
-  agregarCursoAreaInputSchema,
-  type AgregarCursoAreaInput,
-  actualizarCursoAreaInputSchema,
-  type ActualizarCursoAreaInput,
-  reemplazarCursoAreaInputSchema,
-  type ReemplazarCursoAreaInput,
-  moduloResumenSchema,
-  type ModuloResumen,
-  cursoAreaIndividualDetalleSchema,
-  type CursoAreaIndividualDetalle,
-  cursoAreaMutacionResponseSchema,
-  type CursoAreaMutacionResponse,
-  crearModuloAdminInputSchema,
-  type CrearModuloAdminInput,
-  actualizarModuloAdminInputSchema,
-  type ActualizarModuloAdminInput,
-  reordenarModulosAdminInputSchema,
-  type ReordenarModulosAdminInput,
-  moduloDetalleAdminSchema,
-  type ModuloDetalleAdmin,
-  moduloListAdminResponseSchema,
-  type ModuloListAdminResponse,
-  moduloDeleteAdminResponseSchema,
-  type ModuloDeleteAdminResponse,
-  crearSeccionAdminInputSchema,
-  type CrearSeccionAdminInput,
-  actualizarSeccionAdminInputSchema,
-  type ActualizarSeccionAdminInput,
-  reordenarSeccionesAdminInputSchema,
-  type ReordenarSeccionesAdminInput,
-  seccionDetalleAdminSchema,
-  type SeccionDetalleAdmin,
-  seccionListAdminResponseSchema,
-  type SeccionListAdminResponse,
-  seccionDeleteAdminResponseSchema,
-  type SeccionDeleteAdminResponse,
-  tipoBloqueSchema,
-  type TipoBloque,
-  codigoUbicacionSchema,
-  type CodigoUbicacion,
-  codigoInteractivoSchema,
-  type CodigoInteractivo,
-  codigoEvaluableSchema,
-  type CodigoEvaluable,
-  lenguajeCodigoSchema,
-  type LenguajeCodigo,
-  tipVarianteSchema,
-  type TipVariante,
-  payloadParaTipo,
-  crearBloqueAdminInputSchema,
-  type CrearBloqueAdminInput,
-  actualizarBloqueAdminInputSchema,
-  type ActualizarBloqueAdminInput,
-  reordenarBloquesAdminInputSchema,
-  type ReordenarBloquesAdminInput,
-  bloqueDetalleAdminSchema,
-  type BloqueDetalleAdmin,
-  bloqueListAdminResponseSchema,
-  type BloqueListAdminResponse,
-  bloqueDeleteAdminResponseSchema,
-  type BloqueDeleteAdminResponse,
-  upsertMiniProyectoAdminInputSchema,
-  type UpsertMiniProyectoAdminInput,
-  actualizarMiniProyectoAdminInputSchema,
-  type ActualizarMiniProyectoAdminInput,
-  ajustarPesosMiniProyectoInputSchema,
-  type AjustarPesosMiniProyectoInput,
-  ajustarUmbralMiniProyectoInputSchema,
-  type AjustarUmbralMiniProyectoInput,
-  miniProyectoDetalleAdminSchema,
-  type MiniProyectoDetalleAdmin,
-  miniProyectoDeleteAdminResponseSchema,
-  type MiniProyectoDeleteAdminResponse,
-  upsertProyectoTransversalAdminInputSchema,
-  type UpsertProyectoTransversalAdminInput,
-  actualizarProyectoTransversalAdminInputSchema,
-  type ActualizarProyectoTransversalAdminInput,
-  ajustarPesosProyectoTransversalInputSchema,
-  type AjustarPesosProyectoTransversalInput,
-  ajustarUmbralProyectoTransversalInputSchema,
-  type AjustarUmbralProyectoTransversalInput,
-  proyectoTransversalDetalleAdminSchema,
-  type ProyectoTransversalDetalleAdmin,
-  proyectoTransversalDeleteAdminResponseSchema,
-  type ProyectoTransversalDeleteAdminResponse,
-  modoEntrevistaSchema,
-  type ModoEntrevistaApi,
-  upsertEntrevistaIAAdminInputSchema,
-  type UpsertEntrevistaIAAdminInput,
-  actualizarEntrevistaIAAdminInputSchema,
-  type ActualizarEntrevistaIAAdminInput,
-  entrevistaIADetalleAdminSchema,
-  type EntrevistaIADetalleAdmin,
-  entrevistaIADeleteAdminResponseSchema,
-  type EntrevistaIADeleteAdminResponse,
-} from "./admin-cursos"
-
-export {
-  tipoInscripcionSchema,
-  type TipoInscripcion,
-  estadoInscripcionSchema,
-  type EstadoInscripcion,
-  estadoInvitadoSchema,
-  type EstadoInvitado,
-  listarInscripcionesCursoQuerySchema,
-  type ListarInscripcionesCursoQuery,
-  inscripcionDiagnosticoParticipanteSchema,
-  type InscripcionDiagnosticoParticipante,
-  inscripcionDiagnosticoEvaluacionSchema,
-  type InscripcionDiagnosticoEvaluacion,
-  inscripcionDiagnosticoAsignacionSchema,
-  inscripcionDiagnosticoItemSchema,
-  type InscripcionDiagnosticoItem,
-  inscripcionDiagnosticoListResponseSchema,
-  type InscripcionDiagnosticoListResponse,
-  inscripcionDeleteAdminResponseSchema,
-  type InscripcionDeleteAdminResponse,
-  reenviarCredencialesResponseSchema,
-  type ReenviarCredencialesResponse,
-} from "./admin-inscripciones"
-
-export {
-  invitarCandidatosBodySchema,
-  type InvitarCandidatosBody,
-  invitarCandidatosErrorCodigoSchema,
-  type InvitarCandidatosErrorCodigo,
-  invitarCandidatosResponseSchema,
-  type InvitarCandidatosResponse,
-  candidatosDisponiblesQuerySchema,
-  type CandidatosDisponiblesQuery,
-  candidatoDisponibleSchema,
-  type CandidatoDisponible,
-  candidatosDisponiblesResponseSchema,
-  type CandidatosDisponiblesResponse,
-} from "./admin-inscripciones-invitar"
-
-export {
-  semaforoCeldaDiagnosticoSchema,
-  type SemaforoCeldaDiagnostico,
-  matrizDiagnosticoQuerySchema,
-  type MatrizDiagnosticoQuery,
-  matrizDiagnosticoAreaSchema,
-  type MatrizDiagnosticoArea,
-  matrizDiagnosticoCeldaSchema,
-  type MatrizDiagnosticoCelda,
-  matrizDiagnosticoFilaSchema,
-  type MatrizDiagnosticoFila,
-  matrizDiagnosticoContadoresSchema,
-  type MatrizDiagnosticoContadores,
-  matrizDiagnosticoResponseSchema,
-  type MatrizDiagnosticoResponse,
-} from "./admin-diagnostico-matriz"
-
-export {
-  tipoAsignacionSchema,
-  type TipoAsignacion,
-  motivoSugerenciaSchema,
-  type MotivoSugerencia,
-  asignacionAreaSchema,
-  type AsignacionArea,
-  asignacionModuloSchema,
-  type AsignacionModulo,
-  sugerenciaModuloSchema,
-  type SugerenciaModulo,
-  asignacionConfirmadaSchema,
-  type AsignacionConfirmada,
-  cumpleAreaSchema,
-  type CumpleArea,
-  candidatoAsignacionSchema,
-  type CandidatoAsignacion,
-  matrizAsignacionesQuerySchema,
-  type MatrizAsignacionesQuery,
-  matrizAsignacionesContadoresSchema,
-  type MatrizAsignacionesContadores,
-  matrizAsignacionesResponseSchema,
-  type MatrizAsignacionesResponse,
-  asignacionesInscripcionResponseSchema,
-  type AsignacionesInscripcionResponse,
-  asignacionInputSchema,
-  type AsignacionInput,
-  reemplazarAsignacionesInputSchema,
-  type ReemplazarAsignacionesInput,
-  cambiarTipoAsignacionInputSchema,
-  type CambiarTipoAsignacionInput,
-  asignacionDeleteResponseSchema,
-  type AsignacionDeleteResponse,
-  confirmarLoteItemSchema,
-  type ConfirmarLoteItem,
-  confirmarLoteInputSchema,
-  type ConfirmarLoteInput,
-  confirmarLoteResumenSchema,
-  type ConfirmarLoteResumen,
-  confirmarLoteResponseSchema,
-  type ConfirmarLoteResponse,
-} from "./admin-diagnostico-asignaciones"
-
-export {
-  estadoDiagnosticoHubSchema,
-  type EstadoDiagnosticoHub,
-  tabSugeridoHubSchema,
-  type TabSugeridoHub,
-  hubContadoresSchema,
-  type HubContadores,
-  hubDiagnosticoItemSchema,
-  type HubDiagnosticoItem,
-  hubDiagnosticoResponseSchema,
-  type HubDiagnosticoResponse,
-} from "./admin-diagnostico-hub"
-
-export {
-  upsertEvaluacionInicialAdminInputSchema,
-  type UpsertEvaluacionInicialAdminInput,
-  actualizarEvaluacionInicialAdminInputSchema,
-  type ActualizarEvaluacionInicialAdminInput,
-  evaluacionInicialDetalleAdminSchema,
-  type EvaluacionInicialDetalleAdmin,
-  evaluacionInicialListAdminResponseSchema,
-  type EvaluacionInicialListAdminResponse,
-  evaluacionInicialDeleteAdminResponseSchema,
-  type EvaluacionInicialDeleteAdminResponse,
-} from "./admin-evaluaciones-iniciales"
-
-export {
+  listarModulosQuerySchema,
   estadoModuloSchema,
-  type EstadoModuloApi,
-  areaColorSchema,
-  type AreaColor,
-  areaCompetenciaItemSchema,
-  type AreaCompetenciaItem,
-  obtenerAreasCompetenciaResponseSchema,
-  type ObtenerAreasCompetenciaResponse,
-  moduloAdminItemSchema,
-  type ModuloAdminItem,
-  obtenerModulosAdminResponseSchema,
-  type ObtenerModulosAdminResponse,
-  crearModuloInputSchema,
-  type CrearModuloInput,
-  actualizarModuloInputSchema,
-  type ActualizarModuloInput,
-  reordenarModulosInputSchema,
-  type ReordenarModulosInput,
-  clonarModuloInputSchema,
-  type ClonarModuloInput,
-} from "./admin-modulos"
-
+} from "./catalogo/modulos/listar-modulos.schema"
+export type { ListarModulosQuery, EstadoModulo } from "./catalogo/modulos/listar-modulos.schema"
+export type { ModuloResponse } from "./catalogo/modulos/modulo-response"
+export { crearModuloSchema, actualizarModuloSchema } from "./catalogo/modulos/modulo.schema"
+export type {
+  CrearModuloInput,
+  ActualizarModuloInput,
+  CursoActivoAfectado,
+  SkillHuerfana,
+  PreviewImpactoArchivoModulo,
+} from "./catalogo/modulos/modulo.schema"
+export { listarSeccionesQuerySchema } from "./catalogo/secciones/listar-secciones.schema"
+export type { ListarSeccionesQuery } from "./catalogo/secciones/listar-secciones.schema"
+export type { SeccionResponse } from "./catalogo/secciones/seccion-response"
 export {
-  tipoContenidoSchema,
-  type TipoContenido,
-  contenidoEmbebidoSchema,
-  type ContenidoEmbebido,
-  seccionAdminItemSchema,
-  type SeccionAdminItem,
-  obtenerSeccionesAdminResponseSchema,
-  type ObtenerSeccionesAdminResponse,
-  crearSeccionInputSchema,
-  type CrearSeccionInput,
-  actualizarSeccionInputSchema,
-  type ActualizarSeccionInput,
-  reordenarSeccionesInputSchema,
-  type ReordenarSeccionesInput,
-} from "./admin-secciones"
-
+  crearSeccionSchema,
+  actualizarSeccionSchema,
+  reordenarSeccionesSchema,
+} from "./catalogo/secciones/seccion.schema"
+export type {
+  CrearSeccionInput,
+  ActualizarSeccionInput,
+  ReordenarSeccionesInput,
+} from "./catalogo/secciones/seccion.schema"
 export {
-  lecturaContenidoSchema,
-  type LecturaContenido,
-  tiptapDocSchema,
-  type TiptapJSONDoc,
-} from "./bloque-payloads"
-
+  listarBloquesQuerySchema,
+  tipoBloqueSchema,
+  estadoBloqueSchema,
+} from "./catalogo/bloques/listar-bloques.schema"
+export type {
+  ListarBloquesQuery,
+  TipoBloque,
+  EstadoBloque,
+} from "./catalogo/bloques/listar-bloques.schema"
+export type { BloqueResponse, BloqueDetalleResponse } from "./catalogo/bloques/bloque-response"
 export {
-  videoContenidoSchema,
-  type VideoContenido,
-  type ProveedorVideo,
-  recursoContenidoSchema,
-  type RecursoContenido,
-  type TipoRecurso,
-  ejemploCodigoContenidoSchema,
-  type EjemploCodigoContenido,
-  preguntaComprensionSchema,
-  type PreguntaComprension,
-  ejercicioContenidoSchema,
-  type EjercicioContenido,
-  type ModoEjercicio,
-  type LenguajeEjercicio,
-  archivoInicialSchema,
-  type ArchivoInicial,
-  testEjercicioSchema,
-  type TestEjercicio,
-  testContenidoSchema,
-  type TestContenido,
-  type TipoPreguntaTest,
-  opcionTestSchema,
-  type OpcionTest,
-  preguntaTestSchema,
-  type PreguntaTest,
-  type NivelDificultadBasico,
-  type NivelDificultadAvanzado,
-  contenidoPayloadSchema,
-  type ContenidoPayload,
-  contenidoAdminItemSchema,
-  type ContenidoAdminItem,
-  obtenerContenidosAdminResponseSchema,
-  type ObtenerContenidosAdminResponse,
-  crearContenidoInputSchema,
-  type CrearContenidoInput,
-  actualizarContenidoInputSchema,
-  type ActualizarContenidoInput,
-  reordenarContenidosInputSchema,
-  type ReordenarContenidosInput,
-} from "./admin-contenidos"
-
+  crearBloqueSchema,
+  patchBloqueSchema,
+  reordenarBloquesSchema,
+  tipoEdicionBloqueSchema,
+} from "./catalogo/bloques/bloque.schema"
+export type {
+  CrearBloqueInput,
+  PatchBloqueInput,
+  ReordenarBloquesInput,
+  TipoEdicionBloque,
+  ColaboradorAfectadoBloque,
+  PreviewImpactoEliminarBloque,
+} from "./catalogo/bloques/bloque.schema"
+// Contenido por tipo de bloque — schemas Zod de `Bloque.contenido` (jsonb).
+// Fuente unica de verdad usada por editor, backend (validacion al crear/editar)
+// y motor de autocorreccion. Los evaluables se re-exportan desde aqui para que
+// el llamante tenga un solo punto de entrada.
 export {
-  NOTA_MIN,
-  NOTA_MAX,
-  NOTA_DECIMALES,
-  TEXTO_LIBRE_MAX,
-  MOTIVO_MIN,
-  MOTIVO_MAX,
-  notaSchema,
-  textoLibreCualitativoSchema,
-  motivoAjusteSchema,
-} from "./admin-centro-revision-shared"
+  contenidoParrafoSchema,
+  contenidoTipSchema,
+  varianteTipSchema,
+  contenidoCodigoIlustrativoSchema,
+  contenidoVideoSchema,
+  proveedorVideoSchema,
+  contenidoRecursoSchema,
+  subtipoRecursoSchema,
+  contenidoBloquePorTipo,
+  schemaContenidoBloquePorTipo,
+  validarContenidoBloque,
+} from "./catalogo/bloques/contenido"
+export type {
+  ContenidoParrafo,
+  ContenidoTip,
+  VarianteTip,
+  ContenidoCodigoIlustrativo,
+  ContenidoVideo,
+  ProveedorVideo,
+  ContenidoRecurso,
+  SubtipoRecurso,
+} from "./catalogo/bloques/contenido"
+export { listarClientesQuerySchema } from "./catalogo/clientes/listar-clientes.schema"
+export type { ListarClientesQuery } from "./catalogo/clientes/listar-clientes.schema"
+export type {
+  ClienteResponse,
+  ClienteDetalleResponse,
+} from "./catalogo/clientes/cliente-response"
+export { crearClienteSchema, actualizarClienteSchema } from "./catalogo/clientes/cliente.schema"
+export type { CrearClienteInput, ActualizarClienteInput } from "./catalogo/clientes/cliente.schema"
 
+// Cursos P4a — CRUD, lifecycle BORRADOR/ARCHIVADO/CERRADO, duplicar, log-cambios.
 export {
-  estadoEntregaBloqueSchema,
-  type EstadoEntregaBloque,
-  filtroEstadoEntregaBloqueSchema,
-  type FiltroEstadoEntregaBloque,
-  listarEntregasBloqueAdminQuerySchema,
-  type ListarEntregasBloqueAdminQuery,
-  entregaBloqueListItemAdminSchema,
-  type EntregaBloqueListItemAdmin,
-  entregaBloqueListAdminResponseSchema,
-  type EntregaBloqueListAdminResponse,
-  entregaBloqueIntentoPrevioAdminSchema,
-  type EntregaBloqueIntentoPrevioAdmin,
-  entregaBloqueDetalleAdminSchema,
-  type EntregaBloqueDetalleAdmin,
-  evaluarEntregaBloqueAdminInputSchema,
-  type EvaluarEntregaBloqueAdminInput,
-  ajustarEntregaBloqueAdminInputSchema,
-  type AjustarEntregaBloqueAdminInput,
-} from "./admin-centro-revision-bloques"
+  estadoCursoSchema,
+  desbloqueoCursoSchema,
+  accionLogCursoSchema,
+} from "./cursos/curso.types"
+export type {
+  EstadoCurso,
+  DesbloqueoCurso,
+  AccionLogCurso,
+  CursoResumen,
+  CursoDetalle,
+  CursoAreaExigida,
+  CursoSkillExigida,
+  CursoModuloHabilitado,
+  LogCambioCurso,
+  DuplicarCursoResponse,
+  CursoConfiguracionResponse,
+} from "./cursos/curso.types"
+export { crearCursoSchema } from "./cursos/crear-curso.schema"
+export type { CrearCursoInput } from "./cursos/crear-curso.schema"
+export { actualizarCursoSchema } from "./cursos/actualizar-curso.schema"
+export type { ActualizarCursoInput } from "./cursos/actualizar-curso.schema"
+export { listarCursosQuerySchema } from "./cursos/listar-cursos.query.schema"
+export type { ListarCursosQuery } from "./cursos/listar-cursos.query.schema"
+export { duplicarCursoSchema } from "./cursos/duplicar-curso.schema"
+export type { DuplicarCursoInput } from "./cursos/duplicar-curso.schema"
+export {
+  accionCierreAsignacionSchema,
+  cerrarCursoSchema,
+} from "./cursos/cerrar-curso.schema"
+export type {
+  AccionCierreAsignacion,
+  CerrarCursoInput,
+} from "./cursos/cerrar-curso.schema"
+export { listarLogCambiosQuerySchema } from "./cursos/log-cambios.query.schema"
+export type { ListarLogCambiosQuery } from "./cursos/log-cambios.query.schema"
 
+// Cursos P4b — configuracion (areas, skills exigidas, modulos habilitados,
+// pesos, umbrales de logro, transversal, entrevista IA).
+export { actualizarAreasCursoSchema } from "./cursos/actualizar-areas-curso.schema"
+export type { ActualizarAreasCursoInput } from "./cursos/actualizar-areas-curso.schema"
+export { actualizarSkillsExigidasCursoSchema } from "./cursos/actualizar-skills-exigidas-curso.schema"
+export type { ActualizarSkillsExigidasCursoInput } from "./cursos/actualizar-skills-exigidas-curso.schema"
+export { actualizarModulosHabilitadosCursoSchema } from "./cursos/actualizar-modulos-habilitados-curso.schema"
+export type {
+  ActualizarModulosHabilitadosCursoInput,
+  SkillSinCobertura,
+} from "./cursos/actualizar-modulos-habilitados-curso.schema"
+export { actualizarPesosCursoSchema } from "./cursos/actualizar-pesos-curso.schema"
+export type { ActualizarPesosCursoInput } from "./cursos/actualizar-pesos-curso.schema"
+export { actualizarUmbralesLogroCursoSchema } from "./cursos/actualizar-umbrales-logro-curso.schema"
+export type {
+  ActualizarUmbralesLogroCursoInput,
+  UmbralesLogroValores,
+} from "./cursos/actualizar-umbrales-logro-curso.schema"
+export { actualizarTransversalCursoSchema } from "./cursos/actualizar-transversal-curso.schema"
+export type { ActualizarTransversalCursoInput } from "./cursos/actualizar-transversal-curso.schema"
 export {
-  estadoEntregaProyectoSchema,
-  type EstadoEntregaProyecto,
-  filtroEstadoEntregaProyectoSchema,
-  type FiltroEstadoEntregaProyecto,
-  tipoEntregaProyectoSchema,
-  type TipoEntregaProyecto,
-  listarEntregasProyectoAdminQuerySchema,
-  type ListarEntregasProyectoAdminQuery,
-  entregaProyectoListItemAdminSchema,
-  type EntregaProyectoListItemAdmin,
-  entregaProyectoListAdminResponseSchema,
-  type EntregaProyectoListAdminResponse,
-  entregaProyectoIntentoPrevioAdminSchema,
-  type EntregaProyectoIntentoPrevioAdmin,
-  entregaProyectoDetalleAdminSchema,
-  type EntregaProyectoDetalleAdmin,
-  evaluarEntregaProyectoAdminInputSchema,
-  type EvaluarEntregaProyectoAdminInput,
-  ajustarEntregaProyectoAdminInputSchema,
-  type AjustarEntregaProyectoAdminInput,
-} from "./admin-centro-revision-proyectos"
+  actualizarEntrevistaIaCursoSchema,
+  filosofiaEntrevistaSchema,
+  profundidadEntrevistaSchema,
+  tonoEntrevistaSchema,
+} from "./cursos/actualizar-entrevista-ia-curso.schema"
+export type {
+  ActualizarEntrevistaIaCursoInput,
+  FilosofiaEntrevista,
+  ProfundidadEntrevista,
+  TonoEntrevista,
+} from "./cursos/actualizar-entrevista-ia-curso.schema"
 
+// Evaluacion inicial — Slice 5 P5a: tipos de la ficha de skills y su historico.
+export { origenNotaSkillSchema } from "./evaluacion-inicial/ficha.schema"
+export type {
+  OrigenNotaSkill,
+  FichaSkillItem,
+  FichaPorAreaItem,
+  FichaResponse,
+  EntradaHistoricoNotaSkill,
+} from "./evaluacion-inicial/ficha.schema"
+// Evaluacion inicial — Slice 5 P5b: respuesta del preview (D-EVI-2/6/8).
+export type {
+  FuenteCambioPreview,
+  PreviewResumen,
+  PreviewCambioItem,
+  PreviewErrorCelda,
+  PreviewRechazoItem,
+  PreviewResponse,
+} from "./evaluacion-inicial/preview.schema"
+// Schemas Zod para validar resumen/cambios/rechazos antes de persistir Json
+// (FIX-P5b-alineacion §5.60).
 export {
-  seguimientoTabSchema,
-  type SeguimientoTab,
-  estadoSeguimientoSchema,
-  type EstadoSeguimiento,
-  filtroEstadoSeguimientoSchema,
-  type FiltroEstadoSeguimiento,
-  semaforoCeldaSchema,
-  type SemaforoCelda,
-  seguimientoTabQuerySchema,
-  type SeguimientoTabQuery,
-  seguimientoMatrizQuerySchema,
-  type SeguimientoMatrizQuery,
-  matrizAreaHeaderSchema,
-  type MatrizAreaHeader,
-  matrizParticipanteSchema,
-  type MatrizParticipante,
-  matrizCeldaSchema,
-  type MatrizCelda,
-  matrizFilaSchema,
-  type MatrizFila,
-  matrizCursoResponseSchema,
-  type MatrizCursoResponse,
-  kpisCursoActualSchema,
-  type KpisCursoActual,
-  kpisCursoInicialSchema,
-  type KpisCursoInicial,
-  kpisCursoResponseSchema,
-  type KpisCursoResponse,
-  celdaInicialDetalleSchema,
-  type CeldaInicialDetalle,
-  celdaActualModuloSchema,
-  type CeldaActualModulo,
-  celdaActualEntregaRecienteSchema,
-  type CeldaActualEntregaReciente,
-  celdaActualDetalleSchema,
-  type CeldaActualDetalle,
-  celdaDetalleResponseSchema,
-  type CeldaDetalleResponse,
-  trayectoriaResumenFilaSchema,
-  type TrayectoriaResumenFila,
-  cohorteSeriePuntoSchema,
-  type CohorteSeriePunto,
-  cohorteSerieResponseSchema,
-  type CohorteSerieResponse,
-  cohorteAreaPromedioSchema,
-  type CohorteAreaPromedio,
-  cohorteAreasResponseSchema,
-  type CohorteAreasResponse,
-  cohorteDistribucionItemSchema,
-  type CohorteDistribucionItem,
-  cohorteDistribucionResponseSchema,
-  type CohorteDistribucionResponse,
-  celdaEvolucionPuntoSchema,
-  type CeldaEvolucionPunto,
-  celdaEvolucionProyeccionSchema,
-  type CeldaEvolucionProyeccion,
-  celdaEvolucionResponseSchema,
-  type CeldaEvolucionResponse,
-} from "./admin-seguimiento"
+  fuenteCambioPreviewSchema,
+  previewResumenSchema,
+  previewCambioItemSchema,
+  previewErrorCeldaSchema,
+  previewRechazoItemSchema,
+  previewCambiosArraySchema,
+  previewRechazosArraySchema,
+} from "./evaluacion-inicial/preview.schema"
 
+// Evaluacion inicial — Slice 5 P5c: aplicar idempotente + edicion manual + historial.
+export { aplicarRequestSchema, aplicarResponseSchema } from "./evaluacion-inicial/aplicar.schema"
+export type { AplicarRequest, AplicarResponse } from "./evaluacion-inicial/aplicar.schema"
 export {
-  excelPreviewNotaSchema,
-  type ExcelPreviewNota,
-  excelPreviewEstadoSchema,
-  type ExcelPreviewEstado,
-  excelPreviewFilaSchema,
-  type ExcelPreviewFila,
-  excelPreviewResumenSchema,
-  type ExcelPreviewResumen,
-  excelPreviewResponseSchema,
-  type ExcelPreviewResponse,
-  excelConfirmarBodySchema,
-  type ExcelConfirmarBody,
-  excelConfirmarResponseSchema,
-  type ExcelConfirmarResponse,
-} from "./admin-diagnostico-excel"
+  patchSkillRequestSchema,
+  patchSkillResponseSchema,
+} from "./evaluacion-inicial/edicion-manual.schema"
+export type {
+  PatchSkillRequest,
+  PatchSkillResponse,
+} from "./evaluacion-inicial/edicion-manual.schema"
+export type { CargaEvaluacionInicialResumen } from "./evaluacion-inicial/historial.schema"
 
+// Asignaciones — Slice 6 P6a: foundation + altas (listados, alta admin batch,
+// conversion voluntario→asignado, auto-inscripcion, bandeja voluntario).
 export {
-  fichaCtaSchema,
-  type FichaCta,
-  fichaDatosPersonalesSchema,
-  type FichaDatosPersonales,
-  fichaExpedienteAreaSchema,
-  type FichaExpedienteArea,
-  fichaExpedienteEntrySchema,
-  type FichaExpedienteEntry,
-  fichaCursoActivoSchema,
-  type FichaCursoActivo,
-  fichaCursoCerradoSchema,
-  type FichaCursoCerrado,
-  fichaEstadisticaAreaSchema,
-  type FichaEstadisticaArea,
-  fichaHistorialEntregaSchema,
-  type FichaHistorialEntrega,
-  fichaEntrevistaIASchema,
-  type FichaEntrevistaIA,
-  fichaParticipanteResponseSchema,
-  type FichaParticipanteResponse,
-} from "./admin-ficha-participante"
+  rolAsignacionSchema,
+  origenVoluntarioSchema,
+  estadoAsignadoSchema,
+  estadoVoluntarioSchema,
+  resultadoEntrevistaClienteSchema,
+  motivoRechazoAsignacionSchema,
+  crearAsignacionesBatchRequestSchema,
+  autoInscripcionRequestSchema,
+  listarAsignacionesQuerySchema,
+  cerrarCasoAsignadoSchema,
+  cerrarCasoVoluntarioSchema,
+  reabrirRetirarBodySchema,
+  patchResultadoEntrevistaRequestSchema,
+} from "./asignaciones"
 
+// Plan personal — Slice 7 P7a (D-S7-B3, D-S7-D2).
 export {
-  bandejaSaludoSchema,
-  type BandejaSaludo,
-  bandejaEstadoSchema,
-  type BandejaEstado,
-  bandejaHeroSchema,
-  type BandejaHero,
-  bandejaExpedienteResumenSchema,
-  type BandejaExpedienteResumen,
-  siguientePasoVarianteSchema,
-  type SiguientePasoVariante,
-  siguientePasoModuloEstadoSchema,
-  type SiguientePasoModuloEstado,
-  siguientePasoModuloSchema,
-  type SiguientePasoModulo,
-  siguientePasoHitoSchema,
-  type SiguientePasoHito,
-  siguientePasoCursoCompletadoSchema,
-  type SiguientePasoCursoCompletado,
-  bandejaSiguientePasoSchema,
-  type BandejaSiguientePaso,
-  participanteBandejaResponseSchema,
-  type ParticipanteBandejaResponse,
-} from "./participante-bandeja"
+  estadoBrechaSnapshotSchema,
+  origenSnapshotSchema,
+  skillSnapshotItemSchema,
+  fichaSnapshotV1Schema,
+} from "./plan-personal"
+export type {
+  EstadoBrechaSnapshot,
+  OrigenSnapshot,
+  SkillSnapshotItem,
+  FichaSnapshotV1,
+  CaracterItemPlan,
+  RazonItemPlan,
+  PlanAvanceBloques,
+  PlanAvance,
+  SeccionPlanItemAdmin,
+  SeccionPlanItemParticipante,
+  ModuloPlanAdmin,
+  ModuloPlanParticipante,
+  PlanResponseAdmin,
+  PlanResponseParticipante,
+  PlanResponse,
+} from "./plan-personal"
+// Plan personal — Slice 7 P7c: ajustes manuales + diff + apertura seccion.
+export {
+  ajustarPlanSchema,
+  accionAjustarPlanSchema,
+  caracterAjustePlanSchema,
+} from "./plan-personal"
+export type {
+  AjustarPlanInput,
+  AccionAjustarPlan,
+  CaracterAjustePlan,
+  ImpactoDiffSkill,
+  ImpactoSeccionDiff,
+  DiffSeccionAfectada,
+  DiffSkillItem,
+  PlanDiffResponse,
+  AperturaSeccionResponse,
+} from "./plan-personal"
+export type {
+  RolAsignacion,
+  OrigenVoluntario,
+  EstadoAsignado,
+  EstadoVoluntario,
+  ResultadoEntrevistaCliente,
+  Asignacion,
+  AsignacionDetallada,
+  AsignacionColaboradorEmbed,
+  AsignacionHistoricoEntrada,
+  AsignacionRechazada,
+  MotivoRechazoAsignacion,
+  CrearAsignacionesBatchResponse,
+  CursoDisponibleVoluntario,
+  AreaTagEmbed,
+  SkillDestacadaEmbed,
+  CrearAsignacionesBatchRequest,
+  AutoInscripcionRequest,
+  ListarAsignacionesQuery,
+  CerrarCasoAsignadoRequest,
+  CerrarCasoVoluntarioRequest,
+  ReabrirRetirarBody,
+  CondicionesListoFaltante,
+  PatchResultadoEntrevistaRequest,
+} from "./asignaciones"
 
+// Intentos de bloque — Slice 7 P7b (D-S7-C1..C6) + codigo (CODIGO_PREGUNTAS).
 export {
-  pendienteTipoSchema,
-  type PendienteTipo,
-  pendienteTagSchema,
-  type PendienteTag,
-  pendienteItemSchema,
-  type PendienteItem,
-  novedadTipoSchema,
-  type NovedadTipo,
-  novedadItemSchema,
-  type NovedadItem,
-  bandejaStreamSchema,
-  type BandejaStream,
-} from "./participante-bandeja-stream"
+  contenidoQuizSchema,
+  preguntaQuizSchema,
+  tipoPreguntaQuizSchema,
+  contenidoCodigoPreguntasSchema,
+  contenidoCodigoTestsSchema,
+  testStdinStdoutSchema,
+  lenguajeEjecutableSchema,
+  crearIntentoBloqueSchema,
+  respuestaPreguntaSchema,
+  respuestasIntentoSchema,
+  resultadoTestReportadoSchema,
+  intentoBloqueResponseSchema,
+  listarIntentosBloqueQuerySchema,
+  listarIntentosCursoBloqueQuerySchema,
+} from "./intentos-bloque"
+export type {
+  ContenidoQuiz,
+  PreguntaQuiz,
+  PreguntaOpcionUnica,
+  PreguntaOpcionMultiple,
+  PreguntaVerdaderoFalso,
+  PreguntaRespuestaCorta,
+  OpcionQuiz,
+  TipoPreguntaQuiz,
+  SolucionVisible,
+  NormalizacionRespuestaCorta,
+  ContenidoCodigoPreguntas,
+  ContenidoCodigoTests,
+  TestStdinStdout,
+  LenguajeEjecutable,
+  CrearIntentoBloqueInput,
+  RespuestaPregunta,
+  RespuestasIntento,
+  ResultadoTestReportado,
+  IntentoBloqueResponse,
+  ListarIntentosBloqueQuery,
+  ListarIntentosCursoBloqueQuery,
+} from "./intentos-bloque"
 
+// Transversal — Slice 8 P8a + P8b (D-S8-A1..F2, D-S8-B7, D-S8-C4..C7).
 export {
-  gradientePresetSchema,
-  type GradientePreset,
-  iconoCursoPresetSchema,
-  type IconoCursoPreset,
-  cursoNivelSchema,
-  type CursoNivel,
-  cursoTipoInscripcionSchema,
-  type CursoTipoInscripcion,
-  cursoEstadoSchema,
-  type CursoEstado,
-  cursoHintTipoSchema,
-  type CursoHintTipo,
-  cursoHintSchema,
-  type CursoHint,
-  cursoCardSchema,
-  type CursoCard,
-  misCursosResumenSchema,
-  type MisCursosResumen,
-  misCursosKpisSchema,
-  type MisCursosKpis,
-  participanteMisCursosResponseSchema,
-  type ParticipanteMisCursosResponse,
-} from "./participante-mis-cursos"
+  estadoIntentoTransversalSchema,
+  razonDisponibilidadTransversalSchema,
+  transversalResponseSchema,
+  disponibilidadTransversalResponseSchema,
+  crearIntentoTransversalResponseSchema,
+  repoOArtefactoSchema,
+  intentoTransversalBaseSchema,
+  intentoTransversalParticipanteResponseSchema,
+  intentoTransversalAdminResponseSchema,
+  listarIntentosTransversalQuerySchema,
+  crearIntentoTransversalSchema,
+  editarSkillsTransversalSchema,
+  editarSkillsTransversalResponseSchema,
+  cargarCapaTestsSchema,
+  cargarCapaCualitativaSchema,
+  cargarCapaComprensionSchema,
+  finalizarTransversalBodySchema,
+  anularTransversalBodySchema,
+  finalizarTransversalResponseSchema,
+  anularTransversalResponseSchema,
+} from "./transversal"
+export type {
+  EstadoIntentoTransversal,
+  RazonDisponibilidadTransversal,
+  TransversalResponse,
+  DisponibilidadTransversalResponse,
+  CrearIntentoTransversalResponse,
+  RepoOArtefacto,
+  IntentoTransversalBase,
+  IntentoTransversalParticipanteResponse,
+  IntentoTransversalAdminResponse,
+  ListarIntentosTransversalQuery,
+  CrearIntentoTransversalInput,
+  EditarSkillsTransversalInput,
+  EditarSkillsTransversalResponse,
+  CargarCapaTestsInput,
+  CargarCapaCualitativaInput,
+  CargarCapaComprensionInput,
+  FinalizarTransversalBodyInput,
+  AnularTransversalBodyInput,
+  FinalizarTransversalResponse,
+  AnularTransversalResponse,
+} from "./transversal"
 
+// Notificaciones P10b — inbox + preferencias (D-S10-C3..C7).
 export {
-  vistaCursoEstadoSchema,
-  type VistaCursoEstado,
-  vistaCursoKpisSchema,
-  type VistaCursoKpis,
-  vistaCursoSiguientePasoVarianteSchema,
-  type VistaCursoSiguientePasoVariante,
-  vistaCursoSiguientePasoSchema,
-  type VistaCursoSiguientePaso,
-  vistaCursoHeroSchema,
-  type VistaCursoHero,
-  vistaModuloEstadoSchema,
-  type VistaModuloEstado,
-  vistaModuloTagAsignacionSchema,
-  type VistaModuloTagAsignacion,
-  vistaMiniProyectoEstadoSchema,
-  type VistaMiniProyectoEstado,
-  vistaMiniProyectoSchema,
-  type VistaMiniProyecto,
-  vistaModuloSchema,
-  type VistaModulo,
-  vistaAreaEstadoSchema,
-  type VistaAreaEstado,
-  vistaAreaSchema,
-  type VistaArea,
-  vistaHitoEstadoSchema,
-  type VistaHitoEstado,
-  vistaHitoRequisitoSchema,
-  type VistaHitoRequisito,
-  vistaHitoTransversalSchema,
-  type VistaHitoTransversal,
-  vistaHitoEntrevistaSchema,
-  type VistaHitoEntrevista,
-  vistaCursoHitosSchema,
-  type VistaCursoHitos,
-  participanteVistaCursoResponseSchema,
-  type ParticipanteVistaCursoResponse,
-} from "./participante-vista-curso"
+  TIPOS_EVENTO_NOTIF,
+  TIPOS_CRITICOS_NOTIF,
+  CANALES_NOTIF,
+  listarNotificacionesQuerySchema,
+  patchPreferenciasNotificacionSchema,
+} from "./notificaciones"
+export type {
+  TipoEventoNotif,
+  CanalNotif,
+  NotificacionResumen,
+  NotificacionResponse,
+  NotificacionBadgeResponse,
+  PreferenciasNotificacionResponse,
+  ListarNotificacionesQuery,
+  PatchPreferenciasNotificacionInput,
+} from "./notificaciones"
 
+// Reportes P11b — operativos tiempo real (D-S11-B1..B11).
+// Reportes P11c — estrategicos cache + autoservicio + export (D-S11-C1..C11).
 export {
-  bloqueRuntimeEstadoSchema,
-  type BloqueRuntimeEstado,
-  bloqueRuntimeParrafoSchema,
-  type BloqueRuntimeParrafo,
-  bloqueRuntimeSchema,
-  type BloqueRuntime,
-  type TipoBloqueRuntime,
-  type BloqueRuntimePresetKey,
-  presetKeyDeBloque,
-  seccionInmersivaEstadoSchema,
-  type SeccionInmersivaEstado,
-  seccionInmersivaSchema,
-  type SeccionInmersiva,
-  moduloInmersivoCursoSchema,
-  type ModuloInmersivoCurso,
-  moduloInmersivoSchema,
-  type ModuloInmersivo,
-  moduloInmersivoProgresoSchema,
-  type ModuloInmersivoProgreso,
-  moduloInmersivoNavegacionSchema,
-  type ModuloInmersivoNavegacion,
-  moduloInmersivoResponseSchema,
-  type ModuloInmersivoResponse,
-} from "./participante-modulo-inmersivo"
+  TIPOS_ALERTA,
+  esTipoAlerta,
+  filtrosEstandarSchema,
+  avanceCursoQuerySchema,
+  detalleColaboradorQuerySchema,
+  brechasDetectadasQuerySchema,
+  centroRevisionQuerySchema,
+  eficaciaPlataformaQuerySchema,
+  historicoClienteQuerySchema,
+  inventarioSkillsQuerySchema,
+  reutilizacionCatalogoQuerySchema,
+} from "./reportes"
+export type {
+  TipoAlerta,
+  VistaReporte,
+  FiltrosEstandar,
+  AvanceCursoQuery,
+  DetalleColaboradorQuery,
+  BrechasDetectadasQuery,
+  CentroRevisionQuery,
+  EficaciaPlataformaQuery,
+  HistoricoClienteQuery,
+  InventarioSkillsQuery,
+  ReutilizacionCatalogoQuery,
+  ColaboradorEmbed,
+  FilaAvanceCurso,
+  EventoHistorico,
+  ItemPlanReporte,
+  FichaRelevanteItem,
+  IntentoBloqueResumen,
+  IntentoTransversalResumen,
+  IntentoEntrevistaIaResumen,
+  DetalleColaboradorAsignacion,
+  UltimosIntentos,
+  HayMasIntentos,
+  DetalleColaboradorResponse,
+  UmbralesBrechas,
+  SkillBrechaItem,
+  BrechasDetectadasResponse,
+  MotivoRevisionTransversal,
+  MotivoRevisionEntrevistaIa,
+  FilaCentroRevisionTransversal,
+  FilaCentroRevisionEntrevistaIa,
+  CentroRevisionResponse,
+  MetaEstrategico,
+  EficaciaPlataformaAptos,
+  EficaciaPlataformaNoAptos,
+  ObservacionFrecuente,
+  EficaciaPlataformaResponse,
+  HistoricoClienteCursoItem,
+  HistoricoClienteResponse,
+  InventarioSkillsConteoCualitativo,
+  InventarioSkillItem,
+  InventarioSkillsResponse,
+  ReutilizacionCatalogoModuloItem,
+  ReutilizacionCatalogoSkillItem,
+  ReutilizacionCatalogoResponse,
+  EtiquetaCualitativa,
+  ClaseColorSkill,
+  MeAvancePorSkill,
+  MeAvanceSiguienteSeccion,
+  MeAvanceCursoResponse,
+} from "./reportes"
 
+// Entrevista IA P8c — schemas y tipos del flujo de entrevista IA final (D89).
 export {
-  catalogoDuracionBandaSchema,
-  type CatalogoDuracionBanda,
-  catalogoVitrinaQuerySchema,
-  type CatalogoVitrinaQuery,
-  catalogoAreaResumenSchema,
-  type CatalogoAreaResumen,
-  catalogoVitrinaItemSchema,
-  type CatalogoVitrinaItem,
-  catalogoFiltroDuracionSchema,
-  type CatalogoFiltroDuracion,
-  catalogoFiltrosDisponiblesSchema,
-  type CatalogoFiltrosDisponibles,
-  catalogoVitrinaResponseSchema,
-  type CatalogoVitrinaResponse,
-  catalogoFichaHeroSchema,
-  type CatalogoFichaHero,
-  catalogoFichaModuloSchema,
-  type CatalogoFichaModulo,
-  catalogoFichaAreaSchema,
-  type CatalogoFichaArea,
-  catalogoFichaHitosSchema,
-  type CatalogoFichaHitos,
-  catalogoFichaResponseSchema,
-  type CatalogoFichaResponse,
-  catalogoInscribirmeResponseSchema,
-  type CatalogoInscribirmeResponse,
-} from "./participante-catalogo"
+  enviarTurnoSchema,
+  enviarTurnoResponseSchema,
+  ajustarEntrevistaBodySchema,
+  anularEntrevistaBodySchema,
+  finalizarEntrevistaBodySchema,
+  snapshotSeccionesBaseV1Schema,
+  rubricaSnapshotV1Schema,
+  tipoBloqueSnapshotSchema,
+  estadoIntentoEntrevistaIaSchema,
+  razonDisponibilidadEntrevistaIaSchema,
+  entrevistaIaResponseSchema,
+  disponibilidadEntrevistaIaResponseSchema,
+  crearIntentoEntrevistaIaResponseSchema,
+  intentoEntrevistaIaBaseSchema,
+  intentoEntrevistaIaParticipanteResponseSchema,
+  intentoEntrevistaIaAdminResponseSchema,
+  listarIntentosEntrevistaIaQuerySchema,
+  finalizarEntrevistaResponseSchema,
+  ajustarEntrevistaResponseSchema,
+  anularEntrevistaResponseSchema,
+} from "./entrevista-ia"
+export type {
+  EnviarTurnoInput,
+  EnviarTurnoResponse,
+  AjustarEntrevistaBodyInput,
+  AnularEntrevistaBodyInput,
+  FinalizarEntrevistaBodyInput,
+  SnapshotSeccionesBaseV1,
+  RubricaSnapshotV1,
+  TipoBloqueSnapshot,
+  EstadoIntentoEntrevistaIa,
+  RazonDisponibilidadEntrevistaIa,
+  EntrevistaIaResponse,
+  DisponibilidadEntrevistaIaResponse,
+  CrearIntentoEntrevistaIaResponse,
+  IntentoEntrevistaIaBase,
+  IntentoEntrevistaIaParticipanteResponse,
+  IntentoEntrevistaIaAdminResponse,
+  ListarIntentosEntrevistaIaQuery,
+  FinalizarEntrevistaResponse,
+  AjustarEntrevistaResponse,
+  AnularEntrevistaResponse,
+  TurnoEntrevistaIa,
+} from "./entrevista-ia"
+
+// Colaboradores — endpoints autoservicio /me/* (FIX-pre-S12).
+export {
+  meCursosQuerySchema,
+  exportarFichaQuerySchema,
+  formatoExportFichaSchema,
+} from "./colaboradores"
+export type {
+  MeCursoResumen,
+  MeCursosQuery,
+  ExportarFichaQuery,
+  FormatoExportFicha,
+} from "./colaboradores"
+
+// Colaboradores — arbol unificado de curso (modo asignado/voluntario/preview).
+export type {
+  ModoCursoParticipante,
+  CursoArbolCabecera,
+  CursoArbolSeccion,
+  CursoArbolModulo,
+  CursoArbolResponse,
+} from "./colaboradores"
+
+// Colaboradores — bandeja del participante (D-BANDEJA-1).
+export {
+  BANDEJA_TOP_NOVEDADES,
+  BANDEJA_TOP_PENDIENTES,
+  UMBRAL_ASIGNACION_NUEVA_HORAS,
+  UMBRAL_DEADLINE_CERCANO_DIAS,
+  UMBRAL_DEADLINE_CRITICO_AVANCE,
+  UMBRAL_VENTANA_AVISOS_DIAS,
+} from "./colaboradores"
+export type {
+  BandejaCursoPendiente,
+  MeBandejaContadores,
+  MeBandejaResponse,
+  ResultadoCierreVisible,
+  SiguienteAccion,
+  SiguienteAccionAsignacionNueva,
+  SiguienteAccionCasoReabierto,
+  SiguienteAccionContinuarCurso,
+  SiguienteAccionDeadlineCritico,
+  SiguienteAccionEntrevistaIaDisponible,
+  SiguienteAccionExplorarVoluntariado,
+  SiguienteAccionResultadoCierre,
+  SiguienteAccionTransversalDisponible,
+  TipoSiguienteAccion,
+  TonoDeadline,
+} from "./colaboradores"
+
+// Colaboradores — admin: listar paginado + exportar para /admin/personas.
+export {
+  estadoEmpleadoSchema,
+  listarColaboradoresQuerySchema,
+  exportarColaboradoresQuerySchema,
+  formatoExportColaboradoresSchema,
+} from "./colaboradores"
+export type {
+  EstadoEmpleado,
+  ListarColaboradoresQuery,
+  ColaboradorAdminUsuarioInfo,
+  ColaboradorAdminResumen,
+  ExportarColaboradoresQuery,
+  FormatoExportColaboradores,
+} from "./colaboradores"
+
+// Admin — Slice 12 P12: visor de auditoria (activity_logs).
+export {
+  ACCIONES_AUDITORIA,
+  listarAuditoriaQuerySchema,
+  exportarAuditoriaQuerySchema,
+} from "./admin"
+export type {
+  AccionAuditoriaLiteral,
+  AuditoriaResumen,
+  ListarAuditoriaQuery,
+  ExportarAuditoriaQuery,
+} from "./admin"
+
+// Admin — Slice futuro B foundation: 2 visores de logs especificos
+// (log_cambios_curso + historico_estados_asignacion).
+export {
+  ACCIONES_LOG_CURSO,
+  listarLogsCursosQuerySchema,
+  listarLogsAsignacionesQuerySchema,
+} from "./admin"
+export type {
+  AccionLogCursoLiteral,
+  LogCambioCursoResumen,
+  ListarLogsCursosQuery,
+  HistoricoEstadoAsignacionResumen,
+  ListarLogsAsignacionesQuery,
+} from "./admin"
+
+// Admin — Slice futuro B P-B-b: 4 visores adicionales
+// (historico skills + historico modulos + ajustes plan + meta-auditoria).
+export {
+  TIPOS_EVENTO_LOG_SKILL,
+  listarLogsSkillsQuerySchema,
+  ESTADOS_LOG_MODULO,
+  listarLogsModulosQuerySchema,
+  ACCIONES_AJUSTE_PLAN,
+  listarLogsAjustesPlanQuerySchema,
+  listarLogsConsultasQuerySchema,
+} from "./admin"
+export type {
+  TipoEventoLogSkill,
+  LogSkillEventoResumen,
+  ListarLogsSkillsQuery,
+  EstadoLogModulo,
+  LogModuloEstadoResumen,
+  ListarLogsModulosQuery,
+  AccionAjustePlanLiteral,
+  LogAjustePlanResumen,
+  ListarLogsAjustesPlanQuery,
+  LogConsultaResumen,
+  ListarLogsConsultasQuery,
+} from "./admin"
+
+// Admin — Slice futuro B P-B-c: 6 exportadores CSV/XLSX de los visores
+// `/admin/logs/<dominio>`.
+export {
+  exportarLogsCursosQuerySchema,
+  exportarLogsAsignacionesQuerySchema,
+  exportarLogsSkillsQuerySchema,
+  exportarLogsModulosQuerySchema,
+  exportarLogsAjustesPlanQuerySchema,
+  exportarLogsConsultasQuerySchema,
+} from "./admin"
+export type {
+  ExportarLogsCursosQuery,
+  ExportarLogsAsignacionesQuery,
+  ExportarLogsSkillsQuery,
+  ExportarLogsModulosQuery,
+  ExportarLogsAjustesPlanQuery,
+  ExportarLogsConsultasQuery,
+} from "./admin"

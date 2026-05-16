@@ -1,9 +1,13 @@
 #!/bin/sh
-echo "[seed] RUN_SEED=$RUN_SEED"
-if [ "$RUN_SEED" = "true" ]; then
-  echo "[seed] Ejecutando prisma db seed..."
-  pnpm exec prisma db seed
-  echo "[seed] Seed completado."
+# Ejecuta el seed solo cuando RUN_SEED_ON_DEPLOY=true.
+# Idempotente: el seed esta disenado para correr varias veces sin duplicar datos.
+# Uso desde Railway (apps/api/railway.toml):
+#   ... && sh scripts/run-seed-if-enabled.sh && ...
+set -e
+
+if [ "$RUN_SEED_ON_DEPLOY" = "true" ]; then
+  echo "[seed] RUN_SEED_ON_DEPLOY=true -> ejecutando pnpm db:seed"
+  pnpm db:seed
 else
-  echo "[seed] Seed omitido (RUN_SEED != true)"
+  echo "[seed] RUN_SEED_ON_DEPLOY!=true -> skip"
 fi

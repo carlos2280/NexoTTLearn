@@ -1,22 +1,29 @@
 <!doctype html>
-<html lang="es" data-theme="dark">
+<html lang="es" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="theme-color" content="#4F46E5" />
+    <meta name="description" content="NexoTT Learn — plataforma interna de aprendizaje y preparación de colaboradores." />
     <title>NexoTT Learn</title>
-    <script>
-      // Pre-hidratacion: aplica el tema antes del primer paint para evitar
-      // FOUC. Lee de localStorage (clave "nx-theme") y cae a "dark".
-      (function () {
-        try {
-          var saved = localStorage.getItem("nx-theme");
-          var theme = saved === "light" || saved === "dark" ? saved : "dark";
-          document.documentElement.setAttribute("data-theme", theme);
-        } catch (_) {}
-      })();
-    </script>
   </head>
   <body>
+    <script>
+      // Anti-FOUC: aplica el tema guardado (o el del sistema) antes del render.
+      (function () {
+        try {
+          var stored = localStorage.getItem("nexott-theme")
+          var sysDark = window.matchMedia("(prefers-color-scheme: dark)").matches
+          var theme =
+            stored === "light" || stored === "dark" ? stored : sysDark ? "dark" : "light"
+          document.documentElement.setAttribute("data-theme", theme)
+          var meta = document.querySelector('meta[name="color-scheme"]')
+          if (meta) meta.setAttribute("content", theme)
+        } catch (e) {}
+      })()
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -10,6 +10,13 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  // sandbox.worker importa Pyodide con code-splitting (dynamic imports). El
+  // default 'iife' de Vite para workers no soporta multi-chunk; 'es' si.
+  // Workers ES son soportados por todos los browsers evergreen (Chrome >=80,
+  // Firefox >=114, Safari >=15).
+  worker: {
+    format: "es",
+  },
   server: {
     port: 5173,
     // Si 5173 esta ocupado, fallar en vez de saltar a 5174 (que rompe el CORS del API).

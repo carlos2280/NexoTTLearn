@@ -1,24 +1,13 @@
 import { Module } from "@nestjs/common"
-import { PassportModule } from "@nestjs/passport"
-import { AuthEventosService } from "./auth-eventos.service"
+import { PrismaModule } from "../common/prisma/prisma.module"
 import { AuthController } from "./auth.controller"
 import { AuthService } from "./auth.service"
-import { MfaChallengeService } from "./mfa/mfa-challenge.service"
-import { MfaCryptoService } from "./mfa/mfa-crypto.service"
-import { MfaService } from "./mfa/mfa.service"
-import { SerializadorUsuario } from "./serializador.usuario"
+import { MfaModule } from "./mfa/mfa.module"
 
 @Module({
-  imports: [PassportModule.register({ session: true })],
+  imports: [PrismaModule, MfaModule],
   controllers: [AuthController],
-  providers: [
-    AuthService,
-    SerializadorUsuario,
-    MfaCryptoService,
-    MfaChallengeService,
-    MfaService,
-    AuthEventosService,
-  ],
-  exports: [AuthService, MfaService, MfaCryptoService, AuthEventosService],
+  providers: [AuthService],
+  exports: [AuthService],
 })
 export class AuthModule {}
