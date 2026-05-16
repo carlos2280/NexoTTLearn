@@ -9,6 +9,7 @@ import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
 import { NotificacionesService } from "../notificaciones/notificaciones.service"
 import { PlanPersonalService } from "../plan-personal/plan-personal.service"
+import { AsignacionesNotificacionesService } from "./asignaciones-notificaciones.service"
 import { AsignacionesService } from "./asignaciones.service"
 
 interface NotificacionesSpy {
@@ -194,9 +195,24 @@ beforeEach(async () => {
           p: PrismaService,
           i: IdempotencyService,
           pp: PlanPersonalService,
-          n: NotificacionesService,
-        ) => new AsignacionesService(p, i, pp, n),
-        inject: [PrismaService, IdempotencyService, PlanPersonalService, NotificacionesService],
+          notif: AsignacionesNotificacionesService,
+        ) => new AsignacionesService(p, i, pp, notif),
+        inject: [
+          PrismaService,
+          IdempotencyService,
+          PlanPersonalService,
+          AsignacionesNotificacionesService,
+        ],
+      },
+      {
+        // Vitest no emite `emitDecoratorMetadata`, asi que la inyeccion por
+        // shorthand de clase no resuelve las deps. Factory explicito (mismo
+        // patron que `AsignacionesService` arriba) para garantizar que el
+        // service recibe el mock de Prisma y el spy de Notificaciones.
+        provide: AsignacionesNotificacionesService,
+        useFactory: (p: PrismaService, n: NotificacionesService) =>
+          new AsignacionesNotificacionesService(p, n),
+        inject: [PrismaService, NotificacionesService],
       },
       { provide: PrismaService, useValue: prisma },
       { provide: IdempotencyService, useValue: idempotency },
