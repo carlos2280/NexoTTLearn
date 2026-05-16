@@ -103,6 +103,7 @@ function RetoActivo({ bloqueId, cursoId, contenido, contenidoTests }: RetoActivo
           rows={Math.max(10, contenido.esqueletoInicial.split("\n").length + 2)}
           placeholder="Escribe tu solución…"
           mostrarNumerosLinea={true}
+          embedded={true}
         />
         <div className="flex items-center justify-end border-border border-t bg-subtle px-3 py-1.5">
           <Button variant="ghost" size="sm" onClick={flujo.reset} disabled={!puedeReset}>

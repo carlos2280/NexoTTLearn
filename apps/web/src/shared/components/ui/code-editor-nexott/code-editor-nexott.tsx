@@ -27,6 +27,14 @@ interface CodeEditorNexottProps {
    * añadir ruido en CODIGO_ILUSTRATIVO ni en editores compactos del admin.
    */
   readonly mostrarNumerosLinea?: boolean
+  /**
+   * Embebido: el editor está dentro de un contenedor mayor que ya provee
+   * el frame (borde, radius, sombra, tab del lenguaje). En este modo el
+   * editor se vuelve "plano": sin radius, sin borde, sin tab del lenguaje,
+   * sin sombra. Pensado para el reto CODIGO_PREGUNTAS donde el IDE-frame
+   * externo agrupa top-bar + editor + terminal en una sola pieza.
+   */
+  readonly embedded?: boolean
 }
 
 /**
@@ -60,9 +68,10 @@ export function CodeEditorNexott({
   className,
   readOnly = false,
   mostrarNumerosLinea = false,
+  embedded = false,
 }: CodeEditorNexottProps) {
   const etiquetaLenguaje = lenguaje ? (LENGUAJE_LABEL[lenguaje] ?? lenguaje) : null
-  const mostrarTab = !compacto && etiquetaLenguaje !== null
+  const mostrarTab = !(embedded || compacto) && etiquetaLenguaje !== null
   const lang = lenguaje ?? "otro"
   const minHeight = `${Math.max(1, rows) * 1.65}em`
   const padding = compacto ? 12 : 16
@@ -70,10 +79,13 @@ export function CodeEditorNexott({
   return (
     <div
       className={cn(
-        "group/code relative flex flex-col overflow-hidden rounded-lg border shadow-xs",
+        "group/code relative flex flex-col overflow-hidden",
+        embedded ? "" : "rounded-lg border shadow-xs",
         "border-[color:var(--color-code-border)] bg-[color:var(--color-code-bg)]",
         "transition-[border-color,box-shadow] duration-base ease-default",
-        readOnly ? "" : "focus-within:border-aurora-cyan focus-within:shadow-ring-aurora-cyan-soft",
+        readOnly || embedded
+          ? ""
+          : "focus-within:border-aurora-cyan focus-within:shadow-ring-aurora-cyan-soft",
         className,
       )}
     >
