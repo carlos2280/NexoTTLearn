@@ -2,6 +2,7 @@ import { useHistorialFicha } from "@/features/me/hooks/use-historial-ficha"
 import { Button } from "@/shared/components/ui/button"
 import { slugArea } from "@/shared/lib/slug-area"
 import type { EventoHistorialFicha } from "@nexott-learn/shared-types"
+import { motion, useReducedMotion } from "framer-motion"
 import { ChevronDown } from "lucide-react"
 import { useState } from "react"
 import { etiquetaNivelSkill, relativizarFecha } from "../mi-ficha.helpers"
@@ -59,6 +60,7 @@ interface EventoItemProps {
 }
 
 function EventoItem({ evento }: EventoItemProps) {
+  const reducedMotion = useReducedMotion()
   const fechaRel = relativizarFecha(evento.fecha)
   const colorDot =
     evento.tipo === "SKILL_DEMOSTRADA"
@@ -66,7 +68,12 @@ function EventoItem({ evento }: EventoItemProps) {
       : "var(--color-text-tertiary)"
 
   return (
-    <li className="grid grid-cols-[100px_auto_1fr] items-start gap-3 border-border border-b py-4 last:border-b-0">
+    <motion.li
+      initial={reducedMotion ? { opacity: 1 } : { opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 100, damping: 18, mass: 0.6 }}
+      className="grid grid-cols-[100px_auto_1fr] items-start gap-3 border-border border-b py-4 last:border-b-0"
+    >
       <span className="text-caption text-text-tertiary">{fechaRel}</span>
       <span
         aria-hidden="true"
@@ -77,7 +84,7 @@ function EventoItem({ evento }: EventoItemProps) {
         <DescripcionEvento evento={evento} />
         <SubLineaEvento evento={evento} />
       </div>
-    </li>
+    </motion.li>
   )
 }
 
