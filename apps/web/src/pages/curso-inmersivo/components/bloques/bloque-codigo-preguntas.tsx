@@ -149,15 +149,20 @@ function RetoActivo({ bloqueId, cursoId, contenido, contenidoTests }: RetoActivo
             <RotateCcw className="mr-1.5 h-3.5 w-3.5" aria-hidden={true} />
             Restaurar esqueleto
           </Button>
-          <Button
-            size="sm"
-            variant={todosLosTestsPasaron ? "aurora" : "primary"}
-            onClick={flujo.enviar}
-            disabled={!puedeAccionar}
-          >
-            <Send className="mr-1.5 h-3 w-3" aria-hidden={true} />
-            {flujo.isEnviando ? "Enviando…" : "Enviar intento"}
-          </Button>
+          <div className="flex items-center gap-3">
+            <p className="hidden text-body-sm text-text-tertiary sm:block">
+              Solo se guarda tu mejor intento.
+            </p>
+            <Button
+              size="sm"
+              variant={todosLosTestsPasaron ? "aurora" : "primary"}
+              onClick={flujo.enviar}
+              disabled={!puedeAccionar}
+            >
+              <Send className="mr-1.5 h-3 w-3" aria-hidden={true} />
+              {flujo.isEnviando ? "Enviando…" : "Enviar intento"}
+            </Button>
+          </div>
         </div>
         <TerminalTests ejecucion={flujo.ejecucion} isEjecutando={flujo.isEjecutando} />
       </div>
