@@ -1,18 +1,15 @@
-import { Button } from "@/shared/components/ui/button"
 import { slugArea } from "@/shared/lib/slug-area"
 import type { FichaPorAreaItem, FichaSkillItem } from "@nexott-learn/shared-types"
-import { ChevronUp } from "lucide-react"
 import { etiquetaNivelArea } from "../mi-ficha.helpers"
 import { SkillDemostradaRow } from "./skill-demostrada-row"
 
 interface DetalleAreaProps {
   readonly area: FichaPorAreaItem
   readonly skills: readonly FichaSkillItem[]
-  readonly onCerrar: () => void
   readonly onAbrirHistorico: (skillId: string, skillNombre: string) => void
 }
 
-export function DetalleArea({ area, skills, onCerrar, onAbrirHistorico }: DetalleAreaProps) {
+export function DetalleArea({ area, skills, onAbrirHistorico }: DetalleAreaProps) {
   const colorArea = `var(--color-area-${slugArea(area.nombre)})`
   const skillsDelArea = skills.filter((s) => s.areaId === area.areaId)
   const skillsDemostradasIds = new Set(skillsDelArea.map((s) => s.skillId))
@@ -35,21 +32,15 @@ export function DetalleArea({ area, skills, onCerrar, onAbrirHistorico }: Detall
         style={{ background: colorArea }}
       />
 
-      <header className="flex items-start justify-between gap-3">
-        <div className="flex flex-col gap-1.5">
-          <span className="nx-eyebrow text-text-tertiary">{area.nombre}</span>
-          <h3
-            id={`detalle-${area.areaId}`}
-            className="font-medium text-h3"
-            style={{ color: colorArea }}
-          >
-            {etiquetaNivelArea(nivelArea)}
-          </h3>
-        </div>
-        <Button variant="ghost" size="sm" onClick={onCerrar} aria-label="Colapsar">
-          <ChevronUp className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
-          Colapsar
-        </Button>
+      <header className="flex flex-col gap-1.5">
+        <span className="nx-eyebrow text-text-tertiary">{area.nombre}</span>
+        <h3
+          id={`detalle-${area.areaId}`}
+          className="font-medium text-h3"
+          style={{ color: colorArea }}
+        >
+          {etiquetaNivelArea(nivelArea)}
+        </h3>
       </header>
 
       {skillsDelArea.length > 0 ? (
