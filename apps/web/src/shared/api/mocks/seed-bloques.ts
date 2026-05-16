@@ -153,7 +153,6 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     // biome-ignore lint/nursery/noSecrets: URL de YouTube de ejemplo para datos mock, no un secreto
     url: "https://www.youtube.com/watch?v=dLPgQRbVquo",
     proveedor: "youtube",
-    duracionSeg: 720,
     marcarAlPorcentaje: 90,
     notas: "Atencion al minuto 6 sobre conditional types.",
   }),
@@ -436,7 +435,6 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
   nuevoBloque(uuid("blqJ14"), "sec-j1-3", 3, "VIDEO", {
     url: "https://www.youtube.com/watch?v=t1-YZ6bF-g0",
     proveedor: "youtube",
-    duracionSeg: 900,
     marcarAlPorcentaje: 85,
     notas: "Atencion al ejemplo de groupingBy en el minuto 8.",
   }),
@@ -677,7 +675,6 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     // biome-ignore lint/nursery/noSecrets: URL de YouTube de ejemplo para datos mock, no un secreto
     url: "https://www.youtube.com/watch?v=W9KMSDS3o3o",
     proveedor: "youtube",
-    duracionSeg: 1100,
     marcarAlPorcentaje: 80,
     notas: "El bloque sobre LazyInitializationException es clave (minuto 12).",
   }),
