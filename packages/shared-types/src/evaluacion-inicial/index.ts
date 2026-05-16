@@ -7,6 +7,7 @@ export type {
   FichaPorAreaItem,
   FichaResponse,
   EntradaHistoricoNotaSkill,
+  EventoHistorialFicha,
 } from "./ficha.schema"
 export type {
   FuenteCambioPreview,

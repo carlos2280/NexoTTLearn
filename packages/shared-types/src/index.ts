@@ -223,6 +223,7 @@ export type {
   FichaPorAreaItem,
   FichaResponse,
   EntradaHistoricoNotaSkill,
+  EventoHistorialFicha,
 } from "./evaluacion-inicial/ficha.schema"
 // Evaluacion inicial — Slice 5 P5b: respuesta del preview (D-EVI-2/6/8).
 export type {

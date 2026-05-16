@@ -74,6 +74,42 @@ export interface FichaResponse {
 }
 
 /**
+ * Evento agregado del historial cronologico del colaborador (`GET
+ * /me/ficha/historial`). Union discriminada por `tipo`. El backend agrega
+ * cambios de skill + hitos de curso en una sola vista ordenada por fecha.
+ *
+ * TODO B-24: backend debe implementar este endpoint con paginacion (cursor
+ * o `?limite=N&desde=...`). El mock devuelve la coleccion completa y el
+ * frontend pagina en memoria hasta que B-24 este listo.
+ */
+export type EventoHistorialFicha =
+  | {
+      readonly tipo: "SKILL_DEMOSTRADA"
+      readonly id: string
+      readonly fecha: string
+      readonly skillId: string
+      readonly skillNombre: string
+      readonly areaId: string
+      readonly areaNombre: string
+      readonly nivelCualitativo: NivelCualitativoArea
+      readonly origenNarrativo: string
+    }
+  | {
+      readonly tipo: "CURSO_INICIADO"
+      readonly id: string
+      readonly fecha: string
+      readonly cursoId: string
+      readonly cursoTitulo: string
+    }
+  | {
+      readonly tipo: "CURSO_COMPLETADO"
+      readonly id: string
+      readonly fecha: string
+      readonly cursoId: string
+      readonly cursoTitulo: string
+    }
+
+/**
  * Entrada del historico de una skill especifica. Append-only desde
  * `historico_notas_skill`. `valor` puede ser null para representar la marca
  * "sin evidencia" cuando una edicion manual reseteo la nota.

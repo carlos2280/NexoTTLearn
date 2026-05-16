@@ -7,6 +7,7 @@ import { DetalleArea } from "./components/detalle-area"
 import { DrawerHistorico } from "./components/drawer-historico"
 import { FichaSkeleton } from "./components/ficha-skeleton"
 import { HeroViaje } from "./components/hero-viaje"
+import { TuHistorial } from "./components/tu-historial"
 import { TuMapa } from "./components/tu-mapa"
 
 interface HistoricoState {
@@ -71,6 +72,8 @@ export function MiFichaPage() {
           </motion.div>
         ) : null}
       </AnimatePresence>
+
+      {data ? <TuHistorial /> : null}
 
       <DrawerHistorico
         abierto={historico !== null}

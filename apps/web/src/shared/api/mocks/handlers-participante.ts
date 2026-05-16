@@ -1,6 +1,7 @@
 import type {
   CursoDisponibleVoluntario,
   EntradaHistoricoNotaSkill,
+  EventoHistorialFicha,
   FichaResponse,
   MeBandejaResponse,
   MeCursoResumen,
@@ -14,6 +15,7 @@ const RTE_ME_BANDEJA = /^\/me\/bandeja$/
 const RTE_ME_CURSOS = /^\/me\/cursos(\?.*)?$/
 const RTE_ME_FICHA = /^\/me\/ficha$/
 const RTE_ME_FICHA_RESUMEN = /^\/me\/ficha\/resumen$/
+const RTE_ME_FICHA_HISTORIAL = /^\/me\/ficha\/historial(\?.*)?$/
 const RTE_HISTORICO_SKILL = /^\/colaboradores\/[^/]+\/ficha\/skills\/[^/]+\/historico$/
 const RGX_HISTORICO_SKILL = /^\/colaboradores\/[^/]+\/ficha\/skills\/([^/]+)\/historico$/
 const RTE_NOTIFICACIONES_BADGE = /^\/notificaciones\/badge$/
@@ -560,6 +562,119 @@ function handlerMeFicha(_req: MockRequest): FichaResponse {
   }
 }
 
+// Mock de `GET /me/ficha/historial` (TODO B-24). Devuelve la coleccion
+// completa de eventos cronologicos (cambios de skill + hitos de curso). El
+// frontend pagina en memoria hasta que el backend implemente el endpoint
+// real con cursor o `?limite=N&desde=...`.
+function handlerMeFichaHistorial(_req: MockRequest): readonly EventoHistorialFicha[] {
+  return EVENTOS_HISTORIAL
+}
+
+const EVENTOS_HISTORIAL: readonly EventoHistorialFicha[] = [
+  {
+    tipo: "SKILL_DEMOSTRADA",
+    id: "evt-1",
+    fecha: diasDesdeHoy(-3),
+    skillId: "sk-be-django",
+    skillNombre: "Django REST Framework",
+    areaId: "area-backend",
+    areaNombre: "Backend",
+    nivelCualitativo: "excelencia",
+    origenNarrativo: 'Curso "AMS Backend"',
+  },
+  {
+    tipo: "SKILL_DEMOSTRADA",
+    id: "evt-2",
+    fecha: diasDesdeHoy(-5),
+    skillId: "sk-fe-react",
+    skillNombre: "React Hooks",
+    areaId: "area-frontend",
+    areaNombre: "Frontend",
+    nivelCualitativo: "solido",
+    origenNarrativo: 'Curso "Fundamentos Full-Stack & DevOps"',
+  },
+  {
+    tipo: "CURSO_INICIADO",
+    id: "evt-3",
+    fecha: diasDesdeHoy(-7),
+    cursoId: "curso-fullstack-devops",
+    cursoTitulo: "Fundamentos Full-Stack & DevOps",
+  },
+  {
+    tipo: "SKILL_DEMOSTRADA",
+    id: "evt-4",
+    fecha: diasDesdeHoy(-14),
+    skillId: "sk-dv-docker",
+    skillNombre: "Docker basico",
+    areaId: "area-devops",
+    areaNombre: "DevOps",
+    nivelCualitativo: "inicial",
+    origenNarrativo: 'Curso "Fundamentos Full-Stack & DevOps"',
+  },
+  {
+    tipo: "SKILL_DEMOSTRADA",
+    id: "evt-5",
+    fecha: diasDesdeHoy(-22),
+    skillId: "sk-cl-azure",
+    skillNombre: "Azure App Service",
+    areaId: "area-cloud",
+    areaNombre: "Cloud",
+    nivelCualitativo: "enDesarrollo",
+    origenNarrativo: 'Proyecto "Migracion AMS"',
+  },
+  {
+    tipo: "CURSO_INICIADO",
+    id: "evt-6",
+    fecha: diasDesdeHoy(-30),
+    cursoId: "curso-java-senior",
+    cursoTitulo: "Java Senior",
+  },
+  {
+    tipo: "SKILL_DEMOSTRADA",
+    id: "evt-7",
+    fecha: diasDesdeHoy(-40),
+    skillId: "sk-da-sql",
+    skillNombre: "SQL analitico",
+    areaId: "area-data",
+    areaNombre: "Data",
+    nivelCualitativo: "enDesarrollo",
+    origenNarrativo: 'Curso "AMS Backend"',
+  },
+  {
+    tipo: "SKILL_DEMOSTRADA",
+    id: "evt-8",
+    fecha: diasDesdeHoy(-60),
+    skillId: "sk-be-fastapi",
+    skillNombre: "FastAPI",
+    areaId: "area-backend",
+    areaNombre: "Backend",
+    nivelCualitativo: "excelencia",
+    origenNarrativo: "Entrevista inicial",
+  },
+  {
+    tipo: "SKILL_DEMOSTRADA",
+    id: "evt-9",
+    fecha: diasDesdeHoy(-90),
+    skillId: "sk-be-python",
+    skillNombre: "Python avanzado",
+    areaId: "area-backend",
+    areaNombre: "Backend",
+    nivelCualitativo: "excelencia",
+    origenNarrativo: "Entrevista inicial",
+  },
+  {
+    tipo: "SKILL_DEMOSTRADA",
+    id: "evt-10",
+    fecha: diasDesdeHoy(-120),
+    skillId: "sk-sf-comu",
+    skillNombre: "Comunicacion tecnica",
+    areaId: "area-soft",
+    areaNombre: "Soft Skills",
+    nivelCualitativo: "solido",
+    origenNarrativo: "Entrevista inicial",
+  },
+]
+
 // Mock de `GET /colaboradores/:id/ficha/skills/:skillId/historico`.
 // Devuelve un historico determinista por `skillId`. Si el skillId no aparece,
 // se devuelve un historico vacio (skill aun no demostrada).
@@ -823,6 +938,7 @@ export const handlersParticipante = [
   defineRoute("GET", RTE_ME_BANDEJA, handlerMeBandeja),
   defineRoute("GET", RTE_ME_CURSOS, handlerMeCursos),
   defineRoute("GET", RTE_ME_FICHA, handlerMeFicha),
+  defineRoute("GET", RTE_ME_FICHA_HISTORIAL, handlerMeFichaHistorial),
   defineRoute("GET", RTE_HISTORICO_SKILL, handlerHistoricoSkill),
   defineRoute("GET", RTE_ME_FICHA_RESUMEN, handlerMeFichaResumen),
   defineRoute("GET", RTE_NOTIFICACIONES_BADGE, handlerNotificacionesBadge),
