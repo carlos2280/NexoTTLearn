@@ -903,7 +903,7 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
       lenguaje: "javascript",
       enunciado:
         // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML/codigo), no un secreto
-        "Implementa `deduplicar(palabras)` que reciba un array de strings y devuelva un nuevo array sin duplicados, conservando el orden de aparicion. Si la entrada es null o undefined, devuelve un array vacio.",
+        "<p>Implementa <code>deduplicar(palabras)</code> que reciba un array de strings y devuelva un nuevo array <strong>sin duplicados</strong>, conservando el orden de aparición.</p><p>Casos a cubrir:</p><ul><li>Array con repetidos: <code>['a','b','a','c']</code> → <code>['a','b','c']</code></li><li>Array vacío: <code>[]</code> → <code>[]</code></li><li>Entrada <code>null</code> o <code>undefined</code> → devuelve <code>[]</code></li></ul>",
       // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML/codigo), no un secreto
       esqueletoInicial: "function deduplicar(palabras) {\n  // tu codigo aqui\n  return []\n}",
       tiempoLimiteSeg: 30,
@@ -973,7 +973,8 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     {
       lenguaje: "typescript",
       enunciado:
-        "Implementa la funcion generica `agruparPor<T, K extends string>(items: T[], clave: (item: T) => K): Record<K, T[]>` que agrupa los items segun la clave devuelta por la funcion.",
+        // biome-ignore lint/nursery/noSecrets: enunciado HTML del reto, no un secreto
+        "<p>Implementa la función genérica <code>agruparPor&lt;T, K extends string&gt;(items: T[], clave: (item: T) =&gt; K): Record&lt;K, T[]&gt;</code> que agrupa los items según la clave devuelta por la función.</p><p>Reglas:</p><ul><li>El orden dentro de cada grupo respeta el orden original del array.</li><li>Si <code>items</code> está vacío, devuelve un objeto vacío <code>{}</code>.</li><li>La firma genérica debe respetarse para que el resultado sea correctamente tipado.</li></ul><p><em>Pista:</em> usa <code>reduce</code> o un <code>for...of</code> sobre <code>items</code>.</p>",
       esqueletoInicial:
         "function agruparPor<T, K extends string>(\n  items: T[],\n  clave: (item: T) => K,\n): Record<K, T[]> {\n  // tu codigo aqui\n  return {} as Record<K, T[]>\n}",
       tiempoLimiteSeg: 60,
@@ -1067,7 +1068,7 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     {
       lenguaje: "python",
       enunciado:
-        "Implementa `contar_palabras(texto)` que devuelva un dict con la frecuencia de cada palabra (lowercase). Ignora signos de puntuacion basicos (.,;:!?). Si el texto es vacio o None, devuelve {}.",
+        "<p>Implementa <code>contar_palabras(texto)</code> que devuelva un <strong>dict</strong> con la frecuencia de cada palabra del texto.</p><p>Reglas de normalización:</p><ul><li>Todo en <em>minúsculas</em>: <code>\"Hola HOLA\"</code> cuenta <code>{'hola': 2}</code>.</li><li>Ignora signos de puntuación básicos: <code>.</code> <code>,</code> <code>;</code> <code>:</code> <code>!</code> <code>?</code></li><li>Si el texto es vacío o <code>None</code>, devuelve <code>{}</code>.</li></ul><p><em>Pista:</em> el módulo <code>re</code> de la stdlib te ahorra trabajo con la puntuación.</p>",
       esqueletoInicial: "def contar_palabras(texto):\n    # tu codigo aqui\n    return {}",
       tiempoLimiteSeg: 60,
     },
