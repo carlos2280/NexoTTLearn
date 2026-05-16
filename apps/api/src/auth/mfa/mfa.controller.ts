@@ -98,7 +98,10 @@ export class MfaController {
 
     req.session.usuarioId = perfil.usuarioId
     req.session.rol = perfil.rol
-    emitirCsrfToken(req, res, { cookieSecure: this.config.get("COOKIE_SECURE", { infer: true }) })
+    emitirCsrfToken(req, res, {
+      cookieSecure: this.config.get("COOKIE_SECURE", { infer: true }),
+      cookieSameSite: this.config.get("COOKIE_SAMESITE", { infer: true }),
+    })
 
     await new Promise<void>((resolve, reject) => {
       req.session.save((err: unknown) => {
