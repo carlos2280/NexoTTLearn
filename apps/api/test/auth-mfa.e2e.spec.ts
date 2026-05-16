@@ -338,8 +338,12 @@ async function crearUsuarioConMfaActivo(
   })
   // otplib v13 exige >=16 bytes (128 bits) — default 20 bytes lo cumple.
   const secret = generateSecret()
-  // Cifrar usando el mismo CifradoService que la app (importado del dist).
-  const cifradoModule = (await import("../dist/common/crypto/cifrado.service.js")) as {
+  // Cifrar usando el mismo CifradoService que la app (importado del dist
+  // compilado). El path se arma como variable para que TypeScript no intente
+  // resolverlo estaticamente — el typecheck corre antes del build en CI y
+  // dist/ aun no existe; en runtime los e2e si requieren dist/ (DIST_DISPONIBLE).
+  const cifradoServicePath = join(DIST_DIR, "common", "crypto", "cifrado.service.js")
+  const cifradoModule = (await import(cifradoServicePath)) as {
     // biome-ignore lint/style/useNamingConvention: reflejamos el nombre exportado por el modulo (clase Nest).
     CifradoService: new (
       config: unknown,
