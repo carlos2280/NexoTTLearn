@@ -1,5 +1,6 @@
 import type {
   CursoDisponibleVoluntario,
+  FichaResponse,
   MeBandejaResponse,
   MeCursoResumen,
   NotificacionBadgeResponse,
@@ -10,6 +11,7 @@ import { type MockRequest, defineRoute } from "./router"
 
 const RTE_ME_BANDEJA = /^\/me\/bandeja$/
 const RTE_ME_CURSOS = /^\/me\/cursos(\?.*)?$/
+const RTE_ME_FICHA = /^\/me\/ficha$/
 const RTE_ME_FICHA_RESUMEN = /^\/me\/ficha\/resumen$/
 const RTE_NOTIFICACIONES_BADGE = /^\/notificaciones\/badge$/
 const RTE_NOTIFICACIONES = /^\/notificaciones(\?.*)?$/
@@ -342,6 +344,166 @@ function handlerMeBandeja(_req: MockRequest): MeBandejaResponse {
   }
 }
 
+// Mock de `GET /me/ficha` para la pantalla 07 "Mi ficha" (refundado).
+// 6 areas con actividad (frontend, backend, cloud, data, devops, soft) + 2 sin
+// actividad (mobile, qa). F2 anadira `nivelCualitativo` por area; F3 anadira
+// `skillsCatalogo` para la seccion "Por explorar"; F4 anadira historial.
+function handlerMeFicha(_req: MockRequest): FichaResponse {
+  return {
+    colaboradorId: "u-part",
+    porArea: [
+      {
+        areaId: "area-frontend",
+        nombre: "Frontend",
+        promedio: 74,
+        skillsConNota: 2,
+        skillsTotales: 2,
+      },
+      {
+        areaId: "area-backend",
+        nombre: "Backend",
+        promedio: 88,
+        skillsConNota: 3,
+        skillsTotales: 3,
+      },
+      {
+        areaId: "area-cloud",
+        nombre: "Cloud",
+        promedio: 56,
+        skillsConNota: 1,
+        skillsTotales: 1,
+      },
+      {
+        areaId: "area-data",
+        nombre: "Data",
+        promedio: 62,
+        skillsConNota: 1,
+        skillsTotales: 1,
+      },
+      {
+        areaId: "area-devops",
+        nombre: "DevOps",
+        promedio: 48,
+        skillsConNota: 1,
+        skillsTotales: 1,
+      },
+      {
+        areaId: "area-soft",
+        nombre: "Soft Skills",
+        promedio: 72,
+        skillsConNota: 2,
+        skillsTotales: 2,
+      },
+      {
+        areaId: "area-mobile",
+        nombre: "Mobile",
+        promedio: null,
+        skillsConNota: 0,
+        skillsTotales: 0,
+      },
+      {
+        areaId: "area-qa",
+        nombre: "QA",
+        promedio: null,
+        skillsConNota: 0,
+        skillsTotales: 0,
+      },
+    ],
+    skills: [
+      {
+        skillId: "sk-be-django",
+        etiquetaVisible: "Django REST Framework",
+        areaId: "area-backend",
+        areaNombre: "Backend",
+        notaActual: 86,
+        origenActual: { tipo: "BLOQUE", cursoTitulo: "AMS Backend" },
+        fechaUltimoCambio: diasDesdeHoy(-3),
+      },
+      {
+        skillId: "sk-fe-react",
+        etiquetaVisible: "React Hooks",
+        areaId: "area-frontend",
+        areaNombre: "Frontend",
+        notaActual: 78,
+        origenActual: { tipo: "BLOQUE", cursoTitulo: "Fundamentos Full-Stack & DevOps" },
+        fechaUltimoCambio: diasDesdeHoy(-5),
+      },
+      {
+        skillId: "sk-be-fastapi",
+        etiquetaVisible: "FastAPI",
+        areaId: "area-backend",
+        areaNombre: "Backend",
+        notaActual: 92,
+        origenActual: { tipo: "ENTREVISTA_INICIAL" },
+        fechaUltimoCambio: diasDesdeHoy(-60),
+      },
+      {
+        skillId: "sk-fe-ts",
+        etiquetaVisible: "TypeScript avanzado",
+        areaId: "area-frontend",
+        areaNombre: "Frontend",
+        notaActual: 70,
+        origenActual: { tipo: "ENTREVISTA_INICIAL" },
+        fechaUltimoCambio: diasDesdeHoy(-65),
+      },
+      {
+        skillId: "sk-be-python",
+        etiquetaVisible: "Python avanzado",
+        areaId: "area-backend",
+        areaNombre: "Backend",
+        notaActual: 86,
+        origenActual: { tipo: "ENTREVISTA_INICIAL" },
+        fechaUltimoCambio: diasDesdeHoy(-90),
+      },
+      {
+        skillId: "sk-cl-azure",
+        etiquetaVisible: "Azure App Service",
+        areaId: "area-cloud",
+        areaNombre: "Cloud",
+        notaActual: 56,
+        origenActual: { tipo: "TRANSVERSAL" },
+        fechaUltimoCambio: diasDesdeHoy(-22),
+      },
+      {
+        skillId: "sk-da-sql",
+        etiquetaVisible: "SQL analitico",
+        areaId: "area-data",
+        areaNombre: "Data",
+        notaActual: 62,
+        origenActual: { tipo: "BLOQUE", cursoTitulo: "AMS Backend" },
+        fechaUltimoCambio: diasDesdeHoy(-40),
+      },
+      {
+        skillId: "sk-dv-docker",
+        etiquetaVisible: "Docker basico",
+        areaId: "area-devops",
+        areaNombre: "DevOps",
+        notaActual: 48,
+        origenActual: { tipo: "BLOQUE", cursoTitulo: "Fundamentos Full-Stack & DevOps" },
+        fechaUltimoCambio: diasDesdeHoy(-14),
+      },
+      {
+        skillId: "sk-sf-comu",
+        etiquetaVisible: "Comunicacion tecnica",
+        areaId: "area-soft",
+        areaNombre: "Soft Skills",
+        notaActual: 74,
+        origenActual: { tipo: "ENTREVISTA_INICIAL" },
+        fechaUltimoCambio: diasDesdeHoy(-120),
+      },
+      {
+        skillId: "sk-sf-trabajo",
+        etiquetaVisible: "Trabajo en equipo",
+        areaId: "area-soft",
+        areaNombre: "Soft Skills",
+        notaActual: 70,
+        origenActual: { tipo: "ENTREVISTA_INICIAL" },
+        fechaUltimoCambio: diasDesdeHoy(-120),
+      },
+    ],
+  }
+}
+
 // TODO B-3: backend debe implementar `GET /me/ficha/resumen` con el shape
 // definido en el_viaje_colaborador.md.
 function handlerMeFichaResumen(_req: MockRequest): MockFichaResumenResponse {
@@ -473,6 +635,7 @@ function handlerMarcarTodasLeidas(): void {
 export const handlersParticipante = [
   defineRoute("GET", RTE_ME_BANDEJA, handlerMeBandeja),
   defineRoute("GET", RTE_ME_CURSOS, handlerMeCursos),
+  defineRoute("GET", RTE_ME_FICHA, handlerMeFicha),
   defineRoute("GET", RTE_ME_FICHA_RESUMEN, handlerMeFichaResumen),
   defineRoute("GET", RTE_NOTIFICACIONES_BADGE, handlerNotificacionesBadge),
   defineRoute("GET", RTE_NOTIFICACIONES, handlerNotificaciones),

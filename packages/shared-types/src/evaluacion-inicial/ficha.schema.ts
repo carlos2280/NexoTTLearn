@@ -28,6 +28,9 @@ export interface FichaSkillItem {
   readonly areaNombre: string
   readonly notaActual: number | null
   readonly origenActual: Record<string, unknown> | null
+  // TODO B-23: backend debe devolver la fecha del ultimo cambio de nota por
+  // skill para la pantalla "Mi ficha" (hero "Ultima habilidad" + drill-down).
+  readonly fechaUltimoCambio?: string | null
 }
 
 export interface FichaPorAreaItem {
