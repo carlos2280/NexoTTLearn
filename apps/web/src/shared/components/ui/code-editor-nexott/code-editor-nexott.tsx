@@ -20,6 +20,13 @@ interface CodeEditorNexottProps {
    * se aceptan ediciones. Si está activo, `onValueChange` es ignorado.
    */
   readonly readOnly?: boolean
+  /**
+   * Muestra un gutter de números de línea a la izquierda del editor.
+   * Usado en retos de código (CODIGO_PREGUNTAS) para alinear con el
+   * "look IDE" que el participante espera. Por defecto desactivado para no
+   * añadir ruido en CODIGO_ILUSTRATIVO ni en editores compactos del admin.
+   */
+  readonly mostrarNumerosLinea?: boolean
 }
 
 /**
@@ -52,11 +59,13 @@ export function CodeEditorNexott({
   id,
   className,
   readOnly = false,
+  mostrarNumerosLinea = false,
 }: CodeEditorNexottProps) {
   const etiquetaLenguaje = lenguaje ? (LENGUAJE_LABEL[lenguaje] ?? lenguaje) : null
   const mostrarTab = !compacto && etiquetaLenguaje !== null
   const lang = lenguaje ?? "otro"
   const minHeight = `${Math.max(1, rows) * 1.65}em`
+  const padding = compacto ? 12 : 16
 
   return (
     <div
@@ -84,28 +93,71 @@ export function CodeEditorNexott({
           ) : null}
         </div>
       ) : null}
-      <Editor
-        value={value}
-        onValueChange={onValueChange ?? noop}
-        highlight={(code) => highlightCodigo(code, lang)}
-        padding={compacto ? 12 : 16}
-        textareaId={id}
-        placeholder={placeholder}
-        tabSize={2}
-        insertSpaces={true}
-        disabled={readOnly}
-        style={{
-          fontFamily:
-            'var(--font-mono, ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace)',
-          fontSize: 13,
-          lineHeight: 1.65,
-          minHeight,
-          color: "var(--color-syntax-variable)",
-          caretColor: readOnly ? "transparent" : "var(--color-code-cursor)",
-          fontVariantLigatures: "common-ligatures",
-        }}
-        textareaClassName="nx-code-textarea"
-      />
+      <div className="flex">
+        {mostrarNumerosLinea ? <NumerosLinea valor={value} padding={padding} /> : null}
+        <div className="min-w-0 flex-1">
+          <Editor
+            value={value}
+            onValueChange={onValueChange ?? noop}
+            highlight={(code) => highlightCodigo(code, lang)}
+            padding={padding}
+            textareaId={id}
+            placeholder={placeholder}
+            tabSize={2}
+            insertSpaces={true}
+            disabled={readOnly}
+            style={{
+              fontFamily:
+                'var(--font-mono, ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace)',
+              fontSize: 13,
+              lineHeight: 1.65,
+              minHeight,
+              color: "var(--color-syntax-variable)",
+              caretColor: readOnly ? "transparent" : "var(--color-code-cursor)",
+              fontVariantLigatures: "common-ligatures",
+            }}
+            textareaClassName="nx-code-textarea"
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface NumerosLineaProps {
+  readonly valor: string
+  readonly padding: number
+}
+
+/**
+ * Gutter de números de línea alineado verticalmente con el textarea del
+ * editor. Comparte font-size, line-height y padding-top con `<Editor>` para
+ * que cada número quede a la altura exacta de su línea de código.
+ *
+ * `user-select: none` evita que los números se copien al hacer Ctrl+A. El
+ * borde derecho es la separación visual con el código (mismo color que el
+ * borde exterior del editor).
+ */
+function NumerosLinea({ valor, padding }: NumerosLineaProps) {
+  const totalLineas = Math.max(1, valor.split("\n").length)
+  return (
+    <div
+      aria-hidden={true}
+      className="select-none border-[color:var(--color-code-border)] border-r font-mono text-[color:var(--color-code-line-number)]"
+      style={{
+        fontSize: 13,
+        lineHeight: 1.65,
+        paddingTop: padding,
+        paddingBottom: padding,
+        paddingLeft: 12,
+        paddingRight: 10,
+        textAlign: "right",
+        minWidth: totalLineas >= 100 ? "3.5em" : "2.5em",
+      }}
+    >
+      {Array.from({ length: totalLineas }, (_, i) => (
+        <div key={`ln-${i + 1}`}>{i + 1}</div>
+      ))}
     </div>
   )
 }
