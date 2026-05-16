@@ -10,6 +10,7 @@ import { AccionAuditoria, ModoEntregaPassword, Prisma } from "@prisma/client"
 import bcrypt from "bcrypt"
 import { AuditLogService } from "../common/audit/audit-log.service"
 import { ContextoHttpAuditoria } from "../common/audit/audit-log.types"
+import { FACTOR_BCRYPT } from "../common/auth/bcrypt.constants"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { AltaColaboradorResponse, SELECT_COLABORADOR_ADMIN } from "./colaboradores.types"
@@ -17,7 +18,6 @@ import { generarPasswordSegura } from "./password-generator"
 
 type ColaboradorAdminRow = Prisma.ColaboradorGetPayload<{ select: typeof SELECT_COLABORADOR_ADMIN }>
 
-const FACTOR_BCRYPT = 12
 const DIAS_CADUCIDAD_PASSWORD_INICIAL = 7
 const MS_POR_DIA = 24 * 60 * 60 * 1000
 
