@@ -45,6 +45,7 @@ export interface PerfilSesion {
 export interface LoginResponseSinMfa {
   readonly mfaRequired: false
   readonly perfil: PerfilSesion
+  readonly csrfToken: string
 }
 
 export interface LoginResponseConMfa {
