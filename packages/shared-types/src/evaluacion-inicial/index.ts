@@ -3,6 +3,7 @@ export type {
   OrigenNotaSkill,
   NivelCualitativoArea,
   FichaSkillItem,
+  FichaSkillCatalogoItem,
   FichaPorAreaItem,
   FichaResponse,
   EntradaHistoricoNotaSkill,

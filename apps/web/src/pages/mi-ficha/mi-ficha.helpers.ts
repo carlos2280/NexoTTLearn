@@ -1,6 +1,12 @@
-import type { FichaPorAreaItem, FichaSkillItem } from "@nexott-learn/shared-types"
+import type {
+  FichaPorAreaItem,
+  FichaSkillItem,
+  NivelCualitativoArea,
+} from "@nexott-learn/shared-types"
 
 const UMBRAL_SOLIDO = 70
+const UMBRAL_EXCELENCIA = 85
+const UMBRAL_EN_DESARROLLO = 50
 
 export interface UltimaSkill {
   readonly nombre: string
@@ -70,6 +76,76 @@ export function sufijoNarrativo(args: {
     return ", tu camino se esta consolidando."
   }
   return ", estas construyendo tu camino."
+}
+
+// Nivel cualitativo derivado de una nota individual (skill). Mismas franjas
+// que la heuristica temporal de areas, pero a nivel skill: 85+ excelencia,
+// 70+ solido, 50+ enDesarrollo, otra inicial, null sinTocar.
+export function nivelDeNotaSkill(nota: number | null): NivelCualitativoArea {
+  if (nota === null) {
+    return "sinTocar"
+  }
+  if (nota >= UMBRAL_EXCELENCIA) {
+    return "excelencia"
+  }
+  if (nota >= UMBRAL_SOLIDO) {
+    return "solido"
+  }
+  if (nota >= UMBRAL_EN_DESARROLLO) {
+    return "enDesarrollo"
+  }
+  return "inicial"
+}
+
+const ETIQUETA_NIVEL_SKILL: Record<NivelCualitativoArea, string> = {
+  excelencia: "Excelencia",
+  solido: "Solido",
+  enDesarrollo: "En desarrollo",
+  inicial: "Inicial",
+  sinTocar: "Sin demostrar",
+}
+
+export function etiquetaNivelSkill(nivel: NivelCualitativoArea): string {
+  return ETIQUETA_NIVEL_SKILL[nivel]
+}
+
+const ETIQUETA_NIVEL_AREA: Record<NivelCualitativoArea, string> = {
+  excelencia: "Excelencia",
+  solido: "Solido",
+  enDesarrollo: "En desarrollo",
+  inicial: "Inicial",
+  sinTocar: "Por explorar",
+}
+
+export function etiquetaNivelArea(nivel: NivelCualitativoArea): string {
+  return ETIQUETA_NIVEL_AREA[nivel]
+}
+
+// Origen narrativo de una skill — "Demostrada en el curso X" en vez de un tag
+// crudo del enum. Combinado con la fecha relativa por el componente.
+export function origenNarrativo(origen: Record<string, unknown> | null): string {
+  if (!origen) {
+    return "Sin evidencia registrada"
+  }
+  const tipo = typeof origen.tipo === "string" ? origen.tipo : null
+  const cursoTitulo = typeof origen.cursoTitulo === "string" ? origen.cursoTitulo : null
+  const proyectoTitulo = typeof origen.proyectoTitulo === "string" ? origen.proyectoTitulo : null
+  switch (tipo) {
+    case "ENTREVISTA_INICIAL":
+      return "Demostrada en la entrevista inicial"
+    case "BLOQUE":
+      return cursoTitulo ? `Demostrada en el curso "${cursoTitulo}"` : "Demostrada en un bloque"
+    case "TRANSVERSAL":
+      return proyectoTitulo
+        ? `Demostrada en el proyecto "${proyectoTitulo}"`
+        : "Demostrada en un proyecto transversal"
+    case "ENTREVISTA_IA":
+      return "Demostrada en una entrevista IA"
+    case "MANUAL":
+      return "Ajuste manual del equipo"
+    default:
+      return "Demostrada"
+  }
 }
 
 const DIA_MS = 24 * 60 * 60 * 1000

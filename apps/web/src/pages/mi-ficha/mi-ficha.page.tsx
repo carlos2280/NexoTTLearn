@@ -1,23 +1,33 @@
 import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
 import { useMiFicha } from "@/features/me/hooks/use-mi-ficha"
 import { Banner } from "@/shared/components/ui/banner"
-import { useMemo } from "react"
-import { FichaGrupoArea } from "./components/ficha-grupo-area"
+import { useState } from "react"
+import { DetalleArea } from "./components/detalle-area"
+import { DrawerHistorico } from "./components/drawer-historico"
 import { FichaSkeleton } from "./components/ficha-skeleton"
 import { HeroViaje } from "./components/hero-viaje"
 import { TuMapa } from "./components/tu-mapa"
-import { agruparPorArea } from "./mi-ficha.types"
+
+interface HistoricoState {
+  readonly skillId: string
+  readonly skillNombre: string
+}
 
 export function MiFichaPage() {
   const { data, isLoading, error } = useMiFicha()
   const { data: usuario } = useUsuarioActual()
+  const [areaExpandidaId, setAreaExpandidaId] = useState<string | null>(null)
+  const [historico, setHistorico] = useState<HistoricoState | null>(null)
 
-  const grupos = useMemo(() => {
-    if (!data) {
-      return []
-    }
-    return agruparPorArea(data.skills, data.porArea)
-  }, [data])
+  const areaExpandida = data?.porArea.find((a) => a.areaId === areaExpandidaId) ?? null
+
+  const handleAreaClick = (areaId: string) => {
+    setAreaExpandidaId((prev) => (prev === areaId ? null : areaId))
+  }
+
+  const handleAbrirHistorico = (skillId: string, skillNombre: string) => {
+    setHistorico({ skillId, skillNombre })
+  }
 
   return (
     <div className="flex flex-col gap-12">
@@ -33,29 +43,24 @@ export function MiFichaPage() {
         </Banner>
       ) : null}
 
-      {data && grupos.length === 0 ? (
-        <Banner tone="neutral">
-          Aun no hay skills registradas en tu ficha. Se iran completando a medida que avances.
-        </Banner>
+      {data ? <TuMapa porArea={data.porArea} onAreaClick={handleAreaClick} /> : null}
+
+      {data && areaExpandida ? (
+        <DetalleArea
+          area={areaExpandida}
+          skills={data.skills}
+          onCerrar={() => setAreaExpandidaId(null)}
+          onAbrirHistorico={handleAbrirHistorico}
+        />
       ) : null}
 
-      {data ? <TuMapa porArea={data.porArea} /> : null}
-
-      {/* TODO F3: reemplazar FichaGrupoArea por acordeon inline + drawer historico. */}
-      {/* TODO F4: anadir "Tu historial" cronologico al final. */}
-      {data && grupos.length > 0 ? (
-        <section
-          className="flex flex-col gap-10 border-border border-t pt-10 opacity-90"
-          aria-label="Vista anterior — se reemplaza en F3"
-        >
-          <p className="nx-eyebrow text-text-tertiary">Vista anterior (legacy)</p>
-          <div className="flex flex-col gap-10">
-            {grupos.map((grupo) => (
-              <FichaGrupoArea key={grupo.areaId} grupo={grupo} />
-            ))}
-          </div>
-        </section>
-      ) : null}
+      <DrawerHistorico
+        abierto={historico !== null}
+        onCerrar={() => setHistorico(null)}
+        colaboradorId={usuario?.colaboradorId}
+        skillId={historico?.skillId ?? null}
+        skillNombre={historico?.skillNombre ?? null}
+      />
     </div>
   )
 }

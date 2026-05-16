@@ -1,5 +1,6 @@
 import type {
   CursoDisponibleVoluntario,
+  EntradaHistoricoNotaSkill,
   FichaResponse,
   MeBandejaResponse,
   MeCursoResumen,
@@ -13,6 +14,8 @@ const RTE_ME_BANDEJA = /^\/me\/bandeja$/
 const RTE_ME_CURSOS = /^\/me\/cursos(\?.*)?$/
 const RTE_ME_FICHA = /^\/me\/ficha$/
 const RTE_ME_FICHA_RESUMEN = /^\/me\/ficha\/resumen$/
+const RTE_HISTORICO_SKILL = /^\/colaboradores\/[^/]+\/ficha\/skills\/[^/]+\/historico$/
+const RGX_HISTORICO_SKILL = /^\/colaboradores\/[^/]+\/ficha\/skills\/([^/]+)\/historico$/
 const RTE_NOTIFICACIONES_BADGE = /^\/notificaciones\/badge$/
 const RTE_NOTIFICACIONES = /^\/notificaciones(\?.*)?$/
 const RTE_NOTIFICACION_MARCAR_LEIDA = /^\/notificaciones\/[^/]+\/marcar-leida$/
@@ -357,64 +360,109 @@ function handlerMeFicha(_req: MockRequest): FichaResponse {
         nombre: "Frontend",
         promedio: 74,
         skillsConNota: 2,
-        skillsTotales: 2,
+        skillsTotales: 4,
         nivelCualitativo: "solido",
+        skillsCatalogo: [
+          { skillId: "sk-fe-react", etiquetaVisible: "React Hooks" },
+          { skillId: "sk-fe-ts", etiquetaVisible: "TypeScript avanzado" },
+          { skillId: "sk-fe-css", etiquetaVisible: "CSS moderno" },
+          { skillId: "sk-fe-perf", etiquetaVisible: "Performance web" },
+        ],
       },
       {
         areaId: "area-backend",
         nombre: "Backend",
         promedio: 88,
         skillsConNota: 3,
-        skillsTotales: 3,
+        skillsTotales: 5,
         nivelCualitativo: "excelencia",
+        skillsCatalogo: [
+          { skillId: "sk-be-django", etiquetaVisible: "Django REST Framework" },
+          { skillId: "sk-be-fastapi", etiquetaVisible: "FastAPI" },
+          { skillId: "sk-be-python", etiquetaVisible: "Python avanzado" },
+          { skillId: "sk-be-graphql", etiquetaVisible: "GraphQL" },
+          { skillId: "sk-be-grpc", etiquetaVisible: "gRPC" },
+        ],
       },
       {
         areaId: "area-cloud",
         nombre: "Cloud",
         promedio: 56,
         skillsConNota: 1,
-        skillsTotales: 1,
+        skillsTotales: 3,
         nivelCualitativo: "enDesarrollo",
+        skillsCatalogo: [
+          { skillId: "sk-cl-azure", etiquetaVisible: "Azure App Service" },
+          { skillId: "sk-cl-functions", etiquetaVisible: "Azure Functions" },
+          { skillId: "sk-cl-storage", etiquetaVisible: "Storage Accounts" },
+        ],
       },
       {
         areaId: "area-data",
         nombre: "Data",
         promedio: 62,
         skillsConNota: 1,
-        skillsTotales: 1,
+        skillsTotales: 3,
         nivelCualitativo: "enDesarrollo",
+        skillsCatalogo: [
+          { skillId: "sk-da-sql", etiquetaVisible: "SQL analitico" },
+          { skillId: "sk-da-etl", etiquetaVisible: "ETL con Python" },
+          { skillId: "sk-da-bi", etiquetaVisible: "Modelado para BI" },
+        ],
       },
       {
         areaId: "area-devops",
         nombre: "DevOps",
         promedio: 48,
         skillsConNota: 1,
-        skillsTotales: 1,
+        skillsTotales: 4,
         nivelCualitativo: "inicial",
+        skillsCatalogo: [
+          { skillId: "sk-dv-docker", etiquetaVisible: "Docker basico" },
+          { skillId: "sk-dv-ci", etiquetaVisible: "CI/CD con GitHub Actions" },
+          { skillId: "sk-dv-iac", etiquetaVisible: "Infra como codigo" },
+          { skillId: "sk-dv-obs", etiquetaVisible: "Observabilidad" },
+        ],
       },
       {
         areaId: "area-soft",
         nombre: "Soft Skills",
         promedio: 72,
         skillsConNota: 2,
-        skillsTotales: 2,
+        skillsTotales: 4,
         nivelCualitativo: "solido",
+        skillsCatalogo: [
+          { skillId: "sk-sf-comu", etiquetaVisible: "Comunicacion tecnica" },
+          { skillId: "sk-sf-trabajo", etiquetaVisible: "Trabajo en equipo" },
+          { skillId: "sk-sf-mentoria", etiquetaVisible: "Mentoria" },
+          { skillId: "sk-sf-cliente", etiquetaVisible: "Trato con cliente" },
+        ],
       },
       {
         areaId: "area-mobile",
         nombre: "Mobile",
         promedio: null,
         skillsConNota: 0,
-        skillsTotales: 0,
+        skillsTotales: 3,
         nivelCualitativo: "sinTocar",
+        skillsCatalogo: [
+          { skillId: "sk-mo-rn", etiquetaVisible: "React Native" },
+          { skillId: "sk-mo-flutter", etiquetaVisible: "Flutter" },
+          { skillId: "sk-mo-uxmovil", etiquetaVisible: "UX movil" },
+        ],
       },
       {
         areaId: "area-qa",
         nombre: "QA",
         promedio: null,
         skillsConNota: 0,
-        skillsTotales: 0,
+        skillsTotales: 3,
         nivelCualitativo: "sinTocar",
+        skillsCatalogo: [
+          { skillId: "sk-qa-unit", etiquetaVisible: "Tests unitarios" },
+          { skillId: "sk-qa-e2e", etiquetaVisible: "Tests E2E" },
+          { skillId: "sk-qa-cypress", etiquetaVisible: "Cypress / Playwright" },
+        ],
       },
     ],
     skills: [
@@ -510,6 +558,137 @@ function handlerMeFicha(_req: MockRequest): FichaResponse {
       },
     ],
   }
+}
+
+// Mock de `GET /colaboradores/:id/ficha/skills/:skillId/historico`.
+// Devuelve un historico determinista por `skillId`. Si el skillId no aparece,
+// se devuelve un historico vacio (skill aun no demostrada).
+function handlerHistoricoSkill(req: MockRequest): readonly EntradaHistoricoNotaSkill[] {
+  const match = req.path.match(RGX_HISTORICO_SKILL)
+  if (!match) {
+    return []
+  }
+  const skillId = match[1] ?? ""
+  return HISTORICO_POR_SKILL[skillId] ?? []
+}
+
+const HISTORICO_POR_SKILL: Readonly<Record<string, readonly EntradaHistoricoNotaSkill[]>> = {
+  "sk-be-django": [
+    {
+      id: "hist-django-2",
+      fecha: diasDesdeHoy(-3),
+      valor: 86,
+      origen: "BLOQUE",
+      referencia: { cursoTitulo: "AMS Backend", bloqueTitulo: "REST con Django" },
+      autorUsuarioId: null,
+    },
+    {
+      id: "hist-django-1",
+      fecha: diasDesdeHoy(-95),
+      valor: 72,
+      origen: "ENTREVISTA_INICIAL",
+      referencia: null,
+      autorUsuarioId: null,
+    },
+  ],
+  "sk-be-fastapi": [
+    {
+      id: "hist-fastapi-1",
+      fecha: diasDesdeHoy(-60),
+      valor: 92,
+      origen: "ENTREVISTA_INICIAL",
+      referencia: null,
+      autorUsuarioId: null,
+    },
+  ],
+  "sk-be-python": [
+    {
+      id: "hist-python-1",
+      fecha: diasDesdeHoy(-90),
+      valor: 86,
+      origen: "ENTREVISTA_INICIAL",
+      referencia: null,
+      autorUsuarioId: null,
+    },
+  ],
+  "sk-fe-react": [
+    {
+      id: "hist-react-2",
+      fecha: diasDesdeHoy(-5),
+      valor: 78,
+      origen: "BLOQUE",
+      referencia: { cursoTitulo: "Fundamentos Full-Stack & DevOps" },
+      autorUsuarioId: null,
+    },
+    {
+      id: "hist-react-1",
+      fecha: diasDesdeHoy(-110),
+      valor: 60,
+      origen: "ENTREVISTA_INICIAL",
+      referencia: null,
+      autorUsuarioId: null,
+    },
+  ],
+  "sk-fe-ts": [
+    {
+      id: "hist-ts-1",
+      fecha: diasDesdeHoy(-65),
+      valor: 70,
+      origen: "ENTREVISTA_INICIAL",
+      referencia: null,
+      autorUsuarioId: null,
+    },
+  ],
+  "sk-cl-azure": [
+    {
+      id: "hist-azure-1",
+      fecha: diasDesdeHoy(-22),
+      valor: 56,
+      origen: "TRANSVERSAL",
+      referencia: { proyectoTitulo: "Migracion AMS" },
+      autorUsuarioId: null,
+    },
+  ],
+  "sk-da-sql": [
+    {
+      id: "hist-sql-1",
+      fecha: diasDesdeHoy(-40),
+      valor: 62,
+      origen: "BLOQUE",
+      referencia: { cursoTitulo: "AMS Backend" },
+      autorUsuarioId: null,
+    },
+  ],
+  "sk-dv-docker": [
+    {
+      id: "hist-docker-1",
+      fecha: diasDesdeHoy(-14),
+      valor: 48,
+      origen: "BLOQUE",
+      referencia: { cursoTitulo: "Fundamentos Full-Stack & DevOps" },
+      autorUsuarioId: null,
+    },
+  ],
+  "sk-sf-comu": [
+    {
+      id: "hist-comu-1",
+      fecha: diasDesdeHoy(-120),
+      valor: 74,
+      origen: "ENTREVISTA_INICIAL",
+      referencia: null,
+      autorUsuarioId: null,
+    },
+  ],
+  "sk-sf-trabajo": [
+    {
+      id: "hist-trabajo-1",
+      fecha: diasDesdeHoy(-120),
+      valor: 70,
+      origen: "ENTREVISTA_INICIAL",
+      referencia: null,
+      autorUsuarioId: null,
+    },
+  ],
 }
 
 // TODO B-3: backend debe implementar `GET /me/ficha/resumen` con el shape
@@ -644,6 +823,7 @@ export const handlersParticipante = [
   defineRoute("GET", RTE_ME_BANDEJA, handlerMeBandeja),
   defineRoute("GET", RTE_ME_CURSOS, handlerMeCursos),
   defineRoute("GET", RTE_ME_FICHA, handlerMeFicha),
+  defineRoute("GET", RTE_HISTORICO_SKILL, handlerHistoricoSkill),
   defineRoute("GET", RTE_ME_FICHA_RESUMEN, handlerMeFichaResumen),
   defineRoute("GET", RTE_NOTIFICACIONES_BADGE, handlerNotificacionesBadge),
   defineRoute("GET", RTE_NOTIFICACIONES, handlerNotificaciones),

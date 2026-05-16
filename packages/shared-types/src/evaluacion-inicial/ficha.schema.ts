@@ -42,6 +42,15 @@ export interface FichaSkillItem {
  */
 export type NivelCualitativoArea = "excelencia" | "solido" | "enDesarrollo" | "inicial" | "sinTocar"
 
+/**
+ * Skill del catalogo del area (demostrada o no), usada en la pantalla
+ * "Mi ficha" para listar las habilidades "Por explorar" dentro de cada area.
+ */
+export interface FichaSkillCatalogoItem {
+  readonly skillId: string
+  readonly etiquetaVisible: string
+}
+
 export interface FichaPorAreaItem {
   readonly areaId: string
   readonly nombre: string
@@ -52,6 +61,10 @@ export interface FichaPorAreaItem {
   // del promedio y la distribucion de notas), para que el frontend no infiera
   // desde umbrales locales en la pantalla "Mi ficha".
   readonly nivelCualitativo?: NivelCualitativoArea
+  // TODO B-22: backend debe devolver el catalogo completo de skills del area
+  // (incluso las que el colaborador aun no ha demostrado), para la seccion
+  // "Por explorar" del acordeon en la pantalla "Mi ficha".
+  readonly skillsCatalogo?: readonly FichaSkillCatalogoItem[]
 }
 
 export interface FichaResponse {
