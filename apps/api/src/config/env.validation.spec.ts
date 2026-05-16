@@ -73,6 +73,41 @@ describe("validateEnv", () => {
     expect(env.ALLOWED_ORIGINS).toEqual(["https://app.example.com", "https://admin.example.com"])
   })
 
+  it("COOKIE_SAMESITE por defecto es lax", () => {
+    const env = validateEnv(buildEnv())
+    expect(env.COOKIE_SAMESITE).toBe("lax")
+  })
+
+  it("acepta COOKIE_SAMESITE=none cuando COOKIE_SECURE=true", () => {
+    const env = validateEnv(
+      buildEnv(
+        ["NODE_ENV", "production"],
+        ["COOKIE_SECURE", "true"],
+        ["COOKIE_SAMESITE", "none"],
+        ["ALLOWED_ORIGINS", "https://app.example.com"],
+        ["STORAGE_ROOT", "/data/nexott/storage"],
+      ),
+    )
+    expect(env.COOKIE_SAMESITE).toBe("none")
+  })
+
+  it("rechaza COOKIE_SAMESITE=none con COOKIE_SECURE=false en produccion", () => {
+    expect(() =>
+      validateEnv(
+        buildEnv(
+          ["NODE_ENV", "production"],
+          ["COOKIE_SECURE", "false"],
+          ["COOKIE_SAMESITE", "none"],
+          ["ALLOWED_ORIGINS", "https://app.example.com"],
+        ),
+      ),
+    ).toThrow(/COOKIE_SAMESITE|COOKIE_SECURE/)
+  })
+
+  it("rechaza COOKIE_SAMESITE con valor invalido", () => {
+    expect(() => validateEnv(buildEnv(["COOKIE_SAMESITE", "invalid"]))).toThrow(/COOKIE_SAMESITE/)
+  })
+
   it("rechaza SECRETS_ENCRYPTION_KEY con longitud distinta de 64", () => {
     expect(() => validateEnv(buildEnv(["SECRETS_ENCRYPTION_KEY", "a".repeat(63)]))).toThrow(
       /SECRETS_ENCRYPTION_KEY/,

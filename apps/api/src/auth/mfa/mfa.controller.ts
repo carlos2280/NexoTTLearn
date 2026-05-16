@@ -31,6 +31,7 @@ import { MfaSetupResponse } from "./mfa.types"
 
 interface MfaVerifyResponse {
   readonly perfil: PerfilSesion
+  readonly csrfToken: string
 }
 
 @Controller("auth/mfa")
@@ -98,7 +99,10 @@ export class MfaController {
 
     req.session.usuarioId = perfil.usuarioId
     req.session.rol = perfil.rol
-    emitirCsrfToken(req, res, { cookieSecure: this.config.get("COOKIE_SECURE", { infer: true }) })
+    const csrfToken = emitirCsrfToken(req, res, {
+      cookieSecure: this.config.get("COOKIE_SECURE", { infer: true }),
+      cookieSameSite: this.config.get("COOKIE_SAMESITE", { infer: true }),
+    })
 
     await new Promise<void>((resolve, reject) => {
       req.session.save((err: unknown) => {
@@ -110,7 +114,7 @@ export class MfaController {
       })
     })
 
-    return { perfil }
+    return { perfil, csrfToken }
   }
 
   @Delete()

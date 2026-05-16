@@ -1,7 +1,11 @@
 export { rolUsuarioSchema, perfilSesionSchema, AVISO_VIGENTE_VERSION } from "./auth/perfil.schema"
 export type { RolUsuario, PerfilSesion } from "./auth/perfil.schema"
-export { loginSchema, loginResponseSchema } from "./auth/login.schema"
-export type { LoginInput, LoginResponse } from "./auth/login.schema"
+export {
+  loginSchema,
+  loginResponseSchema,
+  mfaVerifyResponseSchema,
+} from "./auth/login.schema"
+export type { LoginInput, LoginResponse, MfaVerifyResponse } from "./auth/login.schema"
 export { cambiarPasswordSchema } from "./auth/cambiar-password.schema"
 export type { CambiarPasswordInput } from "./auth/cambiar-password.schema"
 export { aceptarAvisoPrivacidadSchema } from "./auth/aceptar-aviso.schema"

@@ -310,61 +310,68 @@ describe.runIf(RUN_E2E)("asignaciones transiciones e2e (P6b)", () => {
 
   // ===== Flujo completo asignado =====
 
-  it("flujo completo asignado: iniciar -> listo -> cerrar(APTO) -> reabrir -> cerrar(NO_APTO)", async () => {
-    await limpiarAsignacionesDelCurso(cursoSimpleId)
-    const asignacionId = await seedAsignado(colaboradorPart1Id, cursoSimpleId)
+  // Timeout extendido: este flujo ejecuta 6 mutaciones HTTP + lecturas y bajo
+  // carga del runner (vitest paralelo con ~125 specs) supera los 5s default
+  // por presion en el pool de conexiones Postgres. Aislado tarda ~2s.
+  it(
+    "flujo completo asignado: iniciar -> listo -> cerrar(APTO) -> reabrir -> cerrar(NO_APTO)",
+    { timeout: 20_000 },
+    async () => {
+      await limpiarAsignacionesDelCurso(cursoSimpleId)
+      const asignacionId = await seedAsignado(colaboradorPart1Id, cursoSimpleId)
 
-    // iniciar-progreso
-    const r1 = await agenteAdmin
-      .post(`/api/v1/asignaciones/${asignacionId}/iniciar-progreso`)
-      .set("X-XSRF-TOKEN", csrfAdmin)
-      .send({})
-    expect(r1.status).toBe(200)
-    expect((r1.body as { estadoAsignado: string }).estadoAsignado).toBe("EN_PROGRESO")
+      // iniciar-progreso
+      const r1 = await agenteAdmin
+        .post(`/api/v1/asignaciones/${asignacionId}/iniciar-progreso`)
+        .set("X-XSRF-TOKEN", csrfAdmin)
+        .send({})
+      expect(r1.status).toBe(200)
+      expect((r1.body as { estadoAsignado: string }).estadoAsignado).toBe("EN_PROGRESO")
 
-    // marcar-listo
-    const r2 = await agenteAdmin
-      .post(`/api/v1/asignaciones/${asignacionId}/marcar-listo`)
-      .set("X-XSRF-TOKEN", csrfAdmin)
-      .send({})
-    expect(r2.status).toBe(200)
-    expect((r2.body as { estadoAsignado: string }).estadoAsignado).toBe("LISTO")
+      // marcar-listo
+      const r2 = await agenteAdmin
+        .post(`/api/v1/asignaciones/${asignacionId}/marcar-listo`)
+        .set("X-XSRF-TOKEN", csrfAdmin)
+        .send({})
+      expect(r2.status).toBe(200)
+      expect((r2.body as { estadoAsignado: string }).estadoAsignado).toBe("LISTO")
 
-    // cerrar-caso APTO
-    const r3 = await agenteAdmin
-      .post(`/api/v1/asignaciones/${asignacionId}/cerrar-caso`)
-      .set("X-XSRF-TOKEN", csrfAdmin)
-      .set("Idempotency-Key", randomUUID())
-      .send({ resultado: "APTO" })
-    expect(r3.status).toBe(200)
-    expect((r3.body as { estadoAsignado: string }).estadoAsignado).toBe("APTO")
-    // Por default schema, resultadoEntrevistaCliente=PENDIENTE en ASIGNADO.
-    expect((r3.body as { resultadoEntrevistaCliente: string }).resultadoEntrevistaCliente).toBe(
-      "PENDIENTE",
-    )
+      // cerrar-caso APTO
+      const r3 = await agenteAdmin
+        .post(`/api/v1/asignaciones/${asignacionId}/cerrar-caso`)
+        .set("X-XSRF-TOKEN", csrfAdmin)
+        .set("Idempotency-Key", randomUUID())
+        .send({ resultado: "APTO" })
+      expect(r3.status).toBe(200)
+      expect((r3.body as { estadoAsignado: string }).estadoAsignado).toBe("APTO")
+      // Por default schema, resultadoEntrevistaCliente=PENDIENTE en ASIGNADO.
+      expect((r3.body as { resultadoEntrevistaCliente: string }).resultadoEntrevistaCliente).toBe(
+        "PENDIENTE",
+      )
 
-    // reabrir-caso
-    const r4 = await agenteAdmin
-      .post(`/api/v1/asignaciones/${asignacionId}/reabrir-caso`)
-      .set("X-XSRF-TOKEN", csrfAdmin)
-      .set("X-Motivo", "Cliente solicito revisar")
-      .set("Idempotency-Key", randomUUID())
-      .send({})
-    expect(r4.status).toBe(200)
-    expect((r4.body as { estadoAsignado: string }).estadoAsignado).toBe("EN_PROGRESO")
+      // reabrir-caso
+      const r4 = await agenteAdmin
+        .post(`/api/v1/asignaciones/${asignacionId}/reabrir-caso`)
+        .set("X-XSRF-TOKEN", csrfAdmin)
+        .set("X-Motivo", "Cliente solicito revisar")
+        .set("Idempotency-Key", randomUUID())
+        .send({})
+      expect(r4.status).toBe(200)
+      expect((r4.body as { estadoAsignado: string }).estadoAsignado).toBe("EN_PROGRESO")
 
-    // cerrar-caso NO_APTO
-    const r5 = await agenteAdmin
-      .post(`/api/v1/asignaciones/${asignacionId}/cerrar-caso`)
-      .set("X-XSRF-TOKEN", csrfAdmin)
-      .set("Idempotency-Key", randomUUID())
-      .send({ resultado: "NO_APTO" })
-    expect(r5.status).toBe(200)
-    expect((r5.body as { estadoAsignado: string }).estadoAsignado).toBe("NO_APTO")
+      // cerrar-caso NO_APTO
+      const r5 = await agenteAdmin
+        .post(`/api/v1/asignaciones/${asignacionId}/cerrar-caso`)
+        .set("X-XSRF-TOKEN", csrfAdmin)
+        .set("Idempotency-Key", randomUUID())
+        .send({ resultado: "NO_APTO" })
+      expect(r5.status).toBe(200)
+      expect((r5.body as { estadoAsignado: string }).estadoAsignado).toBe("NO_APTO")
 
-    const historico = await prisma.historicoEstadoAsignacion.count({ where: { asignacionId } })
-    expect(historico).toBeGreaterThanOrEqual(4)
-  })
+      const historico = await prisma.historicoEstadoAsignacion.count({ where: { asignacionId } })
+      expect(historico).toBeGreaterThanOrEqual(4)
+    },
+  )
 
   // ===== Flujo voluntario =====
 

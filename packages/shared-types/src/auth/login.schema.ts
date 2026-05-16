@@ -9,6 +9,17 @@ export const loginSchema = z.object({
 export const loginResponseSinMfaSchema = z.object({
   mfaRequired: z.literal(false),
   perfil: perfilSesionSchema,
+  // Token CSRF emitido tras `req.session.regenerate`. Se devuelve en el body
+  // porque cuando web y API viven en hostnames distintos (cross-site) el JS
+  // del frontend no puede leer la cookie `XSRF-TOKEN` via `document.cookie`
+  // (esta asociada al dominio de la API). El cliente lo guarda en memoria y
+  // lo reenvia en el header `X-XSRF-TOKEN` en cada mutacion.
+  csrfToken: z.string().min(1),
+})
+
+export const mfaVerifyResponseSchema = z.object({
+  perfil: perfilSesionSchema,
+  csrfToken: z.string().min(1),
 })
 
 export const loginResponseConMfaSchema = z.object({
@@ -23,3 +34,4 @@ export const loginResponseSchema = z.discriminatedUnion("mfaRequired", [
 
 export type LoginInput = z.infer<typeof loginSchema>
 export type LoginResponse = z.infer<typeof loginResponseSchema>
+export type MfaVerifyResponse = z.infer<typeof mfaVerifyResponseSchema>

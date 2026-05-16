@@ -82,7 +82,10 @@ export class AuthController {
 
     req.session.usuarioId = perfil.usuarioId
     req.session.rol = perfil.rol
-    emitirCsrfToken(req, res, { cookieSecure: this.config.get("COOKIE_SECURE", { infer: true }) })
+    const csrfToken = emitirCsrfToken(req, res, {
+      cookieSecure: this.config.get("COOKIE_SECURE", { infer: true }),
+      cookieSameSite: this.config.get("COOKIE_SAMESITE", { infer: true }),
+    })
 
     await new Promise<void>((resolve, reject) => {
       req.session.save((err: unknown) => {
@@ -94,7 +97,7 @@ export class AuthController {
       })
     })
 
-    return { mfaRequired: false, perfil }
+    return { mfaRequired: false, perfil, csrfToken }
   }
 
   @Get("me")
