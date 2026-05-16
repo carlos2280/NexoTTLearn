@@ -38,6 +38,7 @@ export function SkillDemostradaRow({ skill, onVerHistorico }: SkillDemostradaRow
         {skill.notaActual !== null ? (
           <span className="tabular font-mono text-caption text-text-tertiary">
             {skill.notaActual}
+            <span className="text-text-disabled">/100</span>
           </span>
         ) : null}
         <Button variant="link" size="sm" onClick={onVerHistorico}>

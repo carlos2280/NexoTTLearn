@@ -97,6 +97,18 @@ export function DetalleArea({ area, skills, onAbrirHistorico }: DetalleAreaProps
           </p>
         </div>
       ) : null}
+
+      {skillsDelArea.length > 0 ? (
+        <p className="border-border border-t pt-4 text-caption text-text-tertiary">
+          Niveles: <span className="text-text-secondary">Inicial</span> (&lt;50){" "}
+          <span className="text-text-disabled">·</span>{" "}
+          <span className="text-text-secondary">En desarrollo</span> (50–69){" "}
+          <span className="text-text-disabled">·</span>{" "}
+          <span className="text-text-secondary">Solido</span> (70–84){" "}
+          <span className="text-text-disabled">·</span>{" "}
+          <span className="text-text-secondary">Excelencia</span> (85+).
+        </p>
+      ) : null}
     </section>
   )
 }
