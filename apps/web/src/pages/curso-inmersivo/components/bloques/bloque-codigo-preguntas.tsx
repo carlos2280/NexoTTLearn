@@ -5,7 +5,7 @@ import {
   type ContenidoCodigoTests,
   contenidoCodigoPreguntasSchema,
 } from "@nexott-learn/shared-types"
-import { Play, RotateCcw } from "lucide-react"
+import { Play, RotateCcw, Send } from "lucide-react"
 import { Cabecera } from "./codigo-preguntas/cabecera"
 import { PanelEnunciado } from "./codigo-preguntas/panel-enunciado"
 import { ResultadoIntento } from "./codigo-preguntas/resultado-intento"
@@ -76,6 +76,11 @@ function RetoActivo({ bloqueId, cursoId, contenido, contenidoTests }: RetoActivo
   const flujo = useFlujoCodigoPregunta({ bloqueId, cursoId, contenido, contenidoTests })
   const isPending = flujo.isEjecutando || flujo.isEnviando
   const puedeReset = !isPending && flujo.codigo !== contenido.esqueletoInicial
+  const tieneCodigo = flujo.codigo.trim().length > 0
+  const puedeAccionar = Boolean(flujo.puedeEjecutar && !isPending && tieneCodigo)
+  const todosLosTestsPasaron = Boolean(
+    flujo.ejecucion && flujo.ejecucion.testsPasados === flujo.ejecucion.testsTotales,
+  )
   const archivo = nombreArchivo(contenido.lenguaje)
 
   return (
@@ -90,11 +95,8 @@ function RetoActivo({ bloqueId, cursoId, contenido, contenidoTests }: RetoActivo
           archivo={archivo}
           lenguaje={contenido.lenguaje}
           onEjecutar={flujo.ejecutar}
-          puedeEjecutar={Boolean(
-            flujo.puedeEjecutar && !isPending && flujo.codigo.trim().length > 0,
-          )}
+          puedeEjecutar={puedeAccionar}
           isEjecutando={flujo.isEjecutando}
-          isEnviando={flujo.isEnviando}
         />
         <CodeEditorNexott
           value={flujo.codigo}
@@ -105,10 +107,19 @@ function RetoActivo({ bloqueId, cursoId, contenido, contenidoTests }: RetoActivo
           mostrarNumerosLinea={true}
           embedded={true}
         />
-        <div className="flex items-center justify-end border-border border-t bg-subtle px-3 py-1.5">
+        <div className="flex items-center justify-between gap-3 border-border border-t bg-subtle px-3 py-2">
           <Button variant="ghost" size="sm" onClick={flujo.reset} disabled={!puedeReset}>
             <RotateCcw className="mr-1.5 h-3.5 w-3.5" aria-hidden={true} />
             Restaurar esqueleto
+          </Button>
+          <Button
+            size="sm"
+            variant={todosLosTestsPasaron ? "aurora" : "primary"}
+            onClick={flujo.enviar}
+            disabled={!puedeAccionar}
+          >
+            <Send className="mr-1.5 h-3 w-3" aria-hidden={true} />
+            {flujo.isEnviando ? "Enviando…" : "Enviar intento"}
           </Button>
         </div>
         <TerminalTests ejecucion={flujo.ejecucion} isEjecutando={flujo.isEjecutando} />
@@ -131,17 +142,9 @@ interface TopBarIdeProps {
   readonly onEjecutar: () => void
   readonly puedeEjecutar: boolean
   readonly isEjecutando: boolean
-  readonly isEnviando: boolean
 }
 
-function TopBarIde({
-  archivo,
-  lenguaje,
-  onEjecutar,
-  puedeEjecutar,
-  isEjecutando,
-  isEnviando,
-}: TopBarIdeProps) {
+function TopBarIde({ archivo, lenguaje, onEjecutar, puedeEjecutar, isEjecutando }: TopBarIdeProps) {
   return (
     <div className="flex items-center justify-between border-border border-b bg-subtle px-4 py-3">
       <div className="flex items-center gap-3">
@@ -154,14 +157,9 @@ function TopBarIde({
           {archivo} · {lenguaje}
         </span>
       </div>
-      <Button
-        size="sm"
-        onClick={onEjecutar}
-        disabled={!puedeEjecutar}
-        style={{ boxShadow: "var(--shadow-accent-glow)" }}
-      >
+      <Button size="sm" variant="secondary" onClick={onEjecutar} disabled={!puedeEjecutar}>
         <Play className="mr-1.5 h-3 w-3 fill-current" aria-hidden={true} />
-        {isEjecutando ? "Ejecutando…" : isEnviando ? "Guardando…" : "Ejecutar tests"}
+        {isEjecutando ? "Ejecutando…" : "Ejecutar tests"}
       </Button>
     </div>
   )
