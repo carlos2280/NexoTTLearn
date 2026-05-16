@@ -832,26 +832,26 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
   // ============================================================
 
   // -- sec-fs-1-1: HTML semantico --
-  nuevoBloque(uuid("blqFS1"), "sec-fs-1-1", 1, "PARRAFO", {
+  nuevoBloque(uuid("fa1"), "sec-fs-1-1", 1, "PARRAFO", {
     // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML), no un secreto
     html: '<h2>HTML semantico: el cimiento del frontend</h2><p>Usar la etiqueta correcta no es una decoracion: es el contrato con el navegador, el lector de pantallas y el motor de busqueda. Un <code>&lt;div&gt;</code> con <code>role="button"</code> nunca sera tan accesible como un <code>&lt;button&gt;</code>.</p>',
     textoPlano:
       "HTML semantico es el contrato con navegador, lector de pantallas y SEO. Usa la etiqueta correcta.",
     tiempoLecturaMin: 3,
   }),
-  nuevoBloque(uuid("blqFS2"), "sec-fs-1-1", 2, "CODIGO_ILUSTRATIVO", {
+  nuevoBloque(uuid("fa2"), "sec-fs-1-1", 2, "CODIGO_ILUSTRATIVO", {
     lenguaje: "html",
     codigo:
       // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML/codigo), no un secreto
       '<!doctype html>\n<html lang="es">\n  <head><title>Mi pagina</title></head>\n  <body>\n    <header>\n      <nav aria-label="Principal">…</nav>\n    </header>\n    <main>\n      <article>\n        <h1>Titulo del articulo</h1>\n        <p>…</p>\n      </article>\n      <aside>Contenido relacionado</aside>\n    </main>\n    <footer>©…</footer>\n  </body>\n</html>',
     descripcion: "Estructura semantica minima: header, nav, main, article, aside, footer.",
   }),
-  nuevoBloque(uuid("blqFS3"), "sec-fs-1-1", 3, "TIP", {
+  nuevoBloque(uuid("fa3"), "sec-fs-1-1", 3, "TIP", {
     variante: "info",
     html: "<p>Regla simple: <strong>ARIA es el ultimo recurso</strong>. Si existe un elemento HTML nativo que hace lo que necesitas, usalo. Solo aplica <code>role</code> y atributos <code>aria-*</code> cuando no haya alternativa nativa.</p>",
   }),
   nuevoBloque(
-    uuid("blqFS4"),
+    uuid("fa4"),
     "sec-fs-1-1",
     4,
     "QUIZ",
@@ -877,25 +877,25 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
   ),
 
   // -- sec-fs-1-2: JavaScript moderno --
-  nuevoBloque(uuid("blqFS5"), "sec-fs-1-2", 1, "PARRAFO", {
+  nuevoBloque(uuid("fa5"), "sec-fs-1-2", 1, "PARRAFO", {
     // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML/JS), no un secreto
     html: "<h2>JavaScript moderno (ES2020+)</h2><p>Las versiones recientes de JavaScript trajeron tres herramientas que reescriben el dia a dia: <strong>optional chaining</strong> (<code>?.</code>), <strong>nullish coalescing</strong> (<code>??</code>) y <strong>destructuring</strong> con valores por defecto.</p>",
     textoPlano:
       "JavaScript moderno: optional chaining, nullish coalescing, destructuring con defaults.",
     tiempoLecturaMin: 3,
   }),
-  nuevoBloque(uuid("blqFS6"), "sec-fs-1-2", 2, "CODIGO_ILUSTRATIVO", {
+  nuevoBloque(uuid("fa6"), "sec-fs-1-2", 2, "CODIGO_ILUSTRATIVO", {
     lenguaje: "javascript",
     codigo:
       "// Optional chaining: nada explota si usuario es undefined\nconst ciudad = usuario?.direccion?.ciudad\n\n// Nullish coalescing: solo cae al default si es null/undefined (no si es 0 o '')\nconst limite = config.limite ?? 100\n\n// Destructuring con default y rename\nconst { nombre: titulo = 'Sin titulo', tags = [] } = articulo",
     descripcion: "Tres patrones cotidianos que evitan bucles de validacion manual.",
   }),
-  nuevoBloque(uuid("blqFS7"), "sec-fs-1-2", 3, "TIP", {
+  nuevoBloque(uuid("fa7"), "sec-fs-1-2", 3, "TIP", {
     variante: "warning",
     html: "<p><strong>Trampa frecuente</strong>: <code>||</code> y <code>??</code> no son lo mismo. <code>0 || 100</code> devuelve 100; <code>0 ?? 100</code> devuelve 0. Si el valor cero es legitimo, usa <code>??</code>.</p>",
   }),
   nuevoBloque(
-    uuid("blqFS8"),
+    uuid("fa8"),
     "sec-fs-1-2",
     4,
     "CODIGO_PREGUNTAS",
@@ -911,12 +911,12 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     { esEvaluable: true, skillQueMideId: ID_SKILL_TS },
   ),
   nuevoBloque(
-    uuid("blqFS9"),
+    uuid("fa9"),
     "sec-fs-1-2",
     5,
     "CODIGO_TESTS",
     {
-      codigoPreguntasId: uuid("blqFS8"),
+      codigoPreguntasId: uuid("fa8"),
       solucionReferencia:
         // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML/codigo), no un secreto
         "function deduplicar(palabras) {\n  if (!palabras) return []\n  return Array.from(new Set(palabras))\n}",
@@ -948,25 +948,25 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
   ),
 
   // -- sec-fs-1-3: TypeScript esencial --
-  nuevoBloque(uuid("blqFS10"), "sec-fs-1-3", 1, "PARRAFO", {
+  nuevoBloque(uuid("fa10"), "sec-fs-1-3", 1, "PARRAFO", {
     html: "<h2>TypeScript: el contrato del codigo</h2><p>TypeScript no es JavaScript con anotaciones: es un sistema de tipos que el compilador usa para detectar errores antes de que lleguen a produccion. Las dos herramientas basicas son <code>interface</code> (para formas de objeto extensibles) y <code>type</code> (para uniones, intersecciones y derivados).</p>",
     textoPlano:
       "TypeScript es un sistema de tipos para detectar errores en compilacion. Interface vs type.",
     tiempoLecturaMin: 4,
   }),
-  nuevoBloque(uuid("blqFS11"), "sec-fs-1-3", 2, "CODIGO_ILUSTRATIVO", {
+  nuevoBloque(uuid("fa11"), "sec-fs-1-3", 2, "CODIGO_ILUSTRATIVO", {
     lenguaje: "typescript",
     codigo:
       // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML/codigo), no un secreto
       "interface Usuario {\n  readonly id: string\n  email: string\n  rol: 'ADMIN' | 'EDITOR' | 'LECTOR'\n}\n\ntype Resultado<T> =\n  | { ok: true; data: T }\n  | { ok: false; error: string }\n\nfunction procesar(u: Usuario): Resultado<string> {\n  if (u.rol === 'LECTOR') return { ok: false, error: 'sin permisos' }\n  return { ok: true, data: `Hola, ${u.email}` }\n}",
     descripcion: "Interface para forma, type para uniones discriminadas y genericos.",
   }),
-  nuevoBloque(uuid("blqFS12"), "sec-fs-1-3", 3, "TIP", {
+  nuevoBloque(uuid("fa12"), "sec-fs-1-3", 3, "TIP", {
     variante: "info",
     html: "<p>Para acotar tipos dentro de un bloque, usa <strong>narrowing</strong>: <code>typeof x === 'string'</code>, <code>'prop' in obj</code>, o type guards personalizados con la firma <code>(x): x is T</code>. El compilador entiende y reduce el tipo automaticamente.</p>",
   }),
   nuevoBloque(
-    uuid("blqFS13"),
+    uuid("fa13"),
     "sec-fs-1-3",
     4,
     "CODIGO_PREGUNTAS",
@@ -981,12 +981,12 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     { esEvaluable: true, skillQueMideId: ID_SKILL_TS },
   ),
   nuevoBloque(
-    uuid("blqFS14"),
+    uuid("fa14"),
     "sec-fs-1-3",
     5,
     "CODIGO_TESTS",
     {
-      codigoPreguntasId: uuid("blqFS13"),
+      codigoPreguntasId: uuid("fa13"),
       solucionReferencia:
         "function agruparPor<T, K extends string>(items: T[], clave: (item: T) => K): Record<K, T[]> {\n  const acc = {} as Record<K, T[]>\n  for (const item of items) {\n    const k = clave(item)\n    if (!acc[k]) acc[k] = []\n    acc[k].push(item)\n  }\n  return acc\n}",
       tests: [
@@ -1009,7 +1009,7 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     { esEvaluable: true, skillQueMideId: ID_SKILL_TS },
   ),
   nuevoBloque(
-    uuid("blqFS15"),
+    uuid("fa15"),
     "sec-fs-1-3",
     6,
     "QUIZ",
@@ -1041,26 +1041,26 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
   ),
 
   // -- sec-fs-2-1: Python para APIs --
-  nuevoBloque(uuid("blqFS16"), "sec-fs-2-1", 1, "PARRAFO", {
+  nuevoBloque(uuid("fa16"), "sec-fs-2-1", 1, "PARRAFO", {
     html: "<h2>Python: legibilidad como filosofia</h2><p>Python prioriza que el codigo se lea como una frase. Para APIs hoy hay un estandar de facto: <strong>FastAPI</strong>, que combina type hints con generacion automatica de OpenAPI y validacion con Pydantic.</p>",
     textoPlano:
       "Python prioriza legibilidad. FastAPI combina type hints, OpenAPI y validacion Pydantic.",
     tiempoLecturaMin: 3,
   }),
-  nuevoBloque(uuid("blqFS17"), "sec-fs-2-1", 2, "CODIGO_ILUSTRATIVO", {
+  nuevoBloque(uuid("fa17"), "sec-fs-2-1", 2, "CODIGO_ILUSTRATIVO", {
     lenguaje: "python",
     codigo:
       "from fastapi import FastAPI\nfrom pydantic import BaseModel\n\napp = FastAPI()\n\nclass Usuario(BaseModel):\n    email: str\n    nombre: str\n\n@app.post('/usuarios')\ndef crear(u: Usuario):\n    return {'id': 'u_123', **u.dict()}",
     descripcion: "Endpoint POST minimo. Pydantic valida el body, FastAPI genera la doc OpenAPI.",
   }),
-  nuevoBloque(uuid("blqFS18"), "sec-fs-2-1", 3, "VIDEO", {
+  nuevoBloque(uuid("fa18"), "sec-fs-2-1", 3, "VIDEO", {
     url: "https://www.youtube.com/watch?v=7t2alSnE2-I",
     proveedor: "youtube",
     marcarAlPorcentaje: 85,
     notas: "Introduccion a FastAPI por el autor original (Sebastian Ramirez).",
   }),
   nuevoBloque(
-    uuid("blqFS19"),
+    uuid("fa19"),
     "sec-fs-2-1",
     4,
     "CODIGO_PREGUNTAS",
@@ -1074,12 +1074,12 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     { esEvaluable: true, skillQueMideId: ID_SKILL_PYTHON },
   ),
   nuevoBloque(
-    uuid("blqFS20"),
+    uuid("fa20"),
     "sec-fs-2-1",
     5,
     "CODIGO_TESTS",
     {
-      codigoPreguntasId: uuid("blqFS19"),
+      codigoPreguntasId: uuid("fa19"),
       solucionReferencia:
         "import re\n\ndef contar_palabras(texto):\n    if not texto:\n        return {}\n    limpio = re.sub(r'[.,;:!?]', ' ', texto.lower())\n    freq = {}\n    for palabra in limpio.split():\n        freq[palabra] = freq.get(palabra, 0) + 1\n    return freq",
       tests: [
@@ -1110,24 +1110,24 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
   ),
 
   // -- sec-fs-3-1: Git workflow basico --
-  nuevoBloque(uuid("blqFS21"), "sec-fs-3-1", 1, "PARRAFO", {
+  nuevoBloque(uuid("fa21"), "sec-fs-3-1", 1, "PARRAFO", {
     html: "<h2>El ciclo del dia a dia</h2><p>El 90% del trabajo con Git es la misma secuencia: <code>status</code> para ver donde estas, <code>add</code> para preparar cambios, <code>commit</code> para guardarlos con mensaje, y <code>push</code> para publicarlos al remoto.</p>",
     textoPlano: "El ciclo basico de Git: status, add, commit, push. Es el 90% del dia a dia.",
     tiempoLecturaMin: 3,
   }),
-  nuevoBloque(uuid("blqFS22"), "sec-fs-3-1", 2, "CODIGO_ILUSTRATIVO", {
+  nuevoBloque(uuid("fa22"), "sec-fs-3-1", 2, "CODIGO_ILUSTRATIVO", {
     lenguaje: "bash",
     codigo:
       '# ver que cambio\ngit status\n\n# preparar cambios (stage)\ngit add src/nuevo-archivo.ts\ngit add -p   # interactivo: revisa hunk por hunk\n\n# guardar con mensaje\ngit commit -m "feat(login): permitir reset de password"\n\n# publicar al remoto\ngit push origin mi-rama',
     descripcion: "Comandos del flujo basico. `git add -p` es el mejor amigo para commits limpios.",
   }),
-  nuevoBloque(uuid("blqFS23"), "sec-fs-3-1", 3, "TIP", {
+  nuevoBloque(uuid("fa23"), "sec-fs-3-1", 3, "TIP", {
     variante: "info",
     // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML/codigo), no un secreto
     html: "<p><strong>Mensajes de commit</strong>: usa el formato <em>Conventional Commits</em> — <code>tipo(scope): descripcion</code>. Tipos comunes: <code>feat</code>, <code>fix</code>, <code>refactor</code>, <code>docs</code>, <code>test</code>, <code>chore</code>. Tu yo del futuro te lo agradecera al hacer <code>git log</code>.</p>",
   }),
   nuevoBloque(
-    uuid("blqFS24"),
+    uuid("fa24"),
     "sec-fs-3-1",
     4,
     "QUIZ",
@@ -1159,31 +1159,31 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
   ),
 
   // -- sec-fs-3-2: Git ramas y PRs --
-  nuevoBloque(uuid("blqFS25"), "sec-fs-3-2", 1, "PARRAFO", {
+  nuevoBloque(uuid("fa25"), "sec-fs-3-2", 1, "PARRAFO", {
     html: "<h2>Ramas: trabajo aislado</h2><p>Una rama es un puntero ligero a un commit. Crear una rama es instantaneo y barato. La regla profesional: <strong>una rama por feature o por fix</strong>, fusionada via Pull Request con revision de un compañero.</p>",
     textoPlano:
       "Una rama es un puntero a commit. Regla: una rama por feature/fix, mergeada via PR revisado.",
     tiempoLecturaMin: 4,
   }),
-  nuevoBloque(uuid("blqFS26"), "sec-fs-3-2", 2, "VIDEO", {
+  nuevoBloque(uuid("fa26"), "sec-fs-3-2", 2, "VIDEO", {
     // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML/codigo), no un secreto
     url: "https://www.youtube.com/watch?v=e2IbNHi4uCI",
     proveedor: "youtube",
     marcarAlPorcentaje: 80,
     notas: "Explicacion visual de ramas, merge y rebase.",
   }),
-  nuevoBloque(uuid("blqFS27"), "sec-fs-3-2", 3, "TIP", {
+  nuevoBloque(uuid("fa27"), "sec-fs-3-2", 3, "TIP", {
     variante: "warning",
     html: "<p><strong>Rebase vs merge</strong>: usa <code>git merge</code> en ramas publicas que otros usan. Usa <code>git rebase</code> en tu rama personal antes de abrir el PR para mantener el historico lineal. <em>Nunca</em> hagas rebase de commits ya empujados a una rama compartida.</p>",
   }),
-  nuevoBloque(uuid("blqFS28"), "sec-fs-3-2", 4, "CODIGO_ILUSTRATIVO", {
+  nuevoBloque(uuid("fa28"), "sec-fs-3-2", 4, "CODIGO_ILUSTRATIVO", {
     lenguaje: "bash",
     codigo:
       '# crear rama desde develop actualizado\ngit checkout develop\ngit pull\ngit checkout -b feat/login-google\n\n# trabajar, commits...\ngit push -u origin feat/login-google\n\n# abrir PR via gh CLI\ngh pr create --title "feat(auth): login con Google" \\\n  --body "Implementa OAuth con provider Google."\n\n# tras aprobacion del review, mergear via UI o:\ngh pr merge --squash --delete-branch',
     descripcion: "Flujo completo: crear rama, push, abrir PR con gh CLI, mergear con squash.",
   }),
   nuevoBloque(
-    uuid("blqFS29"),
+    uuid("fa29"),
     "sec-fs-3-2",
     5,
     "QUIZ",
@@ -1219,28 +1219,28 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
   ),
 
   // -- sec-fs-4-1: Azure servicios core --
-  nuevoBloque(uuid("blqFS30"), "sec-fs-4-1", 1, "PARRAFO", {
+  nuevoBloque(uuid("fa30"), "sec-fs-4-1", 1, "PARRAFO", {
     // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML/Azure), no un secreto
     html: "<h2>Los 4 servicios de Azure que tienes que conocer</h2><ul><li><strong>App Service</strong> — hosting de apps web y APIs con escalado gestionado.</li><li><strong>Storage Account (Blob)</strong> — almacenamiento de archivos a precio bajo.</li><li><strong>Azure SQL / Cosmos DB</strong> — base de datos relacional o NoSQL gestionada.</li><li><strong>Static Web Apps</strong> — hosting de SPA + Functions integradas, gratis para proyectos pequeños.</li></ul>",
     textoPlano:
       "4 servicios Azure clave: App Service, Storage Blob, Azure SQL/Cosmos, Static Web Apps.",
     tiempoLecturaMin: 4,
   }),
-  nuevoBloque(uuid("blqFS31"), "sec-fs-4-1", 2, "RECURSO", {
+  nuevoBloque(uuid("fa31"), "sec-fs-4-1", 2, "RECURSO", {
     subtipo: "enlace",
     url: "https://learn.microsoft.com/es-es/azure/architecture/guide/",
     titulo: "Azure Architecture Center",
     descripcion: "Catalogo oficial de patrones de arquitectura en Azure (Microsoft Learn).",
     abrirNuevaPestana: true,
   }),
-  nuevoBloque(uuid("blqFS32"), "sec-fs-4-1", 3, "VIDEO", {
+  nuevoBloque(uuid("fa32"), "sec-fs-4-1", 3, "VIDEO", {
     url: "https://www.youtube.com/watch?v=Tt6_zP7HrR4",
     proveedor: "youtube",
     marcarAlPorcentaje: 80,
     notas: "Recorrido de los servicios fundamentales de Azure en 15 minutos.",
   }),
   nuevoBloque(
-    uuid("blqFS33"),
+    uuid("fa33"),
     "sec-fs-4-1",
     4,
     "QUIZ",
@@ -1268,25 +1268,25 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
   ),
 
   // -- sec-fs-4-2: Azure deploy basico --
-  nuevoBloque(uuid("blqFS34"), "sec-fs-4-2", 1, "PARRAFO", {
+  nuevoBloque(uuid("fa34"), "sec-fs-4-2", 1, "PARRAFO", {
     html: "<h2>Deploy en 4 pasos con la CLI</h2><p>La <code>az</code> CLI es la forma profesional de hablar con Azure: scriptable, versionable y reproducible. Resource group → crear servicio → configurar → desplegar.</p>",
     textoPlano:
       "Deploy basico con az CLI: resource group, servicio, configuracion, push de codigo.",
     tiempoLecturaMin: 3,
   }),
-  nuevoBloque(uuid("blqFS35"), "sec-fs-4-2", 2, "CODIGO_ILUSTRATIVO", {
+  nuevoBloque(uuid("fa35"), "sec-fs-4-2", 2, "CODIGO_ILUSTRATIVO", {
     lenguaje: "bash",
     codigo:
       '# login y seleccionar suscripcion\naz login\naz account set --subscription "Mi Suscripcion"\n\n# crear resource group\naz group create --name rg-demo --location westeurope\n\n# crear App Service (plan + app)\naz appservice plan create --name plan-demo --resource-group rg-demo --sku B1\naz webapp create --name miapp-demo --plan plan-demo --resource-group rg-demo --runtime "NODE:20-lts"\n\n# desplegar codigo desde un zip\naz webapp deploy --resource-group rg-demo --name miapp-demo --src-path ./dist.zip',
     descripcion: "Despliegue minimo de una app Node a Azure App Service.",
   }),
-  nuevoBloque(uuid("blqFS36"), "sec-fs-4-2", 3, "TIP", {
+  nuevoBloque(uuid("fa36"), "sec-fs-4-2", 3, "TIP", {
     variante: "info",
     // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML/codigo), no un secreto
     html: "<p><strong>Infraestructura como codigo</strong>: para proyectos serios usa <strong>Bicep</strong> (DSL moderno y legible, oficial de Microsoft) en lugar de ARM templates (JSON verboso). Bicep compila a ARM, asi que el motor es el mismo.</p>",
   }),
   nuevoBloque(
-    uuid("blqFS37"),
+    uuid("fa37"),
     "sec-fs-4-2",
     4,
     "QUIZ",
