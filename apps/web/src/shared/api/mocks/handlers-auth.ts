@@ -6,6 +6,7 @@ import {
   buscarUsuarioPorEmail,
   buscarUsuarioPorId,
   mockState,
+  setSesionActual,
 } from "./db"
 import { type MockHandler, defineRoute } from "./router"
 
@@ -88,7 +89,7 @@ const handleLogin: MockHandler = (req) => {
     return response
   }
 
-  mockState.sesionActual = { usuarioId: usuario.id }
+  setSesionActual({ usuarioId: usuario.id })
   const response: LoginResponse = {
     mfaRequired: false,
     perfil: aSesion(usuario),
@@ -130,7 +131,7 @@ const handleMfaVerify: MockHandler = (req) => {
   }
 
   mockState.mfaChallenges.delete(challengeId)
-  mockState.sesionActual = { usuarioId: challenge.usuarioId }
+  setSesionActual({ usuarioId: challenge.usuarioId })
   const usuario = buscarUsuarioPorId(challenge.usuarioId)
   if (!usuario) {
     throw new ApiError(401, "SESION_INVALIDA", "Sesión inválida o expirada.")
@@ -153,7 +154,7 @@ const handleMe: MockHandler = () => {
 }
 
 const handleLogout: MockHandler = () => {
-  mockState.sesionActual = null
+  setSesionActual(null)
   return null
 }
 

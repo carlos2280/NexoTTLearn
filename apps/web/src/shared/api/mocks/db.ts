@@ -136,10 +136,49 @@ interface MockState {
   intentosFallidos: Map<string, number>
 }
 
+// Persistimos solo la sesion en localStorage para sobrevivir a F5 / reapertura
+// de pestana. `mfaChallenges` y `intentosFallidos` se mantienen en memoria
+// porque son efimeros y reiniciarlos en cada recarga es razonable (mejor DX).
+const STORAGE_KEY_SESION = "nexott-mock:sesion"
+
+function leerSesionPersistida(): MockSession | null {
+  if (typeof window === "undefined") {
+    return null
+  }
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY_SESION)
+    if (!raw) {
+      return null
+    }
+    const parsed = JSON.parse(raw) as { usuarioId?: unknown }
+    if (typeof parsed.usuarioId !== "string") {
+      return null
+    }
+    if (!buscarUsuarioPorId(parsed.usuarioId)) {
+      return null
+    }
+    return { usuarioId: parsed.usuarioId }
+  } catch {
+    return null
+  }
+}
+
 export const mockState: MockState = {
-  sesionActual: null,
+  sesionActual: leerSesionPersistida(),
   mfaChallenges: new Map(),
   intentosFallidos: new Map(),
+}
+
+export function setSesionActual(sesion: MockSession | null): void {
+  mockState.sesionActual = sesion
+  if (typeof window === "undefined") {
+    return
+  }
+  if (sesion) {
+    window.localStorage.setItem(STORAGE_KEY_SESION, JSON.stringify(sesion))
+  } else {
+    window.localStorage.removeItem(STORAGE_KEY_SESION)
+  }
 }
 
 export function buscarUsuarioPorEmail(email: string): MockUsuario | undefined {
