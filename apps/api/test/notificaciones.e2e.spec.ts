@@ -408,7 +408,7 @@ describe.runIf(RUN_E2E)("notificaciones e2e (P10b — inbox + preferencias)", ()
   })
 
   it("Admin tambien puede consumir los endpoints (es endpoint generico, D-S10-C3)", async () => {
+    expect(csrfAdmin).toBeTruthy()
     await agenteAdmin.get("/api/v1/notificaciones/badge").expect(200)
-    void csrfAdmin
   })
 })

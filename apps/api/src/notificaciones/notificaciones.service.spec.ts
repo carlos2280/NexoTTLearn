@@ -59,7 +59,7 @@ function buildPrismaMock(): PrismaMock {
   // `$transaction([...])` con array devuelve los resultados literales.
   // `$transaction(async tx => ...)` ejecuta el callback con el mismo mock.
   prisma.$transaction.mockImplementation(
-    async (arg: ((tx: PrismaMock) => Promise<unknown>) | readonly Promise<unknown>[]) => {
+    (arg: ((tx: PrismaMock) => Promise<unknown>) | readonly Promise<unknown>[]) => {
       if (typeof arg === "function") {
         return arg(prisma)
       }

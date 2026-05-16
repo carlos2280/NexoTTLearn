@@ -20,7 +20,7 @@ function buildPrismaMock(): PrismaMock {
     usuario: { findUnique: vi.fn() },
     asignacionCurso: { findMany, count },
     $transaction: vi.fn(async (operations: readonly unknown[]) => {
-      return await Promise.all(operations as Array<Promise<unknown>>)
+      return await Promise.all(operations as Promise<unknown>[])
     }),
   }
 }

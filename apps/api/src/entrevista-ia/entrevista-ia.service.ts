@@ -251,6 +251,12 @@ export class EntrevistaIaService {
           code: apiErrorCodes.entrevistaIaFechaNoAlcanzada,
           message: "La entrevista IA aun no esta disponible: no se alcanzo la fecha de desbloqueo.",
         }
+      default: {
+        // Exhaustividad: si se anade una rama a `RazonDisponibilidadGate` y se
+        // olvida un case aqui, TS aborta el cast a `never` en compile time.
+        const _exhaustivo: never = razon
+        throw new Error(`razon de gate no cubierta: ${String(_exhaustivo)}`)
+      }
     }
   }
 

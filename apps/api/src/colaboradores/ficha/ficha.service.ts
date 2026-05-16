@@ -78,7 +78,7 @@ export class FichaService {
       where: { id: usuarioId },
       select: { colaboradorId: true },
     })
-    if (!usuario || !usuario.colaboradorId) {
+    if (!usuario?.colaboradorId) {
       throw new NotFoundException({
         code: apiErrorCodes.colaboradorNoEncontrado,
         message: "Colaborador no encontrado.",
@@ -231,7 +231,7 @@ export class FichaService {
     for (let i = 0; i < skills.length; i += 1) {
       const skill = skills[i]
       const item = skillsItems[i]
-      if (!skill || !item) {
+      if (!(skill && item)) {
         continue
       }
       const acc = map.get(skill.areaId) ?? {

@@ -1320,7 +1320,6 @@ export class CursosService {
         }
         await this.notificaciones.crear({
           usuarioId,
-          // biome-ignore lint/style/useNamingConvention: identificador del enum Prisma.
           tipo: "RESULTADO_CIERRE",
           payload: {
             asignacionId: p.asignacionId,
