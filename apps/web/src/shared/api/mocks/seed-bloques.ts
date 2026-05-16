@@ -35,6 +35,10 @@ const ID_SEC_REACT_HOOKS = uuid("sec6")
 const ID_SKILL_TS = uuid("skill1")
 const ID_SKILL_NEST = uuid("skill2")
 const ID_SKILL_REACT = uuid("skill4")
+const ID_SKILL_HTML = uuid("skill9")
+const ID_SKILL_PYTHON = uuid("skill10")
+const ID_SKILL_GIT = uuid("skill11")
+const ID_SKILL_AZURE = uuid("skill12")
 
 export const SEED_SECCIONES: SeccionResponse[] = [
   {
@@ -817,5 +821,504 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
       ],
     },
     { esEvaluable: true, skillQueMideId: ID_SKILL_NEST },
+  ),
+
+  // ============================================================
+  // Curso "Fundamentos Full-Stack & DevOps" (curso-fullstack-devops)
+  // Curso base de referencia: HTML, JS, TS, Python, Git, Azure.
+  // CODIGO_PREGUNTAS solo en JS/TS/Python (lenguajes ejecutables
+  // por el sandbox del navegador). HTML, Git, Azure usan
+  // PARRAFO/CODIGO_ILUSTRATIVO/VIDEO/QUIZ/RECURSO/TIP.
+  // ============================================================
+
+  // -- sec-fs-1-1: HTML semantico --
+  nuevoBloque(uuid("blqFS1"), "sec-fs-1-1", 1, "PARRAFO", {
+    // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML), no un secreto
+    html: '<h2>HTML semantico: el cimiento del frontend</h2><p>Usar la etiqueta correcta no es una decoracion: es el contrato con el navegador, el lector de pantallas y el motor de busqueda. Un <code>&lt;div&gt;</code> con <code>role="button"</code> nunca sera tan accesible como un <code>&lt;button&gt;</code>.</p>',
+    textoPlano:
+      "HTML semantico es el contrato con navegador, lector de pantallas y SEO. Usa la etiqueta correcta.",
+    tiempoLecturaMin: 3,
+  }),
+  nuevoBloque(uuid("blqFS2"), "sec-fs-1-1", 2, "CODIGO_ILUSTRATIVO", {
+    lenguaje: "html",
+    codigo:
+      // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML/codigo), no un secreto
+      '<!doctype html>\n<html lang="es">\n  <head><title>Mi pagina</title></head>\n  <body>\n    <header>\n      <nav aria-label="Principal">…</nav>\n    </header>\n    <main>\n      <article>\n        <h1>Titulo del articulo</h1>\n        <p>…</p>\n      </article>\n      <aside>Contenido relacionado</aside>\n    </main>\n    <footer>©…</footer>\n  </body>\n</html>',
+    descripcion: "Estructura semantica minima: header, nav, main, article, aside, footer.",
+  }),
+  nuevoBloque(uuid("blqFS3"), "sec-fs-1-1", 3, "TIP", {
+    variante: "info",
+    html: "<p>Regla simple: <strong>ARIA es el ultimo recurso</strong>. Si existe un elemento HTML nativo que hace lo que necesitas, usalo. Solo aplica <code>role</code> y atributos <code>aria-*</code> cuando no haya alternativa nativa.</p>",
+  }),
+  nuevoBloque(
+    uuid("blqFS4"),
+    "sec-fs-1-1",
+    4,
+    "QUIZ",
+    {
+      intentosMax: null,
+      solucionVisible: "al_aprobar",
+      ordenAleatorio: false,
+      notaMinima: 60,
+      preguntas: [
+        {
+          id: "fs1p1",
+          enunciado: "¿Que etiqueta es la correcta para la navegacion principal de la pagina?",
+          opciones: [
+            { id: "fs1p1o1", texto: '<div class="nav">', esCorrecta: false },
+            { id: "fs1p1o2", texto: "<nav>", esCorrecta: true },
+            { id: "fs1p1o3", texto: '<section role="navigation">', esCorrecta: false },
+          ],
+          explicacion: "<nav> ya implica role=navigation. No hace falta el role explicito.",
+        },
+      ],
+    },
+    { esEvaluable: true, skillQueMideId: ID_SKILL_HTML },
+  ),
+
+  // -- sec-fs-1-2: JavaScript moderno --
+  nuevoBloque(uuid("blqFS5"), "sec-fs-1-2", 1, "PARRAFO", {
+    // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML/JS), no un secreto
+    html: "<h2>JavaScript moderno (ES2020+)</h2><p>Las versiones recientes de JavaScript trajeron tres herramientas que reescriben el dia a dia: <strong>optional chaining</strong> (<code>?.</code>), <strong>nullish coalescing</strong> (<code>??</code>) y <strong>destructuring</strong> con valores por defecto.</p>",
+    textoPlano:
+      "JavaScript moderno: optional chaining, nullish coalescing, destructuring con defaults.",
+    tiempoLecturaMin: 3,
+  }),
+  nuevoBloque(uuid("blqFS6"), "sec-fs-1-2", 2, "CODIGO_ILUSTRATIVO", {
+    lenguaje: "javascript",
+    codigo:
+      "// Optional chaining: nada explota si usuario es undefined\nconst ciudad = usuario?.direccion?.ciudad\n\n// Nullish coalescing: solo cae al default si es null/undefined (no si es 0 o '')\nconst limite = config.limite ?? 100\n\n// Destructuring con default y rename\nconst { nombre: titulo = 'Sin titulo', tags = [] } = articulo",
+    descripcion: "Tres patrones cotidianos que evitan bucles de validacion manual.",
+  }),
+  nuevoBloque(uuid("blqFS7"), "sec-fs-1-2", 3, "TIP", {
+    variante: "warning",
+    html: "<p><strong>Trampa frecuente</strong>: <code>||</code> y <code>??</code> no son lo mismo. <code>0 || 100</code> devuelve 100; <code>0 ?? 100</code> devuelve 0. Si el valor cero es legitimo, usa <code>??</code>.</p>",
+  }),
+  nuevoBloque(
+    uuid("blqFS8"),
+    "sec-fs-1-2",
+    4,
+    "CODIGO_PREGUNTAS",
+    {
+      lenguaje: "javascript",
+      enunciado:
+        // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML/codigo), no un secreto
+        "Implementa `deduplicar(palabras)` que reciba un array de strings y devuelva un nuevo array sin duplicados, conservando el orden de aparicion. Si la entrada es null o undefined, devuelve un array vacio.",
+      // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML/codigo), no un secreto
+      esqueletoInicial: "function deduplicar(palabras) {\n  // tu codigo aqui\n  return []\n}",
+      tiempoLimiteSeg: 30,
+    },
+    { esEvaluable: true, skillQueMideId: ID_SKILL_TS },
+  ),
+  nuevoBloque(
+    uuid("blqFS9"),
+    "sec-fs-1-2",
+    5,
+    "CODIGO_TESTS",
+    {
+      codigoPreguntasId: uuid("blqFS8"),
+      solucionReferencia:
+        // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML/codigo), no un secreto
+        "function deduplicar(palabras) {\n  if (!palabras) return []\n  return Array.from(new Set(palabras))\n}",
+      tests: [
+        {
+          id: "fs-js-1",
+          descripcion: "Quita duplicados conservando orden",
+          entrada: "['a', 'b', 'a', 'c', 'b']",
+          salidaEsperada: "['a', 'b', 'c']",
+          visible: true,
+        },
+        {
+          id: "fs-js-2",
+          descripcion: "Array vacio devuelve vacio",
+          entrada: "[]",
+          salidaEsperada: "[]",
+          visible: true,
+        },
+        {
+          id: "fs-js-3",
+          descripcion: "null devuelve array vacio",
+          entrada: "null",
+          salidaEsperada: "[]",
+          visible: false,
+        },
+      ],
+    },
+    { esEvaluable: true, skillQueMideId: ID_SKILL_TS },
+  ),
+
+  // -- sec-fs-1-3: TypeScript esencial --
+  nuevoBloque(uuid("blqFS10"), "sec-fs-1-3", 1, "PARRAFO", {
+    html: "<h2>TypeScript: el contrato del codigo</h2><p>TypeScript no es JavaScript con anotaciones: es un sistema de tipos que el compilador usa para detectar errores antes de que lleguen a produccion. Las dos herramientas basicas son <code>interface</code> (para formas de objeto extensibles) y <code>type</code> (para uniones, intersecciones y derivados).</p>",
+    textoPlano:
+      "TypeScript es un sistema de tipos para detectar errores en compilacion. Interface vs type.",
+    tiempoLecturaMin: 4,
+  }),
+  nuevoBloque(uuid("blqFS11"), "sec-fs-1-3", 2, "CODIGO_ILUSTRATIVO", {
+    lenguaje: "typescript",
+    codigo:
+      // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML/codigo), no un secreto
+      "interface Usuario {\n  readonly id: string\n  email: string\n  rol: 'ADMIN' | 'EDITOR' | 'LECTOR'\n}\n\ntype Resultado<T> =\n  | { ok: true; data: T }\n  | { ok: false; error: string }\n\nfunction procesar(u: Usuario): Resultado<string> {\n  if (u.rol === 'LECTOR') return { ok: false, error: 'sin permisos' }\n  return { ok: true, data: `Hola, ${u.email}` }\n}",
+    descripcion: "Interface para forma, type para uniones discriminadas y genericos.",
+  }),
+  nuevoBloque(uuid("blqFS12"), "sec-fs-1-3", 3, "TIP", {
+    variante: "info",
+    html: "<p>Para acotar tipos dentro de un bloque, usa <strong>narrowing</strong>: <code>typeof x === 'string'</code>, <code>'prop' in obj</code>, o type guards personalizados con la firma <code>(x): x is T</code>. El compilador entiende y reduce el tipo automaticamente.</p>",
+  }),
+  nuevoBloque(
+    uuid("blqFS13"),
+    "sec-fs-1-3",
+    4,
+    "CODIGO_PREGUNTAS",
+    {
+      lenguaje: "typescript",
+      enunciado:
+        "Implementa la funcion generica `agruparPor<T, K extends string>(items: T[], clave: (item: T) => K): Record<K, T[]>` que agrupa los items segun la clave devuelta por la funcion.",
+      esqueletoInicial:
+        "function agruparPor<T, K extends string>(\n  items: T[],\n  clave: (item: T) => K,\n): Record<K, T[]> {\n  // tu codigo aqui\n  return {} as Record<K, T[]>\n}",
+      tiempoLimiteSeg: 60,
+    },
+    { esEvaluable: true, skillQueMideId: ID_SKILL_TS },
+  ),
+  nuevoBloque(
+    uuid("blqFS14"),
+    "sec-fs-1-3",
+    5,
+    "CODIGO_TESTS",
+    {
+      codigoPreguntasId: uuid("blqFS13"),
+      solucionReferencia:
+        "function agruparPor<T, K extends string>(items: T[], clave: (item: T) => K): Record<K, T[]> {\n  const acc = {} as Record<K, T[]>\n  for (const item of items) {\n    const k = clave(item)\n    if (!acc[k]) acc[k] = []\n    acc[k].push(item)\n  }\n  return acc\n}",
+      tests: [
+        {
+          id: "fs-ts-1",
+          descripcion: "Agrupa numeros por par/impar",
+          entrada: "agruparPor([1,2,3,4], n => n % 2 === 0 ? 'par' : 'impar')",
+          salidaEsperada: "{ impar: [1,3], par: [2,4] }",
+          visible: true,
+        },
+        {
+          id: "fs-ts-2",
+          descripcion: "Array vacio devuelve objeto vacio",
+          entrada: "agruparPor([], () => 'x')",
+          salidaEsperada: "{}",
+          visible: false,
+        },
+      ],
+    },
+    { esEvaluable: true, skillQueMideId: ID_SKILL_TS },
+  ),
+  nuevoBloque(
+    uuid("blqFS15"),
+    "sec-fs-1-3",
+    6,
+    "QUIZ",
+    {
+      intentosMax: 3,
+      solucionVisible: "tras_intento",
+      ordenAleatorio: false,
+      notaMinima: 60,
+      preguntas: [
+        {
+          id: "fs-tsp1",
+          enunciado: "¿Cual es la diferencia clave entre `interface` y `type` en TypeScript?",
+          opciones: [
+            { id: "fs-tsp1o1", texto: "No hay diferencia, son sinonimos", esCorrecta: false },
+            {
+              id: "fs-tsp1o2",
+              texto:
+                "interface admite declaration merging y se prefiere para contratos extensibles; type admite uniones, intersecciones y mapped types",
+              esCorrecta: true,
+            },
+            { id: "fs-tsp1o3", texto: "type es mas rapido en compilacion", esCorrecta: false },
+          ],
+          explicacion:
+            "Interface se reabre (declaration merging). Type es mas flexible para uniones y derivados.",
+        },
+      ],
+    },
+    { esEvaluable: true, skillQueMideId: ID_SKILL_TS },
+  ),
+
+  // -- sec-fs-2-1: Python para APIs --
+  nuevoBloque(uuid("blqFS16"), "sec-fs-2-1", 1, "PARRAFO", {
+    html: "<h2>Python: legibilidad como filosofia</h2><p>Python prioriza que el codigo se lea como una frase. Para APIs hoy hay un estandar de facto: <strong>FastAPI</strong>, que combina type hints con generacion automatica de OpenAPI y validacion con Pydantic.</p>",
+    textoPlano:
+      "Python prioriza legibilidad. FastAPI combina type hints, OpenAPI y validacion Pydantic.",
+    tiempoLecturaMin: 3,
+  }),
+  nuevoBloque(uuid("blqFS17"), "sec-fs-2-1", 2, "CODIGO_ILUSTRATIVO", {
+    lenguaje: "python",
+    codigo:
+      "from fastapi import FastAPI\nfrom pydantic import BaseModel\n\napp = FastAPI()\n\nclass Usuario(BaseModel):\n    email: str\n    nombre: str\n\n@app.post('/usuarios')\ndef crear(u: Usuario):\n    return {'id': 'u_123', **u.dict()}",
+    descripcion: "Endpoint POST minimo. Pydantic valida el body, FastAPI genera la doc OpenAPI.",
+  }),
+  nuevoBloque(uuid("blqFS18"), "sec-fs-2-1", 3, "VIDEO", {
+    url: "https://www.youtube.com/watch?v=7t2alSnE2-I",
+    proveedor: "youtube",
+    marcarAlPorcentaje: 85,
+    notas: "Introduccion a FastAPI por el autor original (Sebastian Ramirez).",
+  }),
+  nuevoBloque(
+    uuid("blqFS19"),
+    "sec-fs-2-1",
+    4,
+    "CODIGO_PREGUNTAS",
+    {
+      lenguaje: "python",
+      enunciado:
+        "Implementa `contar_palabras(texto)` que devuelva un dict con la frecuencia de cada palabra (lowercase). Ignora signos de puntuacion basicos (.,;:!?). Si el texto es vacio o None, devuelve {}.",
+      esqueletoInicial: "def contar_palabras(texto):\n    # tu codigo aqui\n    return {}",
+      tiempoLimiteSeg: 60,
+    },
+    { esEvaluable: true, skillQueMideId: ID_SKILL_PYTHON },
+  ),
+  nuevoBloque(
+    uuid("blqFS20"),
+    "sec-fs-2-1",
+    5,
+    "CODIGO_TESTS",
+    {
+      codigoPreguntasId: uuid("blqFS19"),
+      solucionReferencia:
+        "import re\n\ndef contar_palabras(texto):\n    if not texto:\n        return {}\n    limpio = re.sub(r'[.,;:!?]', ' ', texto.lower())\n    freq = {}\n    for palabra in limpio.split():\n        freq[palabra] = freq.get(palabra, 0) + 1\n    return freq",
+      tests: [
+        {
+          id: "fs-py-1",
+          descripcion: "Frase simple, dos palabras repetidas",
+          entrada: "'hola mundo hola'",
+          salidaEsperada: "{'hola': 2, 'mundo': 1}",
+          visible: true,
+        },
+        {
+          id: "fs-py-2",
+          descripcion: "Ignora puntuacion y mayusculas",
+          entrada: "'Hola, mundo. HOLA!'",
+          salidaEsperada: "{'hola': 2, 'mundo': 1}",
+          visible: true,
+        },
+        {
+          id: "fs-py-3",
+          descripcion: "None devuelve dict vacio",
+          entrada: "None",
+          salidaEsperada: "{}",
+          visible: false,
+        },
+      ],
+    },
+    { esEvaluable: true, skillQueMideId: ID_SKILL_PYTHON },
+  ),
+
+  // -- sec-fs-3-1: Git workflow basico --
+  nuevoBloque(uuid("blqFS21"), "sec-fs-3-1", 1, "PARRAFO", {
+    html: "<h2>El ciclo del dia a dia</h2><p>El 90% del trabajo con Git es la misma secuencia: <code>status</code> para ver donde estas, <code>add</code> para preparar cambios, <code>commit</code> para guardarlos con mensaje, y <code>push</code> para publicarlos al remoto.</p>",
+    textoPlano: "El ciclo basico de Git: status, add, commit, push. Es el 90% del dia a dia.",
+    tiempoLecturaMin: 3,
+  }),
+  nuevoBloque(uuid("blqFS22"), "sec-fs-3-1", 2, "CODIGO_ILUSTRATIVO", {
+    lenguaje: "bash",
+    codigo:
+      '# ver que cambio\ngit status\n\n# preparar cambios (stage)\ngit add src/nuevo-archivo.ts\ngit add -p   # interactivo: revisa hunk por hunk\n\n# guardar con mensaje\ngit commit -m "feat(login): permitir reset de password"\n\n# publicar al remoto\ngit push origin mi-rama',
+    descripcion: "Comandos del flujo basico. `git add -p` es el mejor amigo para commits limpios.",
+  }),
+  nuevoBloque(uuid("blqFS23"), "sec-fs-3-1", 3, "TIP", {
+    variante: "info",
+    // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML/codigo), no un secreto
+    html: "<p><strong>Mensajes de commit</strong>: usa el formato <em>Conventional Commits</em> — <code>tipo(scope): descripcion</code>. Tipos comunes: <code>feat</code>, <code>fix</code>, <code>refactor</code>, <code>docs</code>, <code>test</code>, <code>chore</code>. Tu yo del futuro te lo agradecera al hacer <code>git log</code>.</p>",
+  }),
+  nuevoBloque(
+    uuid("blqFS24"),
+    "sec-fs-3-1",
+    4,
+    "QUIZ",
+    {
+      intentosMax: null,
+      solucionVisible: "al_aprobar",
+      ordenAleatorio: false,
+      notaMinima: 60,
+      preguntas: [
+        {
+          id: "fs-gitp1",
+          enunciado: "¿Que hace `git stash`?",
+          opciones: [
+            { id: "fs-gitp1o1", texto: "Borra los cambios sin guardar", esCorrecta: false },
+            {
+              id: "fs-gitp1o2",
+              texto:
+                "Guarda los cambios temporalmente fuera del working tree para recuperarlos despues",
+              esCorrecta: true,
+            },
+            { id: "fs-gitp1o3", texto: "Hace push de los cambios sin commit", esCorrecta: false },
+          ],
+          explicacion:
+            "`git stash` aparca los cambios. Se recuperan con `git stash pop` o `git stash apply`.",
+        },
+      ],
+    },
+    { esEvaluable: true, skillQueMideId: ID_SKILL_GIT },
+  ),
+
+  // -- sec-fs-3-2: Git ramas y PRs --
+  nuevoBloque(uuid("blqFS25"), "sec-fs-3-2", 1, "PARRAFO", {
+    html: "<h2>Ramas: trabajo aislado</h2><p>Una rama es un puntero ligero a un commit. Crear una rama es instantaneo y barato. La regla profesional: <strong>una rama por feature o por fix</strong>, fusionada via Pull Request con revision de un compañero.</p>",
+    textoPlano:
+      "Una rama es un puntero a commit. Regla: una rama por feature/fix, mergeada via PR revisado.",
+    tiempoLecturaMin: 4,
+  }),
+  nuevoBloque(uuid("blqFS26"), "sec-fs-3-2", 2, "VIDEO", {
+    // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML/codigo), no un secreto
+    url: "https://www.youtube.com/watch?v=e2IbNHi4uCI",
+    proveedor: "youtube",
+    marcarAlPorcentaje: 80,
+    notas: "Explicacion visual de ramas, merge y rebase.",
+  }),
+  nuevoBloque(uuid("blqFS27"), "sec-fs-3-2", 3, "TIP", {
+    variante: "warning",
+    html: "<p><strong>Rebase vs merge</strong>: usa <code>git merge</code> en ramas publicas que otros usan. Usa <code>git rebase</code> en tu rama personal antes de abrir el PR para mantener el historico lineal. <em>Nunca</em> hagas rebase de commits ya empujados a una rama compartida.</p>",
+  }),
+  nuevoBloque(uuid("blqFS28"), "sec-fs-3-2", 4, "CODIGO_ILUSTRATIVO", {
+    lenguaje: "bash",
+    codigo:
+      '# crear rama desde develop actualizado\ngit checkout develop\ngit pull\ngit checkout -b feat/login-google\n\n# trabajar, commits...\ngit push -u origin feat/login-google\n\n# abrir PR via gh CLI\ngh pr create --title "feat(auth): login con Google" \\\n  --body "Implementa OAuth con provider Google."\n\n# tras aprobacion del review, mergear via UI o:\ngh pr merge --squash --delete-branch',
+    descripcion: "Flujo completo: crear rama, push, abrir PR con gh CLI, mergear con squash.",
+  }),
+  nuevoBloque(
+    uuid("blqFS29"),
+    "sec-fs-3-2",
+    5,
+    "QUIZ",
+    {
+      intentosMax: 3,
+      solucionVisible: "tras_intento",
+      ordenAleatorio: false,
+      notaMinima: 70,
+      preguntas: [
+        {
+          id: "fs-gitp2",
+          enunciado: "¿Que es un fast-forward merge?",
+          opciones: [
+            {
+              id: "fs-gitp2o1",
+              texto:
+                "Cuando Git avanza el puntero de la rama destino sin crear un merge commit porque no hubo divergencia",
+              esCorrecta: true,
+            },
+            {
+              id: "fs-gitp2o2",
+              texto: "Un merge automatico sin revision humana",
+              esCorrecta: false,
+            },
+            { id: "fs-gitp2o3", texto: "Un alias de rebase", esCorrecta: false },
+          ],
+          explicacion:
+            "Fast-forward solo es posible si la rama destino no ha divergido del origen del branch.",
+        },
+      ],
+    },
+    { esEvaluable: true, skillQueMideId: ID_SKILL_GIT },
+  ),
+
+  // -- sec-fs-4-1: Azure servicios core --
+  nuevoBloque(uuid("blqFS30"), "sec-fs-4-1", 1, "PARRAFO", {
+    // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML/Azure), no un secreto
+    html: "<h2>Los 4 servicios de Azure que tienes que conocer</h2><ul><li><strong>App Service</strong> — hosting de apps web y APIs con escalado gestionado.</li><li><strong>Storage Account (Blob)</strong> — almacenamiento de archivos a precio bajo.</li><li><strong>Azure SQL / Cosmos DB</strong> — base de datos relacional o NoSQL gestionada.</li><li><strong>Static Web Apps</strong> — hosting de SPA + Functions integradas, gratis para proyectos pequeños.</li></ul>",
+    textoPlano:
+      "4 servicios Azure clave: App Service, Storage Blob, Azure SQL/Cosmos, Static Web Apps.",
+    tiempoLecturaMin: 4,
+  }),
+  nuevoBloque(uuid("blqFS31"), "sec-fs-4-1", 2, "RECURSO", {
+    subtipo: "enlace",
+    url: "https://learn.microsoft.com/es-es/azure/architecture/guide/",
+    titulo: "Azure Architecture Center",
+    descripcion: "Catalogo oficial de patrones de arquitectura en Azure (Microsoft Learn).",
+    abrirNuevaPestana: true,
+  }),
+  nuevoBloque(uuid("blqFS32"), "sec-fs-4-1", 3, "VIDEO", {
+    url: "https://www.youtube.com/watch?v=Tt6_zP7HrR4",
+    proveedor: "youtube",
+    marcarAlPorcentaje: 80,
+    notas: "Recorrido de los servicios fundamentales de Azure en 15 minutos.",
+  }),
+  nuevoBloque(
+    uuid("blqFS33"),
+    "sec-fs-4-1",
+    4,
+    "QUIZ",
+    {
+      intentosMax: null,
+      solucionVisible: "al_aprobar",
+      ordenAleatorio: false,
+      notaMinima: 60,
+      preguntas: [
+        {
+          id: "fs-azp1",
+          enunciado:
+            "¿Que servicio de Azure es la opcion mas adecuada para hostear una SPA estatica con backend serverless?",
+          opciones: [
+            { id: "fs-azp1o1", texto: "Virtual Machines", esCorrecta: false },
+            { id: "fs-azp1o2", texto: "Static Web Apps", esCorrecta: true },
+            { id: "fs-azp1o3", texto: "Blob Storage solo", esCorrecta: false },
+          ],
+          explicacion:
+            "Static Web Apps combina hosting estatico (CDN global) con Azure Functions integradas y CI/CD desde GitHub.",
+        },
+      ],
+    },
+    { esEvaluable: true, skillQueMideId: ID_SKILL_AZURE },
+  ),
+
+  // -- sec-fs-4-2: Azure deploy basico --
+  nuevoBloque(uuid("blqFS34"), "sec-fs-4-2", 1, "PARRAFO", {
+    html: "<h2>Deploy en 4 pasos con la CLI</h2><p>La <code>az</code> CLI es la forma profesional de hablar con Azure: scriptable, versionable y reproducible. Resource group → crear servicio → configurar → desplegar.</p>",
+    textoPlano:
+      "Deploy basico con az CLI: resource group, servicio, configuracion, push de codigo.",
+    tiempoLecturaMin: 3,
+  }),
+  nuevoBloque(uuid("blqFS35"), "sec-fs-4-2", 2, "CODIGO_ILUSTRATIVO", {
+    lenguaje: "bash",
+    codigo:
+      '# login y seleccionar suscripcion\naz login\naz account set --subscription "Mi Suscripcion"\n\n# crear resource group\naz group create --name rg-demo --location westeurope\n\n# crear App Service (plan + app)\naz appservice plan create --name plan-demo --resource-group rg-demo --sku B1\naz webapp create --name miapp-demo --plan plan-demo --resource-group rg-demo --runtime "NODE:20-lts"\n\n# desplegar codigo desde un zip\naz webapp deploy --resource-group rg-demo --name miapp-demo --src-path ./dist.zip',
+    descripcion: "Despliegue minimo de una app Node a Azure App Service.",
+  }),
+  nuevoBloque(uuid("blqFS36"), "sec-fs-4-2", 3, "TIP", {
+    variante: "info",
+    // biome-ignore lint/nursery/noSecrets: contenido literal de seed mock (HTML/codigo), no un secreto
+    html: "<p><strong>Infraestructura como codigo</strong>: para proyectos serios usa <strong>Bicep</strong> (DSL moderno y legible, oficial de Microsoft) en lugar de ARM templates (JSON verboso). Bicep compila a ARM, asi que el motor es el mismo.</p>",
+  }),
+  nuevoBloque(
+    uuid("blqFS37"),
+    "sec-fs-4-2",
+    4,
+    "QUIZ",
+    {
+      intentosMax: 3,
+      solucionVisible: "tras_intento",
+      ordenAleatorio: false,
+      notaMinima: 70,
+      preguntas: [
+        {
+          id: "fs-azp2",
+          enunciado:
+            "¿Cual es el comando correcto para subir un archivo a un contenedor de Blob Storage?",
+          opciones: [
+            {
+              id: "fs-azp2o1",
+              texto: "az blob upload --container-name fotos --file ./hola.png",
+              esCorrecta: false,
+            },
+            {
+              id: "fs-azp2o2",
+              texto:
+                "az storage blob upload --container-name fotos --name hola.png --file ./hola.png --account-name micuenta",
+              esCorrecta: true,
+            },
+            { id: "fs-azp2o3", texto: "az upload blob ./hola.png", esCorrecta: false },
+          ],
+          explicacion:
+            "El comando vive bajo `az storage blob`, requiere el nombre destino del blob y la cuenta de storage.",
+        },
+      ],
+    },
+    { esEvaluable: true, skillQueMideId: ID_SKILL_AZURE },
   ),
 ]
