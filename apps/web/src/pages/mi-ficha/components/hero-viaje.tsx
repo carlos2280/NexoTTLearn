@@ -1,4 +1,5 @@
 import { Button } from "@/shared/components/ui/button"
+import { FirmaNombre } from "@/shared/components/ui/firma-nombre"
 import type { FichaPorAreaItem, FichaSkillItem } from "@nexott-learn/shared-types"
 import {
   areasConActividad,
@@ -34,7 +35,7 @@ export function HeroViaje({ nombre, porArea, skills }: HeroViajeProps) {
       <div className="flex flex-col gap-3">
         <span className="nx-eyebrow text-aurora-violet">Tu ficha</span>
         <h1 className="max-w-[28ch] text-display-md text-text-primary">
-          <span className="font-normal font-serif text-aurora-violet italic">{nombre}</span>
+          <FirmaNombre nombre={nombre} tono="aurora" />
           <span>{sufijo}</span>
         </h1>
         {areas > 0 ? (

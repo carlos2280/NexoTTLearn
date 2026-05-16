@@ -1,4 +1,5 @@
 import type { UsuarioSesion } from "@/features/auth/types"
+import { FirmaNombre } from "@/shared/components/ui/firma-nombre"
 import { motion, useReducedMotion } from "framer-motion"
 
 interface PasoDespedidaProps {
@@ -32,10 +33,8 @@ export function PasoDespedida({ usuario }: PasoDespedidaProps) {
           initial={reducedMotion ? { opacity: 1 } : { opacity: 0, y: 24, filter: "blur(10px)" }}
           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           transition={{ delay: 0.45, duration: 0.8, ease }}
-          className="font-normal font-serif text-warmth italic"
         >
-          {nombre}
-          <span className="text-text-tertiary">.</span>
+          <FirmaNombre nombre={nombre} tono="warmth" withDot={true} />
         </motion.span>
       </motion.h2>
 
