@@ -1,54 +1,30 @@
-import { cn } from "@/shared/lib/cn"
+import { Banner } from "@/shared/components/ui/banner"
 import { sanitizarHtml } from "@/shared/lib/sanitize-html"
 import { type VarianteTip, contenidoTipSchema } from "@nexott-learn/shared-types"
-import { CheckCircle2, Info, TriangleAlert } from "lucide-react"
 
 interface BloqueTipProps {
   readonly contenido: Record<string, unknown> | null
 }
 
-const ESTILOS: Record<
-  VarianteTip,
-  {
-    readonly borde: string
-    readonly bg: string
-    readonly icono: typeof Info
-    readonly iconoColor: string
-    readonly eyebrow: string
-    readonly eyebrowColor: string
-  }
-> = {
-  info: {
-    borde: "border-info/30",
-    bg: "bg-info-soft",
-    icono: Info,
-    iconoColor: "text-info",
-    eyebrow: "Info",
-    eyebrowColor: "text-info-on-soft",
-  },
-  warning: {
-    borde: "border-warning/30",
-    bg: "bg-warning-soft",
-    icono: TriangleAlert,
-    iconoColor: "text-warning",
-    eyebrow: "Atención",
-    eyebrowColor: "text-warning-on-soft",
-  },
-  exito: {
-    borde: "border-success/30",
-    bg: "bg-success-soft",
-    icono: CheckCircle2,
-    iconoColor: "text-success",
-    eyebrow: "Buena práctica",
-    eyebrowColor: "text-success-on-soft",
-  },
+/**
+ * Render del bloque TIP. Delega al componente base `<Banner>` para heredar
+ * la identidad NexoTT (callout editorial en info/neutral; feedback
+ * funcional saturado en warning/exito). Antes este bloque duplicaba el
+ * patrón con su propio borde/icono/fondo, lo que producía un look
+ * Bootstrap-style genérico fuera de la identidad.
+ */
+const TONO_POR_VARIANTE: Record<VarianteTip, "info" | "warning" | "success"> = {
+  info: "info",
+  warning: "warning",
+  exito: "success",
 }
 
-/**
- * Render del bloque TIP. Callout con borde semántico izquierdo (4px) + bg
- * soft + icono. Las 3 variantes (info, warning, éxito) son colores de la
- * capa "feedback" (manifiesto §3 capas).
- */
+const TITULO_POR_VARIANTE: Record<VarianteTip, string> = {
+  info: "Nota",
+  warning: "Atención",
+  exito: "Buena práctica",
+}
+
 export function BloqueTip({ contenido }: BloqueTipProps) {
   const parsed = contenidoTipSchema.safeParse(contenido)
   if (!parsed.success) {
@@ -58,30 +34,16 @@ export function BloqueTip({ contenido }: BloqueTipProps) {
   if (html.trim().length === 0) {
     return null
   }
-  const estilo = ESTILOS[parsed.data.variante]
-  const Icono = estilo.icono
+  const tono = TONO_POR_VARIANTE[parsed.data.variante]
+  const titulo = TITULO_POR_VARIANTE[parsed.data.variante]
 
   return (
-    <aside
-      className={cn(
-        "relative flex flex-col gap-2 overflow-hidden rounded-2xl border p-5 pl-6",
-        estilo.borde,
-        estilo.bg,
-      )}
-    >
-      <span
-        aria-hidden={true}
-        className={cn("absolute inset-y-0 left-0 w-1", estilo.iconoColor.replace("text-", "bg-"))}
-      />
-      <div className="flex items-center gap-2">
-        <Icono className={cn("h-4 w-4", estilo.iconoColor)} aria-hidden={true} />
-        <span className={cn("nx-eyebrow", estilo.eyebrowColor)}>{estilo.eyebrow}</span>
-      </div>
+    <Banner tone={tono} title={titulo}>
       <div
-        className="tiptap max-w-prose text-body-sm text-text-primary"
+        className="tiptap max-w-prose"
         // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML del editor Tiptap, sanitizado.
         dangerouslySetInnerHTML={{ __html: html }}
       />
-    </aside>
+    </Banner>
   )
 }
