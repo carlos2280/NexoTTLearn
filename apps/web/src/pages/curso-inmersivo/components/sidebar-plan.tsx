@@ -8,6 +8,13 @@ import type {
   SeccionPlanItemParticipante,
 } from "@nexott-learn/shared-types"
 import { CheckCircle2, Circle, CircleDashed } from "lucide-react"
+import type {
+  DisponibilidadEntrevistaIaConMotivo,
+  DisponibilidadTransversalConMotivo,
+} from "../types"
+import { BloqueHitosSidebar } from "./bloque-hitos-sidebar"
+
+type HitoTipo = "transversal" | "entrevistaIa"
 
 interface SidebarPlanProps {
   readonly modo: ModoCursoParticipante
@@ -16,6 +23,10 @@ interface SidebarPlanProps {
   readonly errorPlan: Error | null
   readonly seccionActivaId: string | null
   readonly onSeleccionar: (seccionId: string) => void
+  readonly transversal: DisponibilidadTransversalConMotivo | undefined
+  readonly entrevistaIa: DisponibilidadEntrevistaIaConMotivo | undefined
+  readonly hitoActivo: HitoTipo | null
+  readonly onAbrirHito: (hito: HitoTipo) => void
 }
 
 /**
@@ -32,6 +43,10 @@ export function SidebarPlan({
   errorPlan,
   seccionActivaId,
   onSeleccionar,
+  transversal,
+  entrevistaIa,
+  hitoActivo,
+  onAbrirHito,
 }: SidebarPlanProps) {
   if (modo === "asignado" && errorPlan && (!plan || plan.items.length === 0)) {
     return (
@@ -81,6 +96,14 @@ export function SidebarPlan({
             />
           ))}
         </nav>
+        {modo !== "preview" ? (
+          <BloqueHitosSidebar
+            transversal={transversal}
+            entrevistaIa={entrevistaIa}
+            hitoActivo={hitoActivo}
+            onAbrirHito={onAbrirHito}
+          />
+        ) : null}
       </div>
       <FooterAtajos />
     </aside>

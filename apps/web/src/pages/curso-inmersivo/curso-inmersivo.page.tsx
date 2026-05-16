@@ -1,11 +1,13 @@
 import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
-import { Button } from "@/shared/components/ui/button"
 import { RUTAS } from "@/shared/constants/rutas"
+import { useCallback, useState } from "react"
 import { Navigate, useNavigate, useParams } from "react-router-dom"
+import { CanvasHitoPlaceholder } from "./components/canvas-hito-placeholder"
 import { CanvasSeccion } from "./components/canvas-seccion"
 import { CursoInmersivoSkeleton } from "./components/curso-inmersivo-skeleton"
 import { FooterPreviewInscripcion } from "./components/footer-preview-inscripcion"
 import { PanelContexto } from "./components/panel-contexto"
+import { PantallaError } from "./components/pantalla-error"
 import { SidebarPlan } from "./components/sidebar-plan"
 import { TopbarInmersivo } from "./components/topbar-inmersivo"
 import { useAtajosCurso } from "./hooks/use-atajos-curso"
@@ -13,21 +15,22 @@ import { useCursoInmersivo } from "./hooks/use-curso-inmersivo"
 import { useEfectoApertura } from "./hooks/use-efecto-apertura"
 import { useSeccionActiva } from "./hooks/use-seccion-activa"
 
+type HitoTipo = "transversal" | "entrevistaIa"
+
 /**
  * Página inmersiva del curso. Vive FUERA del `ParticipanteShell` — pantalla
  * completa para que el participante pase aquí el grueso del tiempo sin ruido
  * de navegación de producto.
  *
- * Tres modos unificados (decididos por `GET /me/cursos/:cursoId/arbol`):
+ * Coordina dos "lugares" del canvas central:
+ *  - Sección normal (`seccion.seccionActiva`) — lectura + evaluables.
+ *  - Hito de cierre (`hitoActivo`) — Transversal o Entrevista IA, canvas
+ *    especializado SIN cambio de ruta (decisión 2026-05-15).
  *
+ * Tres modos unificados (decididos por `GET /me/cursos/:cursoId/arbol`):
  *  - `asignado`   — 3 columnas: sidebar plan · canvas · panel contexto.
- *                   Plan personal completo, bloques evaluables activos.
- *  - `voluntario` — 3 columnas idem, pero sidebar muestra TOC del catalogo
- *                   (no plan; D-AS-1). Avance y disponibilidades de
- *                   transversal/IA siguen activos para autoevaluacion.
- *  - `preview`    — 2 columnas: sidebar TOC · canvas. Footer sticky con CTA
- *                   "Inscribirme como voluntario". Bloques evaluables se
- *                   muestran en lectura con candado.
+ *  - `voluntario` — 3 columnas idem, sidebar TOC del catálogo (D-AS-1).
+ *  - `preview`    — 2 columnas, footer con CTA inscripción.
  */
 export function CursoInmersivoPage() {
   const navigate = useNavigate()
@@ -39,6 +42,20 @@ export function CursoInmersivoPage() {
     plan: detalle.plan,
     avance: detalle.avance,
   })
+  const [hitoActivo, setHitoActivo] = useState<HitoTipo | null>(null)
+
+  const seleccionarSeccion = useCallback(
+    (seccionId: string) => {
+      setHitoActivo(null)
+      seccion.seleccionar(seccionId)
+    },
+    [seccion],
+  )
+
+  const abrirHito = useCallback((hito: HitoTipo) => {
+    setHitoActivo(hito)
+  }, [])
+
   useEfectoApertura({
     asignacionId: detalle.asignacionId,
     seccionActiva: seccion.seccionActiva,
@@ -46,7 +63,7 @@ export function CursoInmersivoPage() {
   useAtajosCurso({
     arbol: detalle.arbol?.modulos ?? [],
     seccionActivaId: seccion.seccionActiva?.seccionId ?? null,
-    onSeleccionar: seccion.seleccionar,
+    onSeleccionar: seleccionarSeccion,
     onSalir: () => navigate(RUTAS.bandeja),
   })
 
@@ -75,9 +92,6 @@ export function CursoInmersivoPage() {
     )
   }
 
-  if (!(detalle.arbol && detalle.modo)) {
-    return null
-  }
   return (
     <CursoInmersivoLayout
       arbol={detalle.arbol}
@@ -88,7 +102,9 @@ export function CursoInmersivoPage() {
       plan={detalle.plan}
       errorPlan={detalle.errorPlan}
       seccionActiva={seccion.seccionActiva}
-      onSeleccionar={seccion.seleccionar}
+      hitoActivo={hitoActivo}
+      onSeleccionarSeccion={seleccionarSeccion}
+      onAbrirHito={abrirHito}
       colaboradorId={usuario?.colaboradorId ?? null}
     />
   )
@@ -103,7 +119,9 @@ interface CursoInmersivoLayoutProps {
   readonly plan: ReturnType<typeof useCursoInmersivo>["plan"]
   readonly errorPlan: ReturnType<typeof useCursoInmersivo>["errorPlan"]
   readonly seccionActiva: ReturnType<typeof useSeccionActiva>["seccionActiva"]
-  readonly onSeleccionar: (seccionId: string) => void
+  readonly hitoActivo: HitoTipo | null
+  readonly onSeleccionarSeccion: (seccionId: string) => void
+  readonly onAbrirHito: (hito: HitoTipo) => void
   readonly colaboradorId: string | null
 }
 
@@ -117,10 +135,12 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
     plan,
     errorPlan,
     seccionActiva,
-    onSeleccionar,
+    hitoActivo,
+    onSeleccionarSeccion,
+    onAbrirHito,
     colaboradorId,
   } = props
-  const seccionActivaId = seccionActiva?.seccionId ?? null
+  const seccionActivaId = hitoActivo === null ? (seccionActiva?.seccionId ?? null) : null
   const esPreview = modo === "preview"
   const muestraPanelContexto = !esPreview && avance !== undefined
   const grid = muestraPanelContexto
@@ -132,6 +152,7 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
       <TopbarInmersivo
         cursoTitulo={arbol.curso.titulo}
         clienteNombre={arbol.curso.cliente.nombre}
+        areaPrincipal={arbol.curso.areaPrincipal}
         porcentajeAvance={avance?.porcentajeAvance ?? null}
       />
       <div className={grid}>
@@ -141,21 +162,30 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
           plan={plan}
           errorPlan={errorPlan}
           seccionActivaId={seccionActivaId}
-          onSeleccionar={onSeleccionar}
+          onSeleccionar={onSeleccionarSeccion}
+          transversal={transversal}
+          entrevistaIa={entrevistaIa}
+          hitoActivo={hitoActivo}
+          onAbrirHito={onAbrirHito}
         />
-        <CanvasSeccion
-          seccionActiva={seccionActiva}
-          modo={modo}
-          cursoId={arbol.curso.id}
-          colaboradorId={colaboradorId}
-        />
+        {hitoActivo === null ? (
+          <CanvasSeccion
+            seccionActiva={seccionActiva}
+            modo={modo}
+            cursoId={arbol.curso.id}
+            colaboradorId={colaboradorId}
+          />
+        ) : (
+          <CanvasHitoPlaceholder hito={hitoActivo} />
+        )}
         {muestraPanelContexto && avance ? (
           <PanelContexto
             avance={avance}
             transversal={transversal}
             entrevistaIa={entrevistaIa}
             seccionActivaId={seccionActivaId}
-            onIrASiguiente={onSeleccionar}
+            onIrASiguiente={onSeleccionarSeccion}
+            onAbrirHito={onAbrirHito}
           />
         ) : null}
       </div>
@@ -166,26 +196,6 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
           areaCodigo={arbol.curso.areaPrincipal?.codigo ?? null}
         />
       ) : null}
-    </div>
-  )
-}
-
-interface PantallaErrorProps {
-  readonly titulo: string
-  readonly descripcion: string
-  readonly onVolver: () => void
-}
-
-function PantallaError({ titulo, descripcion, onVolver }: PantallaErrorProps) {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-canvas px-6">
-      <article className="flex max-w-md flex-col items-center gap-3 text-center">
-        <h2 className="text-h2 text-text-primary">{titulo}</h2>
-        <p className="text-body text-text-secondary">{descripcion}</p>
-        <div className="mt-2">
-          <Button onClick={onVolver}>Volver a la bandeja</Button>
-        </div>
-      </article>
     </div>
   )
 }
