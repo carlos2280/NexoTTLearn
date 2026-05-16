@@ -45,11 +45,24 @@ export function DrawerHistorico({
       ) : null}
 
       {data && data.length > 0 ? (
-        <ol className="flex flex-col gap-5">
-          {data.map((entrada) => (
-            <EntradaItem key={entrada.id} entrada={entrada} />
-          ))}
-        </ol>
+        <>
+          <ol className="flex flex-col gap-5">
+            {data.map((entrada) => (
+              <EntradaItem key={entrada.id} entrada={entrada} />
+            ))}
+          </ol>
+          {data.some((e) => e.valor !== null) ? (
+            <p className="mt-6 border-border border-t pt-4 text-caption text-text-tertiary">
+              Niveles: <span className="text-text-secondary">Inicial</span> (&lt;50){" "}
+              <span className="text-text-disabled">·</span>{" "}
+              <span className="text-text-secondary">En desarrollo</span> (50–69){" "}
+              <span className="text-text-disabled">·</span>{" "}
+              <span className="text-text-secondary">Solido</span> (70–84){" "}
+              <span className="text-text-disabled">·</span>{" "}
+              <span className="text-text-secondary">Excelencia</span> (85+).
+            </p>
+          ) : null}
+        </>
       ) : null}
     </SidePeek>
   )
@@ -78,6 +91,7 @@ function EntradaItem({ entrada }: EntradaItemProps) {
           {entrada.valor !== null ? (
             <span className="tabular font-mono text-caption text-text-tertiary">
               {entrada.valor}
+              <span className="text-text-disabled">/100</span>
             </span>
           ) : null}
         </div>
