@@ -1,4 +1,5 @@
 import type {
+  CursoArbolResponse,
   CursoDetalle,
   DisponibilidadEntrevistaIaResponse,
   DisponibilidadTransversalResponse,
@@ -8,14 +9,43 @@ import type {
 import { ApiError } from "../api-error"
 import { type MockRequest, defineRoute } from "./router"
 
+// TODO B-4: cuando el backend implemente `caminoHaciaApto.porArea` en
+// `MeAvanceCursoResponse`, borrar este tipo local y usar el oficial.
+interface MockCaminoPorArea {
+  readonly areaId: string
+  readonly areaCodigo: string
+  readonly areaNombre: string
+  readonly skillsExigidas: number
+  readonly skillsDemostradas: number
+  readonly nivelCualitativo: "solido" | "enDesarrollo" | "porExplorar"
+}
+type MockAvanceConCamino = MeAvanceCursoResponse & {
+  readonly caminoHaciaApto: {
+    readonly faltantesParaApto: number
+    readonly estaListo: boolean
+    readonly porArea: readonly MockCaminoPorArea[]
+  }
+}
+
+// TODO B-6: cuando el backend implemente `motivoBloqueo` en disponibilidades,
+// borrar estos tipos locales y usar los oficiales.
+type MockDispTransversal = DisponibilidadTransversalResponse & {
+  readonly motivoBloqueo: string | null
+}
+type MockDispEntrevistaIa = DisponibilidadEntrevistaIaResponse & {
+  readonly motivoBloqueo: string | null
+}
+
 const RTE_CURSO_DETALLE = /^\/cursos\/([^/?]+)(\?.*)?$/
 const RTE_AVANCE_CURSO = /^\/me\/avance\/cursos\/([^/?]+)(\?.*)?$/
+const RTE_ARBOL_CURSO = /^\/me\/cursos\/([^/?]+)\/arbol(\?.*)?$/
 const RTE_PLAN = /^\/asignaciones\/([^/]+)\/plan$/
 const RTE_DISP_TRANSVERSAL = /^\/asignaciones\/([^/]+)\/transversal\/disponibilidad$/
 const RTE_DISP_IA = /^\/asignaciones\/([^/]+)\/entrevista-ia\/disponibilidad$/
 
 const RGX_CURSO_ID = /^\/cursos\/([^/?]+)/
 const RGX_AVANCE_CURSO_ID = /^\/me\/avance\/cursos\/([^/?]+)/
+const RGX_ARBOL_CURSO_ID = /^\/me\/cursos\/([^/?]+)\/arbol/
 const RGX_PLAN_ASIG_ID = /^\/asignaciones\/([^/]+)\/plan/
 const RGX_TRANS_ASIG_ID = /^\/asignaciones\/([^/]+)\/transversal/
 
@@ -269,7 +299,7 @@ function buildPlanFallback(asignacionId: string): PlanResponseParticipante {
   }
 }
 
-const AVANCE_JAVA: MeAvanceCursoResponse = {
+const AVANCE_JAVA: MockAvanceConCamino = {
   cursoId: "curso-java-senior",
   estaCerrado: false,
   porcentajeAvance: 62,
@@ -287,9 +317,40 @@ const AVANCE_JAVA: MeAvanceCursoResponse = {
     moduloId: "mod-java-2",
     titulo: "APIs REST con Spring",
   },
+  // TODO B-4: backend debe devolver este bloque agregado por área (sin skills granulares).
+  caminoHaciaApto: {
+    faltantesParaApto: 4,
+    estaListo: false,
+    porArea: [
+      {
+        areaId: "area-backend",
+        areaCodigo: "backend",
+        areaNombre: "Backend",
+        skillsExigidas: 5,
+        skillsDemostradas: 3,
+        nivelCualitativo: "enDesarrollo",
+      },
+      {
+        areaId: "area-data",
+        areaCodigo: "data",
+        areaNombre: "Data",
+        skillsExigidas: 3,
+        skillsDemostradas: 1,
+        nivelCualitativo: "porExplorar",
+      },
+      {
+        areaId: "area-cloud",
+        areaCodigo: "cloud",
+        areaNombre: "Cloud",
+        skillsExigidas: 4,
+        skillsDemostradas: 4,
+        nivelCualitativo: "solido",
+      },
+    ],
+  },
 }
 
-function buildAvanceFallback(cursoId: string): MeAvanceCursoResponse {
+function buildAvanceFallback(cursoId: string): MockAvanceConCamino {
   return {
     cursoId,
     estaCerrado: false,
@@ -300,7 +361,123 @@ function buildAvanceFallback(cursoId: string): MeAvanceCursoResponse {
       { skillId: "sk-x1", etiqueta: "skill.demo", notaActual: 50, claseColor: "amarillo" },
     ],
     siguienteSeccion: null,
+    // TODO B-4: backend debe devolver este bloque agregado por área.
+    caminoHaciaApto: {
+      faltantesParaApto: 6,
+      estaListo: false,
+      porArea: [
+        {
+          areaId: "area-frontend",
+          areaCodigo: "frontend",
+          areaNombre: "Frontend",
+          skillsExigidas: 4,
+          skillsDemostradas: 1,
+          nivelCualitativo: "porExplorar",
+        },
+        {
+          areaId: "area-backend",
+          areaCodigo: "backend",
+          areaNombre: "Backend",
+          skillsExigidas: 3,
+          skillsDemostradas: 0,
+          nivelCualitativo: "porExplorar",
+        },
+      ],
+    },
   }
+}
+
+const ARBOL_JAVA: CursoArbolResponse = {
+  modo: "asignado",
+  asignacionId: "asg-java-001",
+  curso: {
+    id: "curso-java-senior",
+    titulo: "Java Senior",
+    estado: "ACTIVO",
+    fechaInicio: diasDesdeHoy(-30),
+    fechaDeadline: diasDesdeHoy(45),
+    cliente: { id: CLIENTE_DEMO, nombre: "Banco Demo" },
+    areaPrincipal: { id: "area-backend", nombre: "Backend", codigo: "backend" },
+    skillsDestacadas: [
+      { id: "sk-1", etiquetaVisible: "Spring Boot", areaCodigo: "backend" },
+      { id: "sk-2", etiquetaVisible: "Spring Data", areaCodigo: "backend" },
+      { id: "sk-3", etiquetaVisible: "JPA", areaCodigo: "backend" },
+      { id: "sk-4", etiquetaVisible: "Testing JVM", areaCodigo: "qa" },
+    ],
+  },
+  modulos: [
+    {
+      moduloId: "mod-java-1",
+      titulo: "Java Fundamentos",
+      orden: 1,
+      secciones: [
+        { seccionId: "sec-j1-1", titulo: "Sintaxis básica", orden: 1, totalBloques: 4 },
+        { seccionId: "sec-j1-2", titulo: "POO con Java", orden: 2, totalBloques: 6 },
+        { seccionId: "sec-j1-3", titulo: "Streams y lambdas", orden: 3, totalBloques: 5 },
+      ],
+    },
+    {
+      moduloId: "mod-java-2",
+      titulo: "Spring Boot",
+      orden: 2,
+      secciones: [
+        { seccionId: "sec-j2-1", titulo: "Sintaxis Spring", orden: 1, totalBloques: 5 },
+        { seccionId: "sec-j2-2", titulo: "APIs REST con Spring", orden: 2, totalBloques: 6 },
+        { seccionId: "sec-j2-3", titulo: "Spring Security", orden: 3, totalBloques: 4 },
+        { seccionId: "sec-j2-4", titulo: "Spring Data", orden: 4, totalBloques: 5 },
+      ],
+    },
+    {
+      moduloId: "mod-java-3",
+      titulo: "Persistencia",
+      orden: 3,
+      secciones: [
+        { seccionId: "sec-j3-1", titulo: "JPA básico", orden: 1, totalBloques: 4 },
+        { seccionId: "sec-j3-2", titulo: "Transacciones", orden: 2, totalBloques: 4 },
+        { seccionId: "sec-j3-3", titulo: "Tuning de queries", orden: 3, totalBloques: 3 },
+      ],
+    },
+  ],
+}
+
+function buildArbolFallback(cursoId: string): CursoArbolResponse {
+  return {
+    modo: "asignado",
+    asignacionId: asignacionDesdeCursoId(cursoId),
+    curso: {
+      id: cursoId,
+      titulo: "Curso demo",
+      estado: "ACTIVO",
+      fechaInicio: diasDesdeHoy(-15),
+      fechaDeadline: diasDesdeHoy(30),
+      cliente: { id: CLIENTE_DEMO, nombre: "Cliente demo" },
+      areaPrincipal: { id: "area-frontend", nombre: "Frontend", codigo: "frontend" },
+      skillsDestacadas: [],
+    },
+    modulos: [
+      {
+        moduloId: "mod-demo-1",
+        titulo: "Introducción",
+        orden: 1,
+        secciones: [
+          { seccionId: "sec-demo-1-1", titulo: "Bienvenida", orden: 1, totalBloques: 2 },
+          { seccionId: "sec-demo-1-2", titulo: "Primeros pasos", orden: 2, totalBloques: 3 },
+          { seccionId: "sec-demo-1-3", titulo: "Profundización", orden: 3, totalBloques: 5 },
+        ],
+      },
+    ],
+  }
+}
+
+function handlerArbolCurso(req: MockRequest): CursoArbolResponse {
+  const cursoId = extraerId(req.path, RGX_ARBOL_CURSO_ID)
+  if (!cursoId) {
+    throw new ApiError(404, "NOT_FOUND", "Curso no encontrado")
+  }
+  if (cursoId === "curso-java-senior") {
+    return ARBOL_JAVA
+  }
+  return buildArbolFallback(cursoId)
 }
 
 function handlerCursoDetalle(req: MockRequest): CursoDetalle {
@@ -311,7 +488,7 @@ function handlerCursoDetalle(req: MockRequest): CursoDetalle {
   return CURSOS_DETALLE.get(cursoId) ?? buildCursoFallback(cursoId)
 }
 
-function handlerAvanceCurso(req: MockRequest): MeAvanceCursoResponse {
+function handlerAvanceCurso(req: MockRequest): MockAvanceConCamino {
   const cursoId = extraerId(req.path, RGX_AVANCE_CURSO_ID)
   if (!cursoId) {
     throw new ApiError(404, "NOT_FOUND", "Curso no encontrado")
@@ -330,22 +507,26 @@ function handlerPlan(req: MockRequest): PlanResponseParticipante {
   return buildPlanFallback(asignacionId)
 }
 
-function handlerDispTransversal(req: MockRequest): DisponibilidadTransversalResponse {
+function handlerDispTransversal(req: MockRequest): MockDispTransversal {
   const asignacionId = extraerId(req.path, RGX_TRANS_ASIG_ID)
   const disponible = asignacionId === "asg-java-001"
   return {
     disponible,
     razon: disponible ? "PLAN_COMPLETADO" : "BLOQUEADO_PLAN_INCOMPLETO",
     fechaDisponibleDesde: disponible ? diasDesdeHoy(-1) : null,
+    // TODO B-6: backend debe devolver `motivoBloqueo` para no hardcodear copy en cliente.
+    motivoBloqueo: disponible ? null : "Completa tu plan de estudio",
   }
 }
 
-function handlerDispEntrevistaIa(_req: MockRequest): DisponibilidadEntrevistaIaResponse {
+function handlerDispEntrevistaIa(_req: MockRequest): MockDispEntrevistaIa {
   return {
     disponible: false,
     razon: "PLAN_INCOMPLETO",
     intentosUsadosHoy: 0,
     maxPorHora: 5,
+    // TODO B-6: backend debe devolver `motivoBloqueo` para no hardcodear copy en cliente.
+    motivoBloqueo: "Aprueba el proyecto transversal",
   }
 }
 
@@ -354,6 +535,7 @@ function handlerDispEntrevistaIa(_req: MockRequest): DisponibilidadEntrevistaIaR
 export const _internalAsignacionDesdeCursoId = asignacionDesdeCursoId
 
 export const handlersCursoDetalle = [
+  defineRoute("GET", RTE_ARBOL_CURSO, handlerArbolCurso),
   defineRoute("GET", RTE_CURSO_DETALLE, handlerCursoDetalle),
   defineRoute("GET", RTE_AVANCE_CURSO, handlerAvanceCurso),
   defineRoute("GET", RTE_PLAN, handlerPlan),
