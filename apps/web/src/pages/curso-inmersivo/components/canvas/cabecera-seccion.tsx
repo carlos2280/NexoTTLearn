@@ -9,7 +9,7 @@ interface CabeceraSeccionProps {
 export function CabeceraSeccion({ seccion, modo }: CabeceraSeccionProps) {
   return (
     <header className="flex flex-col gap-2">
-      <span className="nx-eyebrow text-aurora-violet">{eyebrowDeSeccion(seccion, modo)}</span>
+      <span className="nx-eyebrow text-text-tertiary">{eyebrowDeSeccion(seccion, modo)}</span>
       <h2 className="text-display-md text-text-primary leading-tight">{seccion.titulo}</h2>
       <p className="text-body-sm text-text-tertiary">{copySubtitulo(seccion, modo)}</p>
     </header>
@@ -17,13 +17,14 @@ export function CabeceraSeccion({ seccion, modo }: CabeceraSeccionProps) {
 }
 
 function eyebrowDeSeccion(seccion: SeccionActiva, modo: ModoCursoParticipante): string {
+  const base = `Módulo ${seccion.moduloOrden} · ${seccion.moduloTitulo}`
   if (modo === "preview") {
-    return "Vista previa"
+    return `${base} · Vista previa`
   }
   if (seccion.caracter === "OPCIONAL") {
-    return "Sección opcional"
+    return `${base} · Opcional`
   }
-  return "Sección"
+  return base
 }
 
 function copySubtitulo(seccion: SeccionActiva, modo: ModoCursoParticipante): string {
@@ -33,8 +34,9 @@ function copySubtitulo(seccion: SeccionActiva, modo: ModoCursoParticipante): str
   if (seccion.completada) {
     return "Ya completaste esta sección. Puedes repasarla cuando quieras."
   }
-  if (seccion.avance && seccion.avance.bloquesTotales > 0) {
-    return `${seccion.avance.bloquesCompletados} de ${seccion.avance.bloquesTotales} bloques evaluables completados.`
+  const evaluables = seccion.avance?.bloquesTotales ?? 0
+  if (evaluables > 0) {
+    return `Esta sección tiene ${evaluables} ${evaluables === 1 ? "bloque evaluable" : "bloques evaluables"}.`
   }
   return "Sección de lectura — se marca como completada al abrirla."
 }
