@@ -9,7 +9,7 @@ import { Play, RotateCcw } from "lucide-react"
 import { Cabecera } from "./codigo-preguntas/cabecera"
 import { PanelEnunciado } from "./codigo-preguntas/panel-enunciado"
 import { ResultadoIntento } from "./codigo-preguntas/resultado-intento"
-import { ResultadosTests } from "./codigo-preguntas/resultados-tests"
+import { TerminalTests } from "./codigo-preguntas/terminal-tests"
 import { useFlujoCodigoPregunta } from "./codigo-preguntas/use-flujo-codigo-pregunta"
 
 interface BloqueCodigoPreguntasProps {
@@ -21,12 +21,26 @@ interface BloqueCodigoPreguntasProps {
 
 const NOTA_APROBADO_DEFAULT = 60
 
+const NOMBRE_ARCHIVO_POR_LENGUAJE: Record<string, string> = {
+  javascript: "solucion.js",
+  typescript: "solucion.ts",
+  python: "solucion.py",
+  java: "Solucion.java",
+  bash: "solucion.sh",
+  html: "solucion.html",
+}
+
+function nombreArchivo(lenguaje: string): string {
+  return NOMBRE_ARCHIVO_POR_LENGUAJE[lenguaje] ?? "solucion.txt"
+}
+
 /**
  * Bloque CODIGO_PREGUNTAS — reto de código.
  *
- *  - Layout split: enunciado a la izquierda · editor + resultados a la derecha.
+ *  - Layout vertical: enunciado arriba (ancho completo) + frame IDE
+ *    abajo (top bar tipo VSCode + editor + terminal integrada).
  *  - Siempre auto-corregible: el bloque exige un `CODIGO_TESTS` hermano con
- *    pares stdin/stdout. El backend ejecuta los tests en el navegador
+ *    pares stdin/stdout. El runner ejecuta los tests en el navegador
  *    (Pyodide / Web Worker) y persiste el intento con la nota recalculada.
  *  - Si la sección está mal configurada (sin `CODIGO_TESTS` hermano) el
  *    botón queda deshabilitado; el admin debe arreglarlo desde el builder.
@@ -61,56 +75,92 @@ interface RetoActivoProps {
 function RetoActivo({ bloqueId, cursoId, contenido, contenidoTests }: RetoActivoProps) {
   const flujo = useFlujoCodigoPregunta({ bloqueId, cursoId, contenido, contenidoTests })
   const isPending = flujo.isEjecutando || flujo.isEnviando
+  const puedeReset = !isPending && flujo.codigo !== contenido.esqueletoInicial
+  const archivo = nombreArchivo(contenido.lenguaje)
 
   return (
-    <article
-      className="relative flex flex-col gap-5 overflow-hidden rounded-2xl border border-border bg-surface p-6"
-      style={{ boxShadow: "var(--shadow-card-resting)" }}
-    >
+    <article className="flex flex-col gap-5">
       <Cabecera lenguaje={contenido.lenguaje} />
-      <div className="grid gap-5 lg:grid-cols-[1fr_minmax(0,1.4fr)]">
-        <PanelEnunciado contenido={contenido} />
-        <div className="flex flex-col gap-3">
-          <CodeEditorNexott
-            value={flujo.codigo}
-            onValueChange={flujo.setCodigo}
-            lenguaje={contenido.lenguaje}
-            rows={Math.max(10, contenido.esqueletoInicial.split("\n").length + 2)}
-            placeholder="Escribe tu solución…"
-          />
-          <div className="flex items-center justify-between gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={flujo.reset}
-              disabled={isPending || flujo.codigo === contenido.esqueletoInicial}
-            >
-              <RotateCcw className="mr-1.5 h-3.5 w-3.5" aria-hidden={true} />
-              Restaurar esqueleto
-            </Button>
-            <Button
-              onClick={flujo.ejecutar}
-              disabled={!flujo.puedeEjecutar || isPending || flujo.codigo.trim().length === 0}
-            >
-              <Play className="mr-1.5 h-3.5 w-3.5" aria-hidden={true} />
-              {flujo.isEjecutando
-                ? "Ejecutando…"
-                : flujo.isEnviando
-                  ? "Guardando…"
-                  : "Ejecutar tests"}
-            </Button>
-          </div>
+      <PanelEnunciado contenido={contenido} />
+      <div
+        className="overflow-hidden rounded-2xl border border-border-strong bg-surface"
+        style={{ boxShadow: "var(--shadow-card-resting)" }}
+      >
+        <TopBarIde
+          archivo={archivo}
+          lenguaje={contenido.lenguaje}
+          onEjecutar={flujo.ejecutar}
+          puedeEjecutar={Boolean(
+            flujo.puedeEjecutar && !isPending && flujo.codigo.trim().length > 0,
+          )}
+          isEjecutando={flujo.isEjecutando}
+          isEnviando={flujo.isEnviando}
+        />
+        <CodeEditorNexott
+          value={flujo.codigo}
+          onValueChange={flujo.setCodigo}
+          lenguaje={contenido.lenguaje}
+          rows={Math.max(10, contenido.esqueletoInicial.split("\n").length + 2)}
+          placeholder="Escribe tu solución…"
+        />
+        <div className="flex items-center justify-end border-border border-t bg-subtle px-3 py-1.5">
+          <Button variant="ghost" size="sm" onClick={flujo.reset} disabled={!puedeReset}>
+            <RotateCcw className="mr-1.5 h-3.5 w-3.5" aria-hidden={true} />
+            Restaurar esqueleto
+          </Button>
         </div>
+        <TerminalTests ejecucion={flujo.ejecucion} isEjecutando={flujo.isEjecutando} />
       </div>
       {flujo.errorEjecucion ? (
         <aside className="rounded-xl border border-danger/30 bg-danger-soft p-3 text-body-sm text-danger-on-soft">
           No pudimos ejecutar los tests en el navegador: {flujo.errorEjecucion.message}
         </aside>
       ) : null}
-      {flujo.ejecucion ? <ResultadosTests ejecucion={flujo.ejecucion} /> : null}
       {flujo.ultimoIntento ? (
         <ResultadoIntento intento={flujo.ultimoIntento} notaAprobado={NOTA_APROBADO_DEFAULT} />
       ) : null}
     </article>
+  )
+}
+
+interface TopBarIdeProps {
+  readonly archivo: string
+  readonly lenguaje: string
+  readonly onEjecutar: () => void
+  readonly puedeEjecutar: boolean
+  readonly isEjecutando: boolean
+  readonly isEnviando: boolean
+}
+
+function TopBarIde({
+  archivo,
+  lenguaje,
+  onEjecutar,
+  puedeEjecutar,
+  isEjecutando,
+  isEnviando,
+}: TopBarIdeProps) {
+  return (
+    <div className="flex items-center justify-between border-border border-b bg-subtle px-4 py-3">
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5" aria-hidden={true}>
+          <span className="h-2.5 w-2.5 rounded-pill bg-state-no-apto" />
+          <span className="h-2.5 w-2.5 rounded-pill bg-warmth" />
+          <span className="h-2.5 w-2.5 rounded-pill bg-state-solido" />
+        </div>
+        <span className="font-mono text-caption text-text-secondary">
+          {archivo} · {lenguaje}
+        </span>
+      </div>
+      <Button
+        size="sm"
+        onClick={onEjecutar}
+        disabled={!puedeEjecutar}
+        style={{ boxShadow: "var(--shadow-accent-glow)" }}
+      >
+        <Play className="mr-1.5 h-3 w-3 fill-current" aria-hidden={true} />
+        {isEjecutando ? "Ejecutando…" : isEnviando ? "Guardando…" : "Ejecutar tests"}
+      </Button>
+    </div>
   )
 }
