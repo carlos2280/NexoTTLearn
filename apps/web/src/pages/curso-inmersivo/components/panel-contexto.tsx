@@ -1,28 +1,31 @@
-import { cn } from "@/shared/lib/cn"
+import { ArrowRight } from "lucide-react"
 import type {
-  ClaseColorSkill,
-  DisponibilidadEntrevistaIaResponse,
-  DisponibilidadTransversalResponse,
-  MeAvanceCursoResponse,
-} from "@nexott-learn/shared-types"
-import { ArrowRight, Sparkles } from "lucide-react"
+  DisponibilidadEntrevistaIaConMotivo,
+  DisponibilidadTransversalConMotivo,
+  MeAvanceCursoConCamino,
+} from "../types"
+import { SeccionCaminoHaciaApto } from "./seccion-camino-hacia-apto"
+import { SeccionHaciaElCierre } from "./seccion-hacia-el-cierre"
 
 interface PanelContextoProps {
-  readonly avance: MeAvanceCursoResponse
-  readonly transversal: DisponibilidadTransversalResponse | undefined
-  readonly entrevistaIa: DisponibilidadEntrevistaIaResponse | undefined
+  readonly avance: MeAvanceCursoConCamino
+  readonly transversal: DisponibilidadTransversalConMotivo | undefined
+  readonly entrevistaIa: DisponibilidadEntrevistaIaConMotivo | undefined
   readonly seccionActivaId: string | null
   readonly onIrASiguiente: (seccionId: string) => void
+  readonly onAbrirHito: (hito: "transversal" | "entrevistaIa") => void
 }
 
 /**
- * Panel derecho: contexto global del participante en el curso. No es un mero
- * resumen — agrupa lo que el participante necesita para decidir qué hacer
- * después:
+ * Panel derecho del modo inmersivo. Cuatro secciones, en orden:
  *
- *  - "Skills exigidas" → su nota actual contra cada skill (panorámica).
- *  - "Siguiente sección" sugerida → CTA directo cuando aplica.
- *  - "Transversal / Entrevista IA" → chips de disponibilidad si están listos.
+ *  1. "Tu avance" — frase narrativa sobria. El número de avance grande vive
+ *     solo en el topbar (ref 3).
+ *  2. "Siguiente sección" — sugerencia opcional cuando aplica.
+ *  3. "Camino hacia apto" — vista cualitativa por área, sin skills granulares
+ *     ni números crudos (ref 1 + ref 2). El detalle vive en /mi-ficha.
+ *  4. "Hacia el cierre" — línea de tiempo vertical con Transversal y
+ *     Entrevista IA (ref 4).
  */
 export function PanelContexto({
   avance,
@@ -30,6 +33,7 @@ export function PanelContexto({
   entrevistaIa,
   seccionActivaId,
   onIrASiguiente,
+  onAbrirHito,
 }: PanelContextoProps) {
   const sugerencia = avance.siguienteSeccion
   const mostrarSugerencia = sugerencia !== null && sugerencia.seccionId !== seccionActivaId
@@ -43,24 +47,25 @@ export function PanelContexto({
           onClick={() => onIrASiguiente(sugerencia.seccionId)}
         />
       ) : null}
-      <SeccionDisponibilidad transversal={transversal} entrevistaIa={entrevistaIa} />
-      {avance.porSkill.length > 0 ? <SeccionSkills avance={avance} /> : null}
+      {avance.caminoHaciaApto ? <SeccionCaminoHaciaApto camino={avance.caminoHaciaApto} /> : null}
+      <SeccionHaciaElCierre
+        transversal={transversal}
+        entrevistaIa={entrevistaIa}
+        onAbrirHito={onAbrirHito}
+      />
     </aside>
   )
 }
 
-function SeccionAvance({ avance }: { readonly avance: MeAvanceCursoResponse }) {
+function SeccionAvance({ avance }: { readonly avance: MeAvanceCursoConCamino }) {
   return (
-    <section className="flex flex-col gap-2">
+    <section className="flex flex-col gap-1.5">
       <h3 className="nx-eyebrow text-text-tertiary">Tu avance</h3>
-      <div className="flex items-baseline gap-2">
-        <span className="tabular font-mono text-display-md text-text-primary leading-none">
-          {avance.porcentajeAvance}
-        </span>
-        <span className="font-semibold text-h3 text-text-secondary">%</span>
-      </div>
-      <p className="text-caption text-text-tertiary">
-        {avance.seccionesCompletadas} de {avance.seccionesObligatorias} secciones obligatorias
+      <p className="text-body-sm text-text-primary">
+        <span className="tabular font-mono font-semibold">{avance.seccionesCompletadas}</span>
+        {" de "}
+        <span className="tabular font-mono font-semibold">{avance.seccionesObligatorias}</span>
+        {" secciones completadas."}
       </p>
     </section>
   )
@@ -81,119 +86,6 @@ function SeccionSugerencia({
       >
         Ir <ArrowRight className="h-3.5 w-3.5" aria-hidden={true} />
       </button>
-    </section>
-  )
-}
-
-function SeccionDisponibilidad({
-  transversal,
-  entrevistaIa,
-}: {
-  readonly transversal: DisponibilidadTransversalResponse | undefined
-  readonly entrevistaIa: DisponibilidadEntrevistaIaResponse | undefined
-}) {
-  const transversalListo = transversal?.disponible === true
-  const entrevistaLista = entrevistaIa?.disponible === true
-
-  if (!(transversal || entrevistaIa)) {
-    return null
-  }
-
-  return (
-    <section className="flex flex-col gap-2">
-      <h3 className="nx-eyebrow text-text-tertiary">Cierre del curso</h3>
-      <div className="flex flex-col gap-2">
-        {transversal ? (
-          <ChipDisponibilidad
-            etiqueta="Proyecto transversal"
-            disponible={transversalListo}
-            descripcionLocked="Completa tu plan para desbloquearlo."
-          />
-        ) : null}
-        {entrevistaIa ? (
-          <ChipDisponibilidad
-            etiqueta="Entrevista IA"
-            disponible={entrevistaLista}
-            descripcionLocked="Se desbloquea al aprobar el transversal."
-          />
-        ) : null}
-      </div>
-    </section>
-  )
-}
-
-function ChipDisponibilidad({
-  etiqueta,
-  disponible,
-  descripcionLocked,
-}: {
-  readonly etiqueta: string
-  readonly disponible: boolean
-  readonly descripcionLocked: string
-}) {
-  return (
-    <div
-      className={cn(
-        "relative flex items-start gap-3 rounded-xl border p-3 transition-colors duration-slow ease-default",
-        disponible
-          ? "border-aurora-violet/30 bg-[rgb(var(--color-aurora-violet-rgb)/0.06)]"
-          : "border-border bg-subtle",
-      )}
-    >
-      <div className="relative mt-0.5">
-        <Sparkles
-          className={cn(
-            "h-4 w-4 shrink-0",
-            disponible ? "text-aurora-violet" : "text-text-tertiary",
-          )}
-          aria-hidden={true}
-        />
-        {disponible ? (
-          <span
-            aria-hidden={true}
-            className="-right-1 -top-1 nx-pulse-dot absolute inline-block h-2 w-2 rounded-pill bg-aurora-cyan text-aurora-cyan"
-          />
-        ) : null}
-      </div>
-      <div className="flex min-w-0 flex-col">
-        <span className="text-body-sm text-text-primary">{etiqueta}</span>
-        <span className="text-caption text-text-tertiary">
-          {disponible ? "Disponible ahora." : descripcionLocked}
-        </span>
-      </div>
-    </div>
-  )
-}
-
-const COLOR_CLASE: Record<ClaseColorSkill, string> = {
-  verde: "bg-success",
-  amarillo: "bg-warning",
-  rojo: "bg-danger",
-}
-
-function SeccionSkills({ avance }: { readonly avance: MeAvanceCursoResponse }) {
-  return (
-    <section className="flex flex-col gap-3">
-      <h3 className="nx-eyebrow text-text-tertiary">Skills exigidas</h3>
-      <ul className="flex flex-col gap-2">
-        {avance.porSkill.map((skill) => (
-          <li key={skill.skillId} className="flex items-center gap-3">
-            <span
-              aria-hidden={true}
-              className={cn(
-                "inline-block h-2 w-2 shrink-0 rounded-pill",
-                COLOR_CLASE[skill.claseColor],
-              )}
-            />
-            <span className="min-w-0 flex-1 truncate font-mono text-caption text-text-secondary">
-              {skill.etiqueta}
-            </span>
-            <span className="tabular shrink-0 font-mono text-caption text-text-primary">
-              {skill.notaActual === null ? "—" : skill.notaActual.toFixed(0)}
-            </span>
-          </li>
-        ))}
-      </ul>
     </section>
   )
 }
