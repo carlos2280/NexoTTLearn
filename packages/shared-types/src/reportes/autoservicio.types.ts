@@ -34,3 +34,43 @@ export interface MeAvanceCursoResponse {
   readonly notaGlobalFinal?: number
   readonly etiquetaCualitativaFinal?: EtiquetaCualitativa
 }
+
+export type ResultadoCierreCurso = "APTO" | "NO_APTO" | "COMPLETADO"
+
+export interface SkillCosechadaCierre {
+  readonly skillId: string
+  readonly skillNombre: string
+  readonly areaCodigo: string
+  readonly areaNombre: string
+}
+
+export interface AreaPorTrabajarCierre {
+  readonly areaId: string
+  readonly areaNombre: string
+  readonly areaCodigo: string
+  readonly nivelCualitativo: "enDesarrollo" | "inicial"
+}
+
+/**
+ * Respuesta de `GET /me/cursos/:cursoId/resumen-cierre` (TODO B-26).
+ *
+ * Usado por la pantalla "Curso cerrado" (`/cursos/:cursoId/cerrado`), la
+ * ceremonia del veredicto. Hoy parte de esto vive en `MeAvanceCursoResponse`
+ * cuando `estaCerrado=true`, pero el cliente necesita ademas:
+ *
+ *  - `skillsDemostradasNuevas`: la "cosecha" del curso (skills demostradas
+ *    EN ESTE curso, no en otros).
+ *  - `areasPorTrabajar`: solo cuando `resultado === 'NO_APTO'`.
+ *  - `comentarioAdmin`: texto libre del admin al cerrar (si lo escribio).
+ */
+export interface ResumenCierreCurso {
+  readonly cursoId: string
+  readonly cursoTitulo: string
+  readonly fechaCierre: string
+  readonly resultado: ResultadoCierreCurso
+  readonly etiquetaCualitativaFinal: EtiquetaCualitativa
+  readonly notaGlobalFinal: number
+  readonly skillsDemostradasNuevas: readonly SkillCosechadaCierre[]
+  readonly areasPorTrabajar: readonly AreaPorTrabajarCierre[]
+  readonly comentarioAdmin: string | null
+}

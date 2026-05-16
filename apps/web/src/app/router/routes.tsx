@@ -19,6 +19,7 @@ import { ReutilizacionCatalogoPage } from "@/pages/admin/reportes/reutilizacion-
 import { BandejaPage } from "@/pages/bandeja/bandeja.page"
 import { CatalogoPage as CatalogoParticipantePage } from "@/pages/catalogo/catalogo.page"
 import { CuentaPage } from "@/pages/cuenta/cuenta.page"
+import { CursoCerradoPage } from "@/pages/curso-cerrado/curso-cerrado.page"
 import { CursoInmersivoPage } from "@/pages/curso-inmersivo/curso-inmersivo.page"
 import { LoginPage } from "@/pages/login/login.page"
 import { LogoutPage } from "@/pages/logout/logout.page"
@@ -50,6 +51,19 @@ export function AppRoutes() {
         <Route path={RUTAS.participante.miFicha} element={<MiFichaPage />} />
         <Route path={RUTAS.participante.catalogo} element={<CatalogoParticipantePage />} />
       </Route>
+      {/*
+        Curso cerrado (pantalla 08): ceremonia del veredicto. Ruta dedicada
+        fuera del ParticipanteShell y del inmersivo. Se declara ANTES de
+        `/cursos/:cursoId` por especificidad (rutas mas largas primero).
+      */}
+      <Route
+        path="/cursos/:cursoId/cerrado"
+        element={
+          <GuardSesion>
+            <CursoCerradoPage />
+          </GuardSesion>
+        }
+      />
       {/*
         Curso inmersivo del participante: pantalla a pantalla completa fuera
         del ParticipanteShell — espejo del builder admin pero para consumir,

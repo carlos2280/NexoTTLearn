@@ -70,4 +70,8 @@ export type {
   MeAvancePorSkill,
   MeAvanceSiguienteSeccion,
   MeAvanceCursoResponse,
+  ResultadoCierreCurso,
+  SkillCosechadaCierre,
+  AreaPorTrabajarCierre,
+  ResumenCierreCurso,
 } from "./autoservicio.types"

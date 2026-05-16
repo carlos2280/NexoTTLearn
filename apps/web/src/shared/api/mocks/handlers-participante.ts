@@ -8,6 +8,7 @@ import type {
   NotificacionBadgeResponse,
   NotificacionResumen,
   Paginated,
+  ResumenCierreCurso,
 } from "@nexott-learn/shared-types"
 import { type MockRequest, defineRoute } from "./router"
 
@@ -18,6 +19,8 @@ const RTE_ME_FICHA_RESUMEN = /^\/me\/ficha\/resumen$/
 const RTE_ME_FICHA_HISTORIAL = /^\/me\/ficha\/historial(\?.*)?$/
 const RTE_HISTORICO_SKILL = /^\/colaboradores\/[^/]+\/ficha\/skills\/[^/]+\/historico$/
 const RGX_HISTORICO_SKILL = /^\/colaboradores\/[^/]+\/ficha\/skills\/([^/]+)\/historico$/
+const RTE_RESUMEN_CIERRE = /^\/me\/cursos\/[^/]+\/resumen-cierre$/
+const RGX_RESUMEN_CIERRE = /^\/me\/cursos\/([^/]+)\/resumen-cierre$/
 const RTE_NOTIFICACIONES_BADGE = /^\/notificaciones\/badge$/
 const RTE_NOTIFICACIONES = /^\/notificaciones(\?.*)?$/
 const RTE_NOTIFICACION_MARCAR_LEIDA = /^\/notificaciones\/[^/]+\/marcar-leida$/
@@ -562,6 +565,68 @@ function handlerMeFicha(_req: MockRequest): FichaResponse {
   }
 }
 
+// Mock de `GET /me/cursos/:cursoId/resumen-cierre` (TODO B-26). Devuelve la
+// "ceremonia" del veredicto para la pantalla 08. F1 cubre el caso APTO con
+// "Fundamentos Full-Stack & DevOps" como curso de prueba; F2 anadira el caso
+// NO_APTO y el comentario del admin.
+function handlerResumenCierre(req: MockRequest): ResumenCierreCurso {
+  const match = req.path.match(RGX_RESUMEN_CIERRE)
+  const cursoId = match?.[1] ?? "curso-fullstack-devops"
+  const base = RESUMENES_CIERRE[cursoId] ?? RESUMEN_CIERRE_DEFAULT
+  return { ...base, cursoId }
+}
+
+const RESUMEN_CIERRE_DEFAULT: ResumenCierreCurso = {
+  cursoId: "default",
+  cursoTitulo: "Curso de prueba",
+  fechaCierre: diasDesdeHoy(-1),
+  resultado: "APTO",
+  etiquetaCualitativaFinal: "solido",
+  notaGlobalFinal: 78,
+  skillsDemostradasNuevas: [],
+  areasPorTrabajar: [],
+  comentarioAdmin: null,
+}
+
+const RESUMENES_CIERRE: Readonly<Record<string, ResumenCierreCurso>> = {
+  "curso-fullstack-devops": {
+    cursoId: "curso-fullstack-devops",
+    cursoTitulo: "Fundamentos Full-Stack & DevOps",
+    fechaCierre: diasDesdeHoy(-1),
+    resultado: "APTO",
+    etiquetaCualitativaFinal: "excelencia",
+    notaGlobalFinal: 88,
+    skillsDemostradasNuevas: [
+      {
+        skillId: "sk-fe-react",
+        skillNombre: "React Hooks",
+        areaCodigo: "frontend",
+        areaNombre: "Frontend",
+      },
+      {
+        skillId: "sk-be-django",
+        skillNombre: "Django REST Framework",
+        areaCodigo: "backend",
+        areaNombre: "Backend",
+      },
+      {
+        skillId: "sk-dv-docker",
+        skillNombre: "Docker basico",
+        areaCodigo: "devops",
+        areaNombre: "DevOps",
+      },
+      {
+        skillId: "sk-da-sql",
+        skillNombre: "SQL analitico",
+        areaCodigo: "data",
+        areaNombre: "Data",
+      },
+    ],
+    areasPorTrabajar: [],
+    comentarioAdmin: null,
+  },
+}
+
 // Mock de `GET /me/ficha/historial` (TODO B-24). Devuelve la coleccion
 // completa de eventos cronologicos (cambios de skill + hitos de curso). El
 // frontend pagina en memoria hasta que el backend implemente el endpoint
@@ -941,6 +1006,7 @@ export const handlersParticipante = [
   defineRoute("GET", RTE_ME_FICHA_HISTORIAL, handlerMeFichaHistorial),
   defineRoute("GET", RTE_HISTORICO_SKILL, handlerHistoricoSkill),
   defineRoute("GET", RTE_ME_FICHA_RESUMEN, handlerMeFichaResumen),
+  defineRoute("GET", RTE_RESUMEN_CIERRE, handlerResumenCierre),
   defineRoute("GET", RTE_NOTIFICACIONES_BADGE, handlerNotificacionesBadge),
   defineRoute("GET", RTE_NOTIFICACIONES, handlerNotificaciones),
   defineRoute("POST", RTE_NOTIFICACION_MARCAR_LEIDA, handlerMarcarLeida),

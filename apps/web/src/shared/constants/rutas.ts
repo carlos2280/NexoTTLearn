@@ -9,6 +9,7 @@ export const RUTAS = {
     miFicha: "/mi-ficha",
     catalogo: "/catalogo",
     cursoDetalle: (cursoId: string) => `/cursos/${cursoId}`,
+    cursoCerrado: (cursoId: string) => `/cursos/${cursoId}/cerrado`,
   },
   admin: {
     inicio: "/admin",

@@ -515,6 +515,10 @@ export type {
   MeAvancePorSkill,
   MeAvanceSiguienteSeccion,
   MeAvanceCursoResponse,
+  ResultadoCierreCurso,
+  SkillCosechadaCierre,
+  AreaPorTrabajarCierre,
+  ResumenCierreCurso,
 } from "./reportes"
 
 // Entrevista IA P8c — schemas y tipos del flujo de entrevista IA final (D89).
