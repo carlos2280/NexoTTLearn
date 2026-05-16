@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common"
 import { PrismaModule } from "../common/prisma/prisma.module"
 import { NotaSkillModule } from "../nota-skill/nota-skill.module"
 import { NotificacionesModule } from "../notificaciones/notificaciones.module"
+import { EntrevistaEvaluacionService } from "./entrevista-evaluacion.service"
 import { EntrevistaIaController } from "./entrevista-ia.controller"
 import { EntrevistaIaService } from "./entrevista-ia.service"
 
@@ -15,11 +16,14 @@ import { EntrevistaIaService } from "./entrevista-ia.service"
  * S11.5 P11.5a: importa `NotificacionesModule` para inyectar
  * `NotificacionesService` en el trigger `crearIntento`
  * (ENTREVISTA_IA_DISPONIBLE).
+ *
+ * Fase 1.1 split: `EntrevistaEvaluacionService` agrupa finalizar/ajustar/anular
+ * y se inyecta como dependencia interna de `EntrevistaIaService` (no exportado).
  */
 @Module({
   imports: [PrismaModule, NotaSkillModule, NotificacionesModule],
   controllers: [EntrevistaIaController],
-  providers: [EntrevistaIaService],
+  providers: [EntrevistaIaService, EntrevistaEvaluacionService],
   exports: [EntrevistaIaService],
 })
 export class EntrevistaIaModule {}

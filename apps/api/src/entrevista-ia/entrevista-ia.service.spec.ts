@@ -7,6 +7,7 @@ import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
 import { NotaSkillService } from "../nota-skill/nota-skill.service"
 import { NotificacionesService } from "../notificaciones/notificaciones.service"
+import { EntrevistaEvaluacionService } from "./entrevista-evaluacion.service"
 import { EntrevistaIaService } from "./entrevista-ia.service"
 
 /**
@@ -184,12 +185,21 @@ function buildService(): {
   const idempotency = buildIdempotencyMock(prisma)
   const notaSkill = buildNotaSkillMock()
   const notificaciones = buildNotificacionesMock()
-  const service = new EntrevistaIaService(
+  // Fase 1.1 split: el sub-dominio "evaluacion" vive en su propio service.
+  // Lo instanciamos REAL con las mismas mocks para preservar el comportamiento
+  // observable bajo `service.finalizar()/ajustar()/anular()` (fachadas).
+  const evaluacion = new EntrevistaEvaluacionService(
     prisma as unknown as PrismaService,
     idempotency,
     ai,
     notaSkill,
+  )
+  const service = new EntrevistaIaService(
+    prisma as unknown as PrismaService,
+    idempotency,
+    ai,
     notificaciones as unknown as NotificacionesService,
+    evaluacion,
   )
   return { service, prisma, ai, idempotency, notaSkill, notificaciones }
 }
