@@ -3,6 +3,7 @@ import { PrismaModule } from "../common/prisma/prisma.module"
 import { NotaSkillModule } from "../nota-skill/nota-skill.module"
 import { NotificacionesModule } from "../notificaciones/notificaciones.module"
 import { JobEvaluacionTransversalService } from "./job-evaluacion-transversal.service"
+import { TransversalCapasService } from "./transversal-capas.service"
 import { TransversalController } from "./transversal.controller"
 import { TransversalService } from "./transversal.service"
 
@@ -21,7 +22,7 @@ import { TransversalService } from "./transversal.service"
 @Module({
   imports: [PrismaModule, NotaSkillModule, NotificacionesModule],
   controllers: [TransversalController],
-  providers: [TransversalService, JobEvaluacionTransversalService],
+  providers: [TransversalCapasService, TransversalService, JobEvaluacionTransversalService],
   exports: [TransversalService, JobEvaluacionTransversalService],
 })
 export class TransversalModule {}

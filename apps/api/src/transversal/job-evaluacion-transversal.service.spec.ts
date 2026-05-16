@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AiService } from "../common/ai/ai.service"
 import type { PrismaService } from "../common/prisma/prisma.service"
 import { JobEvaluacionTransversalService } from "./job-evaluacion-transversal.service"
-import type { TransversalService } from "./transversal.service"
+import type { TransversalCapasService } from "./transversal-capas.service"
 
 const INTENTO_ID_BASE = "10000000-0000-0000-0000-00000000000"
 const REPO_URL = "https://github.com/foo/bar"
@@ -46,8 +46,8 @@ function buildAi(): AiService {
   } as unknown as AiService
 }
 
-function buildTransversalServiceMock(): {
-  readonly mock: TransversalService
+function buildCapasServiceMock(): {
+  readonly mock: TransversalCapasService
   readonly cargarCapaTests: ReturnType<typeof vi.fn>
   readonly cargarCapaCualitativa: ReturnType<typeof vi.fn>
   readonly cargarCapaComprension: ReturnType<typeof vi.fn>
@@ -60,7 +60,7 @@ function buildTransversalServiceMock(): {
       cargarCapaTests,
       cargarCapaCualitativa,
       cargarCapaComprension,
-    } as unknown as TransversalService,
+    } as unknown as TransversalCapasService,
     cargarCapaTests,
     cargarCapaCualitativa,
     cargarCapaComprension,
@@ -74,28 +74,24 @@ async function flushHasta(ms: number): Promise<void> {
 describe("JobEvaluacionTransversalService (P8a + P8b)", () => {
   let prisma: PrismaMock
   let ai: AiService
-  let transversal: ReturnType<typeof buildTransversalServiceMock>
+  let capas: ReturnType<typeof buildCapasServiceMock>
   let job: JobEvaluacionTransversalService
 
   beforeEach(() => {
     vi.useFakeTimers()
     prisma = buildPrismaMock()
     ai = buildAi()
-    transversal = buildTransversalServiceMock()
-    job = new JobEvaluacionTransversalService(
-      prisma as unknown as PrismaService,
-      ai,
-      transversal.mock,
-    )
+    capas = buildCapasServiceMock()
+    job = new JobEvaluacionTransversalService(prisma as unknown as PrismaService, ai, capas.mock)
   })
 
   it("dispatch invoca AiService y carga las 3 capas via transversalService", async () => {
     job.dispatch(`${INTENTO_ID_BASE}1`)
     await flushHasta(2100)
     expect(ai.evaluarRepoCualitativo).toHaveBeenCalledOnce()
-    expect(transversal.cargarCapaTests).toHaveBeenCalledOnce()
-    expect(transversal.cargarCapaCualitativa).toHaveBeenCalledOnce()
-    const args = transversal.cargarCapaCualitativa.mock.calls[0]?.[0] as {
+    expect(capas.cargarCapaTests).toHaveBeenCalledOnce()
+    expect(capas.cargarCapaCualitativa).toHaveBeenCalledOnce()
+    const args = capas.cargarCapaCualitativa.mock.calls[0]?.[0] as {
       body: { nota: number; detalle: { confianza: string } }
       idempotencyKey: string
     }
@@ -104,7 +100,7 @@ describe("JobEvaluacionTransversalService (P8a + P8b)", () => {
     expect(args.idempotencyKey).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
     )
-    expect(transversal.cargarCapaComprension).toHaveBeenCalledOnce()
+    expect(capas.cargarCapaComprension).toHaveBeenCalledOnce()
   })
 
   it("dispatch del mismo intentoId varias veces solo procesa una vez", async () => {
@@ -123,6 +119,6 @@ describe("JobEvaluacionTransversalService (P8a + P8b)", () => {
     expect(job.estadoCola.pendientes).toBe(2)
     await flushHasta(2100)
     await flushHasta(2100)
-    expect(transversal.cargarCapaCualitativa).toHaveBeenCalledTimes(12)
+    expect(capas.cargarCapaCualitativa).toHaveBeenCalledTimes(12)
   })
 })

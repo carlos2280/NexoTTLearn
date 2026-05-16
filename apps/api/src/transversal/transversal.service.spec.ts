@@ -15,6 +15,7 @@ import type { SesionUsuario } from "../common/types/sesion.types"
 import type { NotaSkillService } from "../nota-skill/nota-skill.service"
 import { NotificacionesService } from "../notificaciones/notificaciones.service"
 import type { JobEvaluacionTransversalService } from "./job-evaluacion-transversal.service"
+import { TransversalCapasService } from "./transversal-capas.service"
 import { TransversalService } from "./transversal.service"
 
 const USUARIO_ID = "9000000a-0000-0000-0000-000000000001"
@@ -133,6 +134,7 @@ let notaSkill: {
   calcularNotaActualSkill: ReturnType<typeof vi.fn>
 }
 let notificaciones: { crear: ReturnType<typeof vi.fn> }
+let capas: TransversalCapasService
 let service: TransversalService
 
 beforeEach(() => {
@@ -158,12 +160,14 @@ beforeEach(() => {
       canalesEnviados: ["IN_APP"],
     }),
   }
+  capas = new TransversalCapasService(idempotency as unknown as IdempotencyService)
   service = new TransversalService(
     prisma as unknown as PrismaService,
     idempotency as unknown as IdempotencyService,
     notaSkill as unknown as NotaSkillService,
     job as unknown as JobEvaluacionTransversalService,
     notificaciones as unknown as NotificacionesService,
+    capas,
   )
 })
 

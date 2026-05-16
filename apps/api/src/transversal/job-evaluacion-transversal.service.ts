@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto"
-import { Inject, Injectable, Logger, forwardRef } from "@nestjs/common"
+import { Injectable, Logger } from "@nestjs/common"
 import { RolUsuario } from "@prisma/client"
 import { AiService } from "../common/ai/ai.service"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
-import { TransversalService } from "./transversal.service"
+import { TransversalCapasService } from "./transversal-capas.service"
 
 /**
  * `JobEvaluacionTransversalService` — esqueleto P8a + integracion real P8b
@@ -47,8 +47,7 @@ export class JobEvaluacionTransversalService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ai: AiService,
-    @Inject(forwardRef(() => TransversalService))
-    private readonly transversal: TransversalService,
+    private readonly capas: TransversalCapasService,
   ) {}
 
   dispatch(intentoId: string): void {
@@ -131,7 +130,7 @@ export class JobEvaluacionTransversalService {
 
   private async cargarCapaTestsSeguro(intentoId: string, sesion: SesionUsuario): Promise<void> {
     try {
-      await this.transversal.cargarCapaTests({
+      await this.capas.cargarCapaTests({
         intentoId,
         body: { nota: NOTA_CAPA_TESTS_MOCK, detalle: { fuente: "worker-mvp" } },
         idempotencyKey: this.derivarKey(intentoId, "tests"),
@@ -152,7 +151,7 @@ export class JobEvaluacionTransversalService {
         repoUrl,
         profundidad: PROFUNDIDAD_MOCK,
       })
-      await this.transversal.cargarCapaCualitativa({
+      await this.capas.cargarCapaCualitativa({
         intentoId,
         body: {
           nota: cualitativa.nota,
@@ -195,7 +194,7 @@ export class JobEvaluacionTransversalService {
       if (comprensionNota === null) {
         return
       }
-      await this.transversal.cargarCapaComprension({
+      await this.capas.cargarCapaComprension({
         intentoId,
         body: {
           nota: comprensionNota,
