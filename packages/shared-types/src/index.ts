@@ -217,6 +217,7 @@ export type {
 export { origenNotaSkillSchema } from "./evaluacion-inicial/ficha.schema"
 export type {
   OrigenNotaSkill,
+  NivelCualitativoArea,
   FichaSkillItem,
   FichaPorAreaItem,
   FichaResponse,

@@ -358,6 +358,7 @@ function handlerMeFicha(_req: MockRequest): FichaResponse {
         promedio: 74,
         skillsConNota: 2,
         skillsTotales: 2,
+        nivelCualitativo: "solido",
       },
       {
         areaId: "area-backend",
@@ -365,6 +366,7 @@ function handlerMeFicha(_req: MockRequest): FichaResponse {
         promedio: 88,
         skillsConNota: 3,
         skillsTotales: 3,
+        nivelCualitativo: "excelencia",
       },
       {
         areaId: "area-cloud",
@@ -372,6 +374,7 @@ function handlerMeFicha(_req: MockRequest): FichaResponse {
         promedio: 56,
         skillsConNota: 1,
         skillsTotales: 1,
+        nivelCualitativo: "enDesarrollo",
       },
       {
         areaId: "area-data",
@@ -379,6 +382,7 @@ function handlerMeFicha(_req: MockRequest): FichaResponse {
         promedio: 62,
         skillsConNota: 1,
         skillsTotales: 1,
+        nivelCualitativo: "enDesarrollo",
       },
       {
         areaId: "area-devops",
@@ -386,6 +390,7 @@ function handlerMeFicha(_req: MockRequest): FichaResponse {
         promedio: 48,
         skillsConNota: 1,
         skillsTotales: 1,
+        nivelCualitativo: "inicial",
       },
       {
         areaId: "area-soft",
@@ -393,6 +398,7 @@ function handlerMeFicha(_req: MockRequest): FichaResponse {
         promedio: 72,
         skillsConNota: 2,
         skillsTotales: 2,
+        nivelCualitativo: "solido",
       },
       {
         areaId: "area-mobile",
@@ -400,6 +406,7 @@ function handlerMeFicha(_req: MockRequest): FichaResponse {
         promedio: null,
         skillsConNota: 0,
         skillsTotales: 0,
+        nivelCualitativo: "sinTocar",
       },
       {
         areaId: "area-qa",
@@ -407,6 +414,7 @@ function handlerMeFicha(_req: MockRequest): FichaResponse {
         promedio: null,
         skillsConNota: 0,
         skillsTotales: 0,
+        nivelCualitativo: "sinTocar",
       },
     ],
     skills: [

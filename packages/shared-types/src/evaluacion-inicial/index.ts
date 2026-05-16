@@ -1,6 +1,7 @@
 export { origenNotaSkillSchema } from "./ficha.schema"
 export type {
   OrigenNotaSkill,
+  NivelCualitativoArea,
   FichaSkillItem,
   FichaPorAreaItem,
   FichaResponse,

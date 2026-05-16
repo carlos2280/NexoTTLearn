@@ -33,12 +33,25 @@ export interface FichaSkillItem {
   readonly fechaUltimoCambio?: string | null
 }
 
+/**
+ * Nivel cualitativo de un area en la ficha del colaborador. El backend lo
+ * deriva del promedio y/o de la distribucion de notas de las skills del area;
+ * el frontend nunca calcula esto desde notas crudas en produccion. La etiqueta
+ * `sinTocar` indica que el colaborador no tiene ninguna skill demostrada en
+ * esa area, pero el area sigue presente en el catalogo.
+ */
+export type NivelCualitativoArea = "excelencia" | "solido" | "enDesarrollo" | "inicial" | "sinTocar"
+
 export interface FichaPorAreaItem {
   readonly areaId: string
   readonly nombre: string
   readonly promedio: number | null
   readonly skillsConNota: number
   readonly skillsTotales: number
+  // TODO B-21: backend debe devolver el nivel cualitativo por area (derivado
+  // del promedio y la distribucion de notas), para que el frontend no infiera
+  // desde umbrales locales en la pantalla "Mi ficha".
+  readonly nivelCualitativo?: NivelCualitativoArea
 }
 
 export interface FichaResponse {
