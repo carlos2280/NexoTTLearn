@@ -34,6 +34,12 @@
      como en dark sobre superficies de color saturadas. */
   --color-on-color: #ffffff;
 
+  /* Blanco/negro explícitos para que Tailwind 4 exponga `text-white` /
+     `bg-white` / `text-black` / `bg-black` como utilities (al haber `@theme`
+     custom, las defaults pueden no generarse). */
+  --color-white: #ffffff;
+  --color-black: #000000;
+
   /* ---------- Color · acento primario (índigo / trabajo) ---------- */
   --color-accent: #4f46e5;
   --color-accent-hover: #4338ca;

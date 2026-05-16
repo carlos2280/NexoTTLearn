@@ -16,13 +16,13 @@ const buttonStyles = tv({
     variant: {
       // Primary — índigo del trabajo. Lift sutil + glow multi-layer al hover.
       primary: [
-        "bg-accent text-[var(--color-on-color)]",
+        "bg-accent text-on-color",
         "shadow-accent-glow hover:shadow-accent-glow-lg hover:-translate-y-0.5",
         "hover:bg-accent-hover active:bg-accent-pressed",
       ],
       // Aurora — CTA "premium" para momentos cumbre (login, publicar, completar).
       aurora: [
-        "relative text-[var(--color-on-color)]",
+        "relative text-on-color",
         "bg-[image:var(--gradient-aurora)] bg-[length:180%_180%] bg-[position:0%_50%]",
         "shadow-aurora-glow hover:-translate-y-0.5",
         "hover:bg-[position:100%_50%] hover:shadow-[0_18px_46px_rgb(var(--color-aurora-violet-rgb)/0.42)]",
@@ -38,7 +38,7 @@ const buttonStyles = tv({
       ghost: ["bg-transparent text-text-primary", "hover:bg-subtle"],
       // Danger — destructiva. Lift sutil para confirmar peso de la acción.
       danger: [
-        "bg-danger text-[var(--color-on-color)]",
+        "bg-danger text-on-color",
         "shadow-[0_8px_24px_rgb(var(--color-danger-rgb)/0.22)]",
         "hover:opacity-95 hover:-translate-y-0.5",
         "hover:shadow-[0_12px_32px_rgb(var(--color-danger-rgb)/0.32)]",
