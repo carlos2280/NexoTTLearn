@@ -1,11 +1,4 @@
-import {
-  BadRequestException,
-  Controller,
-  Get,
-  InternalServerErrorException,
-  Query,
-  Res,
-} from "@nestjs/common"
+import { Controller, Get, InternalServerErrorException, Query, Res } from "@nestjs/common"
 import { Throttle } from "@nestjs/throttler"
 import {
   type ExportarLogsAjustesPlanQuery,
@@ -39,19 +32,22 @@ import {
   listarLogsModulosQuerySchema,
   listarLogsSkillsQuerySchema,
 } from "@nexott-learn/shared-types"
-import { AccionAuditoria, type Prisma, RolUsuario } from "@prisma/client"
+import { RolUsuario } from "@prisma/client"
 import type { Response } from "express"
-import { LIMITE_FILAS_EXPORTACION } from "../auditoria/auditoria-export.helpers"
 import { AuditLogService } from "../common/audit/audit-log.service"
 import { CurrentUser } from "../common/decorators/current-user.decorator"
 import { Roles } from "../common/decorators/roles.decorator"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { ExportService } from "../common/export/export.service"
-import type { ColumnaDef, ExportResult } from "../common/export/export.types"
 import type { Paginated } from "../common/http/paginated"
 import { ZodValidationPipe } from "../common/pipes/zod-validation.pipe"
 import type { SesionUsuario } from "../common/types/sesion.types"
 import { ConsultasLogService } from "../reportes/consultas-log.service"
+import {
+  type DependenciasListadoExportable,
+  ejecutarExportarLogs,
+  ejecutarListarLogs,
+} from "./listado-exportable.helper"
 import {
   COLUMNAS_LOGS_AJUSTES_PLAN,
   COLUMNAS_LOGS_ASIGNACIONES,
@@ -59,12 +55,8 @@ import {
   COLUMNAS_LOGS_CURSOS,
   COLUMNAS_LOGS_MODULOS,
   COLUMNAS_LOGS_SKILLS,
-  type DominioLogs,
-  type FilaConsulta,
-  type FilaCurso,
   aplanarFilaConsulta,
   aplanarFilaCurso,
-  nombreArchivoExport,
 } from "./logs-export.helpers"
 import { LogsService } from "./logs.service"
 
@@ -89,6 +81,10 @@ import { LogsService } from "./logs.service"
  *     audita `LOGS_EXPORTADO` (polimorfico por dominio) y registra en
  *     `consultas_logs` (excepto el de consultas).
  *
+ * La logica comun de los seis pares vive en `ejecutarListarLogs` y
+ * `ejecutarExportarLogs` (`./listado-exportable.helper`). Aqui solo
+ * permanece el cableo Nest (decoradores, validacion Zod, rutas).
+ *
  * Auth/autorizacion: `SesionGuard` + `RolesGuard` ya estan registrados como
  * `APP_GUARD` globales. Aqui se exige `@Roles(ADMIN)` a nivel clase: cualquier
  * PARTICIPANTE recibe 403 sin tocar el service.
@@ -96,31 +92,29 @@ import { LogsService } from "./logs.service"
 @Controller("admin/logs")
 @Roles(RolUsuario.ADMIN)
 export class LogsController {
+  private readonly deps: DependenciasListadoExportable
+
   constructor(
     private readonly logs: LogsService,
-    private readonly consultasLog: ConsultasLogService,
-    private readonly auditLog: AuditLogService,
-    private readonly exportService: ExportService,
-  ) {}
+    consultasLog: ConsultasLogService,
+    auditLog: AuditLogService,
+    exportService: ExportService,
+  ) {
+    this.deps = { consultasLog, auditLog, exportService }
+  }
 
   @Get("cursos")
   async listarCursos(
     @Query(new ZodValidationPipe(listarLogsCursosQuerySchema)) query: ListarLogsCursosQuery,
     @CurrentUser() usuario: SesionUsuario | undefined,
   ): Promise<Paginated<LogCambioCursoResumen>> {
-    const sesion = this.requireUsuario(usuario)
-    const inicio = Date.now()
-    const resultado = await this.logs.listarCambiosCurso(query)
-    const latenciaMs = Date.now() - inicio
-
-    await this.consultasLog.registrar({
-      autorUsuarioId: sesion.usuarioId,
+    return ejecutarListarLogs(this.deps, {
+      query,
+      sesion: this.requireUsuario(usuario),
       endpoint: "/admin/logs/cursos",
-      queryParams: filtrosCursosMetadata(query),
-      latenciaMs,
+      fetch: (q) => this.logs.listarCambiosCurso(q),
+      registrarEnConsultas: true,
     })
-
-    return resultado
   }
 
   @Get("cursos/exportar")
@@ -131,22 +125,17 @@ export class LogsController {
     @CurrentUser() usuario: SesionUsuario | undefined,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    const sesion = this.requireUsuario(usuario)
-    const inicio = Date.now()
-    const { filas, total } = await this.logs.contarYListarCambiosCursoParaExportar(query)
-    this.assertTopeRespetado(total)
-    const aplanadas: readonly FilaCurso[] = filas.map(aplanarFilaCurso)
-    const result = await this.construirExport("cursos", query.formato, aplanadas, [
-      ...COLUMNAS_LOGS_CURSOS,
-    ])
-    await this.auditarExport("cursos", query, sesion, result, total)
-    await this.consultasLog.registrar({
-      autorUsuarioId: sesion.usuarioId,
+    await ejecutarExportarLogs(this.deps, {
+      query,
+      sesion: this.requireUsuario(usuario),
+      response,
+      dominio: "cursos",
       endpoint: "/admin/logs/cursos/exportar",
-      queryParams: filtrosCursosExportMetadata(query),
-      latenciaMs: Date.now() - inicio,
+      columnas: COLUMNAS_LOGS_CURSOS,
+      fetch: (q) => this.logs.contarYListarCambiosCursoParaExportar(q),
+      mapper: aplanarFilaCurso,
+      registrarEnConsultas: true,
     })
-    this.enviarExport(response, "cursos", result)
   }
 
   @Get("asignaciones")
@@ -155,19 +144,13 @@ export class LogsController {
     query: ListarLogsAsignacionesQuery,
     @CurrentUser() usuario: SesionUsuario | undefined,
   ): Promise<Paginated<HistoricoEstadoAsignacionResumen>> {
-    const sesion = this.requireUsuario(usuario)
-    const inicio = Date.now()
-    const resultado = await this.logs.listarHistoricoAsignacion(query)
-    const latenciaMs = Date.now() - inicio
-
-    await this.consultasLog.registrar({
-      autorUsuarioId: sesion.usuarioId,
+    return ejecutarListarLogs(this.deps, {
+      query,
+      sesion: this.requireUsuario(usuario),
       endpoint: "/admin/logs/asignaciones",
-      queryParams: filtrosAsignacionesMetadata(query),
-      latenciaMs,
+      fetch: (q) => this.logs.listarHistoricoAsignacion(q),
+      registrarEnConsultas: true,
     })
-
-    return resultado
   }
 
   @Get("asignaciones/exportar")
@@ -178,21 +161,16 @@ export class LogsController {
     @CurrentUser() usuario: SesionUsuario | undefined,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    const sesion = this.requireUsuario(usuario)
-    const inicio = Date.now()
-    const { filas, total } = await this.logs.contarYListarHistoricoAsignacionParaExportar(query)
-    this.assertTopeRespetado(total)
-    const result = await this.construirExport("asignaciones", query.formato, filas, [
-      ...COLUMNAS_LOGS_ASIGNACIONES,
-    ])
-    await this.auditarExport("asignaciones", query, sesion, result, total)
-    await this.consultasLog.registrar({
-      autorUsuarioId: sesion.usuarioId,
+    await ejecutarExportarLogs(this.deps, {
+      query,
+      sesion: this.requireUsuario(usuario),
+      response,
+      dominio: "asignaciones",
       endpoint: "/admin/logs/asignaciones/exportar",
-      queryParams: filtrosAsignacionesExportMetadata(query),
-      latenciaMs: Date.now() - inicio,
+      columnas: COLUMNAS_LOGS_ASIGNACIONES,
+      fetch: (q) => this.logs.contarYListarHistoricoAsignacionParaExportar(q),
+      registrarEnConsultas: true,
     })
-    this.enviarExport(response, "asignaciones", result)
   }
 
   @Get("skills")
@@ -200,19 +178,13 @@ export class LogsController {
     @Query(new ZodValidationPipe(listarLogsSkillsQuerySchema)) query: ListarLogsSkillsQuery,
     @CurrentUser() usuario: SesionUsuario | undefined,
   ): Promise<Paginated<LogSkillEventoResumen>> {
-    const sesion = this.requireUsuario(usuario)
-    const inicio = Date.now()
-    const resultado = await this.logs.listarEventosSkill(query)
-    const latenciaMs = Date.now() - inicio
-
-    await this.consultasLog.registrar({
-      autorUsuarioId: sesion.usuarioId,
+    return ejecutarListarLogs(this.deps, {
+      query,
+      sesion: this.requireUsuario(usuario),
       endpoint: "/admin/logs/skills",
-      queryParams: filtrosSkillsMetadata(query),
-      latenciaMs,
+      fetch: (q) => this.logs.listarEventosSkill(q),
+      registrarEnConsultas: true,
     })
-
-    return resultado
   }
 
   @Get("skills/exportar")
@@ -223,21 +195,16 @@ export class LogsController {
     @CurrentUser() usuario: SesionUsuario | undefined,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    const sesion = this.requireUsuario(usuario)
-    const inicio = Date.now()
-    const { filas, total } = await this.logs.contarYListarEventosSkillParaExportar(query)
-    this.assertTopeRespetado(total)
-    const result = await this.construirExport("skills", query.formato, filas, [
-      ...COLUMNAS_LOGS_SKILLS,
-    ])
-    await this.auditarExport("skills", query, sesion, result, total)
-    await this.consultasLog.registrar({
-      autorUsuarioId: sesion.usuarioId,
+    await ejecutarExportarLogs(this.deps, {
+      query,
+      sesion: this.requireUsuario(usuario),
+      response,
+      dominio: "skills",
       endpoint: "/admin/logs/skills/exportar",
-      queryParams: filtrosSkillsExportMetadata(query),
-      latenciaMs: Date.now() - inicio,
+      columnas: COLUMNAS_LOGS_SKILLS,
+      fetch: (q) => this.logs.contarYListarEventosSkillParaExportar(q),
+      registrarEnConsultas: true,
     })
-    this.enviarExport(response, "skills", result)
   }
 
   @Get("modulos")
@@ -245,19 +212,13 @@ export class LogsController {
     @Query(new ZodValidationPipe(listarLogsModulosQuerySchema)) query: ListarLogsModulosQuery,
     @CurrentUser() usuario: SesionUsuario | undefined,
   ): Promise<Paginated<LogModuloEstadoResumen>> {
-    const sesion = this.requireUsuario(usuario)
-    const inicio = Date.now()
-    const resultado = await this.logs.listarEventosModulo(query)
-    const latenciaMs = Date.now() - inicio
-
-    await this.consultasLog.registrar({
-      autorUsuarioId: sesion.usuarioId,
+    return ejecutarListarLogs(this.deps, {
+      query,
+      sesion: this.requireUsuario(usuario),
       endpoint: "/admin/logs/modulos",
-      queryParams: filtrosModulosMetadata(query),
-      latenciaMs,
+      fetch: (q) => this.logs.listarEventosModulo(q),
+      registrarEnConsultas: true,
     })
-
-    return resultado
   }
 
   @Get("modulos/exportar")
@@ -268,21 +229,16 @@ export class LogsController {
     @CurrentUser() usuario: SesionUsuario | undefined,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    const sesion = this.requireUsuario(usuario)
-    const inicio = Date.now()
-    const { filas, total } = await this.logs.contarYListarEventosModuloParaExportar(query)
-    this.assertTopeRespetado(total)
-    const result = await this.construirExport("modulos", query.formato, filas, [
-      ...COLUMNAS_LOGS_MODULOS,
-    ])
-    await this.auditarExport("modulos", query, sesion, result, total)
-    await this.consultasLog.registrar({
-      autorUsuarioId: sesion.usuarioId,
+    await ejecutarExportarLogs(this.deps, {
+      query,
+      sesion: this.requireUsuario(usuario),
+      response,
+      dominio: "modulos",
       endpoint: "/admin/logs/modulos/exportar",
-      queryParams: filtrosModulosExportMetadata(query),
-      latenciaMs: Date.now() - inicio,
+      columnas: COLUMNAS_LOGS_MODULOS,
+      fetch: (q) => this.logs.contarYListarEventosModuloParaExportar(q),
+      registrarEnConsultas: true,
     })
-    this.enviarExport(response, "modulos", result)
   }
 
   @Get("ajustes-plan")
@@ -291,19 +247,13 @@ export class LogsController {
     query: ListarLogsAjustesPlanQuery,
     @CurrentUser() usuario: SesionUsuario | undefined,
   ): Promise<Paginated<LogAjustePlanResumen>> {
-    const sesion = this.requireUsuario(usuario)
-    const inicio = Date.now()
-    const resultado = await this.logs.listarAjustesPlan(query)
-    const latenciaMs = Date.now() - inicio
-
-    await this.consultasLog.registrar({
-      autorUsuarioId: sesion.usuarioId,
+    return ejecutarListarLogs(this.deps, {
+      query,
+      sesion: this.requireUsuario(usuario),
       endpoint: "/admin/logs/ajustes-plan",
-      queryParams: filtrosAjustesPlanMetadata(query),
-      latenciaMs,
+      fetch: (q) => this.logs.listarAjustesPlan(q),
+      registrarEnConsultas: true,
     })
-
-    return resultado
   }
 
   @Get("ajustes-plan/exportar")
@@ -314,21 +264,16 @@ export class LogsController {
     @CurrentUser() usuario: SesionUsuario | undefined,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    const sesion = this.requireUsuario(usuario)
-    const inicio = Date.now()
-    const { filas, total } = await this.logs.contarYListarAjustesPlanParaExportar(query)
-    this.assertTopeRespetado(total)
-    const result = await this.construirExport("ajustes-plan", query.formato, filas, [
-      ...COLUMNAS_LOGS_AJUSTES_PLAN,
-    ])
-    await this.auditarExport("ajustes-plan", query, sesion, result, total)
-    await this.consultasLog.registrar({
-      autorUsuarioId: sesion.usuarioId,
+    await ejecutarExportarLogs(this.deps, {
+      query,
+      sesion: this.requireUsuario(usuario),
+      response,
+      dominio: "ajustes-plan",
       endpoint: "/admin/logs/ajustes-plan/exportar",
-      queryParams: filtrosAjustesPlanExportMetadata(query),
-      latenciaMs: Date.now() - inicio,
+      columnas: COLUMNAS_LOGS_AJUSTES_PLAN,
+      fetch: (q) => this.logs.contarYListarAjustesPlanParaExportar(q),
+      registrarEnConsultas: true,
     })
-    this.enviarExport(response, "ajustes-plan", result)
   }
 
   // Recursion bloqueada: no se registra en `consultas_logs` para evitar un
@@ -339,8 +284,13 @@ export class LogsController {
     query: ListarLogsConsultasQuery,
     @CurrentUser() usuario: SesionUsuario | undefined,
   ): Promise<Paginated<LogConsultaResumen>> {
-    this.requireUsuario(usuario)
-    return await this.logs.listarConsultas(query)
+    return ejecutarListarLogs(this.deps, {
+      query,
+      sesion: this.requireUsuario(usuario),
+      endpoint: "/admin/logs/consultas",
+      fetch: (q) => this.logs.listarConsultas(q),
+      registrarEnConsultas: false,
+    })
   }
 
   // Recursion bloqueada: el exportador del visor de consultas tampoco se
@@ -354,15 +304,17 @@ export class LogsController {
     @CurrentUser() usuario: SesionUsuario | undefined,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    const sesion = this.requireUsuario(usuario)
-    const { filas, total } = await this.logs.contarYListarConsultasParaExportar(query)
-    this.assertTopeRespetado(total)
-    const aplanadas: readonly FilaConsulta[] = filas.map(aplanarFilaConsulta)
-    const result = await this.construirExport("consultas", query.formato, aplanadas, [
-      ...COLUMNAS_LOGS_CONSULTAS,
-    ])
-    await this.auditarExport("consultas", query, sesion, result, total)
-    this.enviarExport(response, "consultas", result)
+    await ejecutarExportarLogs(this.deps, {
+      query,
+      sesion: this.requireUsuario(usuario),
+      response,
+      dominio: "consultas",
+      endpoint: "/admin/logs/consultas/exportar",
+      columnas: COLUMNAS_LOGS_CONSULTAS,
+      fetch: (q) => this.logs.contarYListarConsultasParaExportar(q),
+      mapper: aplanarFilaConsulta,
+      registrarEnConsultas: false,
+    })
   }
 
   private requireUsuario(usuario: SesionUsuario | undefined): SesionUsuario {
@@ -374,322 +326,4 @@ export class LogsController {
     }
     return usuario
   }
-
-  private assertTopeRespetado(total: number): void {
-    if (total > LIMITE_FILAS_EXPORTACION) {
-      throw new BadRequestException({
-        code: apiErrorCodes.filtroDemasiadoAmplio,
-        message:
-          "El filtro produce demasiados resultados (>50.000). Reduce el rango temporal o anade filtros adicionales.",
-      })
-    }
-  }
-
-  private async construirExport<T>(
-    dominio: DominioLogs,
-    formato: "csv" | "xlsx",
-    filas: readonly T[],
-    columnas: readonly ColumnaDef<T>[],
-  ): Promise<ExportResult> {
-    return formato === "csv"
-      ? await this.exportService.aCsv(filas, columnas)
-      : await this.exportService.aXlsx(filas, columnas, `logs-${dominio}`)
-  }
-
-  /**
-   * Envia el binario al cliente. Se invoca como ultimo paso del handler, una
-   * vez que auditoria y meta-auditoria estan commiteadas (orden e2e-friendly:
-   * supertest resuelve solo cuando el insert ya esta en la BD).
-   */
-  private enviarExport(response: Response, dominio: DominioLogs, result: ExportResult): void {
-    response.setHeader("Content-Type", result.mime)
-    response.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${nombreArchivoExport(dominio, result.extension === "xlsx" ? "xlsx" : "csv")}"`,
-    )
-    response.send(result.buffer)
-  }
-
-  private async auditarExport(
-    dominio: DominioLogs,
-    query: ExportQueryConFormato,
-    sesion: SesionUsuario,
-    result: ExportResult,
-    totalFilas: number,
-  ): Promise<void> {
-    const metadata: Prisma.InputJsonObject = {
-      dominio,
-      formato: result.extension,
-      totalFilas,
-      filtrosAplicados: filtrosExportMetadata(query),
-    }
-    await this.auditLog.record({
-      usuarioId: sesion.usuarioId,
-      accion: AccionAuditoria.LOGS_EXPORTADO,
-      exito: true,
-      recursoTipo: "logs",
-      metadata,
-    })
-  }
-}
-
-type ExportQueryConFormato =
-  | ExportarLogsCursosQuery
-  | ExportarLogsAsignacionesQuery
-  | ExportarLogsSkillsQuery
-  | ExportarLogsModulosQuery
-  | ExportarLogsAjustesPlanQuery
-  | ExportarLogsConsultasQuery
-
-function filtrosCursosMetadata(query: ListarLogsCursosQuery): Record<string, unknown> {
-  const filtros: Record<string, unknown> = {
-    page: query.page,
-    pageSize: query.pageSize,
-  }
-  if (query.cursoId) {
-    filtros.cursoId = query.cursoId
-  }
-  if (query.autorUsuarioId) {
-    filtros.autorUsuarioId = query.autorUsuarioId
-  }
-  if (query.accion) {
-    filtros.accion = query.accion
-  }
-  if (query.desde) {
-    filtros.desde = query.desde
-  }
-  if (query.hasta) {
-    filtros.hasta = query.hasta
-  }
-  return filtros
-}
-
-function filtrosCursosExportMetadata(query: ExportarLogsCursosQuery): Record<string, unknown> {
-  const filtros: Record<string, unknown> = { formato: query.formato }
-  if (query.cursoId) {
-    filtros.cursoId = query.cursoId
-  }
-  if (query.autorUsuarioId) {
-    filtros.autorUsuarioId = query.autorUsuarioId
-  }
-  if (query.accion) {
-    filtros.accion = query.accion
-  }
-  if (query.desde) {
-    filtros.desde = query.desde
-  }
-  if (query.hasta) {
-    filtros.hasta = query.hasta
-  }
-  return filtros
-}
-
-function filtrosAsignacionesMetadata(query: ListarLogsAsignacionesQuery): Record<string, unknown> {
-  const filtros: Record<string, unknown> = {
-    page: query.page,
-    pageSize: query.pageSize,
-  }
-  if (query.asignacionId) {
-    filtros.asignacionId = query.asignacionId
-  }
-  if (query.autorUsuarioId) {
-    filtros.autorUsuarioId = query.autorUsuarioId
-  }
-  if (query.estadoNuevo) {
-    filtros.estadoNuevo = query.estadoNuevo
-  }
-  if (query.desde) {
-    filtros.desde = query.desde
-  }
-  if (query.hasta) {
-    filtros.hasta = query.hasta
-  }
-  return filtros
-}
-
-function filtrosAsignacionesExportMetadata(
-  query: ExportarLogsAsignacionesQuery,
-): Record<string, unknown> {
-  const filtros: Record<string, unknown> = { formato: query.formato }
-  if (query.asignacionId) {
-    filtros.asignacionId = query.asignacionId
-  }
-  if (query.autorUsuarioId) {
-    filtros.autorUsuarioId = query.autorUsuarioId
-  }
-  if (query.estadoNuevo) {
-    filtros.estadoNuevo = query.estadoNuevo
-  }
-  if (query.desde) {
-    filtros.desde = query.desde
-  }
-  if (query.hasta) {
-    filtros.hasta = query.hasta
-  }
-  return filtros
-}
-
-function filtrosSkillsMetadata(query: ListarLogsSkillsQuery): Record<string, unknown> {
-  const filtros: Record<string, unknown> = {
-    page: query.page,
-    pageSize: query.pageSize,
-  }
-  if (query.skillId) {
-    filtros.skillId = query.skillId
-  }
-  if (query.tipoEvento) {
-    filtros.tipoEvento = query.tipoEvento
-  }
-  if (query.autorUsuarioId) {
-    filtros.autorUsuarioId = query.autorUsuarioId
-  }
-  if (query.desde) {
-    filtros.desde = query.desde
-  }
-  if (query.hasta) {
-    filtros.hasta = query.hasta
-  }
-  return filtros
-}
-
-function filtrosSkillsExportMetadata(query: ExportarLogsSkillsQuery): Record<string, unknown> {
-  const filtros: Record<string, unknown> = { formato: query.formato }
-  if (query.skillId) {
-    filtros.skillId = query.skillId
-  }
-  if (query.tipoEvento) {
-    filtros.tipoEvento = query.tipoEvento
-  }
-  if (query.autorUsuarioId) {
-    filtros.autorUsuarioId = query.autorUsuarioId
-  }
-  if (query.desde) {
-    filtros.desde = query.desde
-  }
-  if (query.hasta) {
-    filtros.hasta = query.hasta
-  }
-  return filtros
-}
-
-function filtrosModulosMetadata(query: ListarLogsModulosQuery): Record<string, unknown> {
-  const filtros: Record<string, unknown> = {
-    page: query.page,
-    pageSize: query.pageSize,
-  }
-  if (query.moduloId) {
-    filtros.moduloId = query.moduloId
-  }
-  if (query.estadoNuevo) {
-    filtros.estadoNuevo = query.estadoNuevo
-  }
-  if (query.autorUsuarioId) {
-    filtros.autorUsuarioId = query.autorUsuarioId
-  }
-  if (query.desde) {
-    filtros.desde = query.desde
-  }
-  if (query.hasta) {
-    filtros.hasta = query.hasta
-  }
-  return filtros
-}
-
-function filtrosModulosExportMetadata(query: ExportarLogsModulosQuery): Record<string, unknown> {
-  const filtros: Record<string, unknown> = { formato: query.formato }
-  if (query.moduloId) {
-    filtros.moduloId = query.moduloId
-  }
-  if (query.estadoNuevo) {
-    filtros.estadoNuevo = query.estadoNuevo
-  }
-  if (query.autorUsuarioId) {
-    filtros.autorUsuarioId = query.autorUsuarioId
-  }
-  if (query.desde) {
-    filtros.desde = query.desde
-  }
-  if (query.hasta) {
-    filtros.hasta = query.hasta
-  }
-  return filtros
-}
-
-function filtrosAjustesPlanMetadata(query: ListarLogsAjustesPlanQuery): Record<string, unknown> {
-  const filtros: Record<string, unknown> = {
-    page: query.page,
-    pageSize: query.pageSize,
-  }
-  if (query.planId) {
-    filtros.planId = query.planId
-  }
-  if (query.seccionId) {
-    filtros.seccionId = query.seccionId
-  }
-  if (query.autorUsuarioId) {
-    filtros.autorUsuarioId = query.autorUsuarioId
-  }
-  if (query.accion) {
-    filtros.accion = query.accion
-  }
-  if (query.desde) {
-    filtros.desde = query.desde
-  }
-  if (query.hasta) {
-    filtros.hasta = query.hasta
-  }
-  return filtros
-}
-
-function filtrosAjustesPlanExportMetadata(
-  query: ExportarLogsAjustesPlanQuery,
-): Record<string, unknown> {
-  const filtros: Record<string, unknown> = { formato: query.formato }
-  if (query.planId) {
-    filtros.planId = query.planId
-  }
-  if (query.seccionId) {
-    filtros.seccionId = query.seccionId
-  }
-  if (query.autorUsuarioId) {
-    filtros.autorUsuarioId = query.autorUsuarioId
-  }
-  if (query.accion) {
-    filtros.accion = query.accion
-  }
-  if (query.desde) {
-    filtros.desde = query.desde
-  }
-  if (query.hasta) {
-    filtros.hasta = query.hasta
-  }
-  return filtros
-}
-
-const CLAVES_FILTROS_EXPORT = [
-  "cursoId",
-  "asignacionId",
-  "skillId",
-  "moduloId",
-  "planId",
-  "seccionId",
-  "autorUsuarioId",
-  "endpoint",
-  "estadoNuevo",
-  "tipoEvento",
-  "accion",
-  "desde",
-  "hasta",
-] as const
-
-function filtrosExportMetadata(query: ExportQueryConFormato): Prisma.InputJsonObject {
-  const filtros: Record<string, Prisma.InputJsonValue> = {}
-  const queryRecord = query as Record<string, string | undefined>
-  for (const clave of CLAVES_FILTROS_EXPORT) {
-    const valor = queryRecord[clave]
-    if (valor) {
-      filtros[clave] = valor
-    }
-  }
-  return filtros
 }
