@@ -71,6 +71,12 @@ const envSchema = z
       .string()
       .default("false")
       .transform((value) => value.toLowerCase() === "true"),
+    // SameSite de las cookies de sesion (`nexott.sid`) y CSRF (`XSRF-TOKEN`).
+    // Usa `none` cuando la web y la API viven en hostnames distintos (deploys
+    // separados sin custom domain compartido); requiere `COOKIE_SECURE=true`
+    // porque los navegadores rechazan `SameSite=None` sin `Secure`.
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    COOKIE_SAMESITE: z.enum(["lax", "none", "strict"]).default("lax"),
     // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
     ALLOWED_ORIGINS: z
       .string()
@@ -237,6 +243,13 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ["COOKIE_SECURE"],
         message: "COOKIE_SECURE debe ser true en NODE_ENV=production",
+      })
+    }
+    if (data.COOKIE_SAMESITE === "none" && !data.COOKIE_SECURE) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["COOKIE_SAMESITE"],
+        message: "COOKIE_SAMESITE=none requiere COOKIE_SECURE=true (regla del navegador)",
       })
     }
     if (data.ALLOWED_ORIGINS.length === 0) {

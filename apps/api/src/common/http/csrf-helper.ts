@@ -6,6 +6,7 @@ const LONGITUD_TOKEN_CSRF_BYTES = 32
 
 interface OpcionesCsrf {
   readonly cookieSecure: boolean
+  readonly cookieSameSite: "lax" | "none" | "strict"
 }
 
 /**
@@ -27,7 +28,7 @@ export function emitirCsrfToken(req: Request, res: Response, opciones: OpcionesC
   res.cookie(NOMBRE_COOKIE_CSRF, token, {
     httpOnly: false,
     secure: opciones.cookieSecure,
-    sameSite: "lax",
+    sameSite: opciones.cookieSameSite,
     path: "/",
   })
   return token

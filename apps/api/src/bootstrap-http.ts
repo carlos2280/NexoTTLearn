@@ -33,6 +33,7 @@ export function configurarHttp(app: INestApplication): void {
   const sessionSecret = config.get("SESSION_SECRET", { infer: true })
   const sessionMaxAge = config.get("SESSION_MAX_AGE_MS", { infer: true })
   const cookieSecure = config.get("COOKIE_SECURE", { infer: true })
+  const cookieSameSite = config.get("COOKIE_SAMESITE", { infer: true })
   const databaseUrl = config.get("DATABASE_URL", { infer: true })
   const allowedOrigins = config.get("ALLOWED_ORIGINS", { infer: true })
 
@@ -91,13 +92,13 @@ export function configurarHttp(app: INestApplication): void {
       cookie: {
         httpOnly: true,
         secure: cookieSecure,
-        sameSite: "lax",
+        sameSite: cookieSameSite,
         maxAge: sessionMaxAge,
       },
     }),
   )
 
-  app.use(crearMiddlewareCsrfFallback({ cookieSecure }))
+  app.use(crearMiddlewareCsrfFallback({ cookieSecure, cookieSameSite }))
 
   app.enableCors({
     origin: (origin, callback) => {
