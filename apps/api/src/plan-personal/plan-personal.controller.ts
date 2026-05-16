@@ -27,6 +27,10 @@ import { Roles } from "../common/decorators/roles.decorator"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { ZodValidationPipe } from "../common/pipes/zod-validation.pipe"
 import { SesionUsuario } from "../common/types/sesion.types"
+import {
+  PlanPersonalRecalculoService,
+  type RecalcularMasivoResultado,
+} from "./plan-personal-recalculo.service"
 import { PlanPersonalService } from "./plan-personal.service"
 
 /**
@@ -40,7 +44,10 @@ import { PlanPersonalService } from "./plan-personal.service"
  */
 @Controller()
 export class PlanPersonalController {
-  constructor(private readonly planService: PlanPersonalService) {}
+  constructor(
+    private readonly planService: PlanPersonalService,
+    private readonly recalculoService: PlanPersonalRecalculoService,
+  ) {}
 
   @Post("asignaciones/:asignacionId/plan/calcular")
   @Roles(RolUsuario.ADMIN)
@@ -106,15 +113,9 @@ export class PlanPersonalController {
   async recalcularMasivo(
     @Param("cursoId", ParseUUIDPipe) cursoId: string,
     @CurrentUser() usuario: SesionUsuario | undefined,
-  ): Promise<{
-    readonly cursoId: string
-    readonly total: number
-    readonly recalculadas: number
-    readonly fallidas: number
-    readonly duracionMs: number
-  }> {
+  ): Promise<RecalcularMasivoResultado> {
     const sesion = this.requireUsuario(usuario)
-    return await this.planService.recalcularMasivo(cursoId, sesion.usuarioId)
+    return await this.recalculoService.recalcularMasivo(cursoId, sesion.usuarioId)
   }
 
   @Post("asignaciones/:asignacionId/secciones/:seccionId/apertura")

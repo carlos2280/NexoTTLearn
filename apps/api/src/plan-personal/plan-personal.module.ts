@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common"
 import { PrismaModule } from "../common/prisma/prisma.module"
 import { NotificacionesModule } from "../notificaciones/notificaciones.module"
+import { PlanPersonalRecalculoService } from "./plan-personal-recalculo.service"
 import { PlanPersonalController } from "./plan-personal.controller"
 import { PlanPersonalService } from "./plan-personal.service"
 
@@ -12,11 +13,16 @@ import { PlanPersonalService } from "./plan-personal.service"
  *
  * P10c: importa `NotificacionesModule` para inyectar `NotificacionesService`
  * en los triggers `calcularExplicito`, `recalcular` y `ajustarPlan`.
+ *
+ * Fase 1.1 split: `PlanPersonalRecalculoService` aisla el recalculo batch
+ * (endpoint /cursos/:cursoId/planes/recalcular-masivo) y delega los
+ * recalculos individuales en `PlanPersonalService.recalcular`. Solo lo usa
+ * el controller — no se exporta del modulo.
  */
 @Module({
   imports: [PrismaModule, NotificacionesModule],
   controllers: [PlanPersonalController],
-  providers: [PlanPersonalService],
+  providers: [PlanPersonalService, PlanPersonalRecalculoService],
   exports: [PlanPersonalService],
 })
 export class PlanPersonalModule {}

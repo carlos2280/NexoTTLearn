@@ -2,7 +2,7 @@ import type { PlanResponseAdmin } from "@nexott-learn/shared-types"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AuditLogService } from "../common/audit/audit-log.service"
 import { PrismaService } from "../common/prisma/prisma.service"
-import { NotificacionesService } from "../notificaciones/notificaciones.service"
+import { PlanPersonalRecalculoService } from "./plan-personal-recalculo.service"
 import { PlanPersonalService } from "./plan-personal.service"
 
 interface PrismaMock {
@@ -19,8 +19,10 @@ function buildAuditMock(): { record: ReturnType<typeof vi.fn> } {
   return { record: vi.fn().mockResolvedValue(undefined) }
 }
 
-function buildNotifMock(): { crear: ReturnType<typeof vi.fn> } {
-  return { crear: vi.fn().mockResolvedValue({ creada: true }) }
+function buildPlanPersonalMock(): { recalcular: ReturnType<typeof vi.fn> } {
+  return {
+    recalcular: vi.fn().mockResolvedValue({ planId: "p" } as unknown as PlanResponseAdmin),
+  }
 }
 
 const CURSO = "11111111-1111-1111-1111-111111111111"
@@ -29,20 +31,20 @@ const ASIG_2 = "22222222-2222-2222-2222-222222222222"
 const ASIG_3 = "22222222-2222-2222-2222-222222222223"
 const ADMIN = "99999999-9999-9999-9999-999999999999"
 
-describe("PlanPersonalService.recalcularMasivo", () => {
+describe("PlanPersonalRecalculoService.recalcularMasivo", () => {
   let prisma: PrismaMock
   let audit: ReturnType<typeof buildAuditMock>
-  let notif: ReturnType<typeof buildNotifMock>
-  let service: PlanPersonalService
+  let planPersonal: ReturnType<typeof buildPlanPersonalMock>
+  let service: PlanPersonalRecalculoService
 
   beforeEach(() => {
     prisma = buildPrismaMock()
     audit = buildAuditMock()
-    notif = buildNotifMock()
-    service = new PlanPersonalService(
+    planPersonal = buildPlanPersonalMock()
+    service = new PlanPersonalRecalculoService(
       prisma as unknown as PrismaService,
       audit as unknown as AuditLogService,
-      notif as unknown as NotificacionesService,
+      planPersonal as unknown as PlanPersonalService,
     )
   })
 
@@ -64,13 +66,10 @@ describe("PlanPersonalService.recalcularMasivo", () => {
       { id: ASIG_2 },
       { id: ASIG_3 },
     ])
-    const recalcular = vi
-      .spyOn(service, "recalcular")
-      .mockResolvedValue({ planId: "p" } as unknown as PlanResponseAdmin)
 
     const out = await service.recalcularMasivo(CURSO, ADMIN)
 
-    expect(recalcular).toHaveBeenCalledTimes(3)
+    expect(planPersonal.recalcular).toHaveBeenCalledTimes(3)
     expect(out.total).toBe(3)
     expect(out.recalculadas).toBe(3)
     expect(out.fallidas).toBe(0)
@@ -82,7 +81,7 @@ describe("PlanPersonalService.recalcularMasivo", () => {
       { id: ASIG_2 },
       { id: ASIG_3 },
     ])
-    vi.spyOn(service, "recalcular")
+    planPersonal.recalcular
       .mockResolvedValueOnce({ planId: "p1" } as unknown as PlanResponseAdmin)
       .mockRejectedValueOnce(new Error("boom"))
       .mockResolvedValueOnce({ planId: "p3" } as unknown as PlanResponseAdmin)
