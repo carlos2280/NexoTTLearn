@@ -1,14 +1,14 @@
 import { cn } from "@/shared/lib/cn"
 import type {
-  DisponibilidadEntrevistaIaConMotivo,
-  DisponibilidadTransversalConMotivo,
-} from "../types"
+  DisponibilidadEntrevistaIaResponse,
+  DisponibilidadTransversalResponse,
+} from "@nexott-learn/shared-types"
 
 type HitoTipo = "transversal" | "entrevistaIa"
 
 interface SeccionHaciaElCierreProps {
-  readonly transversal: DisponibilidadTransversalConMotivo | undefined
-  readonly entrevistaIa: DisponibilidadEntrevistaIaConMotivo | undefined
+  readonly transversal: DisponibilidadTransversalResponse | undefined
+  readonly entrevistaIa: DisponibilidadEntrevistaIaResponse | undefined
   readonly onAbrirHito: (hito: HitoTipo) => void
 }
 

@@ -8,8 +8,8 @@
 > en código frontend.
 >
 > **Sprint 1 en marcha:** B-2 ✅, B-extra.1 ✅ (`GET /me/cursos`),
-> B-3 ✅ (`GET /me/ficha/resumen` — desbloquea la bandeja entera
-> cuando se usa `VITE_USE_MOCKS=false`). Pendientes Sprint 1: B-6,
+> B-3 ✅ (`GET /me/ficha/resumen`), B-6 ✅ (`motivoBloqueo` en
+> disponibilidades transversal y entrevista IA). Pendientes Sprint 1:
 > B-extra.2.
 >
 > **Convenciones API:** todas las rutas bajo `/api/v1/...`. Autenticación
@@ -302,7 +302,7 @@ Al implementar, **mover el tipo a `shared-types`** y borrar
 
 <a id="b-6"></a>
 
-## B-6 · `motivoBloqueo` en disponibilidades
+## B-6 · `motivoBloqueo` en disponibilidades — ✅ HECHO (2026-05-17)
 
 **Origen:** `apps/web/src/pages/curso-inmersivo/types.ts:37-46`,
 `apps/web/src/shared/api/mocks/handlers-curso-detalle.ts:802` y `:849`.

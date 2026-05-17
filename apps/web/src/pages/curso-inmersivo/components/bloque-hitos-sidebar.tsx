@@ -1,15 +1,15 @@
 import { cn } from "@/shared/lib/cn"
-import { CheckCircle2, Lock } from "lucide-react"
 import type {
-  DisponibilidadEntrevistaIaConMotivo,
-  DisponibilidadTransversalConMotivo,
-} from "../types"
+  DisponibilidadEntrevistaIaResponse,
+  DisponibilidadTransversalResponse,
+} from "@nexott-learn/shared-types"
+import { CheckCircle2, Lock } from "lucide-react"
 
 type HitoTipo = "transversal" | "entrevistaIa"
 
 interface BloqueHitosSidebarProps {
-  readonly transversal: DisponibilidadTransversalConMotivo | undefined
-  readonly entrevistaIa: DisponibilidadEntrevistaIaConMotivo | undefined
+  readonly transversal: DisponibilidadTransversalResponse | undefined
+  readonly entrevistaIa: DisponibilidadEntrevistaIaResponse | undefined
   readonly hitoActivo: HitoTipo | null
   readonly onAbrirHito: (hito: HitoTipo) => void
   /**

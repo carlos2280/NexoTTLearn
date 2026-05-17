@@ -292,6 +292,7 @@ describe("E13 GET disponibilidad", () => {
     const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN_SESION)
     expect(r.disponible).toBe(false)
     expect(r.razon).toBe("ENTREVISTA_IA_NO_CONFIGURADA")
+    expect(r.motivoBloqueo).toBe("Este curso aun no tiene entrevista IA configurada.")
   })
 
   it("RATE_LIMIT_HORA cuando hay 5 intentos en la ultima hora", async () => {
@@ -301,6 +302,7 @@ describe("E13 GET disponibilidad", () => {
     expect(r.disponible).toBe(false)
     expect(r.razon).toBe("RATE_LIMIT_HORA")
     expect(r.intentosUsadosHoy).toBe(5)
+    expect(r.motivoBloqueo).toContain("5 intentos")
   })
 
   it("INTENTO_EN_CURSO si existe uno EN_PROGRESO", async () => {
@@ -312,6 +314,7 @@ describe("E13 GET disponibilidad", () => {
     const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN_SESION)
     expect(r.disponible).toBe(false)
     expect(r.razon).toBe("INTENTO_EN_CURSO")
+    expect(r.motivoBloqueo).toBe("Tienes un intento en curso. Termina ese primero.")
   })
 
   it("PLAN_INCOMPLETO si el plan no esta completo", async () => {
@@ -320,6 +323,7 @@ describe("E13 GET disponibilidad", () => {
     const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN_SESION)
     expect(r.disponible).toBe(false)
     expect(r.razon).toBe("PLAN_INCOMPLETO")
+    expect(r.motivoBloqueo).toBe("Completa primero tu plan de estudio.")
   })
 
   it("DISPONIBLE happy path", async () => {
@@ -328,6 +332,7 @@ describe("E13 GET disponibilidad", () => {
     expect(r.disponible).toBe(true)
     expect(r.razon).toBe("DISPONIBLE")
     expect(r.maxPorHora).toBe(5)
+    expect(r.motivoBloqueo).toBeNull()
   })
 
   it("TRANSVERSAL_NO_APROBADO si el curso encadenado tiene transversal sin aprobar", async () => {
@@ -349,6 +354,7 @@ describe("E13 GET disponibilidad", () => {
     const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN_SESION)
     expect(r.disponible).toBe(false)
     expect(r.razon).toBe("TRANSVERSAL_NO_APROBADO")
+    expect(r.motivoBloqueo).toBe("Aprueba primero el transversal.")
   })
 
   it("DISPONIBLE si el transversal del curso encadenado ya esta aprobado", async () => {
@@ -409,6 +415,7 @@ describe("E13 GET disponibilidad", () => {
     const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN_SESION)
     expect(r.disponible).toBe(false)
     expect(r.razon).toBe("FECHA_NO_ALCANZADA")
+    expect(r.motivoBloqueo).toContain("Disponible desde")
   })
 })
 

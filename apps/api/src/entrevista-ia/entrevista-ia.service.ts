@@ -28,6 +28,7 @@ import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
 import { NotificacionesService } from "../notificaciones/notificaciones.service"
+import { motivoEntrevistaIa } from "./disponibilidad-motivo.helpers"
 import { EntrevistaEvaluacionService } from "./entrevista-evaluacion.service"
 import {
   IntentoEntrevistaSeleccionado,
@@ -135,12 +136,14 @@ export class EntrevistaIaService {
     usuario: SesionUsuario,
   ): Promise<DisponibilidadEntrevistaIaResponse> {
     const asignacion = await this.resolverAsignacion(asignacionId, usuario)
+    const fechaDesbloqueoCurso = asignacion.curso.fechaDesbloqueo
     if (asignacion.curso.entrevistaIaId === null) {
       return {
         disponible: false,
         razon: "ENTREVISTA_IA_NO_CONFIGURADA",
         intentosUsadosHoy: 0,
         maxPorHora: RATE_LIMIT_MAX,
+        motivoBloqueo: motivoEntrevistaIa("ENTREVISTA_IA_NO_CONFIGURADA", fechaDesbloqueoCurso),
       }
     }
     const intentosUsadosHoy = await this.contarIntentosUltimaHora(
@@ -153,6 +156,7 @@ export class EntrevistaIaService {
         razon: "RATE_LIMIT_HORA",
         intentosUsadosHoy,
         maxPorHora: RATE_LIMIT_MAX,
+        motivoBloqueo: motivoEntrevistaIa("RATE_LIMIT_HORA", fechaDesbloqueoCurso),
       }
     }
     const enCurso = await this.intentoEnCurso(
@@ -165,17 +169,24 @@ export class EntrevistaIaService {
         razon: "INTENTO_EN_CURSO",
         intentosUsadosHoy,
         maxPorHora: RATE_LIMIT_MAX,
+        motivoBloqueo: motivoEntrevistaIa("INTENTO_EN_CURSO", fechaDesbloqueoCurso),
       }
     }
     const gate = await this.evaluarGateDesbloqueo(asignacion, asignacionId)
     if (gate !== null) {
-      return { ...gate, intentosUsadosHoy, maxPorHora: RATE_LIMIT_MAX }
+      return {
+        ...gate,
+        intentosUsadosHoy,
+        maxPorHora: RATE_LIMIT_MAX,
+        motivoBloqueo: motivoEntrevistaIa(gate.razon, fechaDesbloqueoCurso),
+      }
     }
     return {
       disponible: true,
       razon: "DISPONIBLE",
       intentosUsadosHoy,
       maxPorHora: RATE_LIMIT_MAX,
+      motivoBloqueo: null,
     }
   }
 

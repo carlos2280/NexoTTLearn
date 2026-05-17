@@ -1,8 +1,4 @@
-import type {
-  DisponibilidadEntrevistaIaResponse,
-  DisponibilidadTransversalResponse,
-  MeAvanceCursoResponse,
-} from "@nexott-learn/shared-types"
+import type { MeAvanceCursoResponse } from "@nexott-learn/shared-types"
 
 /**
  * Extensiones LOCALES de tipos oficiales mientras el backend no implementa
@@ -32,15 +28,4 @@ export interface CaminoHaciaApto {
 
 export type MeAvanceCursoConCamino = MeAvanceCursoResponse & {
   readonly caminoHaciaApto?: CaminoHaciaApto
-}
-
-// TODO B-6: cuando llegue al backend, añadir `motivoBloqueo: string | null` a
-// los schemas de `DisponibilidadTransversalResponse` y
-// `DisponibilidadEntrevistaIaResponse`, y borrar estas extensiones.
-export type DisponibilidadTransversalConMotivo = DisponibilidadTransversalResponse & {
-  readonly motivoBloqueo?: string | null
-}
-
-export type DisponibilidadEntrevistaIaConMotivo = DisponibilidadEntrevistaIaResponse & {
-  readonly motivoBloqueo?: string | null
 }

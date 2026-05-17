@@ -28,15 +28,6 @@ type MockAvanceConCamino = MeAvanceCursoResponse & {
   }
 }
 
-// TODO B-6: cuando el backend implemente `motivoBloqueo` en disponibilidades,
-// borrar estos tipos locales y usar los oficiales.
-type MockDispTransversal = DisponibilidadTransversalResponse & {
-  readonly motivoBloqueo: string | null
-}
-type MockDispEntrevistaIa = DisponibilidadEntrevistaIaResponse & {
-  readonly motivoBloqueo: string | null
-}
-
 const RTE_CURSO_DETALLE = /^\/cursos\/([^/?]+)(\?.*)?$/
 const RTE_AVANCE_CURSO = /^\/me\/avance\/cursos\/([^/?]+)(\?.*)?$/
 const RTE_ARBOL_CURSO = /^\/me\/cursos\/([^/?]+)\/arbol(\?.*)?$/
@@ -792,15 +783,16 @@ function handlerPlan(req: MockRequest): PlanResponseParticipante {
   return buildPlanFallback(asignacionId)
 }
 
-function handlerDispTransversal(req: MockRequest): MockDispTransversal {
+function handlerDispTransversal(req: MockRequest): DisponibilidadTransversalResponse {
   const asignacionId = extraerId(req.path, RGX_TRANS_ASIG_ID)
   const disponible = asignacionId === "asg-java-001"
   return {
     disponible,
     razon: disponible ? "PLAN_COMPLETADO" : "BLOQUEADO_PLAN_INCOMPLETO",
     fechaDisponibleDesde: disponible ? diasDesdeHoy(-1) : null,
-    // TODO B-6: backend debe devolver `motivoBloqueo` para no hardcodear copy en cliente.
-    motivoBloqueo: disponible ? null : "Completa tu plan de estudio",
+    motivoBloqueo: disponible
+      ? null
+      : "Completa tu plan de estudio antes de empezar el transversal.",
   }
 }
 
@@ -815,7 +807,7 @@ const RAZONES_VALIDAS = new Set([
   "ENTREVISTA_IA_NO_CONFIGURADA",
 ])
 
-type RazonDisp = MockDispEntrevistaIa["razon"]
+type RazonDisp = DisponibilidadEntrevistaIaResponse["razon"]
 
 function leerOverrideRazonEntrevista(): RazonDisp | null {
   if (typeof window === "undefined") {
@@ -828,7 +820,7 @@ function leerOverrideRazonEntrevista(): RazonDisp | null {
   return null
 }
 
-function handlerDispEntrevistaIa(_req: MockRequest): MockDispEntrevistaIa {
+function handlerDispEntrevistaIa(_req: MockRequest): DisponibilidadEntrevistaIaResponse {
   const override = leerOverrideRazonEntrevista()
   if (override) {
     return construirDisp(override)
@@ -839,17 +831,27 @@ function handlerDispEntrevistaIa(_req: MockRequest): MockDispEntrevistaIa {
   return construirDisp("TRANSVERSAL_NO_APROBADO")
 }
 
-function construirDisp(razon: RazonDisp): MockDispEntrevistaIa {
+function construirDisp(razon: RazonDisp): DisponibilidadEntrevistaIaResponse {
   const disponible = razon === "DISPONIBLE"
   return {
     disponible,
     razon,
     intentosUsadosHoy: razon === "RATE_LIMIT_HORA" ? 5 : 0,
     maxPorHora: 5,
-    // TODO B-6: backend debe devolver `motivoBloqueo` para no hardcodear copy en cliente.
-    motivoBloqueo: disponible ? null : null,
+    motivoBloqueo: disponible
+      ? null
+      : (MOTIVO_ENTREVISTA_IA.get(razon as Exclude<RazonDisp, "DISPONIBLE">) ?? null),
   }
 }
+
+const MOTIVO_ENTREVISTA_IA: ReadonlyMap<Exclude<RazonDisp, "DISPONIBLE">, string> = new Map([
+  ["PLAN_INCOMPLETO", "Completa primero tu plan de estudio."],
+  ["TRANSVERSAL_NO_APROBADO", "Aprueba primero el transversal."],
+  ["FECHA_NO_ALCANZADA", "Aun no esta habilitado por fecha."],
+  ["RATE_LIMIT_HORA", "Has usado tus 5 intentos de esta hora. Vuelve mas tarde."],
+  ["INTENTO_EN_CURSO", "Tienes un intento en curso. Termina ese primero."],
+  ["ENTREVISTA_IA_NO_CONFIGURADA", "Este curso aun no tiene entrevista IA configurada."],
+])
 
 // El primer alias permite localizar la asignación por curso desde otros mocks
 // (por ejemplo, si un endpoint sólo conoce el curso).

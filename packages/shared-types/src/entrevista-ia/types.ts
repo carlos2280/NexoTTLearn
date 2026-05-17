@@ -50,6 +50,12 @@ export type EntrevistaIaResponse = z.infer<typeof entrevistaIaResponseSchema>
  * `GET /asignaciones/:asignacionId/entrevista-ia/disponibilidad`. La razon
  * agrega contexto operacional (cuantos intentos consumidos en la ultima hora,
  * limite). D42 extendida (D-S8-D3).
+ *
+ * B-6: `motivoBloqueo` es una frase amable lista para mostrar al
+ * participante. Siempre `null` cuando `disponible === true`; siempre
+ * string no vacio cuando `disponible === false`. El copy lo decide el
+ * backend para que cambios futuros (i18n, otros clientes) no requieran
+ * tocar cada cliente.
  */
 export const disponibilidadEntrevistaIaResponseSchema = z
   .object({
@@ -57,6 +63,7 @@ export const disponibilidadEntrevistaIaResponseSchema = z
     razon: razonDisponibilidadEntrevistaIaSchema,
     intentosUsadosHoy: z.number().int().min(0),
     maxPorHora: z.literal(5),
+    motivoBloqueo: z.string().nullable(),
   })
   .strict()
 

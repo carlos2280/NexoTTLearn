@@ -1,17 +1,17 @@
 import { cn } from "@/shared/lib/cn"
-import { ArrowRight } from "lucide-react"
 import type {
-  DisponibilidadEntrevistaIaConMotivo,
-  DisponibilidadTransversalConMotivo,
-  MeAvanceCursoConCamino,
-} from "../types"
+  DisponibilidadEntrevistaIaResponse,
+  DisponibilidadTransversalResponse,
+} from "@nexott-learn/shared-types"
+import { ArrowRight } from "lucide-react"
+import type { MeAvanceCursoConCamino } from "../types"
 import { SeccionCaminoHaciaApto } from "./seccion-camino-hacia-apto"
 import { SeccionHaciaElCierre } from "./seccion-hacia-el-cierre"
 
 interface PanelContextoProps {
   readonly avance: MeAvanceCursoConCamino
-  readonly transversal: DisponibilidadTransversalConMotivo | undefined
-  readonly entrevistaIa: DisponibilidadEntrevistaIaConMotivo | undefined
+  readonly transversal: DisponibilidadTransversalResponse | undefined
+  readonly entrevistaIa: DisponibilidadEntrevistaIaResponse | undefined
   readonly seccionActivaId: string | null
   readonly onIrASiguiente: (seccionId: string) => void
   readonly onAbrirHito: (hito: "transversal" | "entrevistaIa") => void

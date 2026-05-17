@@ -3,15 +3,13 @@ import { cn } from "@/shared/lib/cn"
 import type {
   CursoArbolModulo,
   CursoArbolSeccion,
+  DisponibilidadEntrevistaIaResponse,
+  DisponibilidadTransversalResponse,
   ModoCursoParticipante,
   PlanResponseParticipante,
   SeccionPlanItemParticipante,
 } from "@nexott-learn/shared-types"
 import { CheckCircle2, Circle, CircleDashed } from "lucide-react"
-import type {
-  DisponibilidadEntrevistaIaConMotivo,
-  DisponibilidadTransversalConMotivo,
-} from "../types"
 import { BloqueHitosSidebar } from "./bloque-hitos-sidebar"
 
 type HitoTipo = "transversal" | "entrevistaIa"
@@ -23,8 +21,8 @@ interface SidebarPlanProps {
   readonly errorPlan: Error | null
   readonly seccionActivaId: string | null
   readonly onSeleccionar: (seccionId: string) => void
-  readonly transversal: DisponibilidadTransversalConMotivo | undefined
-  readonly entrevistaIa: DisponibilidadEntrevistaIaConMotivo | undefined
+  readonly transversal: DisponibilidadTransversalResponse | undefined
+  readonly entrevistaIa: DisponibilidadEntrevistaIaResponse | undefined
   readonly hitoActivo: HitoTipo | null
   readonly onAbrirHito: (hito: HitoTipo) => void
   /**
