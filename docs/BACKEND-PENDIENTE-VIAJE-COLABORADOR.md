@@ -809,3 +809,127 @@ B-N. Crear ticket nuevo cuando se priorice.
 - Componente del sidebar del inmersivo que dibuja el check de
   "sección completada": probablemente lee del plan (no de
   `AperturaSeccion`). Confirmar al implementar.
+
+---
+
+### DEUDA-B26-1 · `notaGlobalFinal` no se persiste en el snapshot de cierre
+
+**Detectado:** 2026-05-17 implementando B-26.
+
+`CursoFotografiaCierre.snapshot` (construido por
+`cursos/cierre-curso.helpers.ts::construirSnapshotCierre`) NO incluye
+`notaGlobalFinal` por asignación. Esto fuerza dos hacks aguas abajo:
+
+1. `MeAvanceService.extraerNotaFinal` (línea ~398) busca
+   `fila.notaGlobalFinal` que **nunca está presente** → siempre
+   devuelve `null` → el campo nunca se emite en `/me/avance/cursos/:id`
+   aunque el curso esté CERRADO. El comportamiento parece intencional
+   pero no lo es.
+
+2. `MeResumenCierreService` cae a `resolverNotaGlobalFinal` (promedio
+   simple de notas obligatorias del snapshot). Es una aproximación
+   razonable pero **no respeta la fórmula ponderada** del curso
+   (`pesoBloques` + `pesoTransversal` + `pesoEntrevista`).
+
+**Fix correcto:** modificar `construirSnapshotCierre` para incluir
+`notaGlobalFinal` por asignación calculada con la fórmula completa
+(mirar cómo `calcularResultadoFinal` decide APTO/NO_APTO — la nota
+ponderada vive cerca de ahí). Backfillear snapshots existentes vía
+migración o aceptar que solo nuevos cierres tendrán la nota correcta.
+
+**Pistas:**
+- `apps/api/src/cursos/cierre-curso.helpers.ts` función
+  `construirSnapshotCierre` (líneas 400-466).
+- Fórmula ponderada: revisar dónde se calcula el "promedio global" del
+  curso. Probablemente en `cursos.service.ts` o
+  `calcular-resultado-final.ts`.
+- Borrar el fallback `resolverNotaGlobalFinal` en
+  `me-resumen-cierre.service.ts` cuando el snapshot lo traiga.
+
+---
+
+### DEUDA-B24-1 · `origenNarrativo` genérico — falta lookup de curso/bloque
+
+**Detectado:** 2026-05-17 implementando B-24.
+
+`MeFichaHistorialService::narrarOrigen` devuelve frases sin contexto
+(`"Bloque evaluable"`, `"Proyecto transversal"`) cuando la spec del
+inventario pedía `'Curso "Java Senior"'`. Decisión MVP: no introducir
+N+1 con lookup cruzado a `Curso`/`Bloque`/`Transversal`.
+
+**Fix recomendado:** una sola query batched a las tablas referenciadas
+desde `HistoricoNotaSkill.referencia` para enriquecer la frase:
+- `BLOQUE`: `referencia.cursoId` → `Curso.titulo`.
+- `TRANSVERSAL`: `referencia.intentoTransversalId` →
+  `IntentoTransversal.transversal.curso.titulo`.
+- `ENTREVISTA_IA`: `referencia.intentoEntrevistaIaId` →
+  `IntentoEntrevistaIA.entrevistaIA.curso.titulo`.
+
+**Pistas:** los mocks en `handlers-participante.ts` (commits previos)
+muestran el formato esperado de las frases.
+
+---
+
+### DEUDA-B24-2 · Paginación cursor real
+
+**Detectado:** 2026-05-17 implementando B-24.
+
+`historialFichaQuerySchema` define `cursor: string` opcional pero el
+service **no lo interpreta** — siempre devuelve hasta `limite=100`
+desde el inicio. El frontend pagina en memoria de 5 en 5, así que
+funciona para colaboradores normales; un colaborador con cientos de
+hitos puede ser lento al cargar.
+
+**Fix recomendado:** cursor compuesto `(fecha + id)` para evitar
+empates. Aplicar filtros `fecha < cursor.fecha OR (fecha = cursor.fecha
+AND id < cursor.id)` a las dos queries fuente (`historicoNotaSkill` y
+`asignacionCurso`).
+
+---
+
+### DEUDA-SEED-1 · Curso AMSA tiene dos bloques QUIZ idénticos visualmente
+
+**Detectado:** 2026-05-17 al revisar la pantalla del curso "AMS
+Frontend + Backend Django" sección "Vertical Slice Architecture".
+
+En `apps/api/prisma/seed-amsa.local.ts` (líneas ~1336 y ~1369) hay dos
+bloques `TipoBloque.QUIZ` consecutivos con preguntas distintas pero
+mismo nombre visible. Cuando ambos están aprobados, el participante ve
+dos "Quiz · Aprobado · Tu mejor intento cuenta" indistinguibles.
+
+**No es bug del render** — el componente `EvaluableConColapso` está
+correcto. Es un seed que se podría:
+
+1. **Fusionar** ambos quizzes en uno solo con 6 preguntas.
+2. **Diferenciar** el título colapsado con un descriptor (p.ej.
+   `"Quiz · 3 preguntas · 100/100"`). Cambio en
+   `BloqueEvaluableColapsado` para aceptar subtítulo más rico.
+
+Confirmado como aceptable por el usuario el 2026-05-17 (no urgente).
+
+---
+
+## Para el próximo agente de QA / refactor
+
+Después de cerrar el sprint B-N, hay material para un pase de calidad:
+
+1. **Bugs documentados arriba** (BUG-VOL-1, DEUDA-B26-1, DEUDA-B24-1,
+   DEUDA-B24-2, DEUDA-SEED-1). Priorizar según impacto en UX.
+2. **Drift de tipos**: confirmar que `apps/web/src/**/types.ts` ya no
+   tienen extensiones locales. Los archivos del Sprint borraron
+   `pages/bandeja/types.ts` (parcialmente) y
+   `pages/curso-inmersivo/types.ts` (completo). Hacer un barrido
+   global por `// TODO B-N` huérfanos.
+3. **Antipatrones residuales**: buscar `as unknown as`, `// @ts-ignore`,
+   `any` explícito, `import type` para inyectables Nest, fetch directo
+   sin pasar por `httpClient`. El proyecto los prohíbe pero pueden
+   haberse colado.
+4. **Mocks divergentes del backend real**: los mocks de
+   `handlers-participante.ts` y `handlers-curso-detalle.ts` se han ido
+   simplificando al implementar cada B-N. Validar que aún cubren los
+   escenarios de desarrollo (`VITE_USE_MOCKS=true`) sin contradecir el
+   contrato del backend.
+5. **Tests E2E ausentes**: cada B-N tiene tests unitarios pero
+   `obtenerBandeja` integral, `/me/ficha/historial` integral, etc., no
+   tienen tests de integración contra BD real. Considerar añadirlos
+   antes del PR a `develop`.
