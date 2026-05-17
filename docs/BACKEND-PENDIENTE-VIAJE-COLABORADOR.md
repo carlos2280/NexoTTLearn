@@ -909,11 +909,21 @@ Confirmado como aceptable por el usuario el 2026-05-17 (no urgente).
 
 ---
 
-### BUG-CIERRE-1 · Pantalla `/cursos/:id/cerrado` no maneja 409 `CONFLICT_CURSO_NO_CERRADO`
+### BUG-CIERRE-1 · Pantalla `/cursos/:id/cerrado` no maneja 409 `CONFLICT_CURSO_NO_CERRADO` — ✅ RESUELTO (2026-05-17)
 
 **Detectado:** 2026-05-17 navegando a
 `/cursos/dd000000-0000-0000-0000-000000000002/cerrado` desde el
 viaje del colaborador.
+
+**Fix aplicado:**
+- `useResumenCierre` deshabilita el retry para 4xx (el estado del
+  curso no cambia reintentando).
+- `CursoCerradoPage` captura `ApiError(409, CONFLICT_CURSO_NO_CERRADO)`
+  y redirige a `RUTAS.participante.cursoDetalle(cursoId)` (la vista
+  activa del inmersivo).
+- Defensa primaria upstream ya estaba correcta: `topbar-inmersivo` y
+  `siguiente-accion-copy` solo enlazan a `/cerrado` cuando el curso
+  efectivamente esta cerrado.
 
 **Síntomas:**
 - El backend responde correctamente `409 CONFLICT_CURSO_NO_CERRADO`

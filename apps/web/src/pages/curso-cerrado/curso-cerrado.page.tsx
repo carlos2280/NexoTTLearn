@@ -1,6 +1,8 @@
 import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
 import { useResumenCierre } from "@/features/me/hooks/use-resumen-cierre"
+import { ApiError } from "@/shared/api/api-error"
 import { Banner } from "@/shared/components/ui/banner"
+import { RUTAS } from "@/shared/constants/rutas"
 import { Navigate, useParams } from "react-router-dom"
 import { AccionesCierre } from "./components/acciones-cierre"
 import { AreasPorTrabajar } from "./components/areas-por-trabajar"
@@ -15,6 +17,17 @@ export function CursoCerradoPage() {
 
   if (!cursoId) {
     return <Navigate to="/bandeja" replace={true} />
+  }
+
+  // El usuario llego a /cerrado por link stale o navegacion manual: el curso
+  // aun no esta cerrado. Reintentar no resuelve nada, mandamos a la vista
+  // activa del curso (D-CIERRE-1).
+  if (
+    error instanceof ApiError &&
+    error.status === 409 &&
+    error.code === "CONFLICT_CURSO_NO_CERRADO"
+  ) {
+    return <Navigate to={RUTAS.participante.cursoDetalle(cursoId)} replace={true} />
   }
 
   return (
