@@ -452,8 +452,9 @@ function siguienteAccionPorEscenario(escenario: string): MeBandejaResponse["sigu
 
 // Mock de `GET /me/ficha` para la pantalla 07 "Mi ficha" (refundado).
 // 6 areas con actividad (frontend, backend, cloud, data, devops, soft) + 2 sin
-// actividad (mobile, qa). F2 anadira `nivelCualitativo` por area; F3 anadira
-// `skillsCatalogo` para la seccion "Por explorar"; F4 anadira historial.
+// actividad (mobile, qa). Alineado con el contrato del backend: cada area
+// emite `nivelCualitativo` + `skillsCatalogo`, cada skill demostrada emite
+// `fechaUltimoCambio`.
 function handlerMeFicha(_req: MockRequest): FichaResponse {
   return {
     colaboradorId: "u-part",

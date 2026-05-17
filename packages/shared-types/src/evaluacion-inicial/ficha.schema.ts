@@ -20,6 +20,11 @@ export type OrigenNotaSkill = z.infer<typeof origenNotaSkillSchema>
  * los umbrales viven a nivel de curso (`Curso.umbralesLogro`) y la ficha es
  * global, sin contexto de curso. La etiqueta se reintroducira en S11/S12
  * cuando se vincule la ficha al avance por curso.
+ *
+ * `fechaUltimoCambio` es ISO-8601 cuando la skill tiene `NotaSkill`, `null`
+ * cuando aun no hay evidencia. Usa `NotaSkill.updatedAt` directamente (el
+ * modelo solo guarda `notaActual` y `origenActual`, asi que cualquier
+ * mutacion equivale a un cambio de nota).
  */
 export interface FichaSkillItem {
   readonly skillId: string
@@ -28,9 +33,7 @@ export interface FichaSkillItem {
   readonly areaNombre: string
   readonly notaActual: number | null
   readonly origenActual: Record<string, unknown> | null
-  // TODO B-23: backend debe devolver la fecha del ultimo cambio de nota por
-  // skill para la pantalla "Mi ficha" (hero "Ultima habilidad" + drill-down).
-  readonly fechaUltimoCambio?: string | null
+  readonly fechaUltimoCambio: string | null
 }
 
 /**
@@ -57,14 +60,18 @@ export interface FichaPorAreaItem {
   readonly promedio: number | null
   readonly skillsConNota: number
   readonly skillsTotales: number
-  // TODO B-21: backend debe devolver el nivel cualitativo por area (derivado
-  // del promedio y la distribucion de notas), para que el frontend no infiera
-  // desde umbrales locales en la pantalla "Mi ficha".
-  readonly nivelCualitativo?: NivelCualitativoArea
-  // TODO B-22: backend debe devolver el catalogo completo de skills del area
-  // (incluso las que el colaborador aun no ha demostrado), para la seccion
-  // "Por explorar" del acordeon en la pantalla "Mi ficha".
-  readonly skillsCatalogo?: readonly FichaSkillCatalogoItem[]
+  /**
+   * Derivado por el backend desde `promedio` y `skillsConNota` con la escala
+   * canonica (`nivel-cualitativo.helpers.ts`). `sinTocar` cuando el area no
+   * tiene ninguna skill con nota; en caso contrario se clasifica por promedio.
+   */
+  readonly nivelCualitativo: NivelCualitativoArea
+  /**
+   * Catalogo completo de skills del area (incluyendo las que el colaborador
+   * aun no ha demostrado). Usado por la seccion "Por explorar" del acordeon
+   * en la pantalla "Mi ficha".
+   */
+  readonly skillsCatalogo: readonly FichaSkillCatalogoItem[]
 }
 
 export interface FichaResponse {
@@ -78,9 +85,9 @@ export interface FichaResponse {
  * /me/ficha/historial`). Union discriminada por `tipo`. El backend agrega
  * cambios de skill + hitos de curso en una sola vista ordenada por fecha.
  *
- * TODO B-24: backend debe implementar este endpoint con paginacion (cursor
- * o `?limite=N&desde=...`). El mock devuelve la coleccion completa y el
- * frontend pagina en memoria hasta que B-24 este listo.
+ * El endpoint acepta `limite` (default 100); la paginacion cursor real
+ * sigue como deuda (`DEUDA-B24-2` en el inventario). El frontend pagina en
+ * memoria de 5 en 5, suficiente para colaboradores reales.
  */
 export type EventoHistorialFicha =
   | {
@@ -95,16 +102,11 @@ export type EventoHistorialFicha =
       readonly origenNarrativo: string
       /**
        * Tipo de evento que demostro la skill (TRANSVERSAL, ENTREVISTA_IA,
-       * BLOQUE, MANUAL, ENTREVISTA_INICIAL). Opcional por compat con backend
-       * antiguo; el frontend lo usa para enchufar acciones contextuales —
-       * p.ej. abrir el drawer "Releer la entrevista" cuando es ENTREVISTA_IA
-       * y `referenciaIntentoIaId` esta presente.
-       *
-       * TODO B-N (backend): poblar siempre que la skill venga de un origen
-       * con referencia (entrevista IA, transversal). Para BLOQUE y MANUAL
-       * puede quedar undefined.
+       * BLOQUE, MANUAL, ENTREVISTA_INICIAL). El frontend lo usa para enchufar
+       * acciones contextuales — p.ej. abrir el drawer "Releer la entrevista"
+       * cuando es ENTREVISTA_IA y `referenciaIntentoIaId` esta presente.
        */
-      readonly origen?: OrigenNotaSkill
+      readonly origen: OrigenNotaSkill
       /**
        * ID del intento de entrevista IA cuando `origen === "ENTREVISTA_IA"`.
        * Permite abrir el drawer "Releer la entrevista" desde el timeline de

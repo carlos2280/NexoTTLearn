@@ -18,6 +18,7 @@ const FICHA: FichaResponse = {
       areaNombre: "Frontend",
       notaActual: 8.5,
       origenActual: { tipo: "BLOQUE" },
+      fechaUltimoCambio: "2026-05-10T12:00:00.000Z",
     },
     {
       skillId: "s2",
@@ -26,11 +27,28 @@ const FICHA: FichaResponse = {
       areaNombre: "Backend",
       notaActual: null,
       origenActual: null,
+      fechaUltimoCambio: null,
     },
   ],
   porArea: [
-    { areaId: "a1", nombre: "Frontend", promedio: 8.5, skillsConNota: 1, skillsTotales: 1 },
-    { areaId: "a2", nombre: "Backend", promedio: null, skillsConNota: 0, skillsTotales: 1 },
+    {
+      areaId: "a1",
+      nombre: "Frontend",
+      promedio: 8.5,
+      skillsConNota: 1,
+      skillsTotales: 1,
+      nivelCualitativo: "inicial",
+      skillsCatalogo: [{ skillId: "s1", etiquetaVisible: "React" }],
+    },
+    {
+      areaId: "a2",
+      nombre: "Backend",
+      promedio: null,
+      skillsConNota: 0,
+      skillsTotales: 1,
+      nivelCualitativo: "sinTocar",
+      skillsCatalogo: [{ skillId: "s2", etiquetaVisible: "Postgres" }],
+    },
   ],
 }
 

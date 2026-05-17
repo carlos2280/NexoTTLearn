@@ -69,7 +69,7 @@ describe("FichaService.obtenerFicha", () => {
     service = new FichaService(prisma as unknown as PrismaService)
   })
 
-  it("ADMIN: ficha vacia (sin notas) — notaActual queda null explicito, promedio null", async () => {
+  it("ADMIN: ficha vacia (sin notas) — notaActual queda null explicito, promedio null, nivel sinTocar", async () => {
     prisma.colaborador.findUnique.mockResolvedValue({
       id: COL_ID,
       usuario: { id: PART_USR_ID },
@@ -84,32 +84,39 @@ describe("FichaService.obtenerFicha", () => {
     for (const s of ficha.skills) {
       expect(s.notaActual).toBeNull()
       expect(s.origenActual).toBeNull()
+      expect(s.fechaUltimoCambio).toBeNull()
     }
     expect(ficha.porArea).toHaveLength(2)
     for (const a of ficha.porArea) {
       expect(a.promedio).toBeNull()
       expect(a.skillsConNota).toBe(0)
+      expect(a.nivelCualitativo).toBe("sinTocar")
+      expect(a.skillsCatalogo.length).toBe(a.skillsTotales)
     }
   })
 
-  it("ADMIN: ficha con notas — promedio por area solo sobre skills con nota", async () => {
+  it("ADMIN: ficha con notas — promedio, nivelCualitativo y skillsCatalogo por area", async () => {
     prisma.colaborador.findUnique.mockResolvedValue({
       id: COL_ID,
       usuario: { id: PART_USR_ID },
     })
     prisma.skill.findMany.mockResolvedValue(SKILLS_MOCK)
+    const updated1 = new Date("2026-05-15T08:00:00Z")
+    const updated2 = new Date("2026-05-10T08:00:00Z")
     prisma.notaSkill.findMany.mockResolvedValue([
       {
         id: "ns-1",
         skillId: "skill-1",
         notaActual: new Prisma.Decimal("86"),
         origenActual: { curso: "c1" },
+        updatedAt: updated1,
       },
       {
         id: "ns-2",
         skillId: "skill-2",
         notaActual: new Prisma.Decimal("70"),
         origenActual: null,
+        updatedAt: updated2,
       },
     ])
 
@@ -117,19 +124,91 @@ describe("FichaService.obtenerFicha", () => {
     const skill1 = ficha.skills.find((s) => s.skillId === "skill-1")
     expect(skill1?.notaActual).toBe(86)
     expect(skill1?.origenActual).toEqual({ curso: "c1" })
+    expect(skill1?.fechaUltimoCambio).toBe(updated1.toISOString())
 
     const skill3 = ficha.skills.find((s) => s.skillId === "skill-3")
     expect(skill3?.notaActual).toBeNull()
+    expect(skill3?.fechaUltimoCambio).toBeNull()
 
     const areaBackend = ficha.porArea.find((a) => a.areaId === "area-1")
     expect(areaBackend?.promedio).toBe(78) // (86 + 70) / 2
     expect(areaBackend?.skillsConNota).toBe(2)
     expect(areaBackend?.skillsTotales).toBe(2)
+    // 78 -> solido (>= 70, < 85)
+    expect(areaBackend?.nivelCualitativo).toBe("solido")
+    expect(areaBackend?.skillsCatalogo).toEqual([
+      { skillId: "skill-1", etiquetaVisible: "python.fastapi" },
+      { skillId: "skill-2", etiquetaVisible: "python.basico" },
+    ])
 
     const areaTooling = ficha.porArea.find((a) => a.areaId === "area-2")
     expect(areaTooling?.promedio).toBeNull()
     expect(areaTooling?.skillsConNota).toBe(0)
     expect(areaTooling?.skillsTotales).toBe(1)
+    expect(areaTooling?.nivelCualitativo).toBe("sinTocar")
+    expect(areaTooling?.skillsCatalogo).toEqual([
+      { skillId: "skill-3", etiquetaVisible: "git.rebase" },
+    ])
+  })
+
+  it("ADMIN: nivelCualitativo cubre toda la escala (excelencia/enDesarrollo/inicial)", async () => {
+    prisma.colaborador.findUnique.mockResolvedValue({
+      id: COL_ID,
+      usuario: { id: PART_USR_ID },
+    })
+    prisma.skill.findMany.mockResolvedValue([
+      // area-exc: una skill con 92 -> excelencia
+      {
+        id: "sk-exc",
+        etiquetaVisible: "ex",
+        areaId: "area-exc",
+        area: { id: "area-exc", nombre: "Excelencia" },
+      },
+      // area-dev: una skill con 55 -> enDesarrollo
+      {
+        id: "sk-dev",
+        etiquetaVisible: "dev",
+        areaId: "area-dev",
+        area: { id: "area-dev", nombre: "Desarrollo" },
+      },
+      // area-ini: una skill con 30 -> inicial
+      {
+        id: "sk-ini",
+        etiquetaVisible: "ini",
+        areaId: "area-ini",
+        area: { id: "area-ini", nombre: "Inicial" },
+      },
+    ])
+    prisma.notaSkill.findMany.mockResolvedValue([
+      {
+        id: "ns-exc",
+        skillId: "sk-exc",
+        notaActual: new Prisma.Decimal("92"),
+        origenActual: null,
+        updatedAt: new Date("2026-01-01T00:00:00Z"),
+      },
+      {
+        id: "ns-dev",
+        skillId: "sk-dev",
+        notaActual: new Prisma.Decimal("55"),
+        origenActual: null,
+        updatedAt: new Date("2026-01-01T00:00:00Z"),
+      },
+      {
+        id: "ns-ini",
+        skillId: "sk-ini",
+        notaActual: new Prisma.Decimal("30"),
+        origenActual: null,
+        updatedAt: new Date("2026-01-01T00:00:00Z"),
+      },
+    ])
+
+    const ficha = await service.obtenerFicha(COL_ID, SESION_ADMIN)
+    expect(ficha.porArea.find((a) => a.areaId === "area-exc")?.nivelCualitativo).toBe("excelencia")
+    expect(ficha.porArea.find((a) => a.areaId === "area-dev")?.nivelCualitativo).toBe(
+      "enDesarrollo",
+    )
+    expect(ficha.porArea.find((a) => a.areaId === "area-ini")?.nivelCualitativo).toBe("inicial")
   })
 
   it("PARTICIPANTE consultando OTRA ficha: 404 colaboradorNoEncontrado (D-CUR-13)", async () => {
