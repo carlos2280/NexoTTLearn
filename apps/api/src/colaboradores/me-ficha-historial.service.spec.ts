@@ -8,6 +8,9 @@ interface PrismaMock {
   usuario: { findUnique: ReturnType<typeof vi.fn> }
   historicoNotaSkill: { findMany: ReturnType<typeof vi.fn> }
   asignacionCurso: { findMany: ReturnType<typeof vi.fn> }
+  intentoBloque: { findMany: ReturnType<typeof vi.fn> }
+  intentoTransversal: { findMany: ReturnType<typeof vi.fn> }
+  intentoEntrevistaIA: { findMany: ReturnType<typeof vi.fn> }
 }
 
 function buildPrismaMock(): PrismaMock {
@@ -15,6 +18,9 @@ function buildPrismaMock(): PrismaMock {
     usuario: { findUnique: vi.fn() },
     historicoNotaSkill: { findMany: vi.fn().mockResolvedValue([]) },
     asignacionCurso: { findMany: vi.fn().mockResolvedValue([]) },
+    intentoBloque: { findMany: vi.fn().mockResolvedValue([]) },
+    intentoTransversal: { findMany: vi.fn().mockResolvedValue([]) },
+    intentoEntrevistaIA: { findMany: vi.fn().mockResolvedValue([]) },
   }
 }
 
@@ -152,6 +158,88 @@ describe("MeFichaHistorialService.obtenerHistorial", () => {
 
     expect(out[0]?.tipo).toBe("CURSO_INICIADO")
     expect(out[1]?.tipo).toBe("SKILL_DEMOSTRADA")
+  })
+
+  it("origenNarrativo BLOQUE enriquecido con titulo del curso (DEUDA-B24-1)", async () => {
+    prisma.historicoNotaSkill.findMany.mockResolvedValueOnce([
+      {
+        id: "hist-bloque",
+        fecha: new Date("2026-05-14T10:00:00Z"),
+        valor: 88,
+        origen: OrigenNotaSkill.BLOQUE,
+        referencia: { intentoBloqueId: "int-b-1", bloqueId: "blq-1", evento: "CREADO" },
+        notaSkill: { skill: SKILL_DJANGO },
+      },
+    ])
+    prisma.intentoBloque.findMany.mockResolvedValueOnce([
+      { id: "int-b-1", curso: { titulo: "Java Senior" } },
+    ])
+
+    const [evento] = await service.obtenerHistorial(COLAB, 50)
+    expect(evento).toMatchObject({
+      tipo: "SKILL_DEMOSTRADA",
+      origenNarrativo: 'Curso "Java Senior"',
+    })
+  })
+
+  it("origenNarrativo TRANSVERSAL enriquecido (DEUDA-B24-1)", async () => {
+    prisma.historicoNotaSkill.findMany.mockResolvedValueOnce([
+      {
+        id: "hist-tr",
+        fecha: new Date("2026-05-14T10:00:00Z"),
+        valor: 72,
+        origen: OrigenNotaSkill.TRANSVERSAL,
+        referencia: { intentoTransversalId: "int-t-1", evento: "FINALIZADO" },
+        notaSkill: { skill: SKILL_DJANGO },
+      },
+    ])
+    prisma.intentoTransversal.findMany.mockResolvedValueOnce([
+      { id: "int-t-1", transversal: { curso: { titulo: "Analitica de Datos" } } },
+    ])
+
+    const [evento] = await service.obtenerHistorial(COLAB, 50)
+    expect(evento).toMatchObject({
+      origenNarrativo: 'Proyecto transversal · Curso "Analitica de Datos"',
+    })
+  })
+
+  it("origenNarrativo ENTREVISTA_IA enriquecido (DEUDA-B24-1)", async () => {
+    prisma.historicoNotaSkill.findMany.mockResolvedValueOnce([
+      {
+        id: "hist-ia2",
+        fecha: new Date("2026-05-14T10:00:00Z"),
+        valor: 80,
+        origen: OrigenNotaSkill.ENTREVISTA_IA,
+        referencia: { intentoEntrevistaIaId: "int-ia-1", evento: "FINALIZADO" },
+        notaSkill: { skill: SKILL_DJANGO },
+      },
+    ])
+    prisma.intentoEntrevistaIA.findMany.mockResolvedValueOnce([
+      { id: "int-ia-1", entrevistaIA: { curso: { titulo: "Backend Refresh" } } },
+    ])
+
+    const [evento] = await service.obtenerHistorial(COLAB, 50)
+    expect(evento).toMatchObject({
+      origenNarrativo: 'Entrevista IA · Curso "Backend Refresh"',
+      referenciaIntentoIaId: "int-ia-1",
+    })
+  })
+
+  it("origenNarrativo cae a la version generica si el lookup no encuentra titulo", async () => {
+    prisma.historicoNotaSkill.findMany.mockResolvedValueOnce([
+      {
+        id: "hist-bloque-huerfano",
+        fecha: new Date("2026-05-14T10:00:00Z"),
+        valor: 70,
+        origen: OrigenNotaSkill.BLOQUE,
+        referencia: { intentoBloqueId: "int-borrado", bloqueId: "b-x", evento: "CREADO" },
+        notaSkill: { skill: SKILL_DJANGO },
+      },
+    ])
+    // intentoBloque.findMany devuelve vacio (default del mock) -> sin titulo.
+
+    const [evento] = await service.obtenerHistorial(COLAB, 50)
+    expect(evento).toMatchObject({ origenNarrativo: "Bloque evaluable" })
   })
 
   it("respeta el limite y corta el array final", async () => {

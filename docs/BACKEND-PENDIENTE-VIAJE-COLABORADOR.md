@@ -897,9 +897,22 @@ migración o aceptar que solo nuevos cierres tendrán la nota correcta.
 
 ---
 
-### DEUDA-B24-1 · `origenNarrativo` genérico — falta lookup de curso/bloque
+### DEUDA-B24-1 · `origenNarrativo` genérico — falta lookup de curso/bloque — ✅ RESUELTO (2026-05-17)
 
 **Detectado:** 2026-05-17 implementando B-24.
+
+**Fix aplicado:**
+- `MeFichaHistorialService` ahora carga el titulo del curso en 3
+  queries batched (`intentoBloque`, `intentoTransversal`,
+  `intentoEntrevistaIA`) tras leer `HistoricoNotaSkill`. Sin N+1.
+- `narrarOrigen` enriquece las frases:
+  - `BLOQUE` → `Curso "Java Senior"` (o `Bloque evaluable` si no
+    se resolvio el titulo).
+  - `TRANSVERSAL` → `Proyecto transversal · Curso "Java Senior"`.
+  - `ENTREVISTA_IA` → `Entrevista IA · Curso "Java Senior"`.
+- Fallback a la version generica cuando el intento referenciado fue
+  borrado o el snapshot quedo huerfano.
+- Tests: 4 casos nuevos cubriendo cada origen + el fallback.
 
 `MeFichaHistorialService::narrarOrigen` devuelve frases sin contexto
 (`"Bloque evaluable"`, `"Proyecto transversal"`) cuando la spec del

@@ -53,12 +53,94 @@ export class MeFichaHistorialService {
       this.cargarAsignaciones(colaboradorId, limite),
     ])
 
+    const cursoPorHistorico = await this.cargarCursosPorHistorico(historicoSkills)
+
     const eventos: EventoHistorialFicha[] = [
-      ...historicoSkills.map(toEventoSkillDemostrada),
+      ...historicoSkills.map((row) =>
+        toEventoSkillDemostrada(row, cursoPorHistorico.get(row.id) ?? null),
+      ),
       ...asignaciones.flatMap(toEventosCurso),
     ]
 
     return eventos.sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, limite)
+  }
+
+  /**
+   * Resuelve el titulo del curso de cada `HistoricoNotaSkill` cuyo origen
+   * apunta a un intento concreto. Tres queries batched (una por tipo de
+   * intento) — sin N+1 — para enriquecer `origenNarrativo` (DEUDA-B24-1).
+   * Para `ENTREVISTA_INICIAL` y `MANUAL` no aplica (no hay curso asociado).
+   */
+  private async cargarCursosPorHistorico(
+    rows: readonly HistoricoSkillRow[],
+  ): Promise<ReadonlyMap<string, string>> {
+    const { refByHistorico, bloqueIds, transversalIds, entrevistaIaIds } =
+      recolectarReferencias(rows)
+    const tituloPorIntento = await this.cargarTitulosPorIntento({
+      bloqueIds,
+      transversalIds,
+      entrevistaIaIds,
+    })
+    const result = new Map<string, string>()
+    for (const [historicoId, ref] of refByHistorico) {
+      const titulo = tituloPorIntento.get(ref.intentoId)
+      if (titulo) {
+        result.set(historicoId, titulo)
+      }
+    }
+    return result
+  }
+
+  private async cargarTitulosPorIntento(input: {
+    readonly bloqueIds: ReadonlySet<string>
+    readonly transversalIds: ReadonlySet<string>
+    readonly entrevistaIaIds: ReadonlySet<string>
+  }): Promise<ReadonlyMap<string, string>> {
+    const [bloques, transversales, entrevistas] = await Promise.all([
+      input.bloqueIds.size === 0
+        ? Promise.resolve([] as readonly IntentoBloqueLookup[])
+        : this.prisma.intentoBloque.findMany({
+            where: { id: { in: [...input.bloqueIds] } },
+            select: { id: true, curso: { select: { titulo: true } } },
+          }),
+      input.transversalIds.size === 0
+        ? Promise.resolve([] as readonly IntentoTransversalLookup[])
+        : this.prisma.intentoTransversal.findMany({
+            where: { id: { in: [...input.transversalIds] } },
+            select: {
+              id: true,
+              transversal: { select: { curso: { select: { titulo: true } } } },
+            },
+          }),
+      input.entrevistaIaIds.size === 0
+        ? Promise.resolve([] as readonly IntentoEntrevistaIaLookup[])
+        : this.prisma.intentoEntrevistaIA.findMany({
+            where: { id: { in: [...input.entrevistaIaIds] } },
+            select: {
+              id: true,
+              entrevistaIA: { select: { curso: { select: { titulo: true } } } },
+            },
+          }),
+    ])
+    const tituloPorIntento = new Map<string, string>()
+    for (const b of bloques) {
+      if (b.curso?.titulo) {
+        tituloPorIntento.set(b.id, b.curso.titulo)
+      }
+    }
+    for (const t of transversales) {
+      const titulo = t.transversal?.curso?.titulo
+      if (titulo) {
+        tituloPorIntento.set(t.id, titulo)
+      }
+    }
+    for (const e of entrevistas) {
+      const titulo = e.entrevistaIA?.curso?.titulo
+      if (titulo) {
+        tituloPorIntento.set(e.id, titulo)
+      }
+    }
+    return tituloPorIntento
   }
 
   private cargarHistoricoSkills(
@@ -141,7 +223,10 @@ interface AsignacionRow {
   readonly curso: { readonly id: string; readonly titulo: string }
 }
 
-function toEventoSkillDemostrada(row: HistoricoSkillRow): EventoHistorialFicha {
+function toEventoSkillDemostrada(
+  row: HistoricoSkillRow,
+  cursoTitulo: string | null,
+): EventoHistorialFicha {
   const valor = row.valor === null ? null : Number(row.valor.toString())
   return {
     tipo: "SKILL_DEMOSTRADA",
@@ -152,7 +237,7 @@ function toEventoSkillDemostrada(row: HistoricoSkillRow): EventoHistorialFicha {
     areaId: row.notaSkill.skill.area.id,
     areaNombre: row.notaSkill.skill.area.nombre,
     nivelCualitativo: nivelDesdeNota(valor),
-    origenNarrativo: narrarOrigen(row.origen),
+    origenNarrativo: narrarOrigen(row.origen, cursoTitulo),
     origen: row.origen,
     ...(extraerIntentoIaId(row.origen, row.referencia) !== null
       ? { referenciaIntentoIaId: extraerIntentoIaId(row.origen, row.referencia) ?? undefined }
@@ -208,21 +293,22 @@ function nivelDesdeNota(nota: number | null): NivelCualitativoArea {
 }
 
 /**
- * Narrativa humanizada del origen de la skill. Mantengo intencionalmente
- * generica (sin lookup cruzado a curso/bloque) para no introducir N+1; un
- * sprint posterior puede enriquecer con `cursoTitulo` resuelto desde
- * `referencia.cursoId` cuando sea critico para UX.
+ * Narrativa humanizada del origen de la skill. Cuando hay `cursoTitulo`
+ * resuelto (DEUDA-B24-1) lo incorpora — `Curso "Java Senior"` da contexto
+ * al colaborador sobre QUE curso le valio la skill, no solo desde donde.
+ * Para origenes sin curso asociado (ENTREVISTA_INICIAL, MANUAL) o cuando
+ * el lookup no encontro titulo, cae a la version generica.
  */
-function narrarOrigen(origen: OrigenNotaSkill): string {
+function narrarOrigen(origen: OrigenNotaSkill, cursoTitulo: string | null): string {
   switch (origen) {
     case OrigenNotaSkill.ENTREVISTA_INICIAL:
       return "Entrevista inicial"
     case OrigenNotaSkill.BLOQUE:
-      return "Bloque evaluable"
+      return cursoTitulo ? `Curso "${cursoTitulo}"` : "Bloque evaluable"
     case OrigenNotaSkill.TRANSVERSAL:
-      return "Proyecto transversal"
+      return cursoTitulo ? `Proyecto transversal · Curso "${cursoTitulo}"` : "Proyecto transversal"
     case OrigenNotaSkill.ENTREVISTA_IA:
-      return "Entrevista IA"
+      return cursoTitulo ? `Entrevista IA · Curso "${cursoTitulo}"` : "Entrevista IA"
     case OrigenNotaSkill.MANUAL:
       return "Ajuste del administrador"
     default:
@@ -239,4 +325,76 @@ function extraerIntentoIaId(origen: OrigenNotaSkill, referencia: unknown): strin
   }
   const valor = (referencia as Record<string, unknown>).intentoEntrevistaIaId
   return typeof valor === "string" ? valor : null
+}
+
+interface IntentoRef {
+  readonly tipo: "BLOQUE" | "TRANSVERSAL" | "ENTREVISTA_IA"
+  readonly intentoId: string
+}
+
+function recolectarReferencias(rows: readonly HistoricoSkillRow[]): {
+  readonly refByHistorico: ReadonlyMap<string, IntentoRef>
+  readonly bloqueIds: ReadonlySet<string>
+  readonly transversalIds: ReadonlySet<string>
+  readonly entrevistaIaIds: ReadonlySet<string>
+} {
+  const refByHistorico = new Map<string, IntentoRef>()
+  const bloqueIds = new Set<string>()
+  const transversalIds = new Set<string>()
+  const entrevistaIaIds = new Set<string>()
+  for (const row of rows) {
+    const ref = parseReferencia(row.origen, row.referencia)
+    if (!ref) {
+      continue
+    }
+    refByHistorico.set(row.id, ref)
+    if (ref.tipo === "BLOQUE") {
+      bloqueIds.add(ref.intentoId)
+    } else if (ref.tipo === "TRANSVERSAL") {
+      transversalIds.add(ref.intentoId)
+    } else {
+      entrevistaIaIds.add(ref.intentoId)
+    }
+  }
+  return { refByHistorico, bloqueIds, transversalIds, entrevistaIaIds }
+}
+
+interface IntentoBloqueLookup {
+  readonly id: string
+  readonly curso: { readonly titulo: string } | null
+}
+
+interface IntentoTransversalLookup {
+  readonly id: string
+  readonly transversal: { readonly curso: { readonly titulo: string } | null } | null
+}
+
+interface IntentoEntrevistaIaLookup {
+  readonly id: string
+  readonly entrevistaIA: { readonly curso: { readonly titulo: string } | null } | null
+}
+
+/**
+ * Extrae el id del intento referenciado segun el origen. Devuelve `null`
+ * para `MANUAL` / `ENTREVISTA_INICIAL` (sin intento asociado) o cuando
+ * `referencia` esta vacia/malformada.
+ */
+function parseReferencia(origen: OrigenNotaSkill, referencia: unknown): IntentoRef | null {
+  if (referencia === null || typeof referencia !== "object" || Array.isArray(referencia)) {
+    return null
+  }
+  const obj = referencia as Record<string, unknown>
+  if (origen === OrigenNotaSkill.BLOQUE) {
+    const id = obj.intentoBloqueId
+    return typeof id === "string" ? { tipo: "BLOQUE", intentoId: id } : null
+  }
+  if (origen === OrigenNotaSkill.TRANSVERSAL) {
+    const id = obj.intentoTransversalId
+    return typeof id === "string" ? { tipo: "TRANSVERSAL", intentoId: id } : null
+  }
+  if (origen === OrigenNotaSkill.ENTREVISTA_IA) {
+    const id = obj.intentoEntrevistaIaId
+    return typeof id === "string" ? { tipo: "ENTREVISTA_IA", intentoId: id } : null
+  }
+  return null
 }
