@@ -189,12 +189,11 @@ function obtenerCopyResultadoCierre(accion: {
     ctaVariant: "secondary",
     eyebrow: "Resultado disponible",
     titulo: accion.cursoTitulo,
-    descripcion:
-      "El curso cerró con resultado no apto. Revisa observaciones y áreas a reforzar; el administrador puede reabrir tu caso si conviene.",
+    descripcion: "El camino continúa. Mira tu cierre y las áreas que puedes seguir consolidando.",
     cta: "Ver cómo te fue",
     ruta: RUTAS.participante.cursoCerrado(accion.cursoId),
     icono: RotateCcw,
-    porQueAqui: "Cierre reciente como NO APTO.",
+    porQueAqui: null,
   }
 }
 

@@ -41,7 +41,9 @@ export function CartaSiguientePaso({ copy }: CartaSiguientePasoProps) {
           <Button variant={copy.ctaVariant} onClick={() => navigate(copy.ruta)}>
             {copy.cta} <ArrowRight className="ml-2 h-4 w-4" aria-hidden={true} />
           </Button>
-          <span className="text-caption text-text-tertiary">{copy.porQueAqui}</span>
+          {copy.porQueAqui ? (
+            <span className="text-caption text-text-tertiary">{copy.porQueAqui}</span>
+          ) : null}
         </div>
       </div>
     </article>

@@ -23,11 +23,14 @@ const COLOR_ESTADO_CIERRE: Record<EtiquetaCualitativa, string> = {
   noCumple: "var(--color-state-no-apto)",
 }
 
+// Eyebrow del cierre en el inmersivo: solo la cualitativa humanizada en color
+// del estado. El "No apto / Apto" no aparece — el color comunica, y el sello
+// binario se vive UNA vez en la ceremonia, no en cada visita posterior.
 const TEXTO_ESTADO_CIERRE: Record<EtiquetaCualitativa, string> = {
-  excelencia: "Apto · Excelencia",
-  solido: "Apto · Solido",
-  enDesarrollo: "No apto · En desarrollo",
-  noCumple: "No apto",
+  excelencia: "Excelencia",
+  solido: "Solido",
+  enDesarrollo: "En desarrollo",
+  noCumple: "Por reforzar",
 }
 
 /**
@@ -110,6 +113,8 @@ function EyebrowContexto({
       {estaCerrado && etiquetaCualitativaFinal ? (
         <>
           {clienteNombre || area ? <SepEyebrow /> : null}
+          <span className="text-text-tertiary">Cerrado</span>
+          <SepEyebrow />
           <span
             className="font-semibold"
             style={{ color: COLOR_ESTADO_CIERRE[etiquetaCualitativaFinal] }}

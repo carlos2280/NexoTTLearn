@@ -77,8 +77,12 @@ export interface CopySiguiente {
   readonly cta: string
   readonly ruta: string
   readonly icono: LucideIcon
-  /** Línea breve junto al CTA: "por qué te muestro esto ahora". */
-  readonly porQueAqui: string
+  /**
+   * Línea breve junto al CTA: "por qué te muestro esto ahora". `null` cuando
+   * el CTA por si solo basta (ej. cierre NO_APTO — no anadir contexto que
+   * suene a castigo).
+   */
+  readonly porQueAqui: string | null
   /** Slug del área del curso destino — pinta barra superior + eyebrow del área. */
   readonly areaCodigo?: string | null
   /** Nombre del área para el eyebrow ("BACKEND · JAVA SENIOR"). */
