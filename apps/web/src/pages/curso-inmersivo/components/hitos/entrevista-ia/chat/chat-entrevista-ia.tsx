@@ -8,6 +8,7 @@ import { AnimatePresence } from "framer-motion"
 import { useEffect, useRef, useState } from "react"
 
 const RGX_ESPACIOS = /\s+/
+import { CierreEntrevista } from "../cierre/cierre-entrevista"
 import { AtmosferaAurora } from "./atmosfera-aurora"
 import { CabeceraChat } from "./cabecera-chat"
 import { IndicadorEscribiendo } from "./indicador-escribiendo"
@@ -15,13 +16,13 @@ import { InputEntrevista } from "./input-entrevista"
 import { MensajeEvaluador } from "./mensaje-evaluador"
 import { MensajeUsuario } from "./mensaje-usuario"
 import { useSalirEntrevista } from "./use-salir-entrevista"
-import { VistaCierreStub } from "./vista-cierre-stub"
 
 interface ChatEntrevistaIaProps {
   readonly intentoInicial: IntentoEntrevistaIaParticipanteResponse
   /**
-   * Permite al participante salir de la entrevista (vuelve al brief). El intento
-   * en curso queda registrado — en F3 el backend decide si cuenta en cuota.
+   * Cierra el chat y devuelve al brief. Lo usa la cabecera (Salir) y la
+   * vista 3b ("Hacer otra entrevista"). El brief recargara la disponibilidad
+   * y decidira el siguiente paso.
    */
   readonly onSalir?: () => void
 }
@@ -32,13 +33,14 @@ interface ChatEntrevistaIaProps {
  * mensajes editoriales sin bubbles tradicionales, streaming visual del
  * texto del evaluador, indicador "escribiendo" + atajo Cmd/Ctrl+Enter.
  *
- * Cuando la IA cierra (finalizado=true), pasa a `VistaCierreStub` (vistas
- * 3a/3b reales en F3).
+ * Cuando la IA cierra (`finalizado=true`), tras dejar que el ultimo mensaje
+ * se lea, monta `CierreEntrevista` — que pide el detalle del intento al
+ * backend para mostrar la vista 3a (aprobado) o 3b (aun no) con el
+ * veredicto real (F3).
  */
 export function ChatEntrevistaIa({ intentoInicial, onSalir }: ChatEntrevistaIaProps) {
   const [turnos, setTurnos] = useState<readonly TurnoEntrevistaIa[]>(intentoInicial.transcripcion)
   const [finalizado, setFinalizado] = useState(intentoInicial.estado === "FINALIZADO")
-  const [aprobado, setAprobado] = useState(intentoInicial.aprobado === true)
   const [intentoId] = useState(intentoInicial.intentoId)
   const [ultimoTurnoIaIdx, setUltimoTurnoIaIdx] = useState<number>(
     intentoInicial.transcripcion.length - 1,
@@ -79,19 +81,12 @@ export function ChatEntrevistaIa({ intentoInicial, onSalir }: ChatEntrevistaIaPr
             return next
           })
           if (resp.finalizado) {
-            // Espera a que termine el streaming visual antes de cerrar.
+            // Espera a que termine el streaming visual del ultimo mensaje
+            // antes de cambiar a la vista de cierre. El veredicto (`aprobado`)
+            // lo trae `CierreEntrevista` haciendo GET al intento.
             const palabras = resp.respuestaIa.split(RGX_ESPACIOS).length
             const tiempoEstimadoMs = palabras * 45 + 600
-            window.setTimeout(() => {
-              setFinalizado(true)
-              // En F3 esto vendra del backend (finalizar-entrevista). De momento
-              // asumimos aprobado=true salvo override `nexott-mock:entrevista-ia-resultado`.
-              const overrideRaw =
-                typeof window !== "undefined"
-                  ? window.localStorage.getItem("nexott-mock:entrevista-ia-resultado")
-                  : null
-              setAprobado(overrideRaw !== "NO_APROBADO")
-            }, tiempoEstimadoMs)
+            window.setTimeout(() => setFinalizado(true), tiempoEstimadoMs)
           }
         },
       },
@@ -99,12 +94,15 @@ export function ChatEntrevistaIa({ intentoInicial, onSalir }: ChatEntrevistaIaPr
   }
 
   if (finalizado && ultimoTurnoIaIdx === turnos.length - 1 && !enviar.isPending) {
-    // Damos espacio para que el ultimo mensaje IA se lea antes de cerrar.
-    // Cuando setTimeout dispara, finalizado=true y mostramos cierre.
     return (
       <main className="relative flex flex-1 overflow-hidden bg-canvas">
         <AtmosferaAurora />
-        <VistaCierreStub aprobado={aprobado} />
+        <CierreEntrevista
+          intentoId={intentoId}
+          turnos={turnos}
+          fechaISO={intentoInicial.fecha}
+          onCerrar={() => onSalir?.()}
+        />
       </main>
     )
   }
