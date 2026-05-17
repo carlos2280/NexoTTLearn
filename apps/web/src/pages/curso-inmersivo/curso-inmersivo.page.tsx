@@ -2,7 +2,7 @@ import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
 import { RUTAS } from "@/shared/constants/rutas"
 import { useCallback, useState } from "react"
 import { Navigate, useNavigate, useParams } from "react-router-dom"
-import { CanvasHitoPlaceholder } from "./components/canvas-hito-placeholder"
+import { CanvasHito } from "./components/canvas-hito"
 import { CanvasSeccion } from "./components/canvas-seccion"
 import { CursoInmersivoSkeleton } from "./components/curso-inmersivo-skeleton"
 import { FooterPreviewInscripcion } from "./components/footer-preview-inscripcion"
@@ -107,6 +107,7 @@ export function CursoInmersivoPage() {
       onAbrirHito={abrirHito}
       colaboradorId={usuario?.colaboradorId ?? null}
       soloLectura={detalle.avance?.estaCerrado ?? false}
+      asignacionId={detalle.asignacionId}
     />
   )
 }
@@ -125,6 +126,7 @@ interface CursoInmersivoLayoutProps {
   readonly onAbrirHito: (hito: HitoTipo) => void
   readonly colaboradorId: string | null
   readonly soloLectura: boolean
+  readonly asignacionId: string | null
 }
 
 function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
@@ -142,6 +144,7 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
     onAbrirHito,
     colaboradorId,
     soloLectura,
+    asignacionId,
   } = props
   const seccionActivaId = hitoActivo === null ? (seccionActiva?.seccionId ?? null) : null
   const esPreview = modo === "preview"
@@ -184,7 +187,7 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
             soloLectura={soloLectura}
           />
         ) : (
-          <CanvasHitoPlaceholder hito={hitoActivo} />
+          <CanvasHito hito={hitoActivo} cursoId={arbol.curso.id} asignacionId={asignacionId} />
         )}
         {muestraPanelContexto && avance ? (
           <PanelContexto

@@ -9,6 +9,7 @@ import { handlersParticipante } from "./handlers-participante"
 import { handlersPersonas } from "./handlers-personas"
 import { handlersReportes } from "./handlers-reportes"
 import { handlersSecciones } from "./handlers-secciones"
+import { handlersTransversal } from "./handlers-transversal"
 
 export interface MockRequest {
   method: string
@@ -36,6 +37,7 @@ const routes: RouteEntry[] = [
   ...handlersParticipante,
   ...handlersCursoDetalle,
   ...handlersIntentosBloque,
+  ...handlersTransversal,
 ]
 
 const MOCK_LATENCY_MS = 280
