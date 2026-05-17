@@ -25,8 +25,10 @@ const RTE_NOTIFICACIONES_BADGE = /^\/notificaciones\/badge$/
 const RTE_NOTIFICACIONES = /^\/notificaciones(\?.*)?$/
 const RTE_NOTIFICACION_MARCAR_LEIDA = /^\/notificaciones\/[^/]+\/marcar-leida$/
 const RTE_NOTIFICACIONES_MARCAR_TODAS = /^\/notificaciones\/marcar-todas-leidas$/
+const RTE_NOTIFICACION_ARCHIVAR = /^\/notificaciones\/[^/]+\/archivar$/
 const RTE_CURSOS_DISPONIBLES = /^\/cursos\/disponibles-voluntario(\?.*)?$/
 const RGX_MARCAR_LEIDA_ID = /^\/notificaciones\/([^/]+)\/marcar-leida$/
+const RGX_ARCHIVAR_ID = /^\/notificaciones\/([^/]+)\/archivar$/
 
 // TODO B-2: cuando el backend implemente `skillsPendientesCount` en
 // `MeCursoResumen`, mover al schema oficial y borrar.
@@ -67,32 +69,90 @@ interface MockNotificacionState {
 
 const stateNotificaciones: MockNotificacionState = {
   notificaciones: [
+    // HOY — 2 no leidas (1 critica)
     {
       id: "notif-1",
       tipoEvento: "TRANSVERSAL_DISPONIBLE",
       esCritico: false,
-      fechaCreacion: diasDesdeHoy(-0),
+      fechaCreacion: diasDesdeHoy(0),
       leida: false,
       fechaLeida: null,
       archivada: false,
     },
     {
       id: "notif-2",
-      tipoEvento: "PLAN_RECALCULADO",
+      tipoEvento: "CASO_REABIERTO",
+      esCritico: true,
+      fechaCreacion: diasDesdeHoy(0),
+      leida: false,
+      fechaLeida: null,
+      archivada: false,
+    },
+    // ESTA SEMANA — 3 (2 no leidas + 1 leida)
+    {
+      id: "notif-3",
+      tipoEvento: "ENTREVISTA_IA_DISPONIBLE",
       esCritico: false,
-      fechaCreacion: diasDesdeHoy(-1),
+      fechaCreacion: diasDesdeHoy(-2),
       leida: false,
       fechaLeida: null,
       archivada: false,
     },
     {
-      id: "notif-3",
+      id: "notif-4",
       tipoEvento: "RECORDATORIO_DEADLINE",
       esCritico: false,
       fechaCreacion: diasDesdeHoy(-3),
+      leida: true,
+      fechaLeida: diasDesdeHoy(-2),
+      archivada: false,
+    },
+    {
+      id: "notif-5",
+      tipoEvento: "PLAN_RECALCULADO",
+      esCritico: false,
+      fechaCreacion: diasDesdeHoy(-5),
       leida: false,
       fechaLeida: null,
       archivada: false,
+    },
+    // ANTERIOR — 4 (todas leidas, mezcla de tipos)
+    {
+      id: "notif-6",
+      tipoEvento: "ASIGNACION_CURSO",
+      esCritico: true,
+      fechaCreacion: diasDesdeHoy(-12),
+      leida: true,
+      fechaLeida: diasDesdeHoy(-11),
+      archivada: false,
+    },
+    {
+      id: "notif-7",
+      tipoEvento: "RESULTADO_CIERRE",
+      esCritico: true,
+      fechaCreacion: diasDesdeHoy(-20),
+      leida: true,
+      fechaLeida: diasDesdeHoy(-20),
+      archivada: false,
+    },
+    {
+      id: "notif-8",
+      tipoEvento: "CURSO_DEADLINE",
+      esCritico: false,
+      fechaCreacion: diasDesdeHoy(-25),
+      leida: true,
+      fechaLeida: diasDesdeHoy(-25),
+      archivada: false,
+    },
+    // ARCHIVADA — 1 (para validar tab "Archivadas")
+    {
+      id: "notif-archived-1",
+      tipoEvento: "PLAN_RECALCULADO",
+      esCritico: false,
+      fechaCreacion: diasDesdeHoy(-40),
+      leida: true,
+      fechaLeida: diasDesdeHoy(-40),
+      archivada: true,
     },
   ],
 }
@@ -1100,9 +1160,9 @@ function handlerNotificaciones(req: MockRequest): Paginated<NotificacionResumen>
     const filtro = leidaParam === "true"
     lista = lista.filter((n) => n.leida === filtro)
   }
-  if (archivadaParam === "false") {
-    lista = lista.filter((n) => !n.archivada)
-  }
+  // archivada=true → solo archivadas. archivada=false (default) → solo no archivadas.
+  const soloArchivadas = archivadaParam === "true"
+  lista = lista.filter((n) => n.archivada === soloArchivadas)
   lista.sort((a, b) => b.fechaCreacion.localeCompare(a.fechaCreacion))
   return paginar(lista, page, pageSize)
 }
@@ -1128,6 +1188,23 @@ function handlerMarcarTodasLeidas(): void {
   )
 }
 
+function handlerArchivar(req: MockRequest): void {
+  const match = req.path.match(RGX_ARCHIVAR_ID)
+  if (!match) {
+    return
+  }
+  const id = match[1]
+  const idx = stateNotificaciones.notificaciones.findIndex((n) => n.id === id)
+  if (idx === -1) {
+    return
+  }
+  const notif = stateNotificaciones.notificaciones[idx]
+  if (!notif) {
+    return
+  }
+  stateNotificaciones.notificaciones[idx] = { ...notif, archivada: true }
+}
+
 export const handlersParticipante = [
   defineRoute("GET", RTE_ME_BANDEJA, handlerMeBandeja),
   defineRoute("GET", RTE_ME_CURSOS, handlerMeCursos),
@@ -1140,5 +1217,6 @@ export const handlersParticipante = [
   defineRoute("GET", RTE_NOTIFICACIONES, handlerNotificaciones),
   defineRoute("POST", RTE_NOTIFICACION_MARCAR_LEIDA, handlerMarcarLeida),
   defineRoute("POST", RTE_NOTIFICACIONES_MARCAR_TODAS, handlerMarcarTodasLeidas),
+  defineRoute("POST", RTE_NOTIFICACION_ARCHIVAR, handlerArchivar),
   defineRoute("GET", RTE_CURSOS_DISPONIBLES, handlerCursosDisponibles),
 ]
