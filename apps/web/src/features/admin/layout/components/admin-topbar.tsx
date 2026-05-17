@@ -1,7 +1,6 @@
 import { CampanitaNotificaciones } from "@/features/notificaciones/components/campanita-notificaciones"
 import { Button } from "@/shared/components/ui/button"
 import { Kbd } from "@/shared/components/ui/kbd"
-import { ThemeToggle } from "@/shared/components/ui/theme-toggle"
 import { PanelLeftClose, PanelLeftOpen, Search } from "lucide-react"
 import { AdminUserMenu } from "./admin-user-menu"
 
@@ -54,7 +53,6 @@ export function AdminTopbar({
 
       <div className="ml-auto flex items-center gap-2">
         <CampanitaNotificaciones />
-        <ThemeToggle />
         <AdminUserMenu onAbrirCuenta={onAbrirCuenta} />
       </div>
     </div>

@@ -1,6 +1,5 @@
 import { CampanitaNotificaciones } from "@/features/notificaciones/components/campanita-notificaciones"
 import { Button } from "@/shared/components/ui/button"
-import { ThemeToggle } from "@/shared/components/ui/theme-toggle"
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react"
 import { useTituloPaginaParticipante } from "../hooks/use-titulo-pagina-participante"
 import { ParticipanteUserMenu } from "./participante-user-menu"
@@ -41,7 +40,6 @@ export function ParticipanteTopbar({
 
       <div className="ml-auto flex items-center gap-2">
         <CampanitaNotificaciones />
-        <ThemeToggle />
         <ParticipanteUserMenu onAbrirCuenta={onAbrirCuenta} />
       </div>
     </div>
