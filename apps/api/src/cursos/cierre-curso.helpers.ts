@@ -443,6 +443,13 @@ export function construirSnapshotCierre(input: {
     },
     asignaciones: input.asignaciones.map((a) => {
       const aplicada = aplicadasPorAsignacion.get(a.id)
+      const notasPersistidas =
+        aplicada?.notas.map((n) => ({
+          skillId: n.skillId,
+          caracter: n.caracter,
+          notaActual: n.notaActual,
+          umbralCumple: n.umbralCumple,
+        })) ?? []
       return {
         asignacionId: a.id,
         colaborador: {
@@ -454,13 +461,31 @@ export function construirSnapshotCierre(input: {
         decisionAplicada: aplicada?.accion ?? null,
         resultadoFinal: aplicada?.resultadoFinal ?? null,
         estadoPrevio: a.rol === RolAsignacion.ASIGNADO ? a.estadoAsignado : a.estadoVoluntario,
-        notasPorSkill:
-          aplicada?.notas.map((n) => ({
-            skillId: n.skillId,
-            notaActual: n.notaActual,
-            umbralCumple: n.umbralCumple,
-          })) ?? [],
+        // DEUDA-B26-1: la nota global se calcula y persiste AHORA, al cerrar.
+        // Es la fuente de verdad inmutable del veredicto final — si la formula
+        // cambia despues, los cursos ya cerrados conservan su nota original.
+        // Hoy promedio simple de notas OBLIGATORIAS con `notaActual !== null`;
+        // si en el futuro se quiere ponderacion por areas, se cambia aqui sin
+        // afectar a snapshots historicos.
+        notaGlobalFinal: calcularNotaGlobalFinal(notasPersistidas),
+        notasPorSkill: notasPersistidas,
       }
     }),
   }
+}
+
+function calcularNotaGlobalFinal(
+  notas: ReadonlyArray<{
+    readonly caracter: "OBLIGATORIA" | "OPCIONAL"
+    readonly notaActual: number | null
+  }>,
+): number | null {
+  const valores = notas
+    .filter((n) => n.caracter === "OBLIGATORIA" && n.notaActual !== null)
+    .map((n) => n.notaActual as number)
+  if (valores.length === 0) {
+    return null
+  }
+  const suma = valores.reduce((acc, n) => acc + n, 0)
+  return Math.round(suma / valores.length)
 }

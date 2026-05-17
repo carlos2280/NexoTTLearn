@@ -835,9 +835,35 @@ B-N. Crear ticket nuevo cuando se priorice.
 
 ---
 
-### DEUDA-B26-1 · `notaGlobalFinal` no se persiste en el snapshot de cierre
+### DEUDA-B26-1 · `notaGlobalFinal` no se persiste en el snapshot de cierre — ✅ RESUELTO (2026-05-17)
 
 **Detectado:** 2026-05-17 implementando B-26.
+
+**Fix aplicado:**
+- `construirSnapshotCierre` ahora calcula y persiste `notaGlobalFinal`
+  por asignacion: promedio simple de notas OBLIGATORIAS con
+  `notaActual !== null`. Si no hay → `null`.
+- Cada nota del snapshot ahora persiste tambien `caracter`
+  (OBLIGATORIA/OPCIONAL), necesario para que el calculo sea
+  recomputable y para que el fallback aguas abajo lo respete.
+- `MeAvanceService.extraerNotaFinal` ahora encuentra el campo y
+  emite `notaGlobalFinal`+`etiquetaCualitativaFinal` en
+  `/me/avance/cursos/:id` cuando el curso esta CERRADO.
+- `MeResumenCierreService.resolverNotaGlobalFinal` queda como fallback
+  documentado SOLO para snapshots construidos antes del fix; los
+  cierres nuevos no caen al fallback.
+- Tests: nuevo `cierre-curso.helpers.spec.ts` con 6 casos cubriendo
+  la formula y los bordes.
+
+**Lo que no cubre este fix:**
+- Snapshots construidos antes del fix (cursos ya cerrados) siguen sin
+  `notaGlobalFinal` persistida y caen al fallback. En dev local no
+  hay snapshots historicos. Si se llega a produccion con cierres
+  previos, considerar migracion de backfill.
+- La formula es promedio simple. La ponderacion por areas con
+  `Curso.areasExigidas[].peso` queda como futuro: el dato ya esta
+  en el snapshot (`curso.configuracion.areas`), basta cambiar
+  `calcularNotaGlobalFinal` para usarlo sin tocar consumidores.
 
 `CursoFotografiaCierre.snapshot` (construido por
 `cursos/cierre-curso.helpers.ts::construirSnapshotCierre`) NO incluye

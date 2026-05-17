@@ -215,6 +215,11 @@ interface NotaSkillSnapshot {
   readonly skillId: string
   readonly notaActual: number | null
   readonly umbralCumple: number
+  /**
+   * Persistido en snapshots construidos despues del fix DEUDA-B26-1.
+   * Opcional para compat con snapshots anteriores.
+   */
+  readonly caracter?: "OBLIGATORIA" | "OPCIONAL"
 }
 
 function parseSnapshot(value: unknown): SnapshotCierre | null {
@@ -277,21 +282,32 @@ function filtrarResultadoVisible(value: string | null | undefined): ResultadoCie
 }
 
 /**
- * Promedio simple de las notas obligatorias presentes en el snapshot
- * (`notaActual` no nulo). Fallback determinista cuando el snapshot no persiste
- * `notaGlobalFinal` explicitamente. Cuando NO hay notas validas devuelve 0
- * (la `etiquetaCualitativaFinal` cae a `noCumple`, semantica correcta).
+ * Resuelve `notaGlobalFinal` de una asignacion en el snapshot.
+ *
+ * Camino principal (snapshots construidos a partir de DEUDA-B26-1):
+ * `fila.notaGlobalFinal` viene persistida directamente — fuente de verdad
+ * inmutable del veredicto final.
+ *
+ * Fallback (snapshots anteriores que NO persistian la nota): promedio simple
+ * de notas OBLIGATORIAS con `notaActual !== null`. Si el snapshot tampoco
+ * tiene `caracter` por nota, cae a todas las notas no nulas. Cuando NO hay
+ * notas validas devuelve `0` (la `etiquetaCualitativaFinal` cae a `noCumple`,
+ * semantica correcta para snapshots historicos sin nota disponible).
  */
 function resolverNotaGlobalFinal(fila: AsignacionSnapshot): number {
   if (typeof fila.notaGlobalFinal === "number") {
     return fila.notaGlobalFinal
   }
-  const notas = fila.notasPorSkill.map((n) => n.notaActual).filter((n): n is number => n !== null)
-  if (notas.length === 0) {
+  const conCaracter = fila.notasPorSkill.some((n) => n.caracter !== undefined)
+  const elegibles = conCaracter
+    ? fila.notasPorSkill.filter((n) => n.caracter === "OBLIGATORIA")
+    : fila.notasPorSkill
+  const valores = elegibles.map((n) => n.notaActual).filter((n): n is number => n !== null)
+  if (valores.length === 0) {
     return 0
   }
-  const suma = notas.reduce((acc, n) => acc + n, 0)
-  return Math.round(suma / notas.length)
+  const suma = valores.reduce((acc, n) => acc + n, 0)
+  return Math.round(suma / valores.length)
 }
 
 function etiquetaCualitativaPorNota(nota: number): EtiquetaCualitativa {
