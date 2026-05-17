@@ -36,10 +36,6 @@ const DOTS_LLENOS: Record<NivelCualitativoArea, number> = {
 
 const TOTAL_DOTS = 5
 
-function nivelDe(area: FichaPorAreaItem): NivelCualitativoArea {
-  return area.nivelCualitativo ?? (area.skillsConNota > 0 ? "inicial" : "sinTocar")
-}
-
 export function TuMapa({ porArea, onAreaClick }: TuMapaProps) {
   const ordenado = [...porArea].sort((a, b) => {
     const ia = ORDEN_AREAS.indexOf(slugArea(a.nombre))
@@ -75,7 +71,7 @@ interface AreaCardProps {
 
 function AreaCard({ area, onClick }: AreaCardProps) {
   const slug = slugArea(area.nombre)
-  const nivel = nivelDe(area)
+  const nivel = area.nivelCualitativo
   const sinTocar = nivel === "sinTocar"
   const llenos = DOTS_LLENOS[nivel]
   const colorArea = `var(--color-area-${slug})`

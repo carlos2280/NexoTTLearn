@@ -13,12 +13,10 @@ export function DetalleArea({ area, skills, onAbrirHistorico }: DetalleAreaProps
   const colorArea = `var(--color-area-${slugArea(area.nombre)})`
   const skillsDelArea = skills.filter((s) => s.areaId === area.areaId)
   const skillsDemostradasIds = new Set(skillsDelArea.map((s) => s.skillId))
-  const porExplorar = (area.skillsCatalogo ?? []).filter(
-    (s) => !skillsDemostradasIds.has(s.skillId),
-  )
-  const totalCatalogo = area.skillsCatalogo?.length ?? skillsDelArea.length
+  const porExplorar = area.skillsCatalogo.filter((s) => !skillsDemostradasIds.has(s.skillId))
+  const totalCatalogo = area.skillsCatalogo.length
   const restantes = Math.max(0, totalCatalogo - skillsDelArea.length)
-  const nivelArea = area.nivelCualitativo ?? "sinTocar"
+  const nivelArea = area.nivelCualitativo
 
   return (
     <section

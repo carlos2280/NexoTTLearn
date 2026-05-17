@@ -86,7 +86,7 @@ export interface AreaPorTrabajarCierre {
 }
 
 /**
- * Respuesta de `GET /me/cursos/:cursoId/resumen-cierre` (TODO B-26).
+ * Respuesta de `GET /me/cursos/:cursoId/resumen-cierre`.
  *
  * Usado por la pantalla "Curso cerrado" (`/cursos/:cursoId/cerrado`), la
  * ceremonia del veredicto. Hoy parte de esto vive en `MeAvanceCursoResponse`

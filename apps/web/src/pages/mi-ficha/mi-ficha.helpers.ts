@@ -44,14 +44,21 @@ export function ultimaSkill(skills: readonly FichaSkillItem[]): UltimaSkill | nu
   return { nombre: reciente.etiquetaVisible, fecha: reciente.fechaUltimoCambio }
 }
 
-// Heuristica temporal: hasta que B-21 traiga `nivelCualitativo` por area,
-// derivamos "tiene area solida" desde el promedio (>=70 = solido, >=85 = excel).
+// El backend ya emite `nivelCualitativo` por area: derivamos directamente
+// desde la fuente de verdad en vez de inferir desde el promedio.
 export function hayAreaSolida(porArea: readonly FichaPorAreaItem[]): boolean {
-  return porArea.some((a) => (a.promedio ?? 0) >= UMBRAL_SOLIDO)
+  return porArea.some((a) => esNivelSolidoOExcelencia(a.nivelCualitativo))
 }
 
 export function cuentaAreasSolidasOExcelentes(porArea: readonly FichaPorAreaItem[]): number {
-  return porArea.reduce((acc, a) => ((a.promedio ?? 0) >= UMBRAL_SOLIDO ? acc + 1 : acc), 0)
+  return porArea.reduce(
+    (acc, a) => (esNivelSolidoOExcelencia(a.nivelCualitativo) ? acc + 1 : acc),
+    0,
+  )
+}
+
+function esNivelSolidoOExcelencia(nivel: NivelCualitativoArea): boolean {
+  return nivel === "solido" || nivel === "excelencia"
 }
 
 // Devuelve solo el sufijo (sin el nombre del usuario) para que el componente
