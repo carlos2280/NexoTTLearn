@@ -1,5 +1,6 @@
 import { useCursosDisponiblesVoluntario } from "@/features/cursos/hooks/use-cursos-disponibles-voluntario"
 import { Banner } from "@/shared/components/ui/banner"
+import { Pagination } from "@/shared/components/ui/pagination"
 import type { CursoDisponibleVoluntario } from "@nexott-learn/shared-types"
 import { useState } from "react"
 import { CatalogoCard } from "./components/catalogo-card"
@@ -44,10 +45,11 @@ export function CatalogoPage() {
       ) : null}
 
       {data && data.meta.totalPages > 1 ? (
-        <PaginadorSimple
+        <Pagination
           page={data.meta.page}
-          totalPages={data.meta.totalPages}
-          onCambiar={setPage}
+          pageSize={data.meta.pageSize}
+          total={data.meta.total}
+          onCambiarPage={setPage}
         />
       ) : null}
     </div>
@@ -64,41 +66,6 @@ function CursosGrid({ cursos }: CursosGridProps) {
       {cursos.map((curso) => (
         <CatalogoCard key={curso.cursoId} curso={curso} />
       ))}
-    </div>
-  )
-}
-
-interface PaginadorSimpleProps {
-  readonly page: number
-  readonly totalPages: number
-  readonly onCambiar: (page: number) => void
-}
-
-function PaginadorSimple({ page, totalPages, onCambiar }: PaginadorSimpleProps) {
-  if (totalPages <= 1) {
-    return null
-  }
-  return (
-    <div className="flex items-center justify-center gap-3 pt-2">
-      <button
-        type="button"
-        disabled={page <= 1}
-        onClick={() => onCambiar(page - 1)}
-        className="rounded-pill border border-border-strong bg-surface px-4 py-1.5 text-body-sm text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        Anterior
-      </button>
-      <span className="tabular font-mono text-caption text-text-tertiary">
-        {page} / {totalPages}
-      </span>
-      <button
-        type="button"
-        disabled={page >= totalPages}
-        onClick={() => onCambiar(page + 1)}
-        className="rounded-pill border border-border-strong bg-surface px-4 py-1.5 text-body-sm text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        Siguiente
-      </button>
     </div>
   )
 }
