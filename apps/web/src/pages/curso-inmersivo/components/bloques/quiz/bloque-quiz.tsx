@@ -59,7 +59,12 @@ function QuizActivo({ bloqueId, cursoId, colaboradorId, contenido }: QuizActivoP
   // "primera vez que apruebas" en el banner sin contaminar el cache de Tanstack.
   const [mejorPrevioAlEnviar, setMejorPrevioAlEnviar] = useState<IntentoBloqueResponse | null>(null)
 
-  const aprobado = (mejor.data?.nota ?? -1) >= contenido.notaMinima
+  // `aprobado` considera tanto el ultimo intento recien enviado como el
+  // mejor historico cacheado. Sin esto, la solucion no se muestra entre el
+  // POST exitoso y el refetch de `useMejorIntentoBloque`, y en mocks que
+  // no persisten el mejor nunca se mostraria.
+  const notaVigente = Math.max(ultimoIntento?.nota ?? -1, mejor.data?.nota ?? -1)
+  const aprobado = notaVigente >= contenido.notaMinima
   const mostrarSolucion = decidirMostrarSolucion(
     contenido.solucionVisible,
     !!ultimoIntento,

@@ -5,8 +5,14 @@ import { SEED_BLOQUES } from "./seed-bloques"
 
 const RTE_CREAR_INTENTO = /^\/intentos-bloque$/
 const RTE_MEJOR_INTENTO = /^\/colaboradores\/([^/]+)\/bloques\/([^/]+)\/mejor-intento$/
+const RGX_MEJOR_INTENTO_PATH = /^\/colaboradores\/[^/]+\/bloques\/([^/]+)\/mejor-intento$/
 
 const SKILL_PLACEHOLDER = "00000000-0000-4000-a000-000000000000"
+
+// Persistencia en memoria del MEJOR intento por bloque (un solo participante
+// por navegador en mock). Permite que la UI vea aprobado, mostrar solucion
+// y colapsar el bloque (04 R5/R6) sin necesidad de un backend real.
+const mejoresPorBloque = new Map<string, IntentoBloqueResponse>()
 
 interface RespuestaPreguntaPayload {
   readonly preguntaId: string
@@ -143,24 +149,32 @@ function handlerCrearIntento(req: MockRequest): IntentoBloqueResponse {
     throw new ApiError(400, "BODY_INVALIDO", "El body del intento es invalido.")
   }
   const nota = calcularNota(req.body)
-  return {
+  const previo = mejoresPorBloque.get(req.body.bloqueId)
+  const esMejorIntento = !previo || nota > previo.nota
+  const intento: IntentoBloqueResponse = {
     intentoId: intentoIdAleatorio(),
     bloqueId: req.body.bloqueId,
     skillId: SKILL_PLACEHOLDER,
     cursoId: req.body.cursoId,
     nota,
-    esMejorIntento: true,
+    esMejorIntento,
     versionBloque: 1,
     estaInvalidado: false,
     fecha: new Date().toISOString(),
   }
+  if (esMejorIntento) {
+    mejoresPorBloque.set(req.body.bloqueId, intento)
+  }
+  return intento
 }
 
-function handlerMejorIntento(_req: MockRequest): IntentoBloqueResponse | null {
-  // En mock no persistimos historial: siempre devolvemos null para que la UI
-  // entienda "nunca lo intentaste". Tras un POST exitoso, el frontend usa la
-  // respuesta del propio POST como ultimoIntento.
-  return null
+function handlerMejorIntento(req: MockRequest): IntentoBloqueResponse | null {
+  const match = req.path.match(RGX_MEJOR_INTENTO_PATH)
+  const bloqueId = match?.[1]
+  if (!bloqueId) {
+    return null
+  }
+  return mejoresPorBloque.get(bloqueId) ?? null
 }
 
 export const handlersIntentosBloque = [
