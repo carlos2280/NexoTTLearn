@@ -30,6 +30,7 @@ export function ResultadoIntentoQuiz({
       className={cn(
         "flex items-start gap-3 rounded-2xl border p-4",
         aprobado ? "border-success/30 bg-success-soft" : "border-warmth/30 bg-warning-soft",
+        primeraVez && "nx-aurora-pulse",
       )}
     >
       <Icono

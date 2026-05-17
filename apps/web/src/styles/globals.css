@@ -1167,6 +1167,31 @@ button:not(:disabled):not([aria-disabled="true"]):not([data-disabled]) {
   animation: nx-breathe 3.6s var(--ease-default) infinite;
 }
 
+/* Pulso aurora cyan — sello "subió tu skill" cuando un bloque evaluable
+ * aprueba por PRIMERA VEZ. Único momento del canvas donde aparece aurora.
+ * Una sola pasada, 1.5s — no es loop, no decora; comunica un hito
+ * (manifiesto: aurora = recompensa cumbre). Reduced motion lo neutraliza.
+ */
+@keyframes nx-aurora-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(var(--color-aurora-cyan-rgb) / 0);
+  }
+  30% {
+    box-shadow: 0 0 0 6px rgb(var(--color-aurora-cyan-rgb) / 0.32);
+  }
+  100% {
+    box-shadow: 0 0 0 14px rgb(var(--color-aurora-cyan-rgb) / 0);
+  }
+}
+.nx-aurora-pulse {
+  animation: nx-aurora-pulse 1.5s var(--ease-default) 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nx-aurora-pulse {
+    animation: none;
+  }
+}
+
 /* ============================================================
  * Motion · Overlays · Dialogs · Drawers · Popovers
  * Sistema unificado de transiciones para componentes Radix.
