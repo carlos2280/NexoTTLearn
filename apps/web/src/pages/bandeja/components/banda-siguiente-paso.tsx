@@ -1,15 +1,15 @@
 import { Button } from "@/shared/components/ui/button"
 import { SaludoBienvenida } from "@/shared/components/ui/saludo-bienvenida"
 import { RUTAS } from "@/shared/constants/rutas"
+import type { SiguienteAccion } from "@nexott-learn/shared-types"
 import { Compass } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { microcopyDelSaludo } from "../lib/microcopy-saludo"
 import { type ContextoAreaCurso, obtenerCopy } from "../lib/siguiente-accion-copy"
-import type { SiguienteAccionConRevision } from "../types"
 import { CartaSiguientePaso } from "./carta-siguiente-paso"
 
 interface BandaSiguientePasoProps {
-  readonly siguienteAccion: SiguienteAccionConRevision | null
+  readonly siguienteAccion: SiguienteAccion | null
   readonly nombreUsuario: string
   readonly saludo: string
   /** Área principal del curso destino de `siguienteAccion`, si la hay. */

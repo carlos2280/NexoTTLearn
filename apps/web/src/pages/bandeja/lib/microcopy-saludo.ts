@@ -1,11 +1,11 @@
-import type { SiguienteAccionConRevision } from "../types"
+import type { SiguienteAccion } from "@nexott-learn/shared-types"
 
 /**
  * Microcopy contextual del saludo de la bandeja según el `siguienteAccion`
  * que devuelve el server. Calidez sobria, sin emojis, sin gamificación —
  * habla del viaje del participante con un tono honesto.
  */
-export function microcopyDelSaludo(accion: SiguienteAccionConRevision | null): string {
+export function microcopyDelSaludo(accion: SiguienteAccion | null): string {
   if (accion === null) {
     return "Cuando arranque tu primer curso, el viaje empieza aquí."
   }

@@ -12,9 +12,10 @@
 > B-extra.2 (`esPrimeraAprobacion` + `preguntasFalladas` en intento
 > bloque).
 >
-> **Sprint 2 COMPLETO ✅:** B-4 (`caminoHaciaApto.porArea`) y B-26
-> (`GET /me/cursos/:cursoId/resumen-cierre`) hechos. Siguiente Sprint 3:
-> B-1, B-24, B-25.
+> **Sprint 2 COMPLETO ✅:** B-4, B-26.
+>
+> **Sprint 3 en curso:** B-1 (`ESPERANDO_REVISION`) ✅ HECHO. Faltan
+> B-24 (`GET /me/ficha/historial`) y B-25 (`GET /me/ficha/exportar`).
 >
 > **Convenciones API:** todas las rutas bajo `/api/v1/...`. Autenticación
 > por sesión (`req.session`, cookie `nexott.sid`). CSRF doble token
@@ -46,7 +47,7 @@
 
 <a id="b-1"></a>
 
-## B-1 · Nuevo caso `ESPERANDO_REVISION` en `siguienteAccion`
+## B-1 · Nuevo caso `ESPERANDO_REVISION` en `siguienteAccion` — ✅ HECHO (2026-05-17)
 
 **Origen:** `apps/web/src/pages/bandeja/types.ts:10-21`.
 

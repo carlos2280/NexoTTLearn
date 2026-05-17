@@ -109,9 +109,28 @@ export interface SiguienteAccionExplorarVoluntariado {
   readonly totalCursosAbiertos: number
 }
 
+/**
+ * El participante entrego un hito evaluable (proyecto transversal hoy, o
+ * entrevista IA en el futuro) y esta esperando el veredicto. Atmosfera
+ * `calmada` en UI — no hay accion del usuario pendiente.
+ *
+ * Prioridad relativa: por debajo de `RESULTADO_CIERRE_LISTO` y
+ * `CASO_REABIERTO`; por encima de los `..._DISPONIBLE` (si esta en revision,
+ * no hay nada "disponible" para hacer en el mismo hito).
+ */
+export interface SiguienteAccionEsperandoRevision {
+  readonly tipo: "ESPERANDO_REVISION"
+  readonly asignacionId: string
+  readonly cursoId: string
+  readonly cursoTitulo: string
+  readonly enRevision: "transversal" | "entrevistaIa"
+  readonly fechaEnvio: string
+}
+
 export type SiguienteAccion =
   | SiguienteAccionCasoReabierto
   | SiguienteAccionResultadoCierre
+  | SiguienteAccionEsperandoRevision
   | SiguienteAccionEntrevistaIaDisponible
   | SiguienteAccionTransversalDisponible
   | SiguienteAccionDeadlineCritico

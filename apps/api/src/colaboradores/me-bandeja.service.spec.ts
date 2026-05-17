@@ -21,6 +21,7 @@ interface PrismaMock {
   }
   curso: { count: ReturnType<typeof vi.fn> }
   historicoEstadoAsignacion: { findMany: ReturnType<typeof vi.fn> }
+  intentoTransversal: { findMany: ReturnType<typeof vi.fn> }
 }
 
 function buildPrismaMock(): PrismaMock {
@@ -33,6 +34,7 @@ function buildPrismaMock(): PrismaMock {
     },
     curso: { count: vi.fn().mockResolvedValue(0) },
     historicoEstadoAsignacion: { findMany: vi.fn().mockResolvedValue([]) },
+    intentoTransversal: { findMany: vi.fn().mockResolvedValue([]) },
   }
 }
 
@@ -334,5 +336,91 @@ describe("MeBandejaService.obtenerBandeja", () => {
     })
     expect(out.novedades).toHaveLength(1)
     expect(out.novedades[0]?.tipoEvento).toBe("ASIGNACION_CURSO")
+  })
+
+  // ---- B-1: ESPERANDO_REVISION ---------------------------------------------
+
+  it("ESPERANDO_REVISION cuando hay un intento transversal EN_EVALUACION del colaborador", async () => {
+    prisma.usuario.findUnique.mockResolvedValueOnce({ colaboradorId: COLAB })
+    prisma.asignacionCurso.findMany
+      .mockResolvedValueOnce([
+        asignacionRow({
+          id: ASIG_1,
+          cursoId: CURSO_1,
+          cursoTitulo: "Java Senior",
+          transversalId: TRANSVERSAL,
+          fechaDeadline: "2026-12-01T00:00:00Z",
+        }),
+      ])
+      .mockResolvedValueOnce([])
+    plan.obtenerPorcentajeAvance.mockResolvedValue(100)
+    evaluarMock.mockResolvedValueOnce({
+      cumple: false,
+      planCompleto: true,
+      // Aunque sea NO_APROBADO no debe ganar TRANSVERSAL_DISPONIBLE: si esta
+      // en revision el participante no tiene que reintentar.
+      transversal: "NO_APROBADO",
+      entrevistaIA: "NO_APLICA",
+      faltantes: [],
+    })
+    prisma.intentoTransversal.findMany.mockResolvedValueOnce([
+      {
+        id: "intento-1",
+        transversalId: TRANSVERSAL,
+        fecha: new Date("2026-05-13T10:00:00Z"),
+      },
+    ])
+
+    const out = await service.obtenerBandeja(USER)
+    expect(out.siguienteAccion).toEqual({
+      tipo: "ESPERANDO_REVISION",
+      asignacionId: ASIG_1,
+      cursoId: CURSO_1,
+      cursoTitulo: "Java Senior",
+      enRevision: "transversal",
+      fechaEnvio: "2026-05-13T10:00:00.000Z",
+    })
+  })
+
+  it("RESULTADO_CIERRE_LISTO gana sobre ESPERANDO_REVISION (prioridad 2 vs 3)", async () => {
+    prisma.usuario.findUnique.mockResolvedValueOnce({ colaboradorId: COLAB })
+    prisma.asignacionCurso.findMany
+      .mockResolvedValueOnce([
+        asignacionRow({
+          id: ASIG_1,
+          cursoId: CURSO_1,
+          transversalId: TRANSVERSAL,
+        }),
+      ])
+      .mockResolvedValueOnce([
+        asignacionRow({
+          id: ASIG_2,
+          cursoId: CURSO_2,
+          cursoEstado: "CERRADO",
+          estadoAsignado: "APTO",
+          fechaCierre: "2026-05-12T10:00:00Z",
+        }),
+      ])
+    prisma.intentoTransversal.findMany.mockResolvedValueOnce([
+      { id: "intento-1", transversalId: TRANSVERSAL, fecha: new Date("2026-05-13T10:00:00Z") },
+    ])
+
+    const out = await service.obtenerBandeja(USER)
+    expect(out.siguienteAccion?.tipo).toBe("RESULTADO_CIERRE_LISTO")
+  })
+
+  it("ignora intentos de transversales que no pertenecen a una asignacion activa", async () => {
+    prisma.usuario.findUnique.mockResolvedValueOnce({ colaboradorId: COLAB })
+    prisma.asignacionCurso.findMany
+      // Asignacion activa sin transversal: no debe matchearse.
+      .mockResolvedValueOnce([asignacionRow({ id: ASIG_1, cursoId: CURSO_1, transversalId: null })])
+      .mockResolvedValueOnce([])
+    plan.obtenerPorcentajeAvance.mockResolvedValue(40)
+    prisma.intentoTransversal.findMany.mockResolvedValueOnce([
+      { id: "intento-x", transversalId: TRANSVERSAL, fecha: new Date("2026-05-13T10:00:00Z") },
+    ])
+
+    const out = await service.obtenerBandeja(USER)
+    expect(out.siguienteAccion?.tipo).not.toBe("ESPERANDO_REVISION")
   })
 })

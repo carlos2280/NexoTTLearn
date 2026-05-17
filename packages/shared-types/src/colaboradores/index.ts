@@ -58,6 +58,7 @@ export type {
   SiguienteAccionContinuarCurso,
   SiguienteAccionDeadlineCritico,
   SiguienteAccionEntrevistaIaDisponible,
+  SiguienteAccionEsperandoRevision,
   SiguienteAccionExplorarVoluntariado,
   SiguienteAccionResultadoCierre,
   SiguienteAccionTransversalDisponible,

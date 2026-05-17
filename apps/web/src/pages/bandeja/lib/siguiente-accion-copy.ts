@@ -1,7 +1,7 @@
 import { RUTAS } from "@/shared/constants/rutas"
-import type { ResultadoCierreVisible } from "@nexott-learn/shared-types"
+import type { ResultadoCierreVisible, SiguienteAccion } from "@nexott-learn/shared-types"
 import { ArrowRight, Award, Clock, Compass, HourglassIcon, RotateCcw, Sparkles } from "lucide-react"
-import type { CopySiguiente, SiguienteAccionConRevision } from "../types"
+import type { CopySiguiente } from "../types"
 
 export interface ContextoAreaCurso {
   readonly areaCodigo: string | null
@@ -25,7 +25,7 @@ export interface ContextoAreaCurso {
  *  - Sin emojis, sin "¡Genial!", sin microcopy gamificado.
  */
 export function obtenerCopy(
-  accion: SiguienteAccionConRevision,
+  accion: SiguienteAccion,
   contextoArea?: ContextoAreaCurso,
 ): CopySiguiente {
   const base = obtenerCopyBase(accion)
@@ -40,7 +40,7 @@ export function obtenerCopy(
   }
 }
 
-function obtenerCopyBase(accion: SiguienteAccionConRevision): CopySiguiente {
+function obtenerCopyBase(accion: SiguienteAccion): CopySiguiente {
   switch (accion.tipo) {
     case "CASO_REABIERTO":
       return {

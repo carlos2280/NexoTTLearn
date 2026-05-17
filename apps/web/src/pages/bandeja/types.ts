@@ -1,26 +1,4 @@
-import type { SiguienteAccion } from "@nexott-learn/shared-types"
 import type { LucideIcon } from "lucide-react"
-
-/**
- * Extensiones LOCALES de tipos oficiales mientras el backend no implementa
- * los campos definidos en `el_viaje_colaborador.md`. Cuando los tickets
- * correspondientes entren a `@nexott-learn/shared-types`, mover y borrar.
- */
-
-// TODO B-1: cuando el backend implemente `ESPERANDO_REVISION`, mover este
-// caso al schema oficial de `SiguienteAccion` y borrar la extensión local.
-export interface SiguienteAccionEsperandoRevision {
-  readonly tipo: "ESPERANDO_REVISION"
-  readonly asignacionId: string
-  readonly cursoId: string
-  readonly cursoTitulo: string
-  /** Qué se está revisando: transversal o entrevista IA. */
-  readonly enRevision: "transversal" | "entrevistaIa"
-  /** ISO. Cuándo se envió a revisión. */
-  readonly fechaEnvio: string
-}
-
-export type SiguienteAccionConRevision = SiguienteAccion | SiguienteAccionEsperandoRevision
 
 /**
  * Atmósfera visual de la carta del siguiente paso. Modula sombra, borde y
