@@ -63,14 +63,12 @@ export function TarjetaCurso({ curso }: TarjetaCursoProps) {
 
       <div className="mt-auto flex items-center justify-between gap-3 pt-1">
         <span className="text-caption text-text-tertiary">
-          {esVoluntario ? "Voluntario" : "Asignado"}
-          <span className="text-text-disabled"> · </span>
           {cerrado ? (
             <span className="text-text-tertiary">Cerrado</span>
           ) : (
             <span className={cn(CLASES_DEADLINE[deadline.tono])}>
               {esVoluntario && deadline.tono === "lejos"
-                ? "ritmo libre"
+                ? "Ritmo libre"
                 : `${deadline.textoFecha} · ${deadline.textoRelativo}`}
             </span>
           )}
