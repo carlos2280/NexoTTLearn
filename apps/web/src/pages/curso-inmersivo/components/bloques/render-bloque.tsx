@@ -12,6 +12,7 @@ import { BloqueParrafo } from "./bloque-parrafo"
 import { BloqueRecurso } from "./bloque-recurso"
 import { BloqueTip } from "./bloque-tip"
 import { BloqueVideo } from "./bloque-video"
+import { EvaluableConColapso } from "./evaluable-con-colapso"
 import { BloqueQuiz } from "./quiz/bloque-quiz"
 
 const NOTA_APROBADO_CODIGO_DEFAULT = 60
@@ -71,13 +72,14 @@ export function RenderBloque({
     case "CODIGO_ILUSTRATIVO":
       return <BloqueCodigoIlustrativo contenido={bloque.contenido} />
     case "QUIZ": {
+      const notaMinima = notaMinimaQuiz(bloque.contenido)
       if (soloLectura) {
         return (
           <BloqueEvaluableCerrado
             bloqueId={bloque.id}
             colaboradorId={colaboradorId}
             titulo="Quiz"
-            notaMinima={notaMinimaQuiz(bloque.contenido)}
+            notaMinima={notaMinima}
           />
         )
       }
@@ -85,12 +87,19 @@ export function RenderBloque({
         return <BloqueEvaluablePreviewLock titulo="Quiz" />
       }
       return (
-        <BloqueQuiz
+        <EvaluableConColapso
           bloqueId={bloque.id}
-          cursoId={cursoId}
           colaboradorId={colaboradorId}
-          contenido={bloque.contenido}
-        />
+          notaMinima={notaMinima}
+          tituloColapsado="Quiz"
+        >
+          <BloqueQuiz
+            bloqueId={bloque.id}
+            cursoId={cursoId}
+            colaboradorId={colaboradorId}
+            contenido={bloque.contenido}
+          />
+        </EvaluableConColapso>
       )
     }
     case "CODIGO_PREGUNTAS": {
@@ -108,13 +117,20 @@ export function RenderBloque({
         return <BloqueEvaluablePreviewLock titulo="Ejercicio de código" />
       }
       return (
-        <BloqueCodigoPreguntas
+        <EvaluableConColapso
           bloqueId={bloque.id}
-          cursoId={cursoId}
           colaboradorId={colaboradorId}
-          contenido={bloque.contenido}
-          contenidoTests={contenidoTests}
-        />
+          notaMinima={NOTA_APROBADO_CODIGO_DEFAULT}
+          tituloColapsado="Ejercicio de código"
+        >
+          <BloqueCodigoPreguntas
+            bloqueId={bloque.id}
+            cursoId={cursoId}
+            colaboradorId={colaboradorId}
+            contenido={bloque.contenido}
+            contenidoTests={contenidoTests}
+          />
+        </EvaluableConColapso>
       )
     }
     case "CODIGO_TESTS":
