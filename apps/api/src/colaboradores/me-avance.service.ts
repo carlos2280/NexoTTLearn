@@ -13,6 +13,11 @@ import { RolAsignacion } from "@prisma/client"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { PlanPersonalService } from "../plan-personal/plan-personal.service"
+import {
+  etiquetaCualitativaPorNota,
+  parseCierreSnapshotMinimo,
+  resolverNotaGlobalFinal,
+} from "./cierre-snapshot.helpers"
 
 /**
  * Fallback de `umbralNoCumple` (cap. 9.1) cuando el curso no lo define
@@ -23,10 +28,6 @@ import { PlanPersonalService } from "../plan-personal/plan-personal.service"
  * global era 50, no el del curso).
  */
 const UMBRAL_NO_CUMPLE_FALLBACK = 10
-
-const UMBRAL_EXCELENCIA_FINAL = 85
-const UMBRAL_SOLIDO_FINAL = 70
-const UMBRAL_DESARROLLO_FINAL = 50
 
 /**
  * `MeAvanceService` — D-S11-C8, cap. 10.7.
@@ -135,18 +136,18 @@ export class MeAvanceService {
       where: { cursoId },
       select: { snapshot: true, descartada: true },
     })
-    const final = extraerNotaFinal(
+    const notaFinal = extraerNotaFinal(
       fotografia?.snapshot ?? null,
       fotografia?.descartada ?? true,
       asignacion.id,
     )
-    if (final === null) {
+    if (notaFinal === null) {
       return base
     }
     return {
       ...base,
-      notaGlobalFinal: final.notaGlobalFinal,
-      etiquetaCualitativaFinal: final.etiquetaCualitativaFinal,
+      notaGlobalFinal: notaFinal.notaGlobalFinal,
+      etiquetaCualitativaFinal: notaFinal.etiquetaCualitativaFinal,
     }
   }
 
@@ -460,48 +461,37 @@ function claseColorPorNota(
   return "rojo"
 }
 
-interface SnapshotConAsignaciones {
-  readonly asignaciones: ReadonlyArray<{
-    readonly asignacionId: string
-    readonly notaGlobalFinal?: number
-  }>
-}
-
-function esSnapshotConAsignaciones(value: unknown): value is SnapshotConAsignaciones {
-  if (value === null || typeof value !== "object") {
-    return false
-  }
-  const asigs = (value as Record<string, unknown>).asignaciones
-  return Array.isArray(asigs)
-}
-
+/**
+ * Extrae `notaGlobalFinal` y `etiquetaCualitativaFinal` del snapshot del
+ * cierre. Usa `parseCierreSnapshotMinimo` (Zod) para validar la forma y
+ * delega en `resolverNotaGlobalFinal` (helper compartido) para que la regla
+ * sea identica a la de `/me/cursos/:id/resumen-cierre`: prefiere la nota
+ * persistida, cae a promedio de obligatorias para snapshots legacy
+ * (BUG-QA-2). Devuelve `null` cuando no hay nota inferible, asi el response
+ * omite ambos campos en lugar de mentir con un 0.
+ */
 function extraerNotaFinal(
   snapshot: unknown,
   descartada: boolean,
   asignacionId: string,
 ): { notaGlobalFinal: number; etiquetaCualitativaFinal: EtiquetaCualitativa } | null {
-  if (descartada || !esSnapshotConAsignaciones(snapshot)) {
+  if (descartada) {
     return null
   }
-  const fila = snapshot.asignaciones.find((a) => a.asignacionId === asignacionId)
-  if (!fila || typeof fila.notaGlobalFinal !== "number") {
+  const parsed = parseCierreSnapshotMinimo(snapshot)
+  if (!parsed) {
+    return null
+  }
+  const fila = parsed.asignaciones.find((a) => a.asignacionId === asignacionId)
+  if (!fila) {
+    return null
+  }
+  const nota = resolverNotaGlobalFinal(fila)
+  if (nota === null) {
     return null
   }
   return {
-    notaGlobalFinal: fila.notaGlobalFinal,
-    etiquetaCualitativaFinal: etiquetaCualitativaPorNota(fila.notaGlobalFinal),
+    notaGlobalFinal: nota,
+    etiquetaCualitativaFinal: etiquetaCualitativaPorNota(nota),
   }
-}
-
-function etiquetaCualitativaPorNota(nota: number): EtiquetaCualitativa {
-  if (nota >= UMBRAL_EXCELENCIA_FINAL) {
-    return "excelencia"
-  }
-  if (nota >= UMBRAL_SOLIDO_FINAL) {
-    return "solido"
-  }
-  if (nota >= UMBRAL_DESARROLLO_FINAL) {
-    return "enDesarrollo"
-  }
-  return "noCumple"
 }

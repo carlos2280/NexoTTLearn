@@ -145,6 +145,96 @@ describe("MeAvanceService.obtenerAvance", () => {
     const r = await service.obtenerAvance(COLAB, CURSO)
     expect(r.etiquetaCualitativaFinal).toBe("solido")
   })
+
+  // BUG-QA-2: snapshots construidos antes de DEUDA-B26-1 no persisten
+  // `notaGlobalFinal`. El endpoint debe caer al promedio de notas (igual que
+  // /me/cursos/:id/resumen-cierre) en lugar de devolver el cierre sin nota.
+  it("snapshot legacy SIN notaGlobalFinal: aplica fallback promedio (BUG-QA-2)", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValueOnce({
+      id: ASIG,
+      rol: RolAsignacion.ASIGNADO,
+      curso: { id: CURSO, estado: "CERRADO" },
+    })
+    prisma.cursoFotografiaCierre.findUnique.mockResolvedValueOnce({
+      descartada: false,
+      snapshot: {
+        versionSnapshot: 1,
+        asignaciones: [
+          {
+            asignacionId: ASIG,
+            // sin notaGlobalFinal
+            notasPorSkill: [
+              { skillId: "s1", notaActual: 90, umbralCumple: 70 },
+              { skillId: "s2", notaActual: 70, umbralCumple: 70 },
+            ],
+          },
+        ],
+      },
+    })
+
+    const response = await service.obtenerAvance(COLAB, CURSO)
+
+    expect(response.estaCerrado).toBe(true)
+    expect(response.notaGlobalFinal).toBe(80) // (90 + 70) / 2
+    expect(response.etiquetaCualitativaFinal).toBe("solido")
+  })
+
+  it("snapshot legacy con caracter: el fallback solo promedia OBLIGATORIAS", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValueOnce({
+      id: ASIG,
+      rol: RolAsignacion.ASIGNADO,
+      curso: { id: CURSO, estado: "CERRADO" },
+    })
+    prisma.cursoFotografiaCierre.findUnique.mockResolvedValueOnce({
+      descartada: false,
+      snapshot: {
+        versionSnapshot: 1,
+        asignaciones: [
+          {
+            asignacionId: ASIG,
+            notasPorSkill: [
+              { skillId: "s1", notaActual: 80, umbralCumple: 70, caracter: "OBLIGATORIA" },
+              { skillId: "s2", notaActual: 60, umbralCumple: 70, caracter: "OBLIGATORIA" },
+              // OPCIONAL con nota alta: NO debe inflar el promedio.
+              { skillId: "s3", notaActual: 100, umbralCumple: 70, caracter: "OPCIONAL" },
+            ],
+          },
+        ],
+      },
+    })
+
+    const response = await service.obtenerAvance(COLAB, CURSO)
+    expect(response.notaGlobalFinal).toBe(70) // (80 + 60) / 2 — OPCIONAL excluida
+  })
+
+  it("snapshot legacy sin notas no nulas: OMITE notaGlobalFinal en el response", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValueOnce({
+      id: ASIG,
+      rol: RolAsignacion.ASIGNADO,
+      curso: { id: CURSO, estado: "CERRADO" },
+    })
+    prisma.cursoFotografiaCierre.findUnique.mockResolvedValueOnce({
+      descartada: false,
+      snapshot: {
+        versionSnapshot: 1,
+        asignaciones: [
+          {
+            asignacionId: ASIG,
+            notasPorSkill: [{ skillId: "s1", notaActual: null, umbralCumple: 70 }],
+          },
+        ],
+      },
+    })
+
+    const response = await service.obtenerAvance(COLAB, CURSO)
+
+    expect(response.estaCerrado).toBe(true)
+    // Sin nota inferible -> el response omite ambos campos en lugar de mentir
+    // con 0 / noCumple (la version /resumen-cierre sí elige 0 por contrato
+    // de ceremonia; aquí la UX es la vista activa, mejor no inventar).
+    expect("notaGlobalFinal" in response).toBe(false)
+    expect("etiquetaCualitativaFinal" in response).toBe(false)
+  })
 })
 
 describe("MeAvanceService.caminoHaciaApto (B-4)", () => {

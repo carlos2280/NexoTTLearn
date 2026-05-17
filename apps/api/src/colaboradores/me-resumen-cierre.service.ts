@@ -1,17 +1,19 @@
 import { ConflictException, Injectable, NotFoundException } from "@nestjs/common"
 import type {
   AreaPorTrabajarCierre,
-  EtiquetaCualitativa,
   ResultadoCierreCurso,
   ResumenCierreCurso,
   SkillCosechadaCierre,
 } from "@nexott-learn/shared-types"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
-
-const UMBRAL_EXCELENCIA_FINAL = 85
-const UMBRAL_SOLIDO_FINAL = 70
-const UMBRAL_DESARROLLO_FINAL = 50
+import {
+  type CierreSnapshot,
+  type NotaSkillSnapshotCierre,
+  etiquetaCualitativaPorNota,
+  parseCierreSnapshot,
+  resolverNotaGlobalFinal,
+} from "./cierre-snapshot.helpers"
 
 /**
  * `MeResumenCierreService` — B-26. Devuelve la "ceremonia" del veredicto para
@@ -78,15 +80,15 @@ export class MeResumenCierreService {
     })
     if (!fotografia || fotografia.descartada) {
       throw new ConflictException({
-        code: apiErrorCodes.conflictCursoNoCerrado,
+        code: apiErrorCodes.snapshotCierreNoDisponible,
         message: "El curso aun no tiene fotografia de cierre disponible.",
       })
     }
 
-    const snapshot = parseSnapshot(fotografia.snapshot)
+    const snapshot = parseCierreSnapshot(fotografia.snapshot)
     if (!snapshot) {
       throw new ConflictException({
-        code: apiErrorCodes.conflictCursoNoCerrado,
+        code: apiErrorCodes.snapshotCierreFormatoNoSoportado,
         message: "La fotografia de cierre tiene un formato no soportado.",
       })
     }
@@ -95,7 +97,7 @@ export class MeResumenCierreService {
     const resultado = filtrarResultadoVisible(fila?.resultadoFinal)
     if (!fila || resultado === null) {
       throw new ConflictException({
-        code: apiErrorCodes.conflictCursoNoCerrado,
+        code: apiErrorCodes.veredictoCierreNoDisponible,
         message: "La asignacion no tiene un veredicto final disponible.",
       })
     }
@@ -119,7 +121,19 @@ export class MeResumenCierreService {
         ? construirAreasPorTrabajar(snapshot, fila.notasPorSkill, skillsMeta)
         : []
 
+    // Si el fallback no encuentra notas validas (snapshot legacy sin nota
+    // persistida y sin notas no nulas) estamos ante un snapshot inconsistente:
+    // hay resultadoFinal explicito pero no hay datos para soportarlo. Antes
+    // mostrabamos 0/noCumple, lo que mentia al usuario ("saque 0" en lugar
+    // de "el sistema no pudo calcular mi nota"). Ahora lanzamos el code
+    // semantico y el front muestra el banner "veredicto no disponible".
     const notaGlobalFinal = resolverNotaGlobalFinal(fila)
+    if (notaGlobalFinal === null) {
+      throw new ConflictException({
+        code: apiErrorCodes.veredictoCierreNoDisponible,
+        message: "La asignacion no tiene un veredicto final disponible.",
+      })
+    }
 
     return {
       cursoId,
@@ -194,86 +208,6 @@ interface SkillConArea {
   readonly area: { readonly id: string; readonly codigo: string; readonly nombre: string }
 }
 
-interface SnapshotCierre {
-  readonly curso: {
-    readonly titulo: string
-    readonly configuracion: {
-      readonly skillsExigidas: readonly { readonly skillId: string }[]
-    }
-  }
-  readonly asignaciones: readonly AsignacionSnapshot[]
-}
-
-interface AsignacionSnapshot {
-  readonly asignacionId: string
-  readonly resultadoFinal: string | null
-  readonly notaGlobalFinal?: number
-  readonly notasPorSkill: readonly NotaSkillSnapshot[]
-}
-
-interface NotaSkillSnapshot {
-  readonly skillId: string
-  readonly notaActual: number | null
-  readonly umbralCumple: number
-  /**
-   * Persistido en snapshots construidos despues del fix DEUDA-B26-1.
-   * Opcional para compat con snapshots anteriores.
-   */
-  readonly caracter?: "OBLIGATORIA" | "OPCIONAL"
-}
-
-function parseSnapshot(value: unknown): SnapshotCierre | null {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    return null
-  }
-  const root = value as Record<string, unknown>
-  const curso = root.curso as Record<string, unknown> | undefined
-  const config = curso?.configuracion as Record<string, unknown> | undefined
-  const skillsExigidas = config?.skillsExigidas
-  const asignaciones = root.asignaciones
-  if (
-    typeof curso?.titulo !== "string" ||
-    !Array.isArray(skillsExigidas) ||
-    !Array.isArray(asignaciones)
-  ) {
-    return null
-  }
-  const asignacionesParsed = asignaciones.filter(esAsignacionSnapshot)
-  return {
-    curso: {
-      titulo: curso.titulo,
-      configuracion: {
-        skillsExigidas: skillsExigidas.filter(esSkillExigidaSnapshot),
-      },
-    },
-    asignaciones: asignacionesParsed,
-  }
-}
-
-function esAsignacionSnapshot(value: unknown): value is AsignacionSnapshot {
-  if (value === null || typeof value !== "object") {
-    return false
-  }
-  const v = value as Record<string, unknown>
-  if (typeof v.asignacionId !== "string") {
-    return false
-  }
-  if (v.resultadoFinal !== null && typeof v.resultadoFinal !== "string") {
-    return false
-  }
-  if (!Array.isArray(v.notasPorSkill)) {
-    return false
-  }
-  return true
-}
-
-function esSkillExigidaSnapshot(value: unknown): value is { readonly skillId: string } {
-  if (value === null || typeof value !== "object") {
-    return false
-  }
-  return typeof (value as Record<string, unknown>).skillId === "string"
-}
-
 function filtrarResultadoVisible(value: string | null | undefined): ResultadoCierreCurso | null {
   if (value === "APTO" || value === "NO_APTO" || value === "COMPLETADO") {
     return value
@@ -281,50 +215,8 @@ function filtrarResultadoVisible(value: string | null | undefined): ResultadoCie
   return null
 }
 
-/**
- * Resuelve `notaGlobalFinal` de una asignacion en el snapshot.
- *
- * Camino principal (snapshots construidos a partir de DEUDA-B26-1):
- * `fila.notaGlobalFinal` viene persistida directamente — fuente de verdad
- * inmutable del veredicto final.
- *
- * Fallback (snapshots anteriores que NO persistian la nota): promedio simple
- * de notas OBLIGATORIAS con `notaActual !== null`. Si el snapshot tampoco
- * tiene `caracter` por nota, cae a todas las notas no nulas. Cuando NO hay
- * notas validas devuelve `0` (la `etiquetaCualitativaFinal` cae a `noCumple`,
- * semantica correcta para snapshots historicos sin nota disponible).
- */
-function resolverNotaGlobalFinal(fila: AsignacionSnapshot): number {
-  if (typeof fila.notaGlobalFinal === "number") {
-    return fila.notaGlobalFinal
-  }
-  const conCaracter = fila.notasPorSkill.some((n) => n.caracter !== undefined)
-  const elegibles = conCaracter
-    ? fila.notasPorSkill.filter((n) => n.caracter === "OBLIGATORIA")
-    : fila.notasPorSkill
-  const valores = elegibles.map((n) => n.notaActual).filter((n): n is number => n !== null)
-  if (valores.length === 0) {
-    return 0
-  }
-  const suma = valores.reduce((acc, n) => acc + n, 0)
-  return Math.round(suma / valores.length)
-}
-
-function etiquetaCualitativaPorNota(nota: number): EtiquetaCualitativa {
-  if (nota >= UMBRAL_EXCELENCIA_FINAL) {
-    return "excelencia"
-  }
-  if (nota >= UMBRAL_SOLIDO_FINAL) {
-    return "solido"
-  }
-  if (nota >= UMBRAL_DESARROLLO_FINAL) {
-    return "enDesarrollo"
-  }
-  return "noCumple"
-}
-
 function construirSkillsDemostradasNuevas(input: {
-  readonly notasPorSkill: readonly NotaSkillSnapshot[]
+  readonly notasPorSkill: readonly NotaSkillSnapshotCierre[]
   readonly skillsMeta: ReadonlyMap<string, SkillConArea>
   readonly ultimaPreviaPorSkill: ReadonlyMap<string, number | null>
 }): readonly SkillCosechadaCierre[] {
@@ -354,8 +246,8 @@ function construirSkillsDemostradasNuevas(input: {
 }
 
 function construirAreasPorTrabajar(
-  snapshot: SnapshotCierre,
-  notas: readonly NotaSkillSnapshot[],
+  snapshot: CierreSnapshot,
+  notas: readonly NotaSkillSnapshotCierre[],
   skillsMeta: ReadonlyMap<string, SkillConArea>,
 ): readonly AreaPorTrabajarCierre[] {
   const notasPorSkill = new Map(notas.map((n) => [n.skillId, n]))

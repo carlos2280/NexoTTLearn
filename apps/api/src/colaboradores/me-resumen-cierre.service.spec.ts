@@ -1,7 +1,19 @@
 import { ConflictException, NotFoundException } from "@nestjs/common"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { MeResumenCierreService } from "./me-resumen-cierre.service"
+
+async function expectConflictWithCode(promise: Promise<unknown>, code: string): Promise<void> {
+  try {
+    await promise
+    throw new Error("Esperaba ConflictException, no se lanzo ninguna excepcion")
+  } catch (error) {
+    expect(error).toBeInstanceOf(ConflictException)
+    const response = (error as ConflictException).getResponse() as { code: string }
+    expect(response.code).toBe(code)
+  }
+}
 
 interface PrismaMock {
   usuario: { findUnique: ReturnType<typeof vi.fn> }
@@ -78,30 +90,32 @@ describe("MeResumenCierreService.obtenerResumenCierre", () => {
     )
   })
 
-  it("409 conflictCursoNoCerrado si el curso no esta cerrado", async () => {
+  it("409 CONFLICT_CURSO_NO_CERRADO si el curso no esta cerrado", async () => {
     prisma.asignacionCurso.findUnique.mockResolvedValueOnce({
       id: ASIG,
       observacionesAdmin: null,
       curso: { id: CURSO, estado: "ACTIVO", fechaInicio: FECHA_INICIO },
     })
-    await expect(service.obtenerResumenCierre(COLAB, CURSO)).rejects.toBeInstanceOf(
-      ConflictException,
+    await expectConflictWithCode(
+      service.obtenerResumenCierre(COLAB, CURSO),
+      apiErrorCodes.conflictCursoNoCerrado,
     )
   })
 
-  it("409 si no hay fotografia de cierre", async () => {
+  it("409 SNAPSHOT_CIERRE_NO_DISPONIBLE si no hay fotografia de cierre", async () => {
     prisma.asignacionCurso.findUnique.mockResolvedValueOnce({
       id: ASIG,
       observacionesAdmin: null,
       curso: { id: CURSO, estado: "CERRADO", fechaInicio: FECHA_INICIO },
     })
     prisma.cursoFotografiaCierre.findUnique.mockResolvedValueOnce(null)
-    await expect(service.obtenerResumenCierre(COLAB, CURSO)).rejects.toBeInstanceOf(
-      ConflictException,
+    await expectConflictWithCode(
+      service.obtenerResumenCierre(COLAB, CURSO),
+      apiErrorCodes.snapshotCierreNoDisponible,
     )
   })
 
-  it("409 si la fotografia esta descartada", async () => {
+  it("409 SNAPSHOT_CIERRE_NO_DISPONIBLE si la fotografia esta descartada", async () => {
     prisma.asignacionCurso.findUnique.mockResolvedValueOnce({
       id: ASIG,
       observacionesAdmin: null,
@@ -116,12 +130,31 @@ describe("MeResumenCierreService.obtenerResumenCierre", () => {
         notasPorSkill: [{ skillId: "s1", notaActual: 90, umbralCumple: 70 }],
       }),
     })
-    await expect(service.obtenerResumenCierre(COLAB, CURSO)).rejects.toBeInstanceOf(
-      ConflictException,
+    await expectConflictWithCode(
+      service.obtenerResumenCierre(COLAB, CURSO),
+      apiErrorCodes.snapshotCierreNoDisponible,
     )
   })
 
-  it("409 si el resultado final es RETIRADO (no es un veredicto visible)", async () => {
+  it("409 SNAPSHOT_CIERRE_FORMATO_NO_SOPORTADO si el snapshot no se puede parsear", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValueOnce({
+      id: ASIG,
+      observacionesAdmin: null,
+      curso: { id: CURSO, estado: "CERRADO", fechaInicio: FECHA_INICIO },
+    })
+    prisma.cursoFotografiaCierre.findUnique.mockResolvedValueOnce({
+      descartada: false,
+      fechaCierre: FECHA_CIERRE,
+      // Snapshot sin la forma esperada: parseSnapshot devuelve null.
+      snapshot: { foo: "bar" },
+    })
+    await expectConflictWithCode(
+      service.obtenerResumenCierre(COLAB, CURSO),
+      apiErrorCodes.snapshotCierreFormatoNoSoportado,
+    )
+  })
+
+  it("409 VEREDICTO_CIERRE_NO_DISPONIBLE si el resultado final es RETIRADO (no visible)", async () => {
     prisma.asignacionCurso.findUnique.mockResolvedValueOnce({
       id: ASIG,
       observacionesAdmin: null,
@@ -136,8 +169,9 @@ describe("MeResumenCierreService.obtenerResumenCierre", () => {
         notasPorSkill: [{ skillId: "s1", notaActual: 90, umbralCumple: 70 }],
       }),
     })
-    await expect(service.obtenerResumenCierre(COLAB, CURSO)).rejects.toBeInstanceOf(
-      ConflictException,
+    await expectConflictWithCode(
+      service.obtenerResumenCierre(COLAB, CURSO),
+      apiErrorCodes.veredictoCierreNoDisponible,
     )
   })
 
@@ -272,6 +306,34 @@ describe("MeResumenCierreService.obtenerResumenCierre", () => {
 
     expect(response.notaGlobalFinal).toBe(80) // (70 + 90) / 2
     expect(response.etiquetaCualitativaFinal).toBe("solido")
+  })
+
+  // IMP-1 (reviewer): cuando hay resultadoFinal explicito pero el snapshot
+  // no tiene notaGlobalFinal NI notas no nulas para promediar, antes
+  // mentiamos con `0/noCumple`. Ahora lanzamos VEREDICTO_CIERRE_NO_DISPONIBLE
+  // para que el front muestre el banner "veredicto no disponible" en sitio.
+  it("409 VEREDICTO_CIERRE_NO_DISPONIBLE: snapshot inconsistente (resultado APTO sin notas validas)", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValueOnce({
+      id: ASIG,
+      observacionesAdmin: null,
+      curso: { id: CURSO, estado: "CERRADO", fechaInicio: FECHA_INICIO },
+    })
+    prisma.cursoFotografiaCierre.findUnique.mockResolvedValueOnce({
+      descartada: false,
+      fechaCierre: FECHA_CIERRE,
+      snapshot: buildSnapshot({
+        resultadoFinal: "APTO",
+        // sin notaGlobalFinal Y todas las notas son null -> no hay nada que promediar
+        skills: [{ skillId: "s1" }],
+        notasPorSkill: [{ skillId: "s1", notaActual: null, umbralCumple: 70 }],
+      }),
+    })
+    prisma.skill.findMany.mockResolvedValueOnce([])
+
+    await expectConflictWithCode(
+      service.obtenerResumenCierre(COLAB, CURSO),
+      apiErrorCodes.veredictoCierreNoDisponible,
+    )
   })
 })
 
