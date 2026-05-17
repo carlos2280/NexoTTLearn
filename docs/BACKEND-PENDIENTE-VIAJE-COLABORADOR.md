@@ -10,7 +10,10 @@
 > **Sprint 1 COMPLETO ✅:** B-2, B-extra.1 (`GET /me/cursos`), B-3
 > (`GET /me/ficha/resumen`), B-6 (`motivoBloqueo` en disponibilidades),
 > B-extra.2 (`esPrimeraAprobacion` + `preguntasFalladas` en intento
-> bloque). Siguiente Sprint 2: B-3 ya hecho, faltan B-4 y B-26.
+> bloque).
+>
+> **Sprint 2 en curso:** B-4 (`caminoHaciaApto.porArea`) ✅ HECHO.
+> Falta B-26 (`GET /me/cursos/:cursoId/resumen-cierre`).
 >
 > **Convenciones API:** todas las rutas bajo `/api/v1/...`. Autenticación
 > por sesión (`req.session`, cookie `nexott.sid`). CSRF doble token
@@ -224,7 +227,7 @@ en `apps/web/src/pages/bandeja/types.ts:39-56`. Al implementar,
 
 <a id="b-4"></a>
 
-## B-4 · `caminoHaciaApto` en `MeAvanceCursoResponse`
+## B-4 · `caminoHaciaApto` en `MeAvanceCursoResponse` — ✅ HECHO (2026-05-17)
 
 **Origen:** `apps/web/src/pages/curso-inmersivo/types.ts:16-35`,
 `apps/web/src/shared/api/mocks/handlers-curso-detalle.ts:439-469`,

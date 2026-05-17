@@ -134,6 +134,135 @@ describe("MeAvanceService.obtenerAvance", () => {
   })
 })
 
+describe("MeAvanceService.caminoHaciaApto (B-4)", () => {
+  let prisma: PrismaMock
+  let plan: PlanServiceMock
+  let service: MeAvanceService
+
+  beforeEach(() => {
+    prisma = buildPrismaMock()
+    plan = buildPlanMock()
+    service = new MeAvanceService(
+      prisma as unknown as PrismaService,
+      plan as unknown as PlanPersonalService,
+    )
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIG,
+      curso: { id: CURSO, estado: "ACTIVO" },
+    })
+  })
+
+  it("sin skills exigidas: faltantesParaApto=0, estaListo=true, porArea vacio", async () => {
+    const response = await service.obtenerAvance(COLAB, CURSO)
+    expect(response.caminoHaciaApto).toEqual({
+      faltantesParaApto: 0,
+      estaListo: true,
+      porArea: [],
+    })
+  })
+
+  it("agrupa por area, clasifica nivel cualitativo y ordena alfabetico", async () => {
+    const areaBackend = { id: "area-back", codigo: "backend", nombre: "Backend" }
+    const areaCloud = { id: "area-cloud", codigo: "cloud", nombre: "Cloud" }
+    const areaData = { id: "area-data", codigo: "data", nombre: "Data" }
+    prisma.cursoSkillExigida.findMany.mockResolvedValueOnce([
+      // Backend: 3 exigidas, 2 demostradas (>= notaMinima) -> enDesarrollo.
+      {
+        skillId: "sk-b1",
+        notaMinima: 70,
+        skill: { id: "sk-b1", etiquetaVisible: "java", area: areaBackend },
+      },
+      {
+        skillId: "sk-b2",
+        notaMinima: 70,
+        skill: { id: "sk-b2", etiquetaVisible: "spring", area: areaBackend },
+      },
+      {
+        skillId: "sk-b3",
+        notaMinima: 70,
+        skill: { id: "sk-b3", etiquetaVisible: "rest", area: areaBackend },
+      },
+      // Cloud: 2 exigidas, 2 demostradas -> solido.
+      {
+        skillId: "sk-c1",
+        notaMinima: 60,
+        skill: { id: "sk-c1", etiquetaVisible: "aws", area: areaCloud },
+      },
+      {
+        skillId: "sk-c2",
+        notaMinima: 60,
+        skill: { id: "sk-c2", etiquetaVisible: "docker", area: areaCloud },
+      },
+      // Data: 2 exigidas, 0 demostradas -> porExplorar.
+      {
+        skillId: "sk-d1",
+        notaMinima: 50,
+        skill: { id: "sk-d1", etiquetaVisible: "sql", area: areaData },
+      },
+      {
+        skillId: "sk-d2",
+        notaMinima: 50,
+        skill: { id: "sk-d2", etiquetaVisible: "etl", area: areaData },
+      },
+    ])
+    prisma.notaSkill.findMany.mockResolvedValueOnce([
+      { skillId: "sk-b1", notaActual: 85 }, // cumple
+      { skillId: "sk-b2", notaActual: 70 }, // cumple (igual al minimo)
+      { skillId: "sk-b3", notaActual: 40 }, // no cumple
+      { skillId: "sk-c1", notaActual: 90 }, // cumple
+      { skillId: "sk-c2", notaActual: 60 }, // cumple
+      { skillId: "sk-d1", notaActual: 30 }, // no cumple
+      // sk-d2 sin nota -> no cumple.
+    ])
+
+    const response = await service.obtenerAvance(COLAB, CURSO)
+
+    expect(response.caminoHaciaApto.faltantesParaApto).toBe(3) // 1 + 0 + 2
+    expect(response.caminoHaciaApto.estaListo).toBe(false)
+    expect(response.caminoHaciaApto.porArea.map((a) => a.areaNombre)).toEqual([
+      "Backend",
+      "Cloud",
+      "Data",
+    ])
+    expect(response.caminoHaciaApto.porArea[0]).toMatchObject({
+      areaCodigo: "backend",
+      skillsExigidas: 3,
+      skillsDemostradas: 2,
+      nivelCualitativo: "enDesarrollo",
+    })
+    expect(response.caminoHaciaApto.porArea[1]).toMatchObject({
+      areaCodigo: "cloud",
+      skillsExigidas: 2,
+      skillsDemostradas: 2,
+      nivelCualitativo: "solido",
+    })
+    expect(response.caminoHaciaApto.porArea[2]).toMatchObject({
+      areaCodigo: "data",
+      skillsExigidas: 2,
+      skillsDemostradas: 0,
+      nivelCualitativo: "porExplorar",
+    })
+  })
+
+  it("todas demostradas: estaListo=true y nivel solido en todas las areas", async () => {
+    const area = { id: "area-x", codigo: "x", nombre: "X" }
+    prisma.cursoSkillExigida.findMany.mockResolvedValueOnce([
+      { skillId: "s1", notaMinima: 50, skill: { id: "s1", etiquetaVisible: "a", area } },
+      { skillId: "s2", notaMinima: 50, skill: { id: "s2", etiquetaVisible: "b", area } },
+    ])
+    prisma.notaSkill.findMany.mockResolvedValueOnce([
+      { skillId: "s1", notaActual: 80 },
+      { skillId: "s2", notaActual: 50 },
+    ])
+
+    const response = await service.obtenerAvance(COLAB, CURSO)
+
+    expect(response.caminoHaciaApto.faltantesParaApto).toBe(0)
+    expect(response.caminoHaciaApto.estaListo).toBe(true)
+    expect(response.caminoHaciaApto.porArea[0]?.nivelCualitativo).toBe("solido")
+  })
+})
+
 describe("MeAvanceService.obtenerAvanceDeUsuario", () => {
   let prisma: PrismaMock
   let plan: PlanServiceMock

@@ -1,8 +1,8 @@
 import { RUTAS } from "@/shared/constants/rutas"
 import { cn } from "@/shared/lib/cn"
+import type { CaminoHaciaApto, CaminoHaciaAptoPorArea } from "@nexott-learn/shared-types"
 import { ArrowRight } from "lucide-react"
 import { Link } from "react-router-dom"
-import type { CaminoHaciaApto, CaminoHaciaAptoPorArea } from "../types"
 
 interface SeccionCaminoHaciaAptoProps {
   readonly camino: CaminoHaciaApto

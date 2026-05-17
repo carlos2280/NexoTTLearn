@@ -10,24 +10,6 @@ import type {
 import { ApiError } from "../api-error"
 import { type MockRequest, defineRoute } from "./router"
 
-// TODO B-4: cuando el backend implemente `caminoHaciaApto.porArea` en
-// `MeAvanceCursoResponse`, borrar este tipo local y usar el oficial.
-interface MockCaminoPorArea {
-  readonly areaId: string
-  readonly areaCodigo: string
-  readonly areaNombre: string
-  readonly skillsExigidas: number
-  readonly skillsDemostradas: number
-  readonly nivelCualitativo: "solido" | "enDesarrollo" | "porExplorar"
-}
-type MockAvanceConCamino = MeAvanceCursoResponse & {
-  readonly caminoHaciaApto: {
-    readonly faltantesParaApto: number
-    readonly estaListo: boolean
-    readonly porArea: readonly MockCaminoPorArea[]
-  }
-}
-
 const RTE_CURSO_DETALLE = /^\/cursos\/([^/?]+)(\?.*)?$/
 const RTE_AVANCE_CURSO = /^\/me\/avance\/cursos\/([^/?]+)(\?.*)?$/
 const RTE_ARBOL_CURSO = /^\/me\/cursos\/([^/?]+)\/arbol(\?.*)?$/
@@ -409,7 +391,7 @@ function buildPlanFallback(asignacionId: string): PlanResponseParticipante {
   }
 }
 
-const AVANCE_JAVA: MockAvanceConCamino = {
+const AVANCE_JAVA: MeAvanceCursoResponse = {
   cursoId: "curso-java-senior",
   estaCerrado: false,
   porcentajeAvance: 62,
@@ -427,7 +409,6 @@ const AVANCE_JAVA: MockAvanceConCamino = {
     moduloId: "mod-java-2",
     titulo: "APIs REST con Spring",
   },
-  // TODO B-4: backend debe devolver este bloque agregado por área (sin skills granulares).
   caminoHaciaApto: {
     faltantesParaApto: 4,
     estaListo: false,
@@ -460,7 +441,7 @@ const AVANCE_JAVA: MockAvanceConCamino = {
   },
 }
 
-const AVANCE_FULLSTACK: MockAvanceConCamino = {
+const AVANCE_FULLSTACK: MeAvanceCursoResponse = {
   cursoId: "curso-fullstack-devops",
   estaCerrado: false,
   porcentajeAvance: 38,
@@ -511,7 +492,7 @@ const AVANCE_FULLSTACK: MockAvanceConCamino = {
   },
 }
 
-function buildAvanceFallback(cursoId: string): MockAvanceConCamino {
+function buildAvanceFallback(cursoId: string): MeAvanceCursoResponse {
   return {
     cursoId,
     estaCerrado: false,
@@ -522,7 +503,6 @@ function buildAvanceFallback(cursoId: string): MockAvanceConCamino {
       { skillId: "sk-x1", etiqueta: "skill.demo", notaActual: 50, claseColor: "amarillo" },
     ],
     siguienteSeccion: null,
-    // TODO B-4: backend debe devolver este bloque agregado por área.
     caminoHaciaApto: {
       faltantesParaApto: 6,
       estaListo: false,
@@ -711,12 +691,12 @@ function handlerCursoDetalle(req: MockRequest): CursoDetalle {
   return CURSOS_DETALLE.get(cursoId) ?? buildCursoFallback(cursoId)
 }
 
-function handlerAvanceCurso(req: MockRequest): MockAvanceConCamino {
+function handlerAvanceCurso(req: MockRequest): MeAvanceCursoResponse {
   const cursoId = extraerId(req.path, RGX_AVANCE_CURSO_ID)
   if (!cursoId) {
     throw new ApiError(404, "NOT_FOUND", "Curso no encontrado")
   }
-  let base: MockAvanceConCamino
+  let base: MeAvanceCursoResponse
   if (cursoId === "curso-java-senior") {
     base = AVANCE_JAVA
   } else if (cursoId === "curso-fullstack-devops") {
@@ -757,9 +737,9 @@ function leerCursosCerrados(): ReadonlySet<string> {
 }
 
 function aplicarCierreSiCorresponde(
-  base: MockAvanceConCamino,
+  base: MeAvanceCursoResponse,
   cursoId: string,
-): MockAvanceConCamino {
+): MeAvanceCursoResponse {
   if (!leerCursosCerrados().has(cursoId)) {
     return base
   }

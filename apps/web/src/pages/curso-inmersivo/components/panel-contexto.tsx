@@ -2,14 +2,14 @@ import { cn } from "@/shared/lib/cn"
 import type {
   DisponibilidadEntrevistaIaResponse,
   DisponibilidadTransversalResponse,
+  MeAvanceCursoResponse,
 } from "@nexott-learn/shared-types"
 import { ArrowRight } from "lucide-react"
-import type { MeAvanceCursoConCamino } from "../types"
 import { SeccionCaminoHaciaApto } from "./seccion-camino-hacia-apto"
 import { SeccionHaciaElCierre } from "./seccion-hacia-el-cierre"
 
 interface PanelContextoProps {
-  readonly avance: MeAvanceCursoConCamino
+  readonly avance: MeAvanceCursoResponse
   readonly transversal: DisponibilidadTransversalResponse | undefined
   readonly entrevistaIa: DisponibilidadEntrevistaIaResponse | undefined
   readonly seccionActivaId: string | null
@@ -60,7 +60,7 @@ export function PanelContexto({
           onClick={() => onIrASiguiente(sugerencia.seccionId)}
         />
       ) : null}
-      {avance.caminoHaciaApto ? <SeccionCaminoHaciaApto camino={avance.caminoHaciaApto} /> : null}
+      <SeccionCaminoHaciaApto camino={avance.caminoHaciaApto} />
       <SeccionHaciaElCierre
         transversal={transversal}
         entrevistaIa={entrevistaIa}
@@ -70,7 +70,7 @@ export function PanelContexto({
   )
 }
 
-function SeccionAvance({ avance }: { readonly avance: MeAvanceCursoConCamino }) {
+function SeccionAvance({ avance }: { readonly avance: MeAvanceCursoResponse }) {
   return (
     <section className="flex flex-col gap-1.5">
       <h3 className="nx-eyebrow text-text-tertiary">Tu avance</h3>

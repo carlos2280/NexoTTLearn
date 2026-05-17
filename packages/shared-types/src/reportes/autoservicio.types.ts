@@ -23,6 +23,39 @@ export interface MeAvanceSiguienteSeccion {
   readonly titulo: string
 }
 
+/**
+ * Nivel cualitativo de un area dentro del camino hacia apto.
+ *
+ *  - `solido`: todas las skills exigidas del area estan demostradas.
+ *  - `enDesarrollo`: al menos una skill demostrada, pero faltan.
+ *  - `porExplorar`: ninguna skill demostrada todavia.
+ */
+export type NivelCaminoHaciaAptoArea = "solido" | "enDesarrollo" | "porExplorar"
+
+export interface CaminoHaciaAptoPorArea {
+  readonly areaId: string
+  readonly areaCodigo: string
+  readonly areaNombre: string
+  readonly skillsExigidas: number
+  readonly skillsDemostradas: number
+  readonly nivelCualitativo: NivelCaminoHaciaAptoArea
+}
+
+/**
+ * Vista agregada **por area** del progreso hacia el veredicto APTO del curso
+ * (decision 03-R2: el participante solo ve areas, no skills granulares).
+ *
+ * Una skill esta "demostrada" cuando `notaActual >= notaMinima` definida en
+ * `CursoSkillExigida` — misma semantica que el chip "verde" de
+ * `MeAvancePorSkill`. `faltantesParaApto` es la suma de skills no demostradas
+ * en todas las areas. Cuando es 0, `estaListo: true`.
+ */
+export interface CaminoHaciaApto {
+  readonly faltantesParaApto: number
+  readonly estaListo: boolean
+  readonly porArea: readonly CaminoHaciaAptoPorArea[]
+}
+
 export interface MeAvanceCursoResponse {
   readonly cursoId: string
   readonly estaCerrado: boolean
@@ -31,6 +64,7 @@ export interface MeAvanceCursoResponse {
   readonly seccionesObligatorias: number
   readonly porSkill: readonly MeAvancePorSkill[]
   readonly siguienteSeccion: MeAvanceSiguienteSeccion | null
+  readonly caminoHaciaApto: CaminoHaciaApto
   readonly notaGlobalFinal?: number
   readonly etiquetaCualitativaFinal?: EtiquetaCualitativa
 }

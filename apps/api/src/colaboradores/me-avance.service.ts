@@ -1,10 +1,13 @@
 import { Injectable, NotFoundException } from "@nestjs/common"
 import type {
+  CaminoHaciaApto,
+  CaminoHaciaAptoPorArea,
   ClaseColorSkill,
   EtiquetaCualitativa,
   MeAvanceCursoResponse,
   MeAvancePorSkill,
   MeAvanceSiguienteSeccion,
+  NivelCaminoHaciaAptoArea,
 } from "@nexott-learn/shared-types"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
@@ -79,7 +82,14 @@ export class MeAvanceService {
 
     const seccionesObligatorias = await this.contarSeccionesObligatorias(asignacion.id)
     const seccionesCompletadas = await this.contarSeccionesCompletadas(asignacion.id)
-    const porSkill = await this.calcularPorSkill(cursoId, colaboradorId)
+    const exigidas = await this.cargarSkillsExigidasConArea(cursoId)
+    const notas = await this.cargarNotasColaborador(
+      colaboradorId,
+      exigidas.map((e) => e.skillId),
+    )
+    const umbralNoCumple = await this.obtenerUmbralNoCumple(cursoId)
+    const porSkill = construirPorSkill(exigidas, notas, umbralNoCumple)
+    const caminoHaciaApto = construirCaminoHaciaApto(exigidas, notas)
     const siguienteSeccion = await this.calcularSiguienteSeccion(asignacion.id)
 
     const base: MeAvanceCursoResponse = {
@@ -90,6 +100,7 @@ export class MeAvanceService {
       seccionesObligatorias,
       porSkill,
       siguienteSeccion,
+      caminoHaciaApto,
     }
 
     if (!estaCerrado) {
@@ -131,49 +142,44 @@ export class MeAvanceService {
     return this.prisma.aperturaSeccion.count({ where: { asignacionId } })
   }
 
-  private async calcularPorSkill(
-    cursoId: string,
-    colaboradorId: string,
-  ): Promise<readonly MeAvancePorSkill[]> {
-    const [curso, exigidas] = await Promise.all([
-      this.prisma.curso.findUnique({
-        where: { id: cursoId },
-        select: { umbralNoCumple: true },
-      }),
-      this.prisma.cursoSkillExigida.findMany({
-        where: { cursoId },
-        select: {
-          skillId: true,
-          notaMinima: true,
-          skill: { select: { id: true, etiquetaVisible: true } },
+  private cargarSkillsExigidasConArea(cursoId: string): Promise<readonly SkillExigidaConArea[]> {
+    return this.prisma.cursoSkillExigida.findMany({
+      where: { cursoId },
+      select: {
+        skillId: true,
+        notaMinima: true,
+        skill: {
+          select: {
+            id: true,
+            etiquetaVisible: true,
+            area: { select: { id: true, codigo: true, nombre: true } },
+          },
         },
-      }),
-    ])
-    if (exigidas.length === 0) {
-      return []
-    }
-    const umbralNoCumple = curso?.umbralNoCumple
-      ? Number(curso.umbralNoCumple.toString())
-      : UMBRAL_NO_CUMPLE_FALLBACK
-    const notas = await this.prisma.notaSkill.findMany({
-      where: {
-        colaboradorId,
-        skillId: { in: exigidas.map((e) => e.skillId) },
       },
+    })
+  }
+
+  private cargarNotasColaborador(
+    colaboradorId: string,
+    skillIds: readonly string[],
+  ): Promise<readonly NotaSkillRaw[]> {
+    if (skillIds.length === 0) {
+      return Promise.resolve([])
+    }
+    return this.prisma.notaSkill.findMany({
+      where: { colaboradorId, skillId: { in: [...skillIds] } },
       select: { skillId: true, notaActual: true },
     })
-    return exigidas.map((exigida) => {
-      const nota = notas.find((n) => n.skillId === exigida.skillId)
-      const notaActual =
-        nota?.notaActual === null || nota?.notaActual === undefined ? null : Number(nota.notaActual)
-      const notaMinima = Number(exigida.notaMinima.toString())
-      return {
-        skillId: exigida.skillId,
-        etiqueta: exigida.skill.etiquetaVisible,
-        notaActual,
-        claseColor: claseColorPorNota(notaActual, notaMinima, umbralNoCumple),
-      }
+  }
+
+  private async obtenerUmbralNoCumple(cursoId: string): Promise<number> {
+    const curso = await this.prisma.curso.findUnique({
+      where: { id: cursoId },
+      select: { umbralNoCumple: true },
     })
+    return curso?.umbralNoCumple
+      ? Number(curso.umbralNoCumple.toString())
+      : UMBRAL_NO_CUMPLE_FALLBACK
   }
 
   private async calcularSiguienteSeccion(
@@ -223,6 +229,121 @@ export class MeAvanceService {
       titulo: pendiente.seccion.titulo,
     }
   }
+}
+
+interface SkillExigidaConArea {
+  readonly skillId: string
+  readonly notaMinima: { toString(): string }
+  readonly skill: {
+    readonly id: string
+    readonly etiquetaVisible: string
+    readonly area: { readonly id: string; readonly codigo: string; readonly nombre: string }
+  }
+}
+
+interface NotaSkillRaw {
+  readonly skillId: string
+  readonly notaActual: { toString(): string } | null
+}
+
+function notaActualNumero(nota: NotaSkillRaw | undefined): number | null {
+  if (!nota || nota.notaActual === null || nota.notaActual === undefined) {
+    return null
+  }
+  return Number(nota.notaActual.toString())
+}
+
+function construirPorSkill(
+  exigidas: readonly SkillExigidaConArea[],
+  notas: readonly NotaSkillRaw[],
+  umbralNoCumple: number,
+): readonly MeAvancePorSkill[] {
+  if (exigidas.length === 0) {
+    return []
+  }
+  const notasPorSkill = new Map(notas.map((n) => [n.skillId, n]))
+  return exigidas.map((exigida) => {
+    const notaActual = notaActualNumero(notasPorSkill.get(exigida.skillId))
+    const notaMinima = Number(exigida.notaMinima.toString())
+    return {
+      skillId: exigida.skillId,
+      etiqueta: exigida.skill.etiquetaVisible,
+      notaActual,
+      claseColor: claseColorPorNota(notaActual, notaMinima, umbralNoCumple),
+    }
+  })
+}
+
+/**
+ * Construye el agregado `caminoHaciaApto` por area (B-4, decision 03-R2).
+ *
+ * Una skill se considera DEMOSTRADA cuando `notaActual >= notaMinima` definida
+ * en `CursoSkillExigida` — misma semantica que el chip "verde" de
+ * `MeAvancePorSkill`. Las areas se ordenan alfabeticamente por `areaNombre`
+ * (determinista; el frontend no impone orden).
+ */
+function construirCaminoHaciaApto(
+  exigidas: readonly SkillExigidaConArea[],
+  notas: readonly NotaSkillRaw[],
+): CaminoHaciaApto {
+  if (exigidas.length === 0) {
+    return { faltantesParaApto: 0, estaListo: true, porArea: [] }
+  }
+  const notasPorSkill = new Map(notas.map((n) => [n.skillId, n]))
+  interface Acumulador {
+    areaId: string
+    areaCodigo: string
+    areaNombre: string
+    exigidas: number
+    demostradas: number
+  }
+  const porArea = new Map<string, Acumulador>()
+  for (const exigida of exigidas) {
+    const area = exigida.skill.area
+    const entry = porArea.get(area.id) ?? {
+      areaId: area.id,
+      areaCodigo: area.codigo,
+      areaNombre: area.nombre,
+      exigidas: 0,
+      demostradas: 0,
+    }
+    entry.exigidas += 1
+    const notaActual = notaActualNumero(notasPorSkill.get(exigida.skillId))
+    const notaMinima = Number(exigida.notaMinima.toString())
+    if (notaActual !== null && notaActual >= notaMinima) {
+      entry.demostradas += 1
+    }
+    porArea.set(area.id, entry)
+  }
+  const items: CaminoHaciaAptoPorArea[] = [...porArea.values()]
+    .sort((a, b) => a.areaNombre.localeCompare(b.areaNombre))
+    .map((acc) => ({
+      areaId: acc.areaId,
+      areaCodigo: acc.areaCodigo,
+      areaNombre: acc.areaNombre,
+      skillsExigidas: acc.exigidas,
+      skillsDemostradas: acc.demostradas,
+      nivelCualitativo: nivelCualitativoArea(acc.demostradas, acc.exigidas),
+    }))
+  const faltantesParaApto = items.reduce(
+    (acc, item) => acc + (item.skillsExigidas - item.skillsDemostradas),
+    0,
+  )
+  return {
+    faltantesParaApto,
+    estaListo: faltantesParaApto === 0,
+    porArea: items,
+  }
+}
+
+function nivelCualitativoArea(demostradas: number, exigidas: number): NivelCaminoHaciaAptoArea {
+  if (demostradas >= exigidas) {
+    return "solido"
+  }
+  if (demostradas === 0) {
+    return "porExplorar"
+  }
+  return "enDesarrollo"
 }
 
 /**
