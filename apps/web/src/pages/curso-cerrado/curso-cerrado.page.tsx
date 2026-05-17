@@ -3,6 +3,8 @@ import { useResumenCierre } from "@/features/me/hooks/use-resumen-cierre"
 import { Banner } from "@/shared/components/ui/banner"
 import { Navigate, useParams } from "react-router-dom"
 import { AccionesCierre } from "./components/acciones-cierre"
+import { AreasPorTrabajar } from "./components/areas-por-trabajar"
+import { ComentarioAdminCard } from "./components/comentario-admin-card"
 import { CosechaSkills } from "./components/cosecha-skills"
 import { HeroVeredicto } from "./components/hero-veredicto"
 
@@ -34,7 +36,13 @@ export function CursoCerradoPage() {
               resultado={data.resultado}
               etiquetaCualitativa={data.etiquetaCualitativaFinal}
             />
+            {data.comentarioAdmin ? (
+              <ComentarioAdminCard comentario={data.comentarioAdmin} />
+            ) : null}
             <CosechaSkills skills={data.skillsDemostradasNuevas} />
+            {data.resultado === "NO_APTO" ? (
+              <AreasPorTrabajar areas={data.areasPorTrabajar} />
+            ) : null}
             <AccionesCierre cursoId={data.cursoId} />
           </>
         ) : null}

@@ -20,7 +20,7 @@ export function HeroVeredicto({
   const ease: [number, number, number, number] = [0.16, 1, 0.3, 1]
   const esApto = resultado === "APTO"
   const colorEstado = colorDeEtiquetaCualitativa(etiquetaCualitativa)
-  const frase = esApto ? fraseVeredicto(etiquetaCualitativa) : "Aun no apto"
+  const frase = fraseVeredicto(resultado, etiquetaCualitativa)
 
   return (
     <header className="relative flex flex-col items-center gap-8 text-center">

@@ -589,6 +589,7 @@ const RESUMEN_CIERRE_DEFAULT: ResumenCierreCurso = {
 }
 
 const RESUMENES_CIERRE: Readonly<Record<string, ResumenCierreCurso>> = {
+  // Caso APTO limpio (sin comentario admin). Excelencia + 4 skills cosechadas.
   "curso-fullstack-devops": {
     cursoId: "curso-fullstack-devops",
     cursoTitulo: "Fundamentos Full-Stack & DevOps",
@@ -624,6 +625,72 @@ const RESUMENES_CIERRE: Readonly<Record<string, ResumenCierreCurso>> = {
     ],
     areasPorTrabajar: [],
     comentarioAdmin: null,
+  },
+  // Caso APTO + comentario admin. Solido, 2 skills cosechadas.
+  "curso-java-senior": {
+    cursoId: "curso-java-senior",
+    cursoTitulo: "Java Senior",
+    fechaCierre: diasDesdeHoy(-2),
+    resultado: "APTO",
+    etiquetaCualitativaFinal: "solido",
+    notaGlobalFinal: 78,
+    skillsDemostradasNuevas: [
+      {
+        skillId: "sk-be-python",
+        skillNombre: "Diseno OO avanzado",
+        areaCodigo: "backend",
+        areaNombre: "Backend",
+      },
+      {
+        skillId: "sk-be-fastapi",
+        skillNombre: "Patrones de concurrencia",
+        areaCodigo: "backend",
+        areaNombre: "Backend",
+      },
+    ],
+    areasPorTrabajar: [],
+    comentarioAdmin:
+      "Solido manejo de los fundamentos. Te recomiendo profundizar en testing E2E para tu proxima asignacion.",
+  },
+  // Caso NO_APTO + comentario admin. En desarrollo, skills cosechadas igual
+  // (cada paso suma) + areas a profundizar.
+  "curso-cierre-no-apto": {
+    cursoId: "curso-cierre-no-apto",
+    cursoTitulo: "AMS Frontend + Backend Django",
+    fechaCierre: diasDesdeHoy(-1),
+    resultado: "NO_APTO",
+    etiquetaCualitativaFinal: "enDesarrollo",
+    notaGlobalFinal: 62,
+    skillsDemostradasNuevas: [
+      {
+        skillId: "sk-be-django",
+        skillNombre: "Django REST Framework",
+        areaCodigo: "backend",
+        areaNombre: "Backend",
+      },
+      {
+        skillId: "sk-fe-react",
+        skillNombre: "Tanstack Query",
+        areaCodigo: "frontend",
+        areaNombre: "Frontend",
+      },
+    ],
+    areasPorTrabajar: [
+      {
+        areaId: "area-backend",
+        areaNombre: "Backend",
+        areaCodigo: "backend",
+        nivelCualitativo: "enDesarrollo",
+      },
+      {
+        areaId: "area-qa",
+        areaNombre: "Testing",
+        areaCodigo: "qa",
+        nivelCualitativo: "inicial",
+      },
+    ],
+    comentarioAdmin:
+      "Buenas bases en backend, pero falta consolidar testing y la integracion frontend con el flujo asincrono. Repasa el modulo 3 antes de la proxima evaluacion.",
   },
 }
 
