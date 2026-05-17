@@ -36,11 +36,14 @@ export function PreguntaItem({
         mostrarSolucion={mostrarSolucion}
       />
       {mostrarSolucion && pregunta.explicacion ? (
-        <aside
-          className="rounded-xl border border-border bg-subtle p-3 text-body-sm text-text-secondary"
-          // biome-ignore lint/security/noDangerouslySetInnerHtml: explicación del admin, sanitizada.
-          dangerouslySetInnerHTML={{ __html: sanitizarHtml(pregunta.explicacion) }}
-        />
+        <aside className="flex flex-col gap-1.5 rounded-xl border border-border bg-subtle p-3">
+          <span className="nx-eyebrow text-text-tertiary">Por qué esto es correcto</span>
+          <div
+            className="text-body-sm text-text-secondary"
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: explicación del admin, sanitizada.
+            dangerouslySetInnerHTML={{ __html: sanitizarHtml(pregunta.explicacion) }}
+          />
+        </aside>
       ) : null}
     </li>
   )
