@@ -26,21 +26,34 @@ export function MfaActivarDialog({ abierto, onCambiarAbierto }: MfaActivarDialog
   const iniciar = useIniciarMfaSetup()
   const habilitar = useHabilitarMfa()
 
+  // Dispara el setup al abrir. `iniciar` y `habilitar` cambian de referencia
+  // en cada render (objetos de Tanstack Query); meterlos en deps + llamar a
+  // `reset()` causaba loop infinito. Usamos solo los flags primitivos como
+  // triggers — los metodos se leen siempre por referencia actual.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: triggers primitivos, no reads de iniciar/habilitar.
   useEffect(() => {
-    if (abierto && !setupData && !iniciar.isPending) {
-      iniciar
-        .mutateAsync()
-        .then(setSetupData)
-        .catch(() => undefined)
+    if (!(abierto && !setupData && !iniciar.isPending)) {
+      return
     }
-    if (!abierto) {
-      setSetupData(null)
-      setCodigo("")
-      setErrorCodigo(null)
-      iniciar.reset()
-      habilitar.reset()
+    iniciar
+      .mutateAsync()
+      .then(setSetupData)
+      .catch(() => undefined)
+  }, [abierto, setupData, iniciar.isPending])
+
+  // Limpia al cerrar — corre SOLO cuando `abierto` cambia. Mismo motivo que
+  // arriba para no meter `iniciar`/`habilitar` en deps.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: limpieza ligada solo al cierre del dialog.
+  useEffect(() => {
+    if (abierto) {
+      return
     }
-  }, [abierto, setupData, iniciar, habilitar])
+    setSetupData(null)
+    setCodigo("")
+    setErrorCodigo(null)
+    iniciar.reset()
+    habilitar.reset()
+  }, [abierto])
 
   const errorSetup = iniciar.error instanceof ApiError ? iniciar.error : null
   const errorHabilitar = habilitar.error instanceof ApiError ? habilitar.error : null
