@@ -73,6 +73,9 @@ function QuizActivo({ bloqueId, cursoId, colaboradorId, contenido }: QuizActivoP
   const totalContestadas = respuestas.contestadas
   const total = contenido.preguntas.length
   const completo = totalContestadas === total
+  // B-extra.2 punto 4: el server devuelve las falladas del ultimo intento;
+  // el cliente solo las indexa para lookup O(1) en cada PreguntaItem.
+  const preguntasFalladasSet = ultimoIntento ? new Set(ultimoIntento.preguntasFalladas) : undefined
 
   const onEnviar = (): void => {
     setUltimoIntento(null)
@@ -116,6 +119,7 @@ function QuizActivo({ bloqueId, cursoId, colaboradorId, contenido }: QuizActivoP
             respuestas={respuestas}
             bloqueado={crear.isPending}
             mostrarSolucion={mostrarSolucion}
+            preguntasFalladas={preguntasFalladasSet}
           />
         ))}
       </ol>

@@ -7,10 +7,10 @@
 > **Estado al 2026-05-17:** 9 deudas (B-1 … B-26 + B-extra). 21 referencias
 > en código frontend.
 >
-> **Sprint 1 en marcha:** B-2 ✅, B-extra.1 ✅ (`GET /me/cursos`),
-> B-3 ✅ (`GET /me/ficha/resumen`), B-6 ✅ (`motivoBloqueo` en
-> disponibilidades transversal y entrevista IA). Pendientes Sprint 1:
-> B-extra.2.
+> **Sprint 1 COMPLETO ✅:** B-2, B-extra.1 (`GET /me/cursos`), B-3
+> (`GET /me/ficha/resumen`), B-6 (`motivoBloqueo` en disponibilidades),
+> B-extra.2 (`esPrimeraAprobacion` + `preguntasFalladas` en intento
+> bloque). Siguiente Sprint 2: B-3 ya hecho, faltan B-4 y B-26.
 >
 > **Convenciones API:** todas las rutas bajo `/api/v1/...`. Autenticación
 > por sesión (`req.session`, cookie `nexott.sid`). CSRF doble token
@@ -623,7 +623,20 @@ declara skills (defensivo).
 
 ---
 
-### B-extra.2 · Corrección server-side del QUIZ + persistencia del mejor intento
+### B-extra.2 · Corrección server-side del QUIZ + persistencia del mejor intento — ✅ HECHO (2026-05-17)
+
+**Estado al implementar:** puntos 1 (corrección server-side) y 2 (persistencia
+mejor intento) ya existían en el backend (`calcularNotaQuiz` +
+`recalcularMejorIntento`). Implementados los dos "recomendados":
+- **Punto 3 (`esPrimeraAprobacion`):** `crear()` ahora calcula y emite el
+  campo en la respuesta del POST. Solo presente para QUIZ
+  (`CODIGO_PREGUNTAS` no tiene `notaMinima`). El frontend ya no necesita
+  snapshotear `mejor.data` antes del POST.
+- **Punto 4 (`preguntasFalladas`):** `calcularNotaQuiz` devuelve la lista de
+  ids fallidos; se persiste en nueva columna `intentos_bloque.preguntas_falladas`
+  (migración `20260517122625_intentos_bloque_preguntas_falladas`) y viaja en
+  todas las respuestas (POST + GET mejor-intento + listados). El frontend
+  borra `lib-correccion-cliente.ts` y consume el set del server.
 
 **Origen:** `apps/web/src/shared/api/mocks/handlers-intentos-bloque.ts`.
 

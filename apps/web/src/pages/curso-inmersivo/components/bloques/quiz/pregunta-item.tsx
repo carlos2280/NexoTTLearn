@@ -1,6 +1,5 @@
 import { sanitizarHtml } from "@/shared/lib/sanitize-html"
 import type { PreguntaQuiz } from "@nexott-learn/shared-types"
-import { esPreguntaAcertada } from "./lib-correccion-cliente"
 import { QuizPreguntaOpcionMultiple } from "./quiz-pregunta-opcion-multiple"
 import { QuizPreguntaOpcionUnica } from "./quiz-pregunta-opcion-unica"
 import { QuizPreguntaRespuestaCorta } from "./quiz-pregunta-respuesta-corta"
@@ -13,6 +12,13 @@ interface PreguntaItemProps {
   readonly respuestas: UseQuizRespuestasResult
   readonly bloqueado: boolean
   readonly mostrarSolucion: boolean
+  /**
+   * B-extra.2 punto 4: ids de preguntas falladas tal como vinieron del server
+   * en el ultimo intento. Si `undefined`, no hay intento aun y se trata todo
+   * como "no fallado" (no se muestra cierre pedagogico — coherente con el
+   * modo "antes de enviar").
+   */
+  readonly preguntasFalladas?: ReadonlySet<string>
 }
 
 export function PreguntaItem({
@@ -21,12 +27,18 @@ export function PreguntaItem({
   respuestas,
   bloqueado,
   mostrarSolucion,
+  preguntasFalladas,
 }: PreguntaItemProps) {
   // 04 R7 + decision opcion B: cuando el participante ACERTO la pregunta, no
   // mostramos la marca verde ni la explicacion — su atencion se foca en lo
   // que aun no domino (cumplido se desvanece). Solo en las falladas
   // aparece la solucion + el "Por que esto es correcto".
-  const acertada = mostrarSolucion && esPreguntaAcertada(pregunta, respuestas)
+  //
+  // La membresia en `preguntasFalladas` la decide el server (B-extra.2): el
+  // cliente ya no recomputa la correccion para no divergir de la logica
+  // canonica del backend.
+  const acertada =
+    mostrarSolucion && preguntasFalladas !== undefined && !preguntasFalladas.has(pregunta.id)
   const mostrarSolucionEstaPregunta = mostrarSolucion && !acertada
 
   return (

@@ -82,14 +82,23 @@ export function calcularNotaQuiz(
   )
   let puntosObtenidos = 0
   let puntosTotales = 0
+  // B-extra.2 punto 4: pregunta fallida == no acertada AL 100%. Una
+  // pregunta sin respuesta tambien cuenta como fallida. Una acertada
+  // parcialmente (OPCION_MULTIPLE con `puntuacionParcial`) tambien — la
+  // marca pedagogica es binaria.
+  const preguntasFalladasIds: string[] = []
   for (const pregunta of contenido.preguntas) {
     puntosTotales += pregunta.pesoPunto
     const respuesta = respuestasPorPregunta.get(pregunta.id)
     if (respuesta === undefined) {
+      preguntasFalladasIds.push(pregunta.id)
       continue
     }
     const fraccion = evaluarPregunta(pregunta, respuesta)
     puntosObtenidos += pregunta.pesoPunto * fraccion
+    if (fraccion < 1) {
+      preguntasFalladasIds.push(pregunta.id)
+    }
   }
   if (puntosTotales === 0) {
     throw new InternalServerErrorException({
@@ -101,7 +110,12 @@ export function calcularNotaQuiz(
   const nota = Math.round(notaRaw * 100) / 100
   // Redondeo de puntosObtenidos a 4 decimales para evitar IEEE-754 noise.
   const puntosObtenidosRedondeados = Math.round(puntosObtenidos * 10_000) / 10_000
-  return { nota, puntosObtenidos: puntosObtenidosRedondeados, puntosTotales }
+  return {
+    nota,
+    puntosObtenidos: puntosObtenidosRedondeados,
+    puntosTotales,
+    preguntasFalladasIds,
+  }
 }
 
 /**
@@ -222,6 +236,13 @@ function normalizarTexto(valor: string, reglas: NormalizacionRespuestaCorta): st
 /**
  * Mapper `IntentoSeleccionado -> IntentoBloqueResponse`. Convierte la nota
  * `Prisma.Decimal` a `number` y serializa la fecha como ISO 8601.
+ *
+ * `preguntasFalladas` se persiste como JSONB en la BD; aqui se valida en
+ * runtime que sea un array de strings y se devuelve `[]` en cualquier
+ * otro caso (defensivo).
+ *
+ * `esPrimeraAprobacion` solo lo emite `crear()` — el caller lo agrega al
+ * objeto final. En lecturas (mejor-intento, listados) se omite.
  */
 export function toIntentoResponse(intento: IntentoSeleccionado): {
   readonly intentoId: string
@@ -233,6 +254,7 @@ export function toIntentoResponse(intento: IntentoSeleccionado): {
   readonly versionBloque: number
   readonly estaInvalidado: boolean
   readonly fecha: string
+  readonly preguntasFalladas: readonly string[]
 } {
   return {
     intentoId: intento.id,
@@ -244,5 +266,13 @@ export function toIntentoResponse(intento: IntentoSeleccionado): {
     versionBloque: intento.versionBloque,
     estaInvalidado: intento.estaInvalidado,
     fecha: intento.fecha.toISOString(),
+    preguntasFalladas: extraerPreguntasFalladas(intento.preguntasFalladas),
   }
+}
+
+function extraerPreguntasFalladas(valor: Prisma.JsonValue | null): readonly string[] {
+  if (!Array.isArray(valor)) {
+    return []
+  }
+  return valor.filter((v): v is string => typeof v === "string")
 }

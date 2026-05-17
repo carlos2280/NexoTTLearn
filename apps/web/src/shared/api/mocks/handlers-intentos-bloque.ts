@@ -49,35 +49,46 @@ function normalizarTexto(valor: string): string {
     .replace(RGX_ESPACIOS_DOBLES, " ")
 }
 
-function corregirQuiz(bloqueId: string, respuestas: readonly RespuestaPreguntaPayload[]): number {
+interface CorreccionQuiz {
+  readonly nota: number
+  readonly preguntasFalladasIds: readonly string[]
+}
+
+function corregirQuiz(
+  bloqueId: string,
+  respuestas: readonly RespuestaPreguntaPayload[],
+): CorreccionQuiz {
   const bloque = SEED_BLOQUES.find((b) => b.id === bloqueId)
   if (!bloque) {
-    return 0
+    return { nota: 0, preguntasFalladasIds: [] }
   }
   const parsed = contenidoQuizSchema.safeParse(bloque.contenido)
   if (!parsed.success) {
-    return 0
+    return { nota: 0, preguntasFalladasIds: [] }
   }
   const preguntas = parsed.data.preguntas
   if (preguntas.length === 0) {
-    return 0
+    return { nota: 0, preguntasFalladasIds: [] }
   }
 
   const respuestasPorId = new Map(respuestas.map((r) => [r.preguntaId, r]))
   const pesoTotal = preguntas.reduce((acc, p) => acc + (p.pesoPunto ?? 1), 0)
   let pesoAcertado = 0
+  const preguntasFalladasIds: string[] = []
 
   for (const pregunta of preguntas) {
     const respuesta = respuestasPorId.get(pregunta.id)
-    if (!respuesta) {
-      continue
-    }
-    if (esRespuestaCorrecta(pregunta, respuesta)) {
+    if (respuesta && esRespuestaCorrecta(pregunta, respuesta)) {
       pesoAcertado += pregunta.pesoPunto ?? 1
+    } else {
+      preguntasFalladasIds.push(pregunta.id)
     }
   }
 
-  return Math.round((pesoAcertado / pesoTotal) * 100)
+  return {
+    nota: Math.round((pesoAcertado / pesoTotal) * 100),
+    preguntasFalladasIds,
+  }
 }
 
 type PreguntaParseada = ReturnType<typeof contenidoQuizSchema.parse>["preguntas"][number]
@@ -122,19 +133,28 @@ function esRespuestaCorrecta(
   }
 }
 
-function calcularNota(body: BodyCrearIntento): number {
+interface NotaCalculada {
+  readonly nota: number
+  readonly preguntasFalladas: readonly string[]
+}
+
+function calcularNota(body: BodyCrearIntento): NotaCalculada {
   const r = body.respuestas
   if (!r) {
-    return 0
+    return { nota: 0, preguntasFalladas: [] }
   }
   if (r.tipo === "CODIGO_PREGUNTAS" && r.resultadosTests && r.resultadosTests.length > 0) {
     const pasados = r.resultadosTests.filter((t) => t.paso).length
-    return Math.round((pasados / r.resultadosTests.length) * 100)
+    return {
+      nota: Math.round((pasados / r.resultadosTests.length) * 100),
+      preguntasFalladas: [],
+    }
   }
   if (r.tipo === "QUIZ" && r.preguntas) {
-    return corregirQuiz(body.bloqueId, r.preguntas)
+    const c = corregirQuiz(body.bloqueId, r.preguntas)
+    return { nota: c.nota, preguntasFalladas: c.preguntasFalladasIds }
   }
-  return 0
+  return { nota: 0, preguntasFalladas: [] }
 }
 
 function intentoIdAleatorio(): string {
@@ -148,7 +168,7 @@ function handlerCrearIntento(req: MockRequest): IntentoBloqueResponse {
   if (!isBodyCrearIntento(req.body)) {
     throw new ApiError(400, "BODY_INVALIDO", "El body del intento es invalido.")
   }
-  const nota = calcularNota(req.body)
+  const { nota, preguntasFalladas } = calcularNota(req.body)
   const previo = mejoresPorBloque.get(req.body.bloqueId)
   const esMejorIntento = !previo || nota > previo.nota
   const intento: IntentoBloqueResponse = {
@@ -161,6 +181,7 @@ function handlerCrearIntento(req: MockRequest): IntentoBloqueResponse {
     versionBloque: 1,
     estaInvalidado: false,
     fecha: new Date().toISOString(),
+    preguntasFalladas,
   }
   if (esMejorIntento) {
     mejoresPorBloque.set(req.body.bloqueId, intento)

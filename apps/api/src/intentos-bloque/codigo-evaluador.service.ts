@@ -125,7 +125,7 @@ export class CodigoEvaluadorService {
     const notaRaw = (puntosObtenidos / puntosTotales) * 100
     const nota = Math.round(notaRaw * 100) / 100
     return {
-      calculo: { nota, puntosObtenidos, puntosTotales },
+      calculo: { nota, puntosObtenidos, puntosTotales, preguntasFalladasIds: [] },
       resultadosTests,
       lenguaje,
     }

@@ -590,6 +590,60 @@ describe("IntentosBloqueService.crear — mejor intento y NotaSkill", () => {
     )
   })
 
+  it("B-extra.2 punto 3: esPrimeraAprobacion=true si el intento aprueba y el mejor previo no aprobaba", async () => {
+    configurarBloqueOk(prisma)
+    prisma.intentoBloque.create.mockResolvedValue(makeIntento({ nota: 100, id: "nuevo" }))
+    prisma.intentoBloque.findFirst.mockResolvedValueOnce({
+      id: "anterior",
+      nota: new Prisma.Decimal(40), // CONTENIDO_QUIZ_OK tiene notaMinima 60.
+    })
+    prisma.intentoBloque.findUniqueOrThrow.mockResolvedValue(
+      makeIntento({ nota: 100, esMejorIntento: true, id: "nuevo" }),
+    )
+    const r = await service.crear({
+      body: { bloqueId: BLOQUE_ID, cursoId: CURSO_ID, respuestas: RESPUESTAS_TODAS_CORRECTAS },
+      idempotencyKey: IDEMPOTENCY_KEY,
+      usuario: PARTICIPANTE,
+    })
+    expect(r.body.esPrimeraAprobacion).toBe(true)
+  })
+
+  it("B-extra.2 punto 3: esPrimeraAprobacion=false cuando el mejor previo ya aprobaba", async () => {
+    configurarBloqueOk(prisma)
+    prisma.intentoBloque.create.mockResolvedValue(makeIntento({ nota: 100, id: "nuevo" }))
+    prisma.intentoBloque.findFirst.mockResolvedValueOnce({
+      id: "anterior",
+      nota: new Prisma.Decimal(80), // ya superaba el umbral 60.
+    })
+    prisma.intentoBloque.findUniqueOrThrow.mockResolvedValue(
+      makeIntento({ nota: 100, esMejorIntento: true, id: "nuevo" }),
+    )
+    const r = await service.crear({
+      body: { bloqueId: BLOQUE_ID, cursoId: CURSO_ID, respuestas: RESPUESTAS_TODAS_CORRECTAS },
+      idempotencyKey: IDEMPOTENCY_KEY,
+      usuario: PARTICIPANTE,
+    })
+    expect(r.body.esPrimeraAprobacion).toBe(false)
+  })
+
+  it("B-extra.2 punto 4: persiste preguntasFalladas en la BD para QUIZ", async () => {
+    configurarBloqueOk(prisma)
+    prisma.intentoBloque.create.mockResolvedValue(makeIntento({ nota: 0, id: "nuevo" }))
+    prisma.intentoBloque.findFirst.mockResolvedValueOnce(null)
+    prisma.intentoBloque.findUniqueOrThrow.mockResolvedValue(
+      makeIntento({ nota: 0, esMejorIntento: true, id: "nuevo" }),
+    )
+    await service.crear({
+      body: { bloqueId: BLOQUE_ID, cursoId: CURSO_ID, respuestas: RESPUESTAS_NINGUNA },
+      idempotencyKey: IDEMPOTENCY_KEY,
+      usuario: PARTICIPANTE,
+    })
+    const createCall = prisma.intentoBloque.create.mock.calls[0]?.[0] as {
+      data: { preguntasFalladas: unknown }
+    }
+    expect(createCall.data.preguntasFalladas).toEqual(["p1", "p2", "p3"])
+  })
+
   it("delega el calculo de NotaSkill al motor unificado recalcularConFuentes", async () => {
     // FIX-P8-cierre §5.115: el service ya no escribe `notaActual` directo; el
     // calculo D33 (70/20/10 + D35) lo hace `NotaSkillService.recalcularConFuentes`.
