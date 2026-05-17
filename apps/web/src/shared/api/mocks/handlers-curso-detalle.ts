@@ -791,14 +791,50 @@ function handlerDispTransversal(req: MockRequest): MockDispTransversal {
   }
 }
 
+const RAZON_OVERRIDE_KEY = "nexott-mock:entrevista-ia-razon"
+const RAZONES_VALIDAS = new Set([
+  "DISPONIBLE",
+  "PLAN_INCOMPLETO",
+  "TRANSVERSAL_NO_APROBADO",
+  "FECHA_NO_ALCANZADA",
+  "RATE_LIMIT_HORA",
+  "INTENTO_EN_CURSO",
+  "ENTREVISTA_IA_NO_CONFIGURADA",
+])
+
+type RazonDisp = MockDispEntrevistaIa["razon"]
+
+function leerOverrideRazonEntrevista(): RazonDisp | null {
+  if (typeof window === "undefined") {
+    return null
+  }
+  const raw = window.localStorage.getItem(RAZON_OVERRIDE_KEY)
+  if (raw && RAZONES_VALIDAS.has(raw)) {
+    return raw as RazonDisp
+  }
+  return null
+}
+
 function handlerDispEntrevistaIa(_req: MockRequest): MockDispEntrevistaIa {
+  const override = leerOverrideRazonEntrevista()
+  if (override) {
+    return construirDisp(override)
+  }
+  // Default: bloqueada por transversal — la entrevista se desbloquea cuando
+  // el participante aprueba el transversal. F1 deja "DISPONIBLE" detras del
+  // override hasta que el cableado real con intentos lo conecte automaticamente.
+  return construirDisp("TRANSVERSAL_NO_APROBADO")
+}
+
+function construirDisp(razon: RazonDisp): MockDispEntrevistaIa {
+  const disponible = razon === "DISPONIBLE"
   return {
-    disponible: false,
-    razon: "PLAN_INCOMPLETO",
-    intentosUsadosHoy: 0,
+    disponible,
+    razon,
+    intentosUsadosHoy: razon === "RATE_LIMIT_HORA" ? 5 : 0,
     maxPorHora: 5,
     // TODO B-6: backend debe devolver `motivoBloqueo` para no hardcodear copy en cliente.
-    motivoBloqueo: "Aprueba el proyecto transversal",
+    motivoBloqueo: disponible ? null : null,
   }
 }
 

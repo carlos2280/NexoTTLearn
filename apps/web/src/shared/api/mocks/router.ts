@@ -4,6 +4,7 @@ import { handlersAuth } from "./handlers-auth"
 import { handlersBloques } from "./handlers-bloques"
 import { handlersCatalogo } from "./handlers-catalogo"
 import { handlersCursoDetalle } from "./handlers-curso-detalle"
+import { handlersEntrevistaIa } from "./handlers-entrevista-ia"
 import { handlersIntentosBloque } from "./handlers-intentos-bloque"
 import { handlersParticipante } from "./handlers-participante"
 import { handlersPersonas } from "./handlers-personas"
@@ -38,6 +39,7 @@ const routes: RouteEntry[] = [
   ...handlersCursoDetalle,
   ...handlersIntentosBloque,
   ...handlersTransversal,
+  ...handlersEntrevistaIa,
 ]
 
 const MOCK_LATENCY_MS = 280
