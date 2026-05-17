@@ -909,6 +909,49 @@ Confirmado como aceptable por el usuario el 2026-05-17 (no urgente).
 
 ---
 
+### BUG-CIERRE-1 · Pantalla `/cursos/:id/cerrado` no maneja 409 `CONFLICT_CURSO_NO_CERRADO`
+
+**Detectado:** 2026-05-17 navegando a
+`/cursos/dd000000-0000-0000-0000-000000000002/cerrado` desde el
+viaje del colaborador.
+
+**Síntomas:**
+- El backend responde correctamente `409 CONFLICT_CURSO_NO_CERRADO`
+  cuando la pantalla "cierre" se abre para un curso que aún no está
+  cerrado (`GET /me/cursos/:cursoId/resumen-cierre`).
+- El frontend muestra el banner genérico
+  `"No pudimos cargar el cierre del curso. Reintenta en un momento."`
+  — mensaje engañoso (reintentar no cambia el estado, el curso
+  literalmente no está cerrado todavía).
+
+**Causa raíz:** la pantalla `curso-cerrado.page.tsx` (o el hook que
+consume `/me/cursos/:cursoId/resumen-cierre`) trata cualquier error
+de la query como "fallo de carga reintenta", sin diferenciar el caso
+semántico de "el curso no está cerrado".
+
+**Opciones de fix:**
+
+1. **Redirigir** a `/cursos/:cursoId` (vista activa) cuando el error
+   sea `CONFLICT_CURSO_NO_CERRADO`. El usuario llegó por un link
+   stale o un bookmark y debe ver el curso normal.
+2. **Mensaje específico** en lugar del genérico: "Este curso aún no
+   está cerrado. Vuelve cuando el cierre esté disponible." + CTA
+   "Ir al curso".
+3. **Defensa upstream**: el componente/link que lleva a `/cerrado`
+   debería gatearse por `curso.estado === CERRADO` y nunca enviar al
+   usuario aquí si no aplica.
+
+**Recomendación:** 3 (defensa primaria) + 1 (defensa secundaria si
+alguien llega de igual). Mensaje genérico actual = bug.
+
+**Pistas para retomar:**
+- `apps/web/src/pages/curso-cerrado/curso-cerrado.page.tsx`.
+- Hook que consume el endpoint — buscar `useResumenCierre` o similar.
+- El backend YA distingue el caso (`CONFLICT_CURSO_NO_CERRADO`); el
+  frontend solo necesita capturarlo.
+
+---
+
 ## Para el próximo agente de QA / refactor
 
 Después de cerrar el sprint B-N, hay material para un pase de calidad:
