@@ -47,7 +47,6 @@ export function CanvasEntrevistaIa({ cursoId, asignacionId }: CanvasEntrevistaIa
         {disponibilidad.data.disponible ? (
           <VistaBriefEntrevistaIa
             entrevista={entrevista.data}
-            disponibilidad={disponibilidad.data}
             onEmpezar={() => {
               // F2: aqui llamamos POST /asignaciones/:id/intentos-entrevista-ia
               // y conmutamos a la vista 2 (chat).
