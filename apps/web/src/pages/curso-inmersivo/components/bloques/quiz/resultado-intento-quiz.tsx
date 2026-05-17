@@ -1,15 +1,30 @@
 import { cn } from "@/shared/lib/cn"
 import type { ContenidoQuiz, IntentoBloqueResponse } from "@nexott-learn/shared-types"
-import { CheckCircle2, XCircle } from "lucide-react"
+import { CheckCircle2, RotateCcw } from "lucide-react"
 
 interface ResultadoIntentoQuizProps {
   readonly intento: IntentoBloqueResponse
   readonly notaMinima: number
+  /**
+   * Mejor intento *previo* al actual. Sirve para distinguir entre "primera vez
+   * que apruebas" (banner caluroso) y "ya estabas aprobado y reintentaste"
+   * (banner sobrio). `null` si nunca habia intentado.
+   */
+  readonly mejorPrevio: IntentoBloqueResponse | null
 }
 
-export function ResultadoIntentoQuiz({ intento, notaMinima }: ResultadoIntentoQuizProps) {
+export function ResultadoIntentoQuiz({
+  intento,
+  notaMinima,
+  mejorPrevio,
+}: ResultadoIntentoQuizProps) {
   const aprobado = intento.nota >= notaMinima
-  const Icono = aprobado ? CheckCircle2 : XCircle
+  const yaEstabaAprobado = (mejorPrevio?.nota ?? -1) >= notaMinima
+  const primeraVez = aprobado && !yaEstabaAprobado
+
+  const Icono = aprobado ? CheckCircle2 : RotateCcw
+  const mensaje = construirMensaje({ aprobado, primeraVez })
+
   return (
     <aside
       className={cn(
@@ -21,22 +36,21 @@ export function ResultadoIntentoQuiz({ intento, notaMinima }: ResultadoIntentoQu
         className={cn("mt-0.5 h-5 w-5 shrink-0", aprobado ? "text-success" : "text-warmth")}
         aria-hidden={true}
       />
-      <div className="flex flex-col gap-1">
-        <p
-          className={cn("text-body-sm", aprobado ? "text-success-on-soft" : "text-warning-on-soft")}
-        >
-          {aprobado
-            ? `Aprobado · ${intento.nota.toFixed(0)} / 100. Tu mejor intento ahora cuenta para tu nota de skill.`
-            : `Intento registrado · ${intento.nota.toFixed(0)} / 100. Sigue intentando — la mejor nota gana.`}
-        </p>
-        {intento.esMejorIntento ? (
-          <p className="font-mono text-[10px] text-text-tertiary uppercase tracking-wider">
-            Nuevo mejor intento
-          </p>
-        ) : null}
-      </div>
+      <p className={cn("text-body-sm", aprobado ? "text-success-on-soft" : "text-warning-on-soft")}>
+        {mensaje}
+      </p>
     </aside>
   )
+}
+
+function construirMensaje(args: { aprobado: boolean; primeraVez: boolean }): string {
+  if (args.primeraVez) {
+    return "Lo lograste. Acabas de demostrar capacidad nueva."
+  }
+  if (args.aprobado) {
+    return "Aprobado. Tu mejor intento sigue contando."
+  }
+  return "Aún no. Tienes intentos ilimitados — la mejor cuenta."
 }
 
 export function decidirMostrarSolucion(

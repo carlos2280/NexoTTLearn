@@ -1,12 +1,15 @@
+import { useMejorIntentoBloque } from "@/features/intentos-bloque/hooks/use-mejor-intento-bloque"
 import { Button } from "@/shared/components/ui/button"
 import { CodeEditorNexott } from "@/shared/components/ui/code-editor-nexott"
 import { cn } from "@/shared/lib/cn"
 import {
   type ContenidoCodigoPreguntas,
   type ContenidoCodigoTests,
+  type IntentoBloqueResponse,
   contenidoCodigoPreguntasSchema,
 } from "@nexott-learn/shared-types"
 import { Play, RotateCcw, Send } from "lucide-react"
+import { useState } from "react"
 import { Cabecera } from "./codigo-preguntas/cabecera"
 import { PanelEnunciado } from "./codigo-preguntas/panel-enunciado"
 import { ResultadoIntento } from "./codigo-preguntas/resultado-intento"
@@ -16,6 +19,7 @@ import { useFlujoCodigoPregunta } from "./codigo-preguntas/use-flujo-codigo-preg
 interface BloqueCodigoPreguntasProps {
   readonly bloqueId: string
   readonly cursoId: string
+  readonly colaboradorId: string | null
   readonly contenido: Record<string, unknown> | null
   readonly contenidoTests: ContenidoCodigoTests | null
 }
@@ -78,6 +82,7 @@ function derivarEstadoEditor(input: {
 export function BloqueCodigoPreguntas({
   bloqueId,
   cursoId,
+  colaboradorId,
   contenido,
   contenidoTests,
 }: BloqueCodigoPreguntasProps) {
@@ -89,6 +94,7 @@ export function BloqueCodigoPreguntas({
     <RetoActivo
       bloqueId={bloqueId}
       cursoId={cursoId}
+      colaboradorId={colaboradorId}
       contenido={parsed.data}
       contenidoTests={contenidoTests}
     />
@@ -98,12 +104,28 @@ export function BloqueCodigoPreguntas({
 interface RetoActivoProps {
   readonly bloqueId: string
   readonly cursoId: string
+  readonly colaboradorId: string | null
   readonly contenido: ContenidoCodigoPreguntas
   readonly contenidoTests: ContenidoCodigoTests | null
 }
 
-function RetoActivo({ bloqueId, cursoId, contenido, contenidoTests }: RetoActivoProps) {
+function RetoActivo({
+  bloqueId,
+  cursoId,
+  colaboradorId,
+  contenido,
+  contenidoTests,
+}: RetoActivoProps) {
   const flujo = useFlujoCodigoPregunta({ bloqueId, cursoId, contenido, contenidoTests })
+  const mejor = useMejorIntentoBloque({
+    colaboradorId: colaboradorId ?? undefined,
+    bloqueId,
+  })
+  const [mejorPrevioAlEnviar, setMejorPrevioAlEnviar] = useState<IntentoBloqueResponse | null>(null)
+  const onEnviar = (): void => {
+    setMejorPrevioAlEnviar(mejor.data ?? null)
+    flujo.enviar()
+  }
   const isPending = flujo.isEjecutando || flujo.isEnviando
   const puedeReset = !isPending && flujo.codigo !== contenido.esqueletoInicial
   const tieneCodigo = flujo.codigo.trim().length > 0
@@ -156,7 +178,7 @@ function RetoActivo({ bloqueId, cursoId, contenido, contenidoTests }: RetoActivo
             <Button
               size="sm"
               variant={todosLosTestsPasaron ? "aurora" : "primary"}
-              onClick={flujo.enviar}
+              onClick={onEnviar}
               disabled={!puedeAccionar}
             >
               <Send className="mr-1.5 h-3 w-3" aria-hidden={true} />
@@ -172,7 +194,11 @@ function RetoActivo({ bloqueId, cursoId, contenido, contenidoTests }: RetoActivo
         </aside>
       ) : null}
       {flujo.ultimoIntento ? (
-        <ResultadoIntento intento={flujo.ultimoIntento} notaAprobado={NOTA_APROBADO_DEFAULT} />
+        <ResultadoIntento
+          intento={flujo.ultimoIntento}
+          notaAprobado={NOTA_APROBADO_DEFAULT}
+          mejorPrevio={mejorPrevioAlEnviar}
+        />
       ) : null}
     </article>
   )

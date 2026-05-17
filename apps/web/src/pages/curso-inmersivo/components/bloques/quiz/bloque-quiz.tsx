@@ -55,6 +55,9 @@ function QuizActivo({ bloqueId, cursoId, colaboradorId, contenido }: QuizActivoP
   const mejor = useMejorIntentoBloque({ colaboradorId, bloqueId })
   const crear = useCrearIntentoBloque()
   const [ultimoIntento, setUltimoIntento] = useState<IntentoBloqueResponse | null>(null)
+  // Snapshot del mejor previo en el momento del envío. Sirve para distinguir
+  // "primera vez que apruebas" en el banner sin contaminar el cache de Tanstack.
+  const [mejorPrevioAlEnviar, setMejorPrevioAlEnviar] = useState<IntentoBloqueResponse | null>(null)
 
   const aprobado = (mejor.data?.nota ?? -1) >= contenido.notaMinima
   const mostrarSolucion = decidirMostrarSolucion(
@@ -68,6 +71,7 @@ function QuizActivo({ bloqueId, cursoId, colaboradorId, contenido }: QuizActivoP
 
   const onEnviar = (): void => {
     setUltimoIntento(null)
+    setMejorPrevioAlEnviar(mejor.data ?? null)
     crear.mutate(
       {
         body: {
@@ -111,11 +115,15 @@ function QuizActivo({ bloqueId, cursoId, colaboradorId, contenido }: QuizActivoP
         ))}
       </ol>
       {ultimoIntento ? (
-        <ResultadoIntentoQuiz intento={ultimoIntento} notaMinima={contenido.notaMinima} />
+        <ResultadoIntentoQuiz
+          intento={ultimoIntento}
+          notaMinima={contenido.notaMinima}
+          mejorPrevio={mejorPrevioAlEnviar}
+        />
       ) : null}
       <footer className="flex items-center justify-between gap-3 border-border border-t pt-4">
         <p className="text-caption text-text-tertiary">
-          Contestadas {totalContestadas}/{total} · Aprobar con ≥ {contenido.notaMinima}
+          Contestadas {totalContestadas} de {total}.
         </p>
         <div className="flex items-center gap-2">
           {ultimoIntento ? (

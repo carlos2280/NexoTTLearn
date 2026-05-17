@@ -111,6 +111,7 @@ export function RenderBloque({
         <BloqueCodigoPreguntas
           bloqueId={bloque.id}
           cursoId={cursoId}
+          colaboradorId={colaboradorId}
           contenido={bloque.contenido}
           contenidoTests={contenidoTests}
         />
