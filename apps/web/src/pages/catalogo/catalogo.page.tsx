@@ -21,10 +21,8 @@ export function CatalogoPage() {
   return (
     <div className="mx-auto flex max-w-[1180px] flex-col gap-8 px-6 py-10">
       <header className="flex flex-col gap-1.5">
-        <span className="nx-eyebrow text-aurora-violet">Aprende por tu cuenta</span>
-        <h1 className="text-h1 text-text-primary">
-          Catálogo<span className="text-aurora-violet">.</span>
-        </h1>
+        <span className="nx-eyebrow text-text-tertiary">Aprende por tu cuenta</span>
+        <h1 className="text-h1 text-text-primary">Catálogo</h1>
         <p className="max-w-2xl text-body text-text-secondary">
           Cursos abiertos a voluntariado. Explora cada uno y, si te suma, inscríbete por iniciativa
           propia. Suman a tu ficha; no cuentan para el reporte de un cliente.
