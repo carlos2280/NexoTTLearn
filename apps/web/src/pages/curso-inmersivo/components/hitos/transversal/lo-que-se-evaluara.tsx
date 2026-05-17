@@ -1,18 +1,25 @@
 import type { TransversalResponse } from "@nexott-learn/shared-types"
 
+type CapaVisible = "tests" | "cualitativa"
+
 interface LoQueSeEvaluaraProps {
   readonly capasActivas: TransversalResponse["capasActivas"]
 }
 
 interface CapaItem {
-  readonly clave: keyof TransversalResponse["capasActivas"]
+  readonly clave: CapaVisible
   readonly titulo: string
   readonly descripcion: string
 }
 
 /**
- * Texto fijo del sistema para describir las 3 capas (no del admin — decision
- * 2026-05-15 spec 05). Solo se renderizan las capas activas del transversal.
+ * Texto fijo del sistema para describir las capas que el participante VE
+ * (no del admin — decision 2026-05-15 spec 05).
+ *
+ * NOTA producto (2026-05-16): la capa `comprension` del modelo NO se expone
+ * al participante. El transversal evalua codigo (tests + calidad). La
+ * conversacion del cierre vive en la Entrevista IA (pantalla 06) cuando el
+ * curso la tiene configurada; si no, el transversal aprobado cierra solo.
  */
 const CAPAS: readonly CapaItem[] = [
   {
@@ -24,11 +31,6 @@ const CAPAS: readonly CapaItem[] = [
     clave: "cualitativa",
     titulo: "Calidad del codigo",
     descripcion: "Evaluacion cualitativa de buenas practicas.",
-  },
-  {
-    clave: "comprension",
-    titulo: "Comprension",
-    descripcion: "Conversacion corta sobre tu solucion.",
   },
 ]
 
