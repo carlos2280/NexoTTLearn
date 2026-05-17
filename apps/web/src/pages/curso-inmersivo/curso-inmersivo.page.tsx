@@ -214,6 +214,7 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
             seccionActivaId={seccionActivaId}
             onIrASiguiente={onSeleccionarSeccion}
             onAbrirHito={onAbrirHito}
+            atenuado={modoFocus}
           />
         ) : null}
       </div>

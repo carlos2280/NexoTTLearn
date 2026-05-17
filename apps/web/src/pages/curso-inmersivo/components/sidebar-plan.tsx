@@ -61,7 +61,7 @@ export function SidebarPlan({
   atenuado,
 }: SidebarPlanProps) {
   const claseAtenuado = atenuado
-    ? "pointer-events-none opacity-30 blur-[1px] transition-[opacity,filter] duration-cinematic ease-default"
+    ? "pointer-events-none opacity-15 blur-[2px] transition-[opacity,filter] duration-cinematic ease-default"
     : "transition-[opacity,filter] duration-cinematic ease-default"
   if (modo === "asignado" && !soloLectura && errorPlan && (!plan || plan.items.length === 0)) {
     return (

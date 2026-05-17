@@ -1,4 +1,5 @@
 import { useEnviarTurnoEntrevistaIa } from "@/features/entrevista-ia/hooks/use-enviar-turno-entrevista-ia"
+import { ConfirmDialog } from "@/shared/components/ui/confirm-dialog"
 import type {
   IntentoEntrevistaIaParticipanteResponse,
   TurnoEntrevistaIa,
@@ -13,10 +14,16 @@ import { IndicadorEscribiendo } from "./indicador-escribiendo"
 import { InputEntrevista } from "./input-entrevista"
 import { MensajeEvaluador } from "./mensaje-evaluador"
 import { MensajeUsuario } from "./mensaje-usuario"
+import { useSalirEntrevista } from "./use-salir-entrevista"
 import { VistaCierreStub } from "./vista-cierre-stub"
 
 interface ChatEntrevistaIaProps {
   readonly intentoInicial: IntentoEntrevistaIaParticipanteResponse
+  /**
+   * Permite al participante salir de la entrevista (vuelve al brief). El intento
+   * en curso queda registrado — en F3 el backend decide si cuenta en cuota.
+   */
+  readonly onSalir?: () => void
 }
 
 /**
@@ -28,7 +35,7 @@ interface ChatEntrevistaIaProps {
  * Cuando la IA cierra (finalizado=true), pasa a `VistaCierreStub` (vistas
  * 3a/3b reales en F3).
  */
-export function ChatEntrevistaIa({ intentoInicial }: ChatEntrevistaIaProps) {
+export function ChatEntrevistaIa({ intentoInicial, onSalir }: ChatEntrevistaIaProps) {
   const [turnos, setTurnos] = useState<readonly TurnoEntrevistaIa[]>(intentoInicial.transcripcion)
   const [finalizado, setFinalizado] = useState(intentoInicial.estado === "FINALIZADO")
   const [aprobado, setAprobado] = useState(intentoInicial.aprobado === true)
@@ -38,6 +45,9 @@ export function ChatEntrevistaIa({ intentoInicial }: ChatEntrevistaIaProps) {
   )
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const enviar = useEnviarTurnoEntrevistaIa()
+
+  const puedeSalir = onSalir !== undefined && !finalizado
+  const salir = useSalirEntrevista({ habilitado: puedeSalir, onSalir })
 
   // Auto-scroll al fondo cuando cambian los turnos o aparece "escribiendo".
   // `turnos.length` y `enviar.isPending` son triggers, no se leen dentro.
@@ -102,7 +112,11 @@ export function ChatEntrevistaIa({ intentoInicial }: ChatEntrevistaIaProps) {
   return (
     <main className="relative flex flex-1 flex-col overflow-hidden bg-canvas">
       <AtmosferaAurora />
-      <CabeceraChat inicioISO={intentoInicial.fecha} activa={!finalizado} />
+      <CabeceraChat
+        inicioISO={intentoInicial.fecha}
+        activa={!finalizado}
+        onSalir={puedeSalir ? salir.pedirSalir : undefined}
+      />
       <div ref={scrollRef} className="relative flex-1 overflow-y-auto px-6 py-8">
         <div className="mx-auto flex max-w-2xl flex-col gap-7">
           {turnos.map((turno, idx) =>
@@ -120,6 +134,16 @@ export function ChatEntrevistaIa({ intentoInicial }: ChatEntrevistaIaProps) {
         </div>
       </div>
       <InputEntrevista onEnviar={onEnviarMensaje} deshabilitado={enviar.isPending || finalizado} />
+      <ConfirmDialog
+        abierto={salir.confirmacionAbierta}
+        onCambiarAbierto={salir.setConfirmacionAbierta}
+        titulo="¿Salir de la entrevista?"
+        descripcion="Este intento quedará registrado. Podrás volver a intentarlo más adelante."
+        textoConfirmar="Salir"
+        variante="primary"
+        enviando={false}
+        onConfirmar={salir.confirmarSalir}
+      />
     </main>
   )
 }

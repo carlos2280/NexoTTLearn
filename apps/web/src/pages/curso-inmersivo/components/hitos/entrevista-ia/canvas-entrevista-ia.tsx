@@ -61,7 +61,9 @@ export function CanvasEntrevistaIa({
   }
 
   if (intentoActivo) {
-    return <ChatEntrevistaIa intentoInicial={intentoActivo} />
+    return (
+      <ChatEntrevistaIa intentoInicial={intentoActivo} onSalir={() => setIntentoActivo(null)} />
+    )
   }
 
   if (!disponibilidad.data.disponible) {

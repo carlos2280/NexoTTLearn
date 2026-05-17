@@ -1,3 +1,4 @@
+import { cn } from "@/shared/lib/cn"
 import { ArrowRight } from "lucide-react"
 import type {
   DisponibilidadEntrevistaIaConMotivo,
@@ -14,6 +15,11 @@ interface PanelContextoProps {
   readonly seccionActivaId: string | null
   readonly onIrASiguiente: (seccionId: string) => void
   readonly onAbrirHito: (hito: "transversal" | "entrevistaIa") => void
+  /**
+   * Modo focus de la entrevista IA: atenua el panel derecho para que el chat
+   * tenga foco absoluto (V3 de F2 spec 06, completado en F2.5).
+   */
+  readonly atenuado?: boolean
 }
 
 /**
@@ -34,12 +40,19 @@ export function PanelContexto({
   seccionActivaId,
   onIrASiguiente,
   onAbrirHito,
+  atenuado,
 }: PanelContextoProps) {
   const sugerencia = avance.siguienteSeccion
   const mostrarSugerencia = sugerencia !== null && sugerencia.seccionId !== seccionActivaId
 
   return (
-    <aside className="flex flex-col gap-6 overflow-y-auto border-border border-l bg-surface px-5 py-6">
+    <aside
+      className={cn(
+        "flex flex-col gap-6 overflow-y-auto border-border border-l bg-surface px-5 py-6",
+        "transition-[opacity,filter] duration-cinematic ease-default",
+        atenuado ? "pointer-events-none opacity-15 blur-[2px]" : "",
+      )}
+    >
       <SeccionAvance avance={avance} />
       {mostrarSugerencia ? (
         <SeccionSugerencia

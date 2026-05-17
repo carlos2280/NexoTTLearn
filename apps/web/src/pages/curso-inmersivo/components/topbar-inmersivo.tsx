@@ -60,7 +60,7 @@ export function TopbarInmersivo({
       className={cn(
         "flex items-center gap-4 border-border border-b bg-surface px-6 py-3",
         "transition-[opacity,filter] duration-cinematic ease-default",
-        atenuado ? "pointer-events-none opacity-30 blur-[1px]" : "",
+        atenuado ? "pointer-events-none opacity-15 blur-[2px]" : "",
       )}
       style={{ boxShadow: "var(--shadow-sm)" }}
     >
