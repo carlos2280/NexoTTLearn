@@ -233,6 +233,78 @@ function buscarIntentoEnLista(intentoId: string): {
   return { idx, intento }
 }
 
+/**
+ * Intentos "historicos" pre-poblados. Permiten que el timeline de /mi-ficha
+ * tenga eventos `ENTREVISTA_IA` con `referenciaIntentoIaId` apuntando a un
+ * intento que el drawer "Releer la entrevista" puede recuperar via GET — sin
+ * tener que correr una entrevista real primero en el demo.
+ *
+ * Cuando el backend este listo, esto desaparece y los eventos del historial
+ * vienen con los intentos reales del usuario.
+ */
+const ID_HISTORICO_JAVA = "00000000-0000-4000-c000-0001fa5e1001"
+
+const INTENTOS_HISTORICOS: ReadonlyMap<string, IntentoEntrevistaIaParticipanteResponse> = new Map([
+  [
+    ID_HISTORICO_JAVA,
+    {
+      intentoId: ID_HISTORICO_JAVA,
+      estado: "FINALIZADO" as const,
+      fecha: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      aprobado: true,
+      anulado: false,
+      notaGlobal: 84,
+      notasPorArea: [],
+      transcripcion: [
+        {
+          rol: "ASISTENTE",
+          mensaje:
+            "Cuentame sobre el patron Vertical Slice Architecture y cuando lo usarias en un proyecto Java.",
+          timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          rol: "COLABORADOR",
+          mensaje:
+            "VSA organiza el codigo por feature en vez de por capa tecnica. Lo uso cuando el dominio tiene flujos independientes y quiero evitar acoplar todo en `services/`. En Java con Spring lo aterrizo con paquetes por feature, cada uno con su controller, service y repository.",
+          timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 90_000).toISOString(),
+        },
+        {
+          rol: "ASISTENTE",
+          mensaje:
+            "Bien. Tu argumento es solido. Ahora dime: que ventajas concretas le ves frente a la arquitectura tradicional en capas?",
+          timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 120_000).toISOString(),
+        },
+        {
+          rol: "COLABORADOR",
+          mensaje:
+            "Tres principalmente: aislamiento de cambios (un feature nuevo no obliga a tocar capas compartidas), facilidad para eliminar codigo cuando un feature deja de tener sentido, y onboarding mas rapido porque cada carpeta cuenta su historia.",
+          timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 210_000).toISOString(),
+        },
+        {
+          rol: "ASISTENTE",
+          mensaje:
+            "Interesante. Cuando hablamos de transacciones distribuidas, prefieres saga o 2PC? Justifica.",
+          timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 240_000).toISOString(),
+        },
+        {
+          rol: "COLABORADOR",
+          mensaje:
+            "Saga por defecto. 2PC bloquea recursos y no escala bien en microservicios. Saga me da compensacion explicita y tolera mejor caidas parciales. La pago en complejidad de codigo, pero es predecible.",
+          timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 330_000).toISOString(),
+        },
+        {
+          rol: "ASISTENTE",
+          mensaje:
+            "Vale. Has demostrado solido criterio de arquitectura backend. Cerramos aqui — buen recorrido.",
+          timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 360_000).toISOString(),
+        },
+      ],
+    },
+  ],
+])
+
+export { ID_HISTORICO_JAVA }
+
 function handlerEnviarTurno(req: MockRequest): EnviarTurnoResponse {
   if (!(isBodyTurno(req.body) && req.body.mensaje)) {
     throw new ApiError(400, "BODY_INVALIDO", "Falta el mensaje del colaborador.")
@@ -292,6 +364,10 @@ function handlerDetalleIntento(req: MockRequest): IntentoEntrevistaIaParticipant
   const intentoId = match?.[1] ?? null
   if (!intentoId) {
     throw new ApiError(404, "INTENTO_NO_ENCONTRADO", "No encuentro ese intento.")
+  }
+  const historico = INTENTOS_HISTORICOS.get(intentoId)
+  if (historico) {
+    return historico
   }
   const lista = cargarIntentos()
   const intento = lista.find((i) => i.intentoId === intentoId)

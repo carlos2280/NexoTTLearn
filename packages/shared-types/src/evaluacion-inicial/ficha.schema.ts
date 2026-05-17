@@ -93,6 +93,24 @@ export type EventoHistorialFicha =
       readonly areaNombre: string
       readonly nivelCualitativo: NivelCualitativoArea
       readonly origenNarrativo: string
+      /**
+       * Tipo de evento que demostro la skill (TRANSVERSAL, ENTREVISTA_IA,
+       * BLOQUE, MANUAL, ENTREVISTA_INICIAL). Opcional por compat con backend
+       * antiguo; el frontend lo usa para enchufar acciones contextuales —
+       * p.ej. abrir el drawer "Releer la entrevista" cuando es ENTREVISTA_IA
+       * y `referenciaIntentoIaId` esta presente.
+       *
+       * TODO B-N (backend): poblar siempre que la skill venga de un origen
+       * con referencia (entrevista IA, transversal). Para BLOQUE y MANUAL
+       * puede quedar undefined.
+       */
+      readonly origen?: OrigenNotaSkill
+      /**
+       * ID del intento de entrevista IA cuando `origen === "ENTREVISTA_IA"`.
+       * Permite abrir el drawer "Releer la entrevista" desde el timeline de
+       * /mi-ficha sin un round-trip extra.
+       */
+      readonly referenciaIntentoIaId?: string
     }
   | {
       readonly tipo: "CURSO_INICIADO"

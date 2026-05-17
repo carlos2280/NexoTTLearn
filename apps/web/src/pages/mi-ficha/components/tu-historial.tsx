@@ -1,11 +1,9 @@
+import { DrawerReleerEntrevista } from "@/features/entrevista-ia/components/drawer-releer-entrevista"
 import { useHistorialFicha } from "@/features/me/hooks/use-historial-ficha"
 import { Button } from "@/shared/components/ui/button"
-import { slugArea } from "@/shared/lib/slug-area"
-import type { EventoHistorialFicha } from "@nexott-learn/shared-types"
-import { motion, useReducedMotion } from "framer-motion"
 import { ChevronDown } from "lucide-react"
 import { useState } from "react"
-import { etiquetaNivelSkill, relativizarFecha } from "../mi-ficha.helpers"
+import { EventoItem } from "./evento-item"
 
 const PAGINA_INICIAL = 5
 const PAGINA_INCREMENTO = 5
@@ -13,6 +11,7 @@ const PAGINA_INCREMENTO = 5
 export function TuHistorial() {
   const { data, isLoading, error } = useHistorialFicha()
   const [visibles, setVisibles] = useState(PAGINA_INICIAL)
+  const [intentoIaAbierto, setIntentoIaAbierto] = useState<string | null>(null)
 
   if (isLoading || error) {
     return null
@@ -35,7 +34,11 @@ export function TuHistorial() {
 
       <ol className="flex flex-col">
         {mostrados.map((evento) => (
-          <EventoItem key={evento.id} evento={evento} />
+          <EventoItem
+            key={evento.id}
+            evento={evento}
+            onReleerEntrevista={(intentoId) => setIntentoIaAbierto(intentoId)}
+          />
         ))}
       </ol>
 
@@ -51,79 +54,18 @@ export function TuHistorial() {
           </Button>
         </div>
       ) : null}
+
+      {intentoIaAbierto !== null ? (
+        <DrawerReleerEntrevista
+          abierto={true}
+          onCambiarAbierto={(abierto) => {
+            if (!abierto) {
+              setIntentoIaAbierto(null)
+            }
+          }}
+          intentoId={intentoIaAbierto}
+        />
+      ) : null}
     </section>
-  )
-}
-
-interface EventoItemProps {
-  readonly evento: EventoHistorialFicha
-}
-
-function EventoItem({ evento }: EventoItemProps) {
-  const reducedMotion = useReducedMotion()
-  const fechaRel = relativizarFecha(evento.fecha)
-  const colorDot =
-    evento.tipo === "SKILL_DEMOSTRADA"
-      ? `var(--color-area-${slugArea(evento.areaNombre)})`
-      : "var(--color-text-tertiary)"
-
-  return (
-    <motion.li
-      initial={reducedMotion ? { opacity: 1 } : { opacity: 0, y: -6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ type: "spring", stiffness: 100, damping: 18, mass: 0.6 }}
-      className="grid grid-cols-[100px_auto_1fr] items-start gap-3 border-border border-b py-4 last:border-b-0"
-    >
-      <span className="text-caption text-text-tertiary">{fechaRel}</span>
-      <span
-        aria-hidden="true"
-        className="mt-1.5 block h-2 w-2 shrink-0 rounded-full"
-        style={{ background: colorDot }}
-      />
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <DescripcionEvento evento={evento} />
-        <SubLineaEvento evento={evento} />
-      </div>
-    </motion.li>
-  )
-}
-
-function DescripcionEvento({ evento }: EventoItemProps) {
-  switch (evento.tipo) {
-    case "SKILL_DEMOSTRADA":
-      return (
-        <p className="text-body-sm text-text-secondary">
-          Demostraste <span className="font-medium text-text-primary">{evento.skillNombre}</span>
-        </p>
-      )
-    case "CURSO_INICIADO":
-      return (
-        <p className="text-body-sm text-text-secondary">
-          Iniciaste el curso{" "}
-          <span className="font-medium text-text-primary">{evento.cursoTitulo}</span>
-        </p>
-      )
-    case "CURSO_COMPLETADO":
-      return (
-        <p className="text-body-sm text-text-secondary">
-          Completaste el curso{" "}
-          <span className="font-medium text-text-primary">{evento.cursoTitulo}</span>
-        </p>
-      )
-    default:
-      return null
-  }
-}
-
-function SubLineaEvento({ evento }: EventoItemProps) {
-  if (evento.tipo !== "SKILL_DEMOSTRADA") {
-    return null
-  }
-  return (
-    <p className="text-caption text-text-tertiary">
-      {evento.areaNombre} <span className="text-text-disabled">·</span>{" "}
-      {etiquetaNivelSkill(evento.nivelCualitativo)} <span className="text-text-disabled">·</span>{" "}
-      {evento.origenNarrativo}
-    </p>
   )
 }

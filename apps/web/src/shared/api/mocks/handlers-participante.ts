@@ -754,6 +754,19 @@ function handlerMeFichaHistorial(_req: MockRequest): readonly EventoHistorialFic
 const EVENTOS_HISTORIAL: readonly EventoHistorialFicha[] = [
   {
     tipo: "SKILL_DEMOSTRADA",
+    id: "evt-0",
+    fecha: diasDesdeHoy(-3),
+    skillId: "sk-be-arquitectura",
+    skillNombre: "Arquitectura backend",
+    areaId: "area-backend",
+    areaNombre: "Backend",
+    nivelCualitativo: "excelencia",
+    origenNarrativo: 'Entrevista IA · Curso "Java Senior"',
+    origen: "ENTREVISTA_IA",
+    referenciaIntentoIaId: "00000000-0000-4000-c000-0001fa5e1001",
+  },
+  {
+    tipo: "SKILL_DEMOSTRADA",
     id: "evt-1",
     fecha: diasDesdeHoy(-3),
     skillId: "sk-be-django",
