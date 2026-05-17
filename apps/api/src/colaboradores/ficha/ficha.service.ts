@@ -87,6 +87,28 @@ export class FichaService {
     return this.obtenerFicha(usuario.colaboradorId, sesion)
   }
 
+  /**
+   * Devuelve `(colaboradorId, nombre)` para el usuario en sesion. Usado por
+   * `MeController` para construir filenames humanos en la descarga de la
+   * ficha (B-25). Lookup separado para no acoplar `FichaResponse` con el
+   * nombre del colaborador (es info de identidad, no de ficha).
+   */
+  async obtenerIdentidadDeUsuario(
+    usuarioId: string,
+  ): Promise<{ readonly colaboradorId: string; readonly nombre: string }> {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: usuarioId },
+      select: { colaborador: { select: { id: true, nombre: true } } },
+    })
+    if (!usuario?.colaborador) {
+      throw new NotFoundException({
+        code: apiErrorCodes.colaboradorNoEncontrado,
+        message: "Colaborador no encontrado.",
+      })
+    }
+    return { colaboradorId: usuario.colaborador.id, nombre: usuario.colaborador.nombre }
+  }
+
   async obtenerFicha(colaboradorId: string, sesion: SesionUsuario): Promise<FichaResponse> {
     await this.assertAccesoYExistencia(colaboradorId, sesion)
 

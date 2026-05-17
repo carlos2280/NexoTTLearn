@@ -14,9 +14,11 @@
 >
 > **Sprint 2 COMPLETO ✅:** B-4, B-26.
 >
-> **Sprint 3 en curso:** B-1 ✅ HECHO. B-24
-> (`GET /me/ficha/historial`) ✅ HECHO. Falta B-25
-> (`GET /me/ficha/exportar`).
+> **Sprint 3 COMPLETO ✅:** B-1, B-24, B-25.
+>
+> **🎉 Todos los tickets backend del viaje del colaborador implementados.**
+> Los 3 sprints cierran el contrato necesario para llevar
+> `feature/viaje-colaborador` a staging con `VITE_USE_MOCKS=false`.
 >
 > **Convenciones API:** todas las rutas bajo `/api/v1/...`. Autenticación
 > por sesión (`req.session`, cookie `nexott.sid`). CSRF doble token
@@ -453,7 +455,7 @@ escalar a miles, mover a cursor real (`fecha + id` para evitar empates).
 
 <a id="b-25"></a>
 
-## B-25 · `GET /me/ficha/exportar` (nuevo endpoint binario)
+## B-25 · `GET /me/ficha/exportar` (nuevo endpoint binario) — ✅ HECHO (2026-05-17)
 
 **Origen:** `apps/web/src/pages/mi-ficha/components/hero-viaje.tsx:78`,
 `apps/web/src/pages/cuenta/components/tab-privacidad.tsx` (botones CSV

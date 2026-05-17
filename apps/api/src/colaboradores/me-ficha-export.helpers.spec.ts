@@ -5,6 +5,7 @@ import {
   aplanarFichaSkills,
   fichaACsv,
   fichaAPdf,
+  slugNombreColaborador,
 } from "./me-ficha-export.helpers"
 
 const FICHA: FichaResponse = {
@@ -64,6 +65,27 @@ describe("me-ficha-export helpers", () => {
     expect(csv).toContain("React")
     expect(csv).toContain("Postgres")
     expect(csv.endsWith("\n")).toBe(true)
+  })
+
+  it("fichaACsv arranca con BOM UTF-8 para que Excel ESP lo detecte", () => {
+    const csv = fichaACsv(FICHA)
+    expect(csv.charCodeAt(0)).toBe(0xfeff)
+  })
+
+  describe("slugNombreColaborador", () => {
+    it("normaliza diacriticos y espacios", () => {
+      expect(slugNombreColaborador("Camila Soto Pérez")).toBe("camila-soto-perez")
+    })
+    it("colapsa caracteres especiales en un solo guion", () => {
+      expect(slugNombreColaborador("María del Carmen / O'Brien")).toBe("maria-del-carmen-o-brien")
+    })
+    it("recorta guiones al inicio y al final", () => {
+      expect(slugNombreColaborador("  --José Luis--  ")).toBe("jose-luis")
+    })
+    it("fallback `colaborador` cuando el slug queda vacio", () => {
+      expect(slugNombreColaborador("---")).toBe("colaborador")
+      expect(slugNombreColaborador("")).toBe("colaborador")
+    })
   })
 
   it("fichaAPdf devuelve Buffer no vacio empezando por magic %PDF", async () => {

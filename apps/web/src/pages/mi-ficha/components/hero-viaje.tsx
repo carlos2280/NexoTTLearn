@@ -1,6 +1,9 @@
+import { descargarMiFicha, dispararDescargaFicha } from "@/features/me/api/exportar-ficha.api"
 import { Button } from "@/shared/components/ui/button"
 import { FirmaNombre } from "@/shared/components/ui/firma-nombre"
 import type { FichaPorAreaItem, FichaSkillItem } from "@nexott-learn/shared-types"
+import { useState } from "react"
+import { toast } from "sonner"
 import {
   areasConActividad,
   cuentaAreasSolidasOExcelentes,
@@ -18,11 +21,24 @@ interface HeroViajeProps {
 }
 
 export function HeroViaje({ nombre, porArea, skills }: HeroViajeProps) {
+  const [descargando, setDescargando] = useState(false)
   const areas = areasConActividad(porArea)
   const solidas = cuentaAreasSolidasOExcelentes(porArea)
   const solida = hayAreaSolida(porArea)
   const fortaleza = fortalezaActual(porArea)
   const ultima = ultimaSkill(skills)
+
+  async function descargarCsv(): Promise<void> {
+    setDescargando(true)
+    try {
+      const payload = await descargarMiFicha("csv")
+      dispararDescargaFicha(payload)
+    } catch (_err) {
+      toast.error("No se pudo exportar la ficha. Reintenta en un momento.")
+    } finally {
+      setDescargando(false)
+    }
+  }
 
   const sufijo = sufijoNarrativo({
     areasConActividad: areas,
@@ -74,9 +90,10 @@ export function HeroViaje({ nombre, porArea, skills }: HeroViajeProps) {
         <Button
           variant="ghost"
           size="sm"
+          isLoading={descargando}
+          disabled={descargando}
           onClick={() => {
-            // TODO B-25: cablear con `GET /me/ficha/exportar?formato=csv|pdf`
-            // cuando se valide el endpoint en backend.
+            descargarCsv().catch(() => undefined)
           }}
         >
           Exportar →

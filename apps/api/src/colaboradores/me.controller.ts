@@ -40,7 +40,7 @@ import { MeAvanceService } from "./me-avance.service"
 import { MeBandejaService } from "./me-bandeja.service"
 import { MeCursoArbolService } from "./me-curso-arbol.service"
 import { MeCursosService } from "./me-cursos.service"
-import { fichaACsv, fichaAPdf } from "./me-ficha-export.helpers"
+import { fichaACsv, fichaAPdf, slugNombreColaborador } from "./me-ficha-export.helpers"
 import { MeFichaHistorialService } from "./me-ficha-historial.service"
 import { MeFichaResumenService } from "./me-ficha-resumen.service"
 import { MeResumenCierreService } from "./me-resumen-cierre.service"
@@ -132,9 +132,12 @@ export class MeController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
     const sesion = this.requireUsuario(usuario)
-    const ficha = await this.fichaService.obtenerFichaDeUsuario(sesion.usuarioId, sesion)
-    const fechaArchivo = new Date().toISOString().slice(0, 10)
-    const baseFilename = `ficha-${ficha.colaboradorId}-${fechaArchivo}`
+    const [ficha, identidad] = await Promise.all([
+      this.fichaService.obtenerFichaDeUsuario(sesion.usuarioId, sesion),
+      this.fichaService.obtenerIdentidadDeUsuario(sesion.usuarioId),
+    ])
+    const fechaArchivo = new Date().toISOString().slice(0, 10).replace(/-/g, "")
+    const baseFilename = `ficha-${slugNombreColaborador(identidad.nombre)}-${fechaArchivo}`
 
     if (query.formato === "csv") {
       const csv = fichaACsv(ficha)

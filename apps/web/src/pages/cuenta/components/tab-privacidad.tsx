@@ -1,11 +1,28 @@
+import { descargarMiFicha, dispararDescargaFicha } from "@/features/me/api/exportar-ficha.api"
 import { Button } from "@/shared/components/ui/button"
 import { Tooltip } from "@/shared/components/ui/tooltip"
+import type { FormatoExportFicha } from "@nexott-learn/shared-types"
 import { Database, FileText, ShieldCheck } from "lucide-react"
+import { useState } from "react"
 import { toast } from "sonner"
 
 export function TabPrivacidad() {
+  const [descargando, setDescargando] = useState<FormatoExportFicha | null>(null)
+
   function avisoProximamente(): void {
     toast.info("Función disponible próximamente")
+  }
+
+  async function descargar(formato: FormatoExportFicha): Promise<void> {
+    setDescargando(formato)
+    try {
+      const payload = await descargarMiFicha(formato)
+      dispararDescargaFicha(payload)
+    } catch (_err) {
+      toast.error("No se pudo descargar la ficha. Reintenta en un momento.")
+    } finally {
+      setDescargando(null)
+    }
   }
 
   return (
@@ -25,10 +42,26 @@ export function TabPrivacidad() {
         </header>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="primary" size="sm" onClick={avisoProximamente}>
+          <Button
+            variant="primary"
+            size="sm"
+            isLoading={descargando === "csv"}
+            disabled={descargando !== null}
+            onClick={() => {
+              descargar("csv").catch(() => undefined)
+            }}
+          >
             Exportar como CSV
           </Button>
-          <Button variant="secondary" size="sm" onClick={avisoProximamente}>
+          <Button
+            variant="secondary"
+            size="sm"
+            isLoading={descargando === "pdf"}
+            disabled={descargando !== null}
+            onClick={() => {
+              descargar("pdf").catch(() => undefined)
+            }}
+          >
             Exportar como PDF
           </Button>
         </div>
