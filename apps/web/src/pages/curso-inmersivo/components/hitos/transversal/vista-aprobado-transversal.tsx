@@ -62,8 +62,8 @@ export function VistaAprobadoTransversal({
         />
         <p className="mt-2 text-body-sm text-text-secondary">
           {tieneEntrevistaIa
-            ? "Sigues hacia la entrevista IA."
-            : "Tu cierre ya esta en tu ficha. Sigue construyendo tu camino."}
+            ? "Tu camino sigue. Te espera la entrevista IA."
+            : "Tu camino sigue. Cada paso se queda en tu ficha."}
         </p>
       </header>
 
