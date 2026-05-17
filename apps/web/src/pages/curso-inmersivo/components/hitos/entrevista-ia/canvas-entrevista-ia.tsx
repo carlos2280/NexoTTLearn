@@ -1,9 +1,12 @@
 import { useCrearIntentoEntrevistaIa } from "@/features/entrevista-ia/hooks/use-crear-intento-entrevista-ia"
 import { useDisponibilidadEntrevistaIa } from "@/features/entrevista-ia/hooks/use-disponibilidad-entrevista-ia"
 import { useEntrevistaIaCurso } from "@/features/entrevista-ia/hooks/use-entrevista-ia-curso"
+import { DUR, EASE } from "@/shared/lib/motion"
 import type { IntentoEntrevistaIaParticipanteResponse } from "@nexott-learn/shared-types"
-import { AlertCircle, Loader2 } from "lucide-react"
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
+import { Loader2 } from "lucide-react"
 import { useEffect, useState } from "react"
+import { ErrorCanvas, SinAsignacion } from "./canvas-entrevista-ia-estados"
 import { ChatEntrevistaIa } from "./chat/chat-entrevista-ia"
 import { VistaBloqueadaEntrevistaIa } from "./vista-bloqueada-entrevista-ia"
 import { VistaBriefEntrevistaIa } from "./vista-brief-entrevista-ia"
@@ -36,6 +39,7 @@ export function CanvasEntrevistaIa({
     useState<IntentoEntrevistaIaParticipanteResponse | null>(null)
 
   const chatActivo = intentoActivo !== null
+  const reducedMotion = useReducedMotion()
   useEffect(() => {
     onChatActivoChange?.(chatActivo)
     return () => onChatActivoChange?.(false)
@@ -58,12 +62,6 @@ export function CanvasEntrevistaIa({
 
   if (!asignacionId) {
     return <SinAsignacion />
-  }
-
-  if (intentoActivo) {
-    return (
-      <ChatEntrevistaIa intentoInicial={intentoActivo} onSalir={() => setIntentoActivo(null)} />
-    )
   }
 
   if (!disponibilidad.data.disponible) {
@@ -97,49 +95,49 @@ export function CanvasEntrevistaIa({
     })
   }
 
-  return (
-    <main className="flex flex-1 flex-col overflow-y-auto bg-canvas px-8 py-10">
-      <div className="mx-auto flex w-full max-w-2xl flex-col">
-        <VistaBriefEntrevistaIa
-          entrevista={entrevista.data}
-          onEmpezar={() => {
-            onEmpezar().catch(() => {
-              // Errores los maneja el state de la mutation; basta con no romper la promise.
-            })
-          }}
-        />
-      </div>
-    </main>
-  )
-}
+  // Transicion brief <-> chat con `mode="wait"` para que el brief termine
+  // de salir antes de que el chat entre. Coherente con la sensacion del modo
+  // focus que ocurre en paralelo (duracion cinematic).
+  const transition = reducedMotion
+    ? { duration: 0 }
+    : { duration: DUR.storytelling, ease: EASE.default }
+  const initial = reducedMotion ? false : { opacity: 0, y: 8 }
+  const exit = reducedMotion ? undefined : { opacity: 0, y: -4 }
 
-function ErrorCanvas() {
   return (
-    <main className="flex flex-1 items-center justify-center bg-canvas px-6 py-10">
-      <article className="flex max-w-md flex-col items-start gap-3">
-        <span className="nx-eyebrow inline-flex items-center gap-2 text-text-tertiary">
-          <AlertCircle className="h-3.5 w-3.5" aria-hidden={true} />
-          Hito de cierre
-        </span>
-        <h2 className="text-h2 text-text-primary">No pudimos cargar la entrevista IA.</h2>
-        <p className="text-body-sm text-text-secondary">
-          Reintenta en un momento. Si persiste, avisa al administrador del curso.
-        </p>
-      </article>
-    </main>
-  )
-}
-
-function SinAsignacion() {
-  return (
-    <main className="flex flex-1 items-center justify-center bg-canvas px-6 py-10">
-      <article className="flex max-w-md flex-col items-start gap-3">
-        <span className="nx-eyebrow text-text-tertiary">Hito de cierre</span>
-        <h2 className="text-h2 text-text-primary">Entrevista IA</h2>
-        <p className="text-body-sm text-text-secondary">
-          Necesitas estar inscrito en el curso para hacer la entrevista.
-        </p>
-      </article>
-    </main>
+    <AnimatePresence mode="wait" initial={false}>
+      {intentoActivo ? (
+        <motion.div
+          key="chat"
+          className="flex flex-1"
+          initial={initial}
+          animate={{ opacity: 1, y: 0 }}
+          exit={exit}
+          transition={transition}
+        >
+          <ChatEntrevistaIa intentoInicial={intentoActivo} onSalir={() => setIntentoActivo(null)} />
+        </motion.div>
+      ) : (
+        <motion.main
+          key="brief"
+          className="flex flex-1 flex-col overflow-y-auto bg-canvas px-8 py-10"
+          initial={initial}
+          animate={{ opacity: 1, y: 0 }}
+          exit={exit}
+          transition={transition}
+        >
+          <div className="mx-auto flex w-full max-w-2xl flex-col">
+            <VistaBriefEntrevistaIa
+              entrevista={entrevista.data}
+              onEmpezar={() => {
+                onEmpezar().catch(() => {
+                  // Errores los maneja el state de la mutation; basta con no romper la promise.
+                })
+              }}
+            />
+          </div>
+        </motion.main>
+      )}
+    </AnimatePresence>
   )
 }
