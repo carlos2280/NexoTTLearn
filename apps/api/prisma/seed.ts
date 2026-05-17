@@ -71,10 +71,21 @@ async function upsertAdmin(): Promise<void> {
     select: { id: true },
   })
 
+  // OBS-QA-1: el `update` debe restaurar TODOS los campos sensibles, no solo
+  // el rol. Antes solo refrescaba `rol`, asi que si el admin habia sido
+  // bloqueado, tenia intentos fallidos acumulados, o si la password fue
+  // rehasheada en una corrida previa, `make db-seed` no lo restauraba. El
+  // seed debe ser idempotente: tras correrlo, el admin queda en estado fresh.
   await prisma.usuario.upsert({
     where: { colaboradorId: colaborador.id },
     update: {
       rol: RolUsuario.ADMIN,
+      passwordHash,
+      passwordInicialCaduca,
+      requiereCambioPassword: true,
+      mfaHabilitado: false,
+      intentosFallidos: 0,
+      bloqueado: false,
     },
     create: {
       colaboradorId: colaborador.id,
