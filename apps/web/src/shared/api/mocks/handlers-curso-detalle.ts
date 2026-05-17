@@ -647,6 +647,12 @@ const ARBOL_FULLSTACK: CursoArbolResponse = {
       orden: 2,
       secciones: [
         { seccionId: "sec-fs-2-1", titulo: "Python para APIs", orden: 1, totalBloques: 5 },
+        {
+          seccionId: "sec-fs-2-quiz",
+          titulo: "Quiz de repaso · Python para APIs",
+          orden: 2,
+          totalBloques: 2,
+        },
       ],
     },
     {
