@@ -9,8 +9,12 @@ import type {
   NotificacionResponse,
   NotificacionResumen,
   Paginated,
+  PatchPreferenciasNotificacionInput,
+  PreferenciasNotificacionResponse,
   ResumenCierreCurso,
+  TipoEventoNotif,
 } from "@nexott-learn/shared-types"
+import { TIPOS_CRITICOS_NOTIF } from "@nexott-learn/shared-types"
 import { ApiError } from "../api-error"
 import { type MockRequest, defineRoute } from "./router"
 
@@ -24,6 +28,7 @@ const RGX_HISTORICO_SKILL = /^\/colaboradores\/[^/]+\/ficha\/skills\/([^/]+)\/hi
 const RTE_RESUMEN_CIERRE = /^\/me\/cursos\/[^/]+\/resumen-cierre$/
 const RGX_RESUMEN_CIERRE = /^\/me\/cursos\/([^/]+)\/resumen-cierre$/
 const RTE_NOTIFICACIONES_BADGE = /^\/notificaciones\/badge$/
+const RTE_NOTIFICACIONES_PREFERENCIAS = /^\/notificaciones\/preferencias$/
 const RTE_NOTIFICACIONES = /^\/notificaciones(\?.*)?$/
 const RTE_NOTIFICACION_DETALLE = /^\/notificaciones\/[^/]+$/
 const RTE_NOTIFICACION_MARCAR_LEIDA = /^\/notificaciones\/[^/]+\/marcar-leida$/
@@ -1269,6 +1274,78 @@ function handlerDetalleNotificacion(req: MockRequest): NotificacionResponse {
   }
 }
 
+const PREFERENCIAS_STORAGE_KEY = "nexott-mock-preferencias-notif"
+
+function leerPreferenciasGuardadas(): readonly TipoEventoNotif[] {
+  if (typeof window === "undefined") {
+    return []
+  }
+  try {
+    const raw = window.localStorage.getItem(PREFERENCIAS_STORAGE_KEY)
+    if (!raw) {
+      return []
+    }
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) {
+      return []
+    }
+    return parsed.filter((v): v is TipoEventoNotif => typeof v === "string")
+  } catch {
+    return []
+  }
+}
+
+function guardarPreferencias(silenciados: readonly TipoEventoNotif[]): void {
+  if (typeof window === "undefined") {
+    return
+  }
+  window.localStorage.setItem(PREFERENCIAS_STORAGE_KEY, JSON.stringify(silenciados))
+}
+
+function handlerObtenerPreferencias(): PreferenciasNotificacionResponse {
+  return {
+    silenciados: leerPreferenciasGuardadas(),
+    tiposCriticos: TIPOS_CRITICOS_NOTIF,
+  }
+}
+
+function handlerActualizarPreferencias(req: MockRequest): PreferenciasNotificacionResponse {
+  const body = (req.body ?? {}) as Partial<PatchPreferenciasNotificacionInput>
+  const silenciar = Array.isArray(body.silenciar) ? body.silenciar : []
+  const desilenciar = Array.isArray(body.desilenciar) ? body.desilenciar : []
+
+  const contradiccion = silenciar.find((t) => desilenciar.includes(t))
+  if (contradiccion) {
+    throw new ApiError(
+      422,
+      // biome-ignore lint/nursery/noSecrets: codigo de error del API, no es un secreto
+      "validacionTipoEnSilenciarYDesilenciar",
+      "Un mismo tipo no puede silenciarse y desilenciarse a la vez.",
+    )
+  }
+  const criticoInvalido = silenciar.find((t) => TIPOS_CRITICOS_NOTIF.includes(t))
+  if (criticoInvalido) {
+    throw new ApiError(
+      422,
+      // biome-ignore lint/nursery/noSecrets: codigo de error del API, no es un secreto
+      "validacionTipoCriticoNoSilenciable",
+      "Ese tipo de notificación es crítico y no se puede silenciar.",
+    )
+  }
+
+  const actual = new Set(leerPreferenciasGuardadas())
+  for (const tipo of silenciar) {
+    actual.add(tipo)
+  }
+  for (const tipo of desilenciar) {
+    actual.delete(tipo)
+  }
+
+  const siguiente: readonly TipoEventoNotif[] = Array.from(actual)
+  guardarPreferencias(siguiente)
+  return { silenciados: siguiente, tiposCriticos: TIPOS_CRITICOS_NOTIF }
+}
+
 function handlerArchivar(req: MockRequest): void {
   const match = req.path.match(RGX_ARCHIVAR_ID)
   if (!match) {
@@ -1295,6 +1372,8 @@ export const handlersParticipante = [
   defineRoute("GET", RTE_ME_FICHA_RESUMEN, handlerMeFichaResumen),
   defineRoute("GET", RTE_RESUMEN_CIERRE, handlerResumenCierre),
   defineRoute("GET", RTE_NOTIFICACIONES_BADGE, handlerNotificacionesBadge),
+  defineRoute("GET", RTE_NOTIFICACIONES_PREFERENCIAS, handlerObtenerPreferencias),
+  defineRoute("PATCH", RTE_NOTIFICACIONES_PREFERENCIAS, handlerActualizarPreferencias),
   defineRoute("GET", RTE_NOTIFICACIONES, handlerNotificaciones),
   defineRoute("POST", RTE_NOTIFICACION_MARCAR_LEIDA, handlerMarcarLeida),
   defineRoute("POST", RTE_NOTIFICACIONES_MARCAR_TODAS, handlerMarcarTodasLeidas),

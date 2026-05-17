@@ -6,16 +6,18 @@ import { RUTAS } from "@/shared/constants/rutas"
 import { LogOut } from "lucide-react"
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { TabNotificaciones } from "./components/tab-notificaciones"
 import { TabPerfil } from "./components/tab-perfil"
 import { TabSeguridad } from "./components/tab-seguridad"
 import { TabSesiones } from "./components/tab-sesiones"
 
-type TabCuenta = "perfil" | "seguridad" | "sesiones"
+type TabCuenta = "perfil" | "seguridad" | "sesiones" | "notificaciones"
 
 const TABS: readonly { readonly id: TabCuenta; readonly etiqueta: string }[] = [
   { id: "perfil", etiqueta: "Perfil" },
   { id: "seguridad", etiqueta: "Seguridad" },
   { id: "sesiones", etiqueta: "Sesiones" },
+  { id: "notificaciones", etiqueta: "Notificaciones" },
 ]
 
 export function CuentaPage() {
@@ -52,6 +54,7 @@ export function CuentaPage() {
         {tab === "perfil" ? <TabPerfil usuario={usuario} /> : null}
         {tab === "seguridad" ? <TabSeguridad usuario={usuario} /> : null}
         {tab === "sesiones" ? <TabSesiones /> : null}
+        {tab === "notificaciones" ? <TabNotificaciones /> : null}
       </section>
 
       <hr className="border-border" />
