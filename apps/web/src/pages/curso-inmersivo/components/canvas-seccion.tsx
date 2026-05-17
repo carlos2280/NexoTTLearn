@@ -15,6 +15,7 @@ interface CanvasSeccionProps {
   readonly modo: ModoCursoParticipante
   readonly cursoId: string
   readonly colaboradorId: string | null
+  readonly soloLectura: boolean
 }
 
 /**
@@ -23,7 +24,13 @@ interface CanvasSeccionProps {
  * spring suave, no más alto que la altura del elemento) y resetea el scroll
  * al top para que el participante siempre aterrice en la cabecera.
  */
-export function CanvasSeccion({ seccionActiva, modo, cursoId, colaboradorId }: CanvasSeccionProps) {
+export function CanvasSeccion({
+  seccionActiva,
+  modo,
+  cursoId,
+  colaboradorId,
+  soloLectura,
+}: CanvasSeccionProps) {
   const bloques = useBloquesDeSeccion(seccionActiva?.seccionId ?? null)
   const mainRef = useRef<HTMLElement | null>(null)
   const reducedMotion = useReducedMotion()
@@ -87,6 +94,7 @@ export function CanvasSeccion({ seccionActiva, modo, cursoId, colaboradorId }: C
                     colaboradorId={colaboradorParaBloques}
                     modo={modo}
                     contenidoTests={testsPorPreguntaId.get(bloque.id) ?? null}
+                    soloLectura={soloLectura}
                   />
                 </li>
               ))}

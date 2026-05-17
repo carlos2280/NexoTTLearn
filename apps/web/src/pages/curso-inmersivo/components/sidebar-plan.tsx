@@ -27,6 +27,11 @@ interface SidebarPlanProps {
   readonly entrevistaIa: DisponibilidadEntrevistaIaConMotivo | undefined
   readonly hitoActivo: HitoTipo | null
   readonly onAbrirHito: (hito: HitoTipo) => void
+  /**
+   * Curso cerrado. El sidebar deja de ser estado vivo y pasa a historico:
+   * todas las secciones con check verde, contador en x/x, sin avance dinamico.
+   */
+  readonly soloLectura: boolean
 }
 
 /**
@@ -47,8 +52,9 @@ export function SidebarPlan({
   entrevistaIa,
   hitoActivo,
   onAbrirHito,
+  soloLectura,
 }: SidebarPlanProps) {
-  if (modo === "asignado" && errorPlan && (!plan || plan.items.length === 0)) {
+  if (modo === "asignado" && !soloLectura && errorPlan && (!plan || plan.items.length === 0)) {
     return (
       <aside className="flex flex-col gap-3 overflow-y-auto border-border border-r bg-subtle p-5">
         <h2 className="nx-eyebrow text-text-tertiary">Plan de estudio</h2>
@@ -71,13 +77,18 @@ export function SidebarPlan({
   }
 
   const planById = indexarPlanPorSeccion(plan)
+  const totalSecciones = arbol.reduce((acc, modulo) => acc + modulo.secciones.length, 0)
 
   return (
     <aside className="flex flex-col overflow-hidden border-border border-r bg-subtle">
       <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-5 py-6">
         <header className="flex items-baseline justify-between gap-2">
-          <h2 className="nx-eyebrow text-text-tertiary">{eyebrowSidebar(modo)}</h2>
-          {modo === "asignado" && plan ? (
+          <h2 className="nx-eyebrow text-text-tertiary">{eyebrowSidebar(modo, soloLectura)}</h2>
+          {soloLectura ? (
+            <span className="font-mono text-caption text-text-tertiary">
+              {totalSecciones}/{totalSecciones}
+            </span>
+          ) : modo === "asignado" && plan ? (
             <span className="font-mono text-caption text-text-tertiary">
               {plan.avance.seccionesCompletadas}/{plan.avance.seccionesObligatorias}
             </span>
@@ -93,6 +104,7 @@ export function SidebarPlan({
               modo={modo}
               seccionActivaId={seccionActivaId}
               onSeleccionar={onSeleccionar}
+              soloLectura={soloLectura}
             />
           ))}
         </nav>
@@ -102,6 +114,7 @@ export function SidebarPlan({
             entrevistaIa={entrevistaIa}
             hitoActivo={hitoActivo}
             onAbrirHito={onAbrirHito}
+            soloLectura={soloLectura}
           />
         ) : null}
       </div>
@@ -110,7 +123,10 @@ export function SidebarPlan({
   )
 }
 
-function eyebrowSidebar(modo: ModoCursoParticipante): string {
+function eyebrowSidebar(modo: ModoCursoParticipante, soloLectura: boolean): string {
+  if (soloLectura) {
+    return "Recorrido completado"
+  }
   if (modo === "asignado") {
     return "Plan de estudio"
   }
@@ -158,6 +174,7 @@ interface ModuloGrupoProps {
   readonly modo: ModoCursoParticipante
   readonly seccionActivaId: string | null
   readonly onSeleccionar: (seccionId: string) => void
+  readonly soloLectura: boolean
 }
 
 function ModuloGrupo({
@@ -167,6 +184,7 @@ function ModuloGrupo({
   modo,
   seccionActivaId,
   onSeleccionar,
+  soloLectura,
 }: ModuloGrupoProps) {
   return (
     <section className="flex flex-col gap-2">
@@ -185,6 +203,7 @@ function ModuloGrupo({
               plan={plan}
               activa={seccion.seccionId === seccionActivaId}
               onSeleccionar={onSeleccionar}
+              soloLectura={soloLectura}
             />
           )
         })}
@@ -200,10 +219,19 @@ interface FilaSeccionProps {
   readonly plan: SeccionPlanItemParticipante | null
   readonly activa: boolean
   readonly onSeleccionar: (seccionId: string) => void
+  readonly soloLectura: boolean
 }
 
-function FilaSeccion({ titulo, seccionId, modo, plan, activa, onSeleccionar }: FilaSeccionProps) {
-  const completada = plan?.completada ?? false
+function FilaSeccion({
+  titulo,
+  seccionId,
+  modo,
+  plan,
+  activa,
+  onSeleccionar,
+  soloLectura,
+}: FilaSeccionProps) {
+  const completada = soloLectura || (plan?.completada ?? false)
   const esOpcional = plan?.caracter === "OPCIONAL"
   return (
     <li>

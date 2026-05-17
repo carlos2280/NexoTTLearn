@@ -3,14 +3,18 @@ import type {
   ContenidoCodigoTests,
   ModoCursoParticipante,
 } from "@nexott-learn/shared-types"
+import { contenidoQuizSchema } from "@nexott-learn/shared-types"
 import { BloqueCodigoIlustrativo } from "./bloque-codigo-ilustrativo"
 import { BloqueCodigoPreguntas } from "./bloque-codigo-preguntas"
+import { BloqueEvaluableCerrado } from "./bloque-evaluable-cerrado"
 import { BloqueEvaluablePreviewLock } from "./bloque-evaluable-preview-lock"
 import { BloqueParrafo } from "./bloque-parrafo"
 import { BloqueRecurso } from "./bloque-recurso"
 import { BloqueTip } from "./bloque-tip"
 import { BloqueVideo } from "./bloque-video"
 import { BloqueQuiz } from "./quiz/bloque-quiz"
+
+const NOTA_APROBADO_CODIGO_DEFAULT = 60
 
 interface RenderBloqueProps {
   readonly bloque: BloqueDetalleResponse
@@ -28,6 +32,13 @@ interface RenderBloqueProps {
    * tests del reto en el cliente (Pyodide / Web Worker).
    */
   readonly contenidoTests: ContenidoCodigoTests | null
+  /**
+   * Curso cerrado (`avance.estaCerrado === true`). Los bloques evaluables se
+   * renderizan en modo lectura — sin inputs, sin CTA — mostrando el resultado
+   * del mejor intento. Ortogonal al `modo` (un curso `asignado` se cierra,
+   * no cambia de modo).
+   */
+  readonly soloLectura: boolean
 }
 
 /**
@@ -46,6 +57,7 @@ export function RenderBloque({
   colaboradorId,
   modo,
   contenidoTests,
+  soloLectura,
 }: RenderBloqueProps) {
   switch (bloque.tipo) {
     case "PARRAFO":
@@ -59,6 +71,16 @@ export function RenderBloque({
     case "CODIGO_ILUSTRATIVO":
       return <BloqueCodigoIlustrativo contenido={bloque.contenido} />
     case "QUIZ": {
+      if (soloLectura) {
+        return (
+          <BloqueEvaluableCerrado
+            bloqueId={bloque.id}
+            colaboradorId={colaboradorId}
+            titulo="Quiz"
+            notaMinima={notaMinimaQuiz(bloque.contenido)}
+          />
+        )
+      }
       if (modo === "preview" || !colaboradorId) {
         return <BloqueEvaluablePreviewLock titulo="Quiz" />
       }
@@ -72,6 +94,16 @@ export function RenderBloque({
       )
     }
     case "CODIGO_PREGUNTAS": {
+      if (soloLectura) {
+        return (
+          <BloqueEvaluableCerrado
+            bloqueId={bloque.id}
+            colaboradorId={colaboradorId}
+            titulo="Ejercicio de código"
+            notaMinima={NOTA_APROBADO_CODIGO_DEFAULT}
+          />
+        )
+      }
       if (modo === "preview" || !colaboradorId) {
         return <BloqueEvaluablePreviewLock titulo="Ejercicio de código" />
       }
@@ -89,4 +121,12 @@ export function RenderBloque({
     default:
       return null
   }
+}
+
+function notaMinimaQuiz(contenido: Record<string, unknown> | null): number {
+  const parsed = contenidoQuizSchema.safeParse(contenido)
+  if (parsed.success) {
+    return parsed.data.notaMinima
+  }
+  return 60
 }

@@ -106,6 +106,7 @@ export function CursoInmersivoPage() {
       onSeleccionarSeccion={seleccionarSeccion}
       onAbrirHito={abrirHito}
       colaboradorId={usuario?.colaboradorId ?? null}
+      soloLectura={detalle.avance?.estaCerrado ?? false}
     />
   )
 }
@@ -123,6 +124,7 @@ interface CursoInmersivoLayoutProps {
   readonly onSeleccionarSeccion: (seccionId: string) => void
   readonly onAbrirHito: (hito: HitoTipo) => void
   readonly colaboradorId: string | null
+  readonly soloLectura: boolean
 }
 
 function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
@@ -139,6 +141,7 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
     onSeleccionarSeccion,
     onAbrirHito,
     colaboradorId,
+    soloLectura,
   } = props
   const seccionActivaId = hitoActivo === null ? (seccionActiva?.seccionId ?? null) : null
   const esPreview = modo === "preview"
@@ -170,6 +173,7 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
           entrevistaIa={entrevistaIa}
           hitoActivo={hitoActivo}
           onAbrirHito={onAbrirHito}
+          soloLectura={soloLectura}
         />
         {hitoActivo === null ? (
           <CanvasSeccion
@@ -177,6 +181,7 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
             modo={modo}
             cursoId={arbol.curso.id}
             colaboradorId={colaboradorId}
+            soloLectura={soloLectura}
           />
         ) : (
           <CanvasHitoPlaceholder hito={hitoActivo} />

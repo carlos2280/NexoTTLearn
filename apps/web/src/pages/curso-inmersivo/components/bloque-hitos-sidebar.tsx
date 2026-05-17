@@ -1,5 +1,5 @@
 import { cn } from "@/shared/lib/cn"
-import { Lock } from "lucide-react"
+import { CheckCircle2, Lock } from "lucide-react"
 import type {
   DisponibilidadEntrevistaIaConMotivo,
   DisponibilidadTransversalConMotivo,
@@ -12,6 +12,11 @@ interface BloqueHitosSidebarProps {
   readonly entrevistaIa: DisponibilidadEntrevistaIaConMotivo | undefined
   readonly hitoActivo: HitoTipo | null
   readonly onAbrirHito: (hito: HitoTipo) => void
+  /**
+   * Curso cerrado. Los hitos se muestran como completados (check verde)
+   * y dejan de ser interactivos — son historico, no acciones pendientes.
+   */
+  readonly soloLectura: boolean
 }
 
 /**
@@ -25,6 +30,7 @@ export function BloqueHitosSidebar({
   entrevistaIa,
   hitoActivo,
   onAbrirHito,
+  soloLectura,
 }: BloqueHitosSidebarProps) {
   if (!(transversal || entrevistaIa)) {
     return null
@@ -44,6 +50,7 @@ export function BloqueHitosSidebar({
             disponible={transversal.disponible}
             activo={hitoActivo === "transversal"}
             onClick={() => onAbrirHito("transversal")}
+            soloLectura={soloLectura}
           />
         ) : null}
         {entrevistaIa ? (
@@ -52,6 +59,7 @@ export function BloqueHitosSidebar({
             disponible={entrevistaIa.disponible}
             activo={hitoActivo === "entrevistaIa"}
             onClick={() => onAbrirHito("entrevistaIa")}
+            soloLectura={soloLectura}
           />
         ) : null}
       </ul>
@@ -64,37 +72,40 @@ interface ItemHitoProps {
   readonly disponible: boolean
   readonly activo: boolean
   readonly onClick: () => void
+  readonly soloLectura: boolean
 }
 
-function ItemHito({ etiqueta, disponible, activo, onClick }: ItemHitoProps) {
+function ItemHito({ etiqueta, disponible, activo, onClick, soloLectura }: ItemHitoProps) {
+  const interactivo = !soloLectura && disponible
   return (
     <li>
       <button
         type="button"
-        onClick={disponible ? onClick : undefined}
-        disabled={!disponible}
+        onClick={interactivo ? onClick : undefined}
+        disabled={!interactivo}
         aria-current={activo ? "true" : undefined}
         className={cn(
           "group flex w-full items-start gap-3 rounded-lg px-2.5 py-2 text-left transition-colors duration-fast ease-default",
           activo ? "bg-accent-soft text-accent-on-soft" : "",
-          disponible && !activo
+          interactivo && !activo
             ? "text-text-secondary hover:bg-surface hover:text-text-primary"
             : "",
-          disponible ? "" : "cursor-not-allowed text-text-tertiary",
+          interactivo ? "" : "cursor-default text-text-tertiary",
         )}
       >
-        <IconoHito disponible={disponible} activo={activo} />
+        <IconoHito disponible={disponible} activo={activo} soloLectura={soloLectura} />
         <span className="min-w-0 flex-1">
           <span
             className={cn(
               "block truncate text-body-sm",
               activo ? "font-semibold text-text-primary" : "",
+              soloLectura ? "text-text-tertiary" : "",
             )}
           >
             {etiqueta}
           </span>
           <span className="block font-mono text-[10px] text-text-tertiary uppercase tracking-wider">
-            {disponible ? "Disponible" : "Pendiente"}
+            {soloLectura ? "Completado" : disponible ? "Disponible" : "Pendiente"}
           </span>
         </span>
       </button>
@@ -102,10 +113,16 @@ function ItemHito({ etiqueta, disponible, activo, onClick }: ItemHitoProps) {
   )
 }
 
-function IconoHito({
-  disponible,
-  activo,
-}: { readonly disponible: boolean; readonly activo: boolean }) {
+interface IconoHitoProps {
+  readonly disponible: boolean
+  readonly activo: boolean
+  readonly soloLectura: boolean
+}
+
+function IconoHito({ disponible, activo, soloLectura }: IconoHitoProps) {
+  if (soloLectura) {
+    return <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden={true} />
+  }
   if (disponible) {
     return (
       <span
