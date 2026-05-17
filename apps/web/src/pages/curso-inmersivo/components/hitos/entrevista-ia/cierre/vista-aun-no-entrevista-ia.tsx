@@ -1,14 +1,12 @@
+import { DrawerReleerEntrevista } from "@/features/entrevista-ia/components/drawer-releer-entrevista"
 import { Button } from "@/shared/components/ui/button"
 import { DUR, EASE } from "@/shared/lib/motion"
-import type { TurnoEntrevistaIa } from "@nexott-learn/shared-types"
 import { motion, useReducedMotion } from "framer-motion"
 import { ArrowRight } from "lucide-react"
 import { useState } from "react"
-import { DrawerReleerEntrevista } from "./drawer-releer-entrevista"
 
 interface VistaAunNoEntrevistaIaProps {
-  readonly turnos: readonly TurnoEntrevistaIa[]
-  readonly fechaISO: string
+  readonly intentoId: string
   /**
    * Cierra la vista y devuelve al brief. El brief recarga disponibilidad y
    * decide si mostrar "Iniciar entrevista" o la vista bloqueada
@@ -22,11 +20,7 @@ interface VistaAunNoEntrevistaIaProps {
  * humanizado ("Casi.") en línea con la vista equivalente del transversal.
  * Aurora suave acompaña pero sin la sensacion de "premio" de la 3a.
  */
-export function VistaAunNoEntrevistaIa({
-  turnos,
-  fechaISO,
-  onCerrar,
-}: VistaAunNoEntrevistaIaProps) {
+export function VistaAunNoEntrevistaIa({ intentoId, onCerrar }: VistaAunNoEntrevistaIaProps) {
   const reducedMotion = useReducedMotion()
   const [drawerAbierto, setDrawerAbierto] = useState(false)
 
@@ -92,8 +86,7 @@ export function VistaAunNoEntrevistaIa({
       <DrawerReleerEntrevista
         abierto={drawerAbierto}
         onCambiarAbierto={setDrawerAbierto}
-        turnos={turnos}
-        fechaISO={fechaISO}
+        intentoId={intentoId}
       />
     </section>
   )

@@ -1,16 +1,14 @@
+import { DrawerReleerEntrevista } from "@/features/entrevista-ia/components/drawer-releer-entrevista"
 import { Button } from "@/shared/components/ui/button"
 import { RUTAS } from "@/shared/constants/rutas"
 import { DUR, EASE } from "@/shared/lib/motion"
-import type { TurnoEntrevistaIa } from "@nexott-learn/shared-types"
 import { motion, useReducedMotion } from "framer-motion"
 import { ArrowRight } from "lucide-react"
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { DrawerReleerEntrevista } from "./drawer-releer-entrevista"
 
 interface VistaAprobadoEntrevistaIaProps {
-  readonly turnos: readonly TurnoEntrevistaIa[]
-  readonly fechaISO: string
+  readonly intentoId: string
 }
 
 /**
@@ -19,7 +17,7 @@ interface VistaAprobadoEntrevistaIaProps {
  * sutil para abrir el drawer "Releer la entrevista" sin competir con el CTA
  * principal (una jerarquia por pantalla).
  */
-export function VistaAprobadoEntrevistaIa({ turnos, fechaISO }: VistaAprobadoEntrevistaIaProps) {
+export function VistaAprobadoEntrevistaIa({ intentoId }: VistaAprobadoEntrevistaIaProps) {
   const navigate = useNavigate()
   const reducedMotion = useReducedMotion()
   const [drawerAbierto, setDrawerAbierto] = useState(false)
@@ -86,8 +84,7 @@ export function VistaAprobadoEntrevistaIa({ turnos, fechaISO }: VistaAprobadoEnt
       <DrawerReleerEntrevista
         abierto={drawerAbierto}
         onCambiarAbierto={setDrawerAbierto}
-        turnos={turnos}
-        fechaISO={fechaISO}
+        intentoId={intentoId}
       />
     </section>
   )

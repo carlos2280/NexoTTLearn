@@ -1,3 +1,5 @@
+import { MensajeEvaluador } from "@/features/entrevista-ia/components/mensaje-evaluador"
+import { MensajeUsuario } from "@/features/entrevista-ia/components/mensaje-usuario"
 import { useEnviarTurnoEntrevistaIa } from "@/features/entrevista-ia/hooks/use-enviar-turno-entrevista-ia"
 import { ConfirmDialog } from "@/shared/components/ui/confirm-dialog"
 import type {
@@ -13,8 +15,6 @@ import { AtmosferaAurora } from "./atmosfera-aurora"
 import { CabeceraChat } from "./cabecera-chat"
 import { IndicadorEscribiendo } from "./indicador-escribiendo"
 import { InputEntrevista } from "./input-entrevista"
-import { MensajeEvaluador } from "./mensaje-evaluador"
-import { MensajeUsuario } from "./mensaje-usuario"
 import { useSalirEntrevista } from "./use-salir-entrevista"
 
 interface ChatEntrevistaIaProps {
@@ -97,12 +97,7 @@ export function ChatEntrevistaIa({ intentoInicial, onSalir }: ChatEntrevistaIaPr
     return (
       <main className="relative flex flex-1 overflow-hidden bg-canvas">
         <AtmosferaAurora />
-        <CierreEntrevista
-          intentoId={intentoId}
-          turnos={turnos}
-          fechaISO={intentoInicial.fecha}
-          onCerrar={() => onSalir?.()}
-        />
+        <CierreEntrevista intentoId={intentoId} onCerrar={() => onSalir?.()} />
       </main>
     )
   }
