@@ -1,4 +1,5 @@
 import { NotFoundException } from "@nestjs/common"
+import { RolAsignacion } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { PlanPersonalService } from "../plan-personal/plan-personal.service"
@@ -20,6 +21,10 @@ interface PrismaMock {
     count: ReturnType<typeof vi.fn>
     findMany: ReturnType<typeof vi.fn>
   }
+  seccion: {
+    count: ReturnType<typeof vi.fn>
+    findMany: ReturnType<typeof vi.fn>
+  }
 }
 
 function buildPrismaMock(): PrismaMock {
@@ -33,6 +38,10 @@ function buildPrismaMock(): PrismaMock {
     planEstudio: { findUnique: vi.fn().mockResolvedValue(null) },
     itemPlan: { count: vi.fn().mockResolvedValue(0), findMany: vi.fn().mockResolvedValue([]) },
     aperturaSeccion: {
+      count: vi.fn().mockResolvedValue(0),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    seccion: {
       count: vi.fn().mockResolvedValue(0),
       findMany: vi.fn().mockResolvedValue([]),
     },
@@ -74,6 +83,7 @@ describe("MeAvanceService.obtenerAvance", () => {
   it("curso ACTIVO: NO incluye notaGlobalFinal ni etiquetaCualitativaFinal", async () => {
     prisma.asignacionCurso.findUnique.mockResolvedValueOnce({
       id: ASIG,
+      rol: RolAsignacion.ASIGNADO,
       curso: { id: CURSO, estado: "ACTIVO" },
     })
 
@@ -88,6 +98,7 @@ describe("MeAvanceService.obtenerAvance", () => {
   it("curso CERRADO con fotografia: INCLUYE notaGlobalFinal + etiqueta", async () => {
     prisma.asignacionCurso.findUnique.mockResolvedValueOnce({
       id: ASIG,
+      rol: RolAsignacion.ASIGNADO,
       curso: { id: CURSO, estado: "CERRADO" },
     })
     prisma.cursoFotografiaCierre.findUnique.mockResolvedValueOnce({
@@ -108,6 +119,7 @@ describe("MeAvanceService.obtenerAvance", () => {
   it("curso CERRADO sin fotografia: estaCerrado=true pero SIN nota final", async () => {
     prisma.asignacionCurso.findUnique.mockResolvedValueOnce({
       id: ASIG,
+      rol: RolAsignacion.ASIGNADO,
       curso: { id: CURSO, estado: "CERRADO" },
     })
     prisma.cursoFotografiaCierre.findUnique.mockResolvedValueOnce(null)
@@ -120,6 +132,7 @@ describe("MeAvanceService.obtenerAvance", () => {
   it("clasifica nota final 70 como solido", async () => {
     prisma.asignacionCurso.findUnique.mockResolvedValueOnce({
       id: ASIG,
+      rol: RolAsignacion.ASIGNADO,
       curso: { id: CURSO, estado: "CERRADO" },
     })
     prisma.cursoFotografiaCierre.findUnique.mockResolvedValueOnce({
@@ -148,16 +161,18 @@ describe("MeAvanceService.caminoHaciaApto (B-4)", () => {
     )
     prisma.asignacionCurso.findUnique.mockResolvedValue({
       id: ASIG,
+      rol: RolAsignacion.ASIGNADO,
       curso: { id: CURSO, estado: "ACTIVO" },
     })
   })
 
-  it("sin skills exigidas: faltantesParaApto=0, estaListo=true, porArea vacio", async () => {
+  it("sin skills exigidas: catalogoIncompleto=true, estaListo=false (evita falso SOLIDO)", async () => {
     const response = await service.obtenerAvance(COLAB, CURSO)
     expect(response.caminoHaciaApto).toEqual({
       faltantesParaApto: 0,
-      estaListo: true,
+      estaListo: false,
       porArea: [],
+      catalogoIncompleto: true,
     })
   })
 
@@ -263,6 +278,86 @@ describe("MeAvanceService.caminoHaciaApto (B-4)", () => {
   })
 })
 
+describe("MeAvanceService.obtenerAvance — rol VOLUNTARIO (BUG-VOL-1)", () => {
+  let prisma: PrismaMock
+  let plan: PlanServiceMock
+  let service: MeAvanceService
+
+  beforeEach(() => {
+    prisma = buildPrismaMock()
+    plan = buildPlanMock()
+    service = new MeAvanceService(
+      prisma as unknown as PrismaService,
+      plan as unknown as PlanPersonalService,
+    )
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIG,
+      rol: RolAsignacion.VOLUNTARIO,
+      curso: { id: CURSO, estado: "ACTIVO" },
+    })
+  })
+
+  it("voluntario sin plan: seccionesObligatorias = total del curso, porcentaje real", async () => {
+    // El voluntario abrio 2 de 8 secciones del catalogo. Sin plan, antes el
+    // backend devolvia "2 de 0 secciones, 0%" (matematicamente imposible).
+    prisma.aperturaSeccion.findMany.mockResolvedValueOnce([
+      { seccionId: "sec-a" },
+      { seccionId: "sec-b" },
+    ])
+    prisma.seccion.count.mockResolvedValueOnce(8)
+    prisma.seccion.findMany.mockResolvedValueOnce([
+      { id: "sec-a", titulo: "A", orden: 1, moduloId: "m1", modulo: { titulo: "Modulo 1" } },
+      { id: "sec-b", titulo: "B", orden: 2, moduloId: "m1", modulo: { titulo: "Modulo 1" } },
+      { id: "sec-c", titulo: "C", orden: 3, moduloId: "m1", modulo: { titulo: "Modulo 1" } },
+    ])
+
+    const response = await service.obtenerAvance(COLAB, CURSO)
+
+    expect(response.seccionesCompletadas).toBe(2)
+    expect(response.seccionesObligatorias).toBe(8)
+    expect(response.porcentajeAvance).toBe(25) // 2/8 = 25%
+    expect(response.seccionesAbiertasIds).toEqual(["sec-a", "sec-b"])
+    // Siguiente seccion: primera no abierta del catalogo.
+    expect(response.siguienteSeccion).toEqual({
+      seccionId: "sec-c",
+      moduloId: "m1",
+      titulo: "C",
+    })
+    // No se llama al plan personal para voluntarios.
+    expect(plan.obtenerPorcentajeAvance).not.toHaveBeenCalled()
+  })
+
+  it("voluntario sin aperturas: 0% pero seccionesObligatorias > 0 (no 2 de 0)", async () => {
+    prisma.seccion.count.mockResolvedValueOnce(5)
+    const response = await service.obtenerAvance(COLAB, CURSO)
+    expect(response.seccionesCompletadas).toBe(0)
+    expect(response.seccionesObligatorias).toBe(5)
+    expect(response.porcentajeAvance).toBe(0)
+  })
+
+  it("voluntario que recorrio todo el curso: 100%, sin siguiente seccion", async () => {
+    prisma.aperturaSeccion.findMany.mockResolvedValueOnce([
+      { seccionId: "sec-a" },
+      { seccionId: "sec-b" },
+    ])
+    prisma.seccion.count.mockResolvedValueOnce(2)
+    prisma.seccion.findMany.mockResolvedValueOnce([
+      { id: "sec-a", titulo: "A", orden: 1, moduloId: "m1", modulo: { titulo: "M1" } },
+      { id: "sec-b", titulo: "B", orden: 2, moduloId: "m1", modulo: { titulo: "M1" } },
+    ])
+    const response = await service.obtenerAvance(COLAB, CURSO)
+    expect(response.porcentajeAvance).toBe(100)
+    expect(response.siguienteSeccion).toBeNull()
+  })
+
+  it("voluntario en curso sin secciones declaradas: 0% sin division por cero", async () => {
+    prisma.seccion.count.mockResolvedValueOnce(0)
+    const response = await service.obtenerAvance(COLAB, CURSO)
+    expect(response.seccionesObligatorias).toBe(0)
+    expect(response.porcentajeAvance).toBe(0)
+  })
+})
+
 describe("MeAvanceService.obtenerAvanceDeUsuario", () => {
   let prisma: PrismaMock
   let plan: PlanServiceMock
@@ -288,6 +383,7 @@ describe("MeAvanceService.obtenerAvanceDeUsuario", () => {
     prisma.usuario.findUnique.mockResolvedValueOnce({ colaboradorId: COLAB })
     prisma.asignacionCurso.findUnique.mockResolvedValueOnce({
       id: ASIG,
+      rol: RolAsignacion.ASIGNADO,
       curso: { id: CURSO, estado: "ACTIVO" },
     })
 

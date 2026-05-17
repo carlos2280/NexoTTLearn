@@ -49,11 +49,19 @@ export interface CaminoHaciaAptoPorArea {
  * `CursoSkillExigida` — misma semantica que el chip "verde" de
  * `MeAvancePorSkill`. `faltantesParaApto` es la suma de skills no demostradas
  * en todas las areas. Cuando es 0, `estaListo: true`.
+ *
+ * `catalogoIncompleto: true` indica que el curso aun no declara
+ * `CursoSkillExigida`, por lo que el camino hacia apto no se puede calcular.
+ * En ese caso `estaListo` queda en `false` (no `true` vacuamente) y el
+ * frontend muestra un mensaje neutro tipo "el curso aun no declara las
+ * habilidades que evalua" en vez del falso "Has demostrado todas las
+ * capacidades".
  */
 export interface CaminoHaciaApto {
   readonly faltantesParaApto: number
   readonly estaListo: boolean
   readonly porArea: readonly CaminoHaciaAptoPorArea[]
+  readonly catalogoIncompleto?: boolean
 }
 
 export interface MeAvanceCursoResponse {
@@ -65,6 +73,14 @@ export interface MeAvanceCursoResponse {
   readonly porSkill: readonly MeAvancePorSkill[]
   readonly siguienteSeccion: MeAvanceSiguienteSeccion | null
   readonly caminoHaciaApto: CaminoHaciaApto
+  /**
+   * Ids de secciones que el colaborador ha abierto en este curso (lectura de
+   * `AperturaSeccion`). El frontend lo usa para pintar checkmarks en el
+   * sidebar inmersivo del modo voluntario (que no tiene `PlanEstudio`, ver
+   * D-AS-1). En modo asignado tambien se devuelve, aunque ahi el sidebar
+   * sigue prefiriendo `PlanResponseParticipante.items[].completada`.
+   */
+  readonly seccionesAbiertasIds: readonly string[]
   readonly notaGlobalFinal?: number
   readonly etiquetaCualitativaFinal?: EtiquetaCualitativa
 }

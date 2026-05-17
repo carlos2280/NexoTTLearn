@@ -409,6 +409,7 @@ const AVANCE_JAVA: MeAvanceCursoResponse = {
     moduloId: "mod-java-2",
     titulo: "APIs REST con Spring",
   },
+  seccionesAbiertasIds: [],
   caminoHaciaApto: {
     faltantesParaApto: 4,
     estaListo: false,
@@ -460,6 +461,7 @@ const AVANCE_FULLSTACK: MeAvanceCursoResponse = {
     moduloId: "mod-fs-1",
     titulo: "TypeScript esencial",
   },
+  seccionesAbiertasIds: [],
   caminoHaciaApto: {
     faltantesParaApto: 3,
     estaListo: false,
@@ -503,6 +505,7 @@ function buildAvanceFallback(cursoId: string): MeAvanceCursoResponse {
       { skillId: "sk-x1", etiqueta: "skill.demo", notaActual: 50, claseColor: "amarillo" },
     ],
     siguienteSeccion: null,
+    seccionesAbiertasIds: [],
     caminoHaciaApto: {
       faltantesParaApto: 6,
       estaListo: false,

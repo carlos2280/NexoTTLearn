@@ -9,6 +9,7 @@ import type {
   MeAvanceSiguienteSeccion,
   NivelCaminoHaciaAptoArea,
 } from "@nexott-learn/shared-types"
+import { RolAsignacion } from "@prisma/client"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { PlanPersonalService } from "../plan-personal/plan-personal.service"
@@ -67,6 +68,7 @@ export class MeAvanceService {
       },
       select: {
         id: true,
+        rol: true,
         curso: { select: { id: true, estado: true } },
       },
     })
@@ -78,10 +80,33 @@ export class MeAvanceService {
     }
 
     const estaCerrado = asignacion.curso.estado === "CERRADO"
-    const porcentajeAvance = await this.planPersonalService.obtenerPorcentajeAvance(asignacion.id)
+    const esVoluntario = asignacion.rol === RolAsignacion.VOLUNTARIO
 
-    const seccionesObligatorias = await this.contarSeccionesObligatorias(asignacion.id)
-    const seccionesCompletadas = await this.contarSeccionesCompletadas(asignacion.id)
+    const seccionesAbiertasIds = await this.cargarSeccionesAbiertasIds(asignacion.id)
+    const seccionesCompletadas = seccionesAbiertasIds.length
+
+    // VOLUNTARIO (D-AS-1): no hay PlanEstudio. El denominador es el total de
+    // secciones del curso (catalogo) y el siguiente paso es la primera no
+    // abierta. Esto da feedback de progreso honesto sin generar plan artificial.
+    let seccionesObligatorias: number
+    let porcentajeAvance: number
+    let siguienteSeccion: MeAvanceSiguienteSeccion | null
+    if (esVoluntario) {
+      seccionesObligatorias = await this.contarSeccionesTotalesCurso(cursoId)
+      porcentajeAvance =
+        seccionesObligatorias === 0
+          ? 0
+          : Math.min(100, Math.round((seccionesCompletadas / seccionesObligatorias) * 100))
+      siguienteSeccion = await this.calcularSiguienteSeccionVoluntario(
+        cursoId,
+        seccionesAbiertasIds,
+      )
+    } else {
+      seccionesObligatorias = await this.contarSeccionesObligatorias(asignacion.id)
+      porcentajeAvance = await this.planPersonalService.obtenerPorcentajeAvance(asignacion.id)
+      siguienteSeccion = await this.calcularSiguienteSeccion(asignacion.id)
+    }
+
     const exigidas = await this.cargarSkillsExigidasConArea(cursoId)
     const notas = await this.cargarNotasColaborador(
       colaboradorId,
@@ -90,7 +115,6 @@ export class MeAvanceService {
     const umbralNoCumple = await this.obtenerUmbralNoCumple(cursoId)
     const porSkill = construirPorSkill(exigidas, notas, umbralNoCumple)
     const caminoHaciaApto = construirCaminoHaciaApto(exigidas, notas)
-    const siguienteSeccion = await this.calcularSiguienteSeccion(asignacion.id)
 
     const base: MeAvanceCursoResponse = {
       cursoId,
@@ -101,6 +125,7 @@ export class MeAvanceService {
       porSkill,
       siguienteSeccion,
       caminoHaciaApto,
+      seccionesAbiertasIds,
     }
 
     if (!estaCerrado) {
@@ -138,8 +163,63 @@ export class MeAvanceService {
     })
   }
 
-  private contarSeccionesCompletadas(asignacionId: string): Promise<number> {
-    return this.prisma.aperturaSeccion.count({ where: { asignacionId } })
+  private async cargarSeccionesAbiertasIds(asignacionId: string): Promise<readonly string[]> {
+    const aperturas = await this.prisma.aperturaSeccion.findMany({
+      where: { asignacionId },
+      select: { seccionId: true },
+    })
+    return aperturas.map((a) => a.seccionId)
+  }
+
+  /**
+   * Total de secciones del curso (todos los modulos habilitados) usado como
+   * denominador del avance del VOLUNTARIO (D-AS-1: voluntarios no tienen
+   * PlanEstudio, el avance se calcula sobre el catalogo completo). La
+   * habilitacion de un modulo en un curso vive en `CursoModuloHabilitado`.
+   */
+  private contarSeccionesTotalesCurso(cursoId: string): Promise<number> {
+    return this.prisma.seccion.count({
+      where: { modulo: { cursosModulosHabilitados: { some: { cursoId } } } },
+    })
+  }
+
+  /**
+   * Para voluntarios: primera seccion del catalogo que el colaborador aun no
+   * ha abierto. Orden: alfabetico por titulo de modulo + `Seccion.orden`
+   * (mismo criterio que `calcularSiguienteSeccion` para asignados, porque
+   * `Modulo` no tiene campo `orden` propio dentro del curso).
+   */
+  private async calcularSiguienteSeccionVoluntario(
+    cursoId: string,
+    seccionesAbiertasIds: readonly string[],
+  ): Promise<MeAvanceSiguienteSeccion | null> {
+    const aperturasSet = new Set(seccionesAbiertasIds)
+    const secciones = await this.prisma.seccion.findMany({
+      where: { modulo: { cursosModulosHabilitados: { some: { cursoId } } } },
+      select: {
+        id: true,
+        titulo: true,
+        orden: true,
+        moduloId: true,
+        modulo: { select: { titulo: true } },
+      },
+    })
+    const pendiente = [...secciones]
+      .filter((s) => !aperturasSet.has(s.id))
+      .sort((a, b) => {
+        if (a.modulo.titulo !== b.modulo.titulo) {
+          return a.modulo.titulo.localeCompare(b.modulo.titulo)
+        }
+        return a.orden - b.orden
+      })[0]
+    if (!pendiente) {
+      return null
+    }
+    return {
+      seccionId: pendiente.id,
+      moduloId: pendiente.moduloId,
+      titulo: pendiente.titulo,
+    }
   }
 
   private cargarSkillsExigidasConArea(cursoId: string): Promise<readonly SkillExigidaConArea[]> {
@@ -286,8 +366,12 @@ function construirCaminoHaciaApto(
   exigidas: readonly SkillExigidaConArea[],
   notas: readonly NotaSkillRaw[],
 ): CaminoHaciaApto {
+  // Un curso sin `CursoSkillExigida` (seed incompleto, o catalogo en
+  // construccion) NO esta "listo": el camino simplemente no se puede calcular.
+  // Devolvemos `catalogoIncompleto: true` para que el frontend muestre un
+  // mensaje neutro en vez del falso "Has demostrado todas las capacidades".
   if (exigidas.length === 0) {
-    return { faltantesParaApto: 0, estaListo: true, porArea: [] }
+    return { faltantesParaApto: 0, estaListo: false, porArea: [], catalogoIncompleto: true }
   }
   const notasPorSkill = new Map(notas.map((n) => [n.skillId, n]))
   interface Acumulador {

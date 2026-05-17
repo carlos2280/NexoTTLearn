@@ -185,6 +185,7 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
           entrevistaIa={entrevistaIa}
           hitoActivo={hitoActivo}
           onAbrirHito={onAbrirHito}
+          seccionesAbiertasIds={avance?.seccionesAbiertasIds ?? []}
           soloLectura={soloLectura}
           atenuado={modoFocus}
         />

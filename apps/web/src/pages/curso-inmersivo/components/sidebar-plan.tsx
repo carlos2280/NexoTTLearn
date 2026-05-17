@@ -26,6 +26,13 @@ interface SidebarPlanProps {
   readonly hitoActivo: HitoTipo | null
   readonly onAbrirHito: (hito: HitoTipo) => void
   /**
+   * Ids de secciones que el colaborador ha abierto. Fuente alterna a
+   * `plan?.completada` usada en modo voluntario (D-AS-1: voluntarios no
+   * tienen PlanEstudio, asi que el plan llega `undefined` y los checkmarks
+   * se calculan desde `AperturaSeccion`).
+   */
+  readonly seccionesAbiertasIds: readonly string[]
+  /**
    * Curso cerrado. El sidebar deja de ser estado vivo y pasa a historico:
    * todas las secciones con check verde, contador en x/x, sin avance dinamico.
    */
@@ -55,9 +62,11 @@ export function SidebarPlan({
   entrevistaIa,
   hitoActivo,
   onAbrirHito,
+  seccionesAbiertasIds,
   soloLectura,
   atenuado,
 }: SidebarPlanProps) {
+  const seccionesAbiertasSet = new Set(seccionesAbiertasIds)
   const claseAtenuado = atenuado
     ? "pointer-events-none opacity-15 blur-[2px] transition-[opacity,filter] duration-cinematic ease-default"
     : "transition-[opacity,filter] duration-cinematic ease-default"
@@ -114,6 +123,10 @@ export function SidebarPlan({
             <span className="font-mono text-caption text-text-tertiary">
               {plan.avance.seccionesCompletadas}/{plan.avance.seccionesObligatorias}
             </span>
+          ) : modo === "voluntario" ? (
+            <span className="font-mono text-caption text-text-tertiary">
+              {seccionesAbiertasSet.size}/{totalSecciones}
+            </span>
           ) : null}
         </header>
         <nav aria-label="Contenido del curso" className="flex flex-col gap-5">
@@ -126,6 +139,7 @@ export function SidebarPlan({
               modo={modo}
               seccionActivaId={seccionActivaId}
               onSeleccionar={onSeleccionar}
+              seccionesAbiertasSet={seccionesAbiertasSet}
               soloLectura={soloLectura}
             />
           ))}
@@ -196,6 +210,7 @@ interface ModuloGrupoProps {
   readonly modo: ModoCursoParticipante
   readonly seccionActivaId: string | null
   readonly onSeleccionar: (seccionId: string) => void
+  readonly seccionesAbiertasSet: ReadonlySet<string>
   readonly soloLectura: boolean
 }
 
@@ -206,6 +221,7 @@ function ModuloGrupo({
   modo,
   seccionActivaId,
   onSeleccionar,
+  seccionesAbiertasSet,
   soloLectura,
 }: ModuloGrupoProps) {
   return (
@@ -223,6 +239,7 @@ function ModuloGrupo({
               seccionId={seccion.seccionId}
               modo={modo}
               plan={plan}
+              abiertaPorAperturas={seccionesAbiertasSet.has(seccion.seccionId)}
               activa={seccion.seccionId === seccionActivaId}
               onSeleccionar={onSeleccionar}
               soloLectura={soloLectura}
@@ -239,6 +256,7 @@ interface FilaSeccionProps {
   readonly seccionId: string
   readonly modo: ModoCursoParticipante
   readonly plan: SeccionPlanItemParticipante | null
+  readonly abiertaPorAperturas: boolean
   readonly activa: boolean
   readonly onSeleccionar: (seccionId: string) => void
   readonly soloLectura: boolean
@@ -249,11 +267,14 @@ function FilaSeccion({
   seccionId,
   modo,
   plan,
+  abiertaPorAperturas,
   activa,
   onSeleccionar,
   soloLectura,
 }: FilaSeccionProps) {
-  const completada = soloLectura || (plan?.completada ?? false)
+  // Asignado: el plan personal manda. Voluntario: no hay plan, pero
+  // marcamos como completada cuando hay `AperturaSeccion` (D-AS-1).
+  const completada = soloLectura || (plan?.completada ?? false) || abiertaPorAperturas
   const esOpcional = plan?.caracter === "OPCIONAL"
   return (
     <li>

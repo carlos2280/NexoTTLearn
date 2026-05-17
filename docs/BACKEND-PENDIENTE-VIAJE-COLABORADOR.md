@@ -747,11 +747,34 @@ B-3+B-24+B-26 (endpoints nuevos read-only similares).
 Hallazgos que no estaban en el inventario original. Se documentan aquí
 para retomarlos cuando corresponda.
 
-### BUG-VOL-1 · Voluntarios sin plan personal — UI muestra "2 de 0 secciones, 0% avance, SÓLIDO"
+### BUG-VOL-1 · Voluntarios sin plan personal — UI muestra "2 de 0 secciones, 0% avance, SÓLIDO" — ✅ RESUELTO (2026-05-17)
 
 **Detectado:** 2026-05-17 durante validación frontend del B-4 con
 `camila.soto@amsa.demo` inscrita como voluntaria al curso BHP
 "Seguridad OWASP para devs".
+
+**Fix aplicado** (opcion B + defensa B-4, sin romper D-AS-1):
+
+- `MeAvanceService.obtenerAvance` distingue rol VOLUNTARIO: denominador
+  pasa a ser total de secciones del curso (catalogo via
+  `CursoModuloHabilitado`), porcentaje calculado desde aperturas,
+  `siguienteSeccion` = primera no abierta del catalogo. NO se genera
+  `PlanEstudio` artificial — D-AS-1 sigue intacto.
+- `construirCaminoHaciaApto`: si `skillsExigidas.length === 0` ahora
+  devuelve `catalogoIncompleto: true, estaListo: false` (antes
+  `estaListo: true` daba un falso SOLIDO).
+- `MeAvanceCursoResponse` gana `seccionesAbiertasIds: string[]` y
+  `CaminoHaciaApto.catalogoIncompleto?: boolean` en `shared-types`.
+- Sidebar inmersivo: marca checkmark verde cuando hay apertura, incluso
+  sin plan personal (voluntarios). Contador `X/Y` ahora aparece en
+  modo voluntario.
+
+**Lo que sigue igual** (no es bug, es contrato):
+- Cuando admin promueve a ASIGNADO via
+  `POST /asignaciones/:id/convertir-a-asignado`, las aperturas previas
+  se conservan y cuentan contra el plan recien calculado.
+- Voluntarios no tienen plan personal ni deadline ni APTO/NO_APTO
+  (D-AS-1, D-AS-10).
 
 **Síntomas:**
 - Panel derecho: `"2 de 0 secciones completadas. 0% avance."`
