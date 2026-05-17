@@ -242,6 +242,52 @@ describe("MeFichaHistorialService.obtenerHistorial", () => {
     expect(evento).toMatchObject({ origenNarrativo: "Bloque evaluable" })
   })
 
+  it("cursor: aplica fecha < cursor a HistoricoNotaSkill (DEUDA-B24-2)", async () => {
+    prisma.historicoNotaSkill.findMany.mockResolvedValueOnce([])
+    await service.obtenerHistorial(COLAB, 50, "2026-05-10T00:00:00.000Z")
+    const where = prisma.historicoNotaSkill.findMany.mock.calls[0]?.[0]?.where as {
+      fecha?: { lt?: Date }
+    }
+    expect(where?.fecha?.lt).toEqual(new Date("2026-05-10T00:00:00.000Z"))
+  })
+
+  it("cursor: aplica filtro OR(createdAt < cursor, fechaCierre < cursor) a AsignacionCurso", async () => {
+    prisma.asignacionCurso.findMany.mockResolvedValueOnce([])
+    await service.obtenerHistorial(COLAB, 50, "2026-05-10T00:00:00.000Z")
+    const where = prisma.asignacionCurso.findMany.mock.calls[0]?.[0]?.where as {
+      // biome-ignore lint/style/useNamingConvention: `OR` es operador Prisma.
+      OR?: ReadonlyArray<{ createdAt?: { lt?: Date }; fechaCierre?: { lt?: Date } }>
+    }
+    const cursor = new Date("2026-05-10T00:00:00.000Z")
+    expect(where?.OR).toEqual([{ createdAt: { lt: cursor } }, { fechaCierre: { lt: cursor } }])
+  })
+
+  it("cursor: descarta eventos individuales con fecha >= cursor aunque la fila pase el WHERE", async () => {
+    // Asignacion con CURSO_INICIADO antes del cursor y CURSO_COMPLETADO despues.
+    prisma.asignacionCurso.findMany.mockResolvedValueOnce([
+      {
+        id: "asig-1",
+        rol: RolAsignacion.ASIGNADO,
+        estadoAsignado: "APTO",
+        estadoVoluntario: null,
+        createdAt: new Date("2026-04-01T08:00:00Z"), // antes del cursor
+        fechaCierre: new Date("2026-05-15T18:00:00Z"), // despues del cursor
+        curso: { id: "curso-1", titulo: "Java Senior" },
+      },
+    ])
+    const eventos = await service.obtenerHistorial(COLAB, 50, "2026-05-10T00:00:00.000Z")
+    expect(eventos.map((e) => e.tipo)).toEqual(["CURSO_INICIADO"])
+  })
+
+  it("sin cursor: comportamiento original (sin filtros adicionales)", async () => {
+    prisma.historicoNotaSkill.findMany.mockResolvedValueOnce([])
+    await service.obtenerHistorial(COLAB, 50)
+    const where = prisma.historicoNotaSkill.findMany.mock.calls[0]?.[0]?.where as {
+      fecha?: unknown
+    }
+    expect(where?.fecha).toBeUndefined()
+  })
+
   it("respeta el limite y corta el array final", async () => {
     const hoy = new Date("2026-05-14T10:00:00Z")
     prisma.historicoNotaSkill.findMany.mockResolvedValueOnce(

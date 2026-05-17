@@ -932,9 +932,32 @@ muestran el formato esperado de las frases.
 
 ---
 
-### DEUDA-B24-2 · Paginación cursor real
+### DEUDA-B24-2 · Paginación cursor real — ✅ RESUELTO (2026-05-17)
 
 **Detectado:** 2026-05-17 implementando B-24.
+
+**Fix aplicado (versión simple, cursor por fecha):**
+- `historialFichaQuerySchema.cursor` ahora es `z.string().datetime()` (ISO).
+- `MeFichaHistorialService.obtenerHistorial` interpreta `cursor` como
+  fecha del ultimo evento ya mostrado por el cliente, y aplica
+  `fecha < cursor` a:
+  - `HistoricoNotaSkill.fecha`.
+  - `AsignacionCurso`: `OR(createdAt < cursor, fechaCierre < cursor)`
+    + filtro post-map a nivel evento (porque una asignacion aporta
+    dos eventos con fechas distintas).
+- Trade-off documentado: empates exactos a milisegundo se omiten —
+  no se introduce cursor compuesto `(fecha, id)` para mantener la
+  API simple. Probabilidad real en produccion: prácticamente nula.
+
+**Cambios al contrato:**
+- Query: `cursor` pasa de `z.string().min(1)` a `z.string().datetime()`
+  (rechaza strings no-ISO con 400).
+- Respuesta: sigue siendo `EventoHistorialFicha[]` plano. El cliente
+  construye el cursor desde `eventos[eventos.length-1].fecha`.
+
+**Tests:** 4 casos nuevos en `me-ficha-historial.service.spec.ts`
+(cursor en HistoricoNotaSkill, en AsignacionCurso, filtro post-map
+para asignaciones bisagra, comportamiento sin cursor).
 
 `historialFichaQuerySchema` define `cursor: string` opcional pero el
 service **no lo interpreta** — siempre devuelve hasta `limite=100`

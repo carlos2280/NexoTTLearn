@@ -19,9 +19,11 @@ const UMBRAL_DESARROLLO = 50
  *    es APTO/NO_APTO (asignado) o COMPLETADO (voluntario).
  *
  * Devuelve la union ordenada por fecha DESC, cortada al `limite` solicitado.
- * El frontend (`tu-historial.tsx`) pagina en memoria con un boton "Ver mas".
- * El parametro `cursor` esta en el contrato pero todavia no se interpreta —
- * cuando el volumen crezca se evolucionara a cursor real `(fecha, id)`.
+ * Paginacion (DEUDA-B24-2): el cliente envia como `cursor` la `fecha` ISO del
+ * ultimo evento ya mostrado; el backend filtra eventos con `fecha < cursor`
+ * en ambas fuentes (`HistoricoNotaSkill.fecha`, `AsignacionCurso.createdAt`
+ * y `AsignacionCurso.fechaCierre`). Empates a milisegundo se omiten — trade
+ * off aceptable a cambio de no introducir cursor compuesto.
  */
 @Injectable()
 export class MeFichaHistorialService {
@@ -30,6 +32,7 @@ export class MeFichaHistorialService {
   async obtenerHistorialDeUsuario(
     usuarioId: string,
     limite: number,
+    cursor?: string,
   ): Promise<readonly EventoHistorialFicha[]> {
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: usuarioId },
@@ -41,16 +44,18 @@ export class MeFichaHistorialService {
         message: "Colaborador no encontrado.",
       })
     }
-    return this.obtenerHistorial(usuario.colaboradorId, limite)
+    return this.obtenerHistorial(usuario.colaboradorId, limite, cursor)
   }
 
   async obtenerHistorial(
     colaboradorId: string,
     limite: number,
+    cursor?: string,
   ): Promise<readonly EventoHistorialFicha[]> {
+    const cursorDate = cursor ? new Date(cursor) : null
     const [historicoSkills, asignaciones] = await Promise.all([
-      this.cargarHistoricoSkills(colaboradorId, limite),
-      this.cargarAsignaciones(colaboradorId, limite),
+      this.cargarHistoricoSkills(colaboradorId, limite, cursorDate),
+      this.cargarAsignaciones(colaboradorId, limite, cursorDate),
     ])
 
     const cursoPorHistorico = await this.cargarCursosPorHistorico(historicoSkills)
@@ -62,7 +67,13 @@ export class MeFichaHistorialService {
       ...asignaciones.flatMap(toEventosCurso),
     ]
 
-    return eventos.sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, limite)
+    // Una asignacion puede aportar ambos eventos (iniciado/completado) y solo
+    // uno de ellos cumplir `fecha < cursor`. Filtramos a nivel evento aqui
+    // para evitar mezclar eventos posteriores al cursor en el resultado.
+    const cursorIso = cursorDate?.toISOString() ?? null
+    const filtrados = cursorIso ? eventos.filter((e) => e.fecha < cursorIso) : eventos
+
+    return filtrados.sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, limite)
   }
 
   /**
@@ -146,11 +157,13 @@ export class MeFichaHistorialService {
   private cargarHistoricoSkills(
     colaboradorId: string,
     limite: number,
+    cursor: Date | null,
   ): Promise<readonly HistoricoSkillRow[]> {
     return this.prisma.historicoNotaSkill.findMany({
       where: {
         valor: { not: null },
         notaSkill: { colaboradorId },
+        ...(cursor ? { fecha: { lt: cursor } } : {}),
       },
       select: {
         id: true,
@@ -178,9 +191,19 @@ export class MeFichaHistorialService {
   private cargarAsignaciones(
     colaboradorId: string,
     limite: number,
+    cursor: Date | null,
   ): Promise<readonly AsignacionRow[]> {
+    // Una asignacion contribuye un evento si su `createdAt < cursor` (CURSO_INICIADO)
+    // o `fechaCierre < cursor` (CURSO_COMPLETADO). El sort + slice del nivel
+    // superior filtra los eventos individuales con fecha >= cursor.
+    const cursorFilter = cursor
+      ? {
+          // biome-ignore lint/style/useNamingConvention: `OR` es operador Prisma, no clave de dominio.
+          OR: [{ createdAt: { lt: cursor } }, { fechaCierre: { lt: cursor } }],
+        }
+      : {}
     return this.prisma.asignacionCurso.findMany({
-      where: { colaboradorId },
+      where: { colaboradorId, ...cursorFilter },
       select: {
         id: true,
         rol: true,

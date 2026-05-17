@@ -110,7 +110,11 @@ export class MeController {
     @Query(new ZodValidationPipe(historialFichaQuerySchema)) query: HistorialFichaQuery,
   ): Promise<readonly EventoHistorialFicha[]> {
     const sesion = this.requireUsuario(usuario)
-    return this.meFichaHistorialService.obtenerHistorialDeUsuario(sesion.usuarioId, query.limite)
+    return this.meFichaHistorialService.obtenerHistorialDeUsuario(
+      sesion.usuarioId,
+      query.limite,
+      query.cursor,
+    )
   }
 
   @Get("cursos")

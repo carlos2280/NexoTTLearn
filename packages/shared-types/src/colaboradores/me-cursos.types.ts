@@ -76,12 +76,16 @@ export type ExportarFichaQuery = z.infer<typeof exportarFichaQuerySchema>
  * `historico_notas_skill` + hitos de cada `AsignacionCurso` (iniciado /
  * completado), ordenado por fecha DESC.
  *
- * Paginacion: por ahora solo `limite` (default 50, max 100). El frontend
- * pagina en memoria. La paginacion cursor real se anadira si surge necesidad
- * por volumen — el shape soporta el cursor opcional.
+ * Paginacion (cursor por fecha — DEUDA-B24-2 cerrada):
+ *  - `limite` (default 50, max 100) acota el numero de eventos devueltos.
+ *  - `cursor` opcional es la `fecha` ISO del ULTIMO evento ya mostrado por el
+ *    cliente. El backend devuelve eventos con `fecha < cursor`, garantizando
+ *    progreso. Eventos con timestamp identico al cursor (extremadamente raro,
+ *    requiere precision a milisegundo) se omiten — trade-off aceptable para
+ *    mantener la API simple sin cursor compuesto.
  */
 export const historialFichaQuerySchema = z.object({
-  cursor: z.string().min(1).optional(),
+  cursor: z.string().datetime().optional(),
   limite: z.coerce.number().int().min(1).max(100).default(50),
 })
 export type HistorialFichaQuery = z.infer<typeof historialFichaQuerySchema>
