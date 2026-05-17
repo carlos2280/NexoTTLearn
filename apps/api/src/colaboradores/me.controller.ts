@@ -17,6 +17,7 @@ import type {
   MeBandejaResponse,
   MeCursoResumen,
   MeCursosQuery,
+  ResumenCierreCurso,
 } from "@nexott-learn/shared-types"
 import { exportarFichaQuerySchema, meCursosQuerySchema } from "@nexott-learn/shared-types"
 import { AccionAuditoria, RolUsuario } from "@prisma/client"
@@ -35,6 +36,7 @@ import { MeCursoArbolService } from "./me-curso-arbol.service"
 import { MeCursosService } from "./me-cursos.service"
 import { fichaACsv, fichaAPdf } from "./me-ficha-export.helpers"
 import { MeFichaResumenService } from "./me-ficha-resumen.service"
+import { MeResumenCierreService } from "./me-resumen-cierre.service"
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -59,6 +61,7 @@ export class MeController {
     private readonly meCursoArbolService: MeCursoArbolService,
     private readonly meCursosService: MeCursosService,
     private readonly meFichaResumenService: MeFichaResumenService,
+    private readonly meResumenCierreService: MeResumenCierreService,
     private readonly auditLog: AuditLogService,
   ) {}
 
@@ -173,6 +176,28 @@ export class MeController {
       })
     }
     return this.meCursoArbolService.obtenerArbol(sesion.usuarioId, cursoId)
+  }
+
+  /**
+   * `GET /me/cursos/:cursoId/resumen-cierre` (B-26). Veredicto del curso para
+   * la pantalla `/cursos/:cursoId/cerrado`. Devuelve 409 `cursoNoCerrado` si
+   * el curso todavia no esta cerrado o si la fotografia no esta disponible.
+   */
+  @Get("cursos/:cursoId/resumen-cierre")
+  @Roles(RolUsuario.PARTICIPANTE, RolUsuario.ADMIN)
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  obtenerResumenCierreCurso(
+    @CurrentUser() usuario: SesionUsuario | undefined,
+    @Param("cursoId") cursoId: string,
+  ): Promise<ResumenCierreCurso> {
+    const sesion = this.requireUsuario(usuario)
+    if (!UUID_REGEX.test(cursoId)) {
+      throw new BadRequestException({
+        code: apiErrorCodes.invalidQuery,
+        message: "cursoId no es un UUID valido.",
+      })
+    }
+    return this.meResumenCierreService.obtenerResumenCierreDeUsuario(sesion.usuarioId, cursoId)
   }
 
   private requireUsuario(usuario: SesionUsuario | undefined): SesionUsuario {

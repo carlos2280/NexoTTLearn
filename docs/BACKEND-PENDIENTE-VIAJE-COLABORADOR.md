@@ -12,8 +12,9 @@
 > B-extra.2 (`esPrimeraAprobacion` + `preguntasFalladas` en intento
 > bloque).
 >
-> **Sprint 2 en curso:** B-4 (`caminoHaciaApto.porArea`) ✅ HECHO.
-> Falta B-26 (`GET /me/cursos/:cursoId/resumen-cierre`).
+> **Sprint 2 COMPLETO ✅:** B-4 (`caminoHaciaApto.porArea`) y B-26
+> (`GET /me/cursos/:cursoId/resumen-cierre`) hechos. Siguiente Sprint 3:
+> B-1, B-24, B-25.
 >
 > **Convenciones API:** todas las rutas bajo `/api/v1/...`. Autenticación
 > por sesión (`req.session`, cookie `nexott.sid`). CSRF doble token
@@ -499,7 +500,7 @@ ya consume `/me/ficha` y `/me/ficha/historial`.
 
 <a id="b-26"></a>
 
-## B-26 · `GET /me/cursos/:cursoId/resumen-cierre`
+## B-26 · `GET /me/cursos/:cursoId/resumen-cierre` — ✅ HECHO (2026-05-17)
 
 **Origen:** `apps/web/src/shared/api/mocks/handlers-participante.ts:686-813`.
 
