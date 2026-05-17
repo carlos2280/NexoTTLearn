@@ -1,5 +1,6 @@
 import { sanitizarHtml } from "@/shared/lib/sanitize-html"
 import type { PreguntaQuiz } from "@nexott-learn/shared-types"
+import { esPreguntaAcertada } from "./lib-correccion-cliente"
 import { QuizPreguntaOpcionMultiple } from "./quiz-pregunta-opcion-multiple"
 import { QuizPreguntaOpcionUnica } from "./quiz-pregunta-opcion-unica"
 import { QuizPreguntaRespuestaCorta } from "./quiz-pregunta-respuesta-corta"
@@ -21,6 +22,13 @@ export function PreguntaItem({
   bloqueado,
   mostrarSolucion,
 }: PreguntaItemProps) {
+  // 04 R7 + decision opcion B: cuando el participante ACERTO la pregunta, no
+  // mostramos la marca verde ni la explicacion — su atencion se foca en lo
+  // que aun no domino (cumplido se desvanece). Solo en las falladas
+  // aparece la solucion + el "Por que esto es correcto".
+  const acertada = mostrarSolucion && esPreguntaAcertada(pregunta, respuestas)
+  const mostrarSolucionEstaPregunta = mostrarSolucion && !acertada
+
   return (
     <li className="flex flex-col gap-3">
       <div className="flex items-baseline gap-3">
@@ -33,9 +41,9 @@ export function PreguntaItem({
         pregunta={pregunta}
         respuestas={respuestas}
         bloqueado={bloqueado}
-        mostrarSolucion={mostrarSolucion}
+        mostrarSolucion={mostrarSolucionEstaPregunta}
       />
-      {mostrarSolucion && pregunta.explicacion ? (
+      {mostrarSolucionEstaPregunta && pregunta.explicacion ? (
         <aside className="flex flex-col gap-1.5 rounded-xl border border-border bg-subtle p-3">
           <span className="nx-eyebrow text-text-tertiary">Por qué esto es correcto</span>
           <div
