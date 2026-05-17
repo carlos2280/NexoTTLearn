@@ -736,3 +736,73 @@ B-3+B-24+B-26 (endpoints nuevos read-only similares).
    local.
 3. Marcar el TODO como resuelto en el spec del viaje
    (`el_viaje_colaborador.md`).
+
+---
+
+## Bugs y deudas detectadas durante la implementación
+
+Hallazgos que no estaban en el inventario original. Se documentan aquí
+para retomarlos cuando corresponda.
+
+### BUG-VOL-1 · Voluntarios sin plan personal — UI muestra "2 de 0 secciones, 0% avance, SÓLIDO"
+
+**Detectado:** 2026-05-17 durante validación frontend del B-4 con
+`camila.soto@amsa.demo` inscrita como voluntaria al curso BHP
+"Seguridad OWASP para devs".
+
+**Síntomas:**
+- Panel derecho: `"2 de 0 secciones completadas. 0% avance."`
+  (matemáticamente imposible).
+- `caminoHaciaApto` muestra `"Has demostrado todas las capacidades
+  exigidas"` y nivel `SÓLIDO` sin que el participante haya demostrado
+  nada.
+- Los checkmarks del sidebar de secciones no se marcan aunque las
+  aperturas sí se persisten en `AperturaSeccion`.
+- Sin avance perceptible para el participante.
+
+**Causa raíz:** los **voluntarios no tienen `PlanEstudio` generado** al
+inscribirse — el sistema está diseñado para que el plan personal
+aplique solo a `RolAsignacion.ASIGNADO`. Sin plan:
+- `MeAvanceService.contarSeccionesObligatorias` devuelve 0 (defensivo
+  documentado en `me-avance.service.ts:123-128`).
+- `PlanPersonalService.obtenerPorcentajeAvance` devuelve 0 (defensivo
+  documentado en `plan-personal.service.ts:1135-1138`).
+- Pero `AperturaSeccion.count` sí cuenta las aperturas → numerador
+  positivo con denominador 0 = "2 de 0".
+
+El falso "SÓLIDO" del `caminoHaciaApto` es consecuencia del seed
+incompleto: el curso BHP no tiene `CursoSkillExigida` cargadas, así que
+`skillsExigidas.length === 0` → `faltantesParaApto = 0 → estaListo:
+true → nivelCualitativo: solido`. **Caso borde no contemplado en
+B-4.**
+
+**Opciones de fix (no implementadas todavía):**
+
+1. **Backend (correcto)**: al ejecutar `POST
+   /asignaciones/voluntarios` (auto-inscripción) generar también un
+   `PlanEstudio` con TODAS las secciones del curso marcadas como
+   OBLIGATORIA. Esto alinea voluntarios con asignados en métricas.
+   Riesgo: toca el flow de inscripción y puede afectar contratos del
+   admin.
+
+2. **Frontend defensivo**: cuando `rol === VOLUNTARIO`, ocultar el
+   contador "X de Y secciones" y el panel "Camino hacia apto" — solo
+   mostrar `"Secciones abiertas: N"` sin meta. Parche cosmético rápido
+   que no resuelve la base.
+
+3. **B-4 defensivo (mínimo)**: en `construirCaminoHaciaApto`, si
+   `exigidas.length === 0` devolver un shape distinto que el frontend
+   pueda interpretar como "este curso aún no declara catálogo de
+   skills" en lugar del falso `estaListo: true`. Evita el SÓLIDO
+   engañoso sin tocar voluntarios.
+
+**Recomendación:** 1 + 2 combinados. Fuera del scope de los Sprints
+B-N. Crear ticket nuevo cuando se priorice.
+
+**Pistas para retomar:**
+- Flow inscripción voluntario: buscar `POST` que crea
+  `AsignacionCurso` con `rol: VOLUNTARIO`. Verificar si hay rama que
+  llame a `PlanPersonalService.calcularPlanPersonal` o similar.
+- Componente del sidebar del inmersivo que dibuja el check de
+  "sección completada": probablemente lee del plan (no de
+  `AperturaSeccion`). Confirmar al implementar.
