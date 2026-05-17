@@ -39,17 +39,6 @@ const RGX_MARCAR_LEIDA_ID = /^\/notificaciones\/([^/]+)\/marcar-leida$/
 const RGX_ARCHIVAR_ID = /^\/notificaciones\/([^/]+)\/archivar$/
 const RGX_DETALLE_ID = /^\/notificaciones\/([^/]+)$/
 
-// TODO B-2: cuando el backend implemente `skillsPendientesCount` en
-// `MeCursoResumen`, mover al schema oficial y borrar.
-// TODO B-extra: backend debe exponer `areaPrincipal` (al menos `codigo` +
-// `nombre`) en `MeCursoResumen` para pintar color de área en bandeja y
-// listado de "Mis cursos".
-type MockMeCursoResumen = MeCursoResumen & {
-  readonly skillsPendientesCount?: number
-  readonly areaCodigo?: string | null
-  readonly areaNombre?: string | null
-}
-
 // TODO B-3: cuando el backend implemente `GET /me/ficha/resumen`, mover este
 // tipo a `@nexott-learn/shared-types` y borrar.
 interface MockFichaResumenResponse {
@@ -166,7 +155,7 @@ const stateNotificaciones: MockNotificacionState = {
   ],
 }
 
-const MOCK_MIS_CURSOS: readonly MockMeCursoResumen[] = [
+const MOCK_MIS_CURSOS: readonly MeCursoResumen[] = [
   {
     asignacionId: "asg-java-001",
     cursoId: "curso-java-senior",
@@ -178,7 +167,7 @@ const MOCK_MIS_CURSOS: readonly MockMeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-30),
     fechaDeadline: diasDesdeHoy(12),
     porcentajeAvance: 62,
-    skillsPendientesCount: 4, // TODO B-2: backend debe devolver este campo.
+    skillsPendientesCount: 4,
     areaCodigo: "backend",
     areaNombre: "Backend",
   },
@@ -208,6 +197,7 @@ const MOCK_MIS_CURSOS: readonly MockMeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-15),
     fechaDeadline: diasDesdeHoy(27),
     porcentajeAvance: 18,
+    skillsPendientesCount: 6,
     areaCodigo: "frontend",
     areaNombre: "Frontend",
   },
@@ -222,6 +212,7 @@ const MOCK_MIS_CURSOS: readonly MockMeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-10),
     fechaDeadline: diasDesdeHoy(90),
     porcentajeAvance: 45,
+    skillsPendientesCount: 5,
     areaCodigo: "backend",
     areaNombre: "Backend",
   },
@@ -236,6 +227,7 @@ const MOCK_MIS_CURSOS: readonly MockMeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-2),
     fechaDeadline: diasDesdeHoy(60),
     porcentajeAvance: 0,
+    skillsPendientesCount: 7,
     areaCodigo: "backend",
     areaNombre: "Backend",
   },
@@ -250,6 +242,7 @@ const MOCK_MIS_CURSOS: readonly MockMeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-1),
     fechaDeadline: diasDesdeHoy(45),
     porcentajeAvance: 5,
+    skillsPendientesCount: 4,
     areaCodigo: "qa",
     areaNombre: "QA",
   },
@@ -264,6 +257,7 @@ const MOCK_MIS_CURSOS: readonly MockMeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-120),
     fechaDeadline: diasDesdeHoy(-30),
     porcentajeAvance: 100,
+    skillsPendientesCount: 0,
     areaCodigo: "devops",
     areaNombre: "DevOps",
   },
@@ -278,6 +272,7 @@ const MOCK_MIS_CURSOS: readonly MockMeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-90),
     fechaDeadline: diasDesdeHoy(-15),
     porcentajeAvance: 100,
+    skillsPendientesCount: 0,
     areaCodigo: "data",
     areaNombre: "Data",
   },
@@ -292,6 +287,7 @@ const MOCK_MIS_CURSOS: readonly MockMeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-200),
     fechaDeadline: diasDesdeHoy(-60),
     porcentajeAvance: 30,
+    skillsPendientesCount: 5,
     areaCodigo: "backend",
     areaNombre: "Backend",
   },
@@ -306,6 +302,7 @@ const MOCK_MIS_CURSOS: readonly MockMeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-20),
     fechaDeadline: diasDesdeHoy(40),
     porcentajeAvance: 25,
+    skillsPendientesCount: 6,
     areaCodigo: "cloud",
     areaNombre: "Cloud",
   },
@@ -320,6 +317,7 @@ const MOCK_MIS_CURSOS: readonly MockMeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-45),
     fechaDeadline: diasDesdeHoy(5),
     porcentajeAvance: 100,
+    skillsPendientesCount: 0,
     areaCodigo: "data",
     areaNombre: "Data",
   },
@@ -334,6 +332,7 @@ const MOCK_MIS_CURSOS: readonly MockMeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-5),
     fechaDeadline: diasDesdeHoy(60),
     porcentajeAvance: 12,
+    skillsPendientesCount: 5,
     areaCodigo: "cloud",
     areaNombre: "Cloud",
   },
@@ -348,6 +347,7 @@ const MOCK_MIS_CURSOS: readonly MockMeCursoResumen[] = [
     fechaInscripcion: diasDesdeHoy(-150),
     fechaDeadline: diasDesdeHoy(-80),
     porcentajeAvance: 70,
+    skillsPendientesCount: 2,
     areaCodigo: "devops",
     areaNombre: "DevOps",
   },
@@ -384,13 +384,13 @@ function leerStringQuery(path: string, clave: string): string | null {
   return new URLSearchParams(path.slice(idx + 1)).get(clave)
 }
 
-function handlerMeCursos(req: MockRequest): Paginated<MockMeCursoResumen> {
+function handlerMeCursos(req: MockRequest): Paginated<MeCursoResumen> {
   const page = leerNumeroQuery(req.path, "page", 1)
   const pageSize = leerNumeroQuery(req.path, "pageSize", 20)
   const estado = leerStringQuery(req.path, "estado")
   const rol = leerStringQuery(req.path, "rol")
 
-  let filtrados: readonly MockMeCursoResumen[] = MOCK_MIS_CURSOS
+  let filtrados: readonly MeCursoResumen[] = MOCK_MIS_CURSOS
   if (estado && estado !== "TODOS") {
     filtrados = filtrados.filter((c) => c.cursoEstado === estado)
   }

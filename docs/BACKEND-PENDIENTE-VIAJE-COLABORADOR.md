@@ -7,6 +7,11 @@
 > **Estado al 2026-05-17:** 9 deudas (B-1 … B-26 + B-extra). 21 referencias
 > en código frontend.
 >
+> **Sprint 1 en marcha:** B-2 ✅ y B-extra.1 ✅ (mismo endpoint
+> `GET /me/cursos`) implementados, tipo `MeCursoResumen` movido a
+> `shared-types` con `skillsPendientesCount`, `areaCodigo`, `areaNombre`
+> required. Pendientes Sprint 1: B-6, B-extra.2.
+>
 > **Convenciones API:** todas las rutas bajo `/api/v1/...`. Autenticación
 > por sesión (`req.session`, cookie `nexott.sid`). CSRF doble token
 > (`XSRF-TOKEN` cookie + `X-XSRF-TOKEN` header) en métodos no-GET.
@@ -100,7 +105,7 @@ está preparado para renderizarla.
 
 <a id="b-2"></a>
 
-## B-2 · `skillsPendientesCount` en `MeCursoResumen`
+## B-2 · `skillsPendientesCount` en `MeCursoResumen` — ✅ HECHO (2026-05-17)
 
 **Origen:** `apps/web/src/pages/bandeja/types.ts:58-69`,
 `apps/web/src/shared/api/mocks/handlers-participante.ts:181`.
@@ -594,7 +599,7 @@ interface ResumenCierreCurso {
 
 ## B-extra · Varios pequeños
 
-### B-extra.1 · `areaPrincipal` en `MeCursoResumen`
+### B-extra.1 · `areaPrincipal` en `MeCursoResumen` — ✅ HECHO (2026-05-17)
 
 **Origen:** `apps/web/src/pages/bandeja/types.ts:62-68`.
 

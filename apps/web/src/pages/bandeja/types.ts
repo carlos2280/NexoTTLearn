@@ -1,4 +1,4 @@
-import type { MeCursoResumen, SiguienteAccion } from "@nexott-learn/shared-types"
+import type { SiguienteAccion } from "@nexott-learn/shared-types"
 import type { LucideIcon } from "lucide-react"
 
 /**
@@ -53,19 +53,6 @@ export interface FichaResumenResponse {
     readonly skillNombre: string
     readonly fecha: string
   } | null
-}
-
-// TODO B-2: cuando el backend implemente `skillsPendientesCount` en
-// `MeCursoResumen`, mover y borrar la extensión local. Solo lo consume la
-// card destacada (cuando hay 1 solo curso activo).
-//
-// TODO B-extra: backend debe exponer `areaPrincipal` (al menos `codigo`) en
-// `MeCursoResumen`. La bandeja pinta barras superiores y eyebrows con el
-// color del área para anclar identidad del curso visualmente.
-export type MeCursoResumenConSkills = MeCursoResumen & {
-  readonly skillsPendientesCount?: number
-  readonly areaCodigo?: string | null
-  readonly areaNombre?: string | null
 }
 
 export interface CopySiguiente {

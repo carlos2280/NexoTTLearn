@@ -1,17 +1,14 @@
 import { useFichaResumen } from "@/features/me/hooks/use-ficha-resumen"
 import { useMiBandeja } from "@/features/me/hooks/use-mi-bandeja"
 import { useMisCursos } from "@/features/me/hooks/use-mis-cursos"
-import type {
-  FichaResumenResponse,
-  MeCursoResumenConSkills,
-  SiguienteAccionConRevision,
-} from "../types"
+import type { MeCursoResumen } from "@nexott-learn/shared-types"
+import type { FichaResumenResponse, SiguienteAccionConRevision } from "../types"
 
 interface BandejaDatos {
   readonly cargando: boolean
   readonly error: Error | null
   readonly siguienteAccion: SiguienteAccionConRevision | null
-  readonly cursosActivos: readonly MeCursoResumenConSkills[]
+  readonly cursosActivos: readonly MeCursoResumen[]
   readonly fichaResumen: FichaResumenResponse | null
 }
 
@@ -40,7 +37,7 @@ export function useBandejaDatos(): BandejaDatos {
     cargando,
     error,
     siguienteAccion: (bandeja.data?.siguienteAccion as SiguienteAccionConRevision | null) ?? null,
-    cursosActivos: (cursos.data?.data as readonly MeCursoResumenConSkills[] | undefined) ?? [],
+    cursosActivos: (cursos.data?.data as readonly MeCursoResumen[] | undefined) ?? [],
     fichaResumen: (ficha.data as FichaResumenResponse | undefined) ?? null,
   }
 }

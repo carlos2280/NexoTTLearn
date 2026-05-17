@@ -1,5 +1,5 @@
 import { formatearDeadline } from "@/features/me/lib/deadline-curso"
-import type { MeCursoResumenConSkills } from "../types"
+import type { MeCursoResumen } from "@nexott-learn/shared-types"
 
 /**
  * Ordena los cursos activos del participante para la bandeja según la regla
@@ -20,9 +20,7 @@ const PESO_TONO: Record<"vencido" | "cercano" | "lejos", number> = {
   lejos: 2,
 }
 
-export function ordenarCursosActivos(
-  cursos: readonly MeCursoResumenConSkills[],
-): readonly MeCursoResumenConSkills[] {
+export function ordenarCursosActivos(cursos: readonly MeCursoResumen[]): readonly MeCursoResumen[] {
   return [...cursos].sort((a, b) => {
     const tonoA = formatearDeadline(a.fechaDeadline).tono
     const tonoB = formatearDeadline(b.fechaDeadline).tono

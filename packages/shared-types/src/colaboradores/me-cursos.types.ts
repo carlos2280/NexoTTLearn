@@ -31,6 +31,17 @@ export interface MeCursoResumen {
   readonly fechaInscripcion: string
   readonly fechaDeadline: string
   readonly porcentajeAvance: number
+  /**
+   * B-2: numero de skills del catalogo del curso que aun no superan el
+   * `notaMinima` exigido. `0` cuando todas demostradas (no `null`).
+   */
+  readonly skillsPendientesCount: number
+  /**
+   * B-extra.1: area mas representada en el catalogo de skills del curso
+   * (slug). `null` si el curso aun no declara skills.
+   */
+  readonly areaCodigo: string | null
+  readonly areaNombre: string | null
 }
 
 const filtroEstadoCursoSchema = z.union([estadoCursoSchema, z.literal("TODOS")]).default("TODOS")

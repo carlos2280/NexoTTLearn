@@ -1,14 +1,14 @@
 import { Button } from "@/shared/components/ui/button"
 import { RUTAS } from "@/shared/constants/rutas"
 import { cn } from "@/shared/lib/cn"
+import type { MeCursoResumen } from "@nexott-learn/shared-types"
 import { ArrowRight } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { ordenarCursosActivos } from "../lib/orden-cursos"
-import type { MeCursoResumenConSkills } from "../types"
 import { CardCursoBandeja } from "./card-curso-bandeja"
 
 interface BandaCursosActivosProps {
-  readonly cursos: readonly MeCursoResumenConSkills[]
+  readonly cursos: readonly MeCursoResumen[]
 }
 
 /**
@@ -47,7 +47,7 @@ export function BandaCursosActivos({ cursos }: BandaCursosActivosProps) {
   )
 }
 
-function Grilla({ cursos }: { readonly cursos: readonly MeCursoResumenConSkills[] }) {
+function Grilla({ cursos }: { readonly cursos: readonly MeCursoResumen[] }) {
   const total = cursos.length
   if (total === 1) {
     const curso = cursos[0]

@@ -2,15 +2,15 @@ import { type TonoDeadline, formatearDeadline } from "@/features/me/lib/deadline
 import { Button } from "@/shared/components/ui/button"
 import { RUTAS } from "@/shared/constants/rutas"
 import { cn } from "@/shared/lib/cn"
+import type { MeCursoResumen } from "@nexott-learn/shared-types"
 import { ArrowRight } from "lucide-react"
 import type { ReactNode } from "react"
 import { useNavigate } from "react-router-dom"
-import type { MeCursoResumenConSkills } from "../types"
 
 type Variante = "destacada" | "compacta"
 
 interface CardCursoBandejaProps {
-  readonly curso: MeCursoResumenConSkills
+  readonly curso: MeCursoResumen
   readonly variante: Variante
 }
 
@@ -47,7 +47,7 @@ export function CardCursoBandeja({ curso, variante }: CardCursoBandejaProps) {
   return variante === "destacada" ? <CardDestacada curso={curso} /> : <CardCompacta curso={curso} />
 }
 
-function CardDestacada({ curso }: { readonly curso: MeCursoResumenConSkills }) {
+function CardDestacada({ curso }: { readonly curso: MeCursoResumen }) {
   const navigate = useNavigate()
   const deadline = formatearDeadline(curso.fechaDeadline)
   const avance = Math.round(curso.porcentajeAvance)
@@ -87,7 +87,7 @@ function CardDestacada({ curso }: { readonly curso: MeCursoResumenConSkills }) {
   )
 }
 
-function CardCompacta({ curso }: { readonly curso: MeCursoResumenConSkills }) {
+function CardCompacta({ curso }: { readonly curso: MeCursoResumen }) {
   const navigate = useNavigate()
   const deadline = formatearDeadline(curso.fechaDeadline)
   const avance = Math.round(curso.porcentajeAvance)

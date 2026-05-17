@@ -1,10 +1,10 @@
+import { useMarcarTodasLeidas } from "@/features/notificaciones/hooks/use-marcar-leida"
 import {
   type FiltroCentro,
   useNotificaciones,
 } from "@/features/notificaciones/hooks/use-notificaciones"
 import { useNotificacionesBadge } from "@/features/notificaciones/hooks/use-notificaciones-badge"
-import { useMarcarTodasLeidas } from "@/features/notificaciones/hooks/use-marcar-leida"
-import { Tabs, type TabItem } from "@/shared/components/ui/tabs"
+import { type TabItem, Tabs } from "@/shared/components/ui/tabs"
 import { RUTAS } from "@/shared/constants/rutas"
 import { ArrowUpRight } from "lucide-react"
 import { useState } from "react"
