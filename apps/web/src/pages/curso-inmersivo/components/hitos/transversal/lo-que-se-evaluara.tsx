@@ -24,7 +24,7 @@ interface CapaItem {
 const CAPAS: readonly CapaItem[] = [
   {
     clave: "tests",
-    titulo: "Tests automaticos",
+    titulo: "Tests",
     descripcion: "Verificacion funcional de tu solucion.",
   },
   {
