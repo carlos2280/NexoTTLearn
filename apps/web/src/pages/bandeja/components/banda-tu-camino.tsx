@@ -1,14 +1,18 @@
 import { RUTAS } from "@/shared/constants/rutas"
+import type {
+  FichaResumenResponse,
+  FichaResumenTopArea,
+  NivelCualitativoAreaResumen,
+} from "@nexott-learn/shared-types"
 import { ArrowRight } from "lucide-react"
 import { Link } from "react-router-dom"
-import type { FichaResumenResponse, FichaResumenTopArea, NivelCualitativoArea } from "../types"
 
 interface BandaTuCaminoProps {
   readonly resumen: FichaResumenResponse | null
   readonly cursoActivoIdParaEmpezar: string | null
 }
 
-const NIVEL_ETIQUETA: Record<NivelCualitativoArea, string> = {
+const NIVEL_ETIQUETA: Record<NivelCualitativoAreaResumen, string> = {
   solido: "sólido",
   enDesarrollo: "en desarrollo",
   inicial: "inicial",

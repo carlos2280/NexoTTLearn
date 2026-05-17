@@ -7,10 +7,10 @@
 > **Estado al 2026-05-17:** 9 deudas (B-1 … B-26 + B-extra). 21 referencias
 > en código frontend.
 >
-> **Sprint 1 en marcha:** B-2 ✅ y B-extra.1 ✅ (mismo endpoint
-> `GET /me/cursos`) implementados, tipo `MeCursoResumen` movido a
-> `shared-types` con `skillsPendientesCount`, `areaCodigo`, `areaNombre`
-> required. Pendientes Sprint 1: B-6, B-extra.2.
+> **Sprint 1 en marcha:** B-2 ✅, B-extra.1 ✅ (`GET /me/cursos`),
+> B-3 ✅ (`GET /me/ficha/resumen` — desbloquea la bandeja entera
+> cuando se usa `VITE_USE_MOCKS=false`). Pendientes Sprint 1: B-6,
+> B-extra.2.
 >
 > **Convenciones API:** todas las rutas bajo `/api/v1/...`. Autenticación
 > por sesión (`req.session`, cookie `nexott.sid`). CSRF doble token
@@ -159,7 +159,7 @@ Devolver `0` cuando todas demostradas (no `null`).
 
 <a id="b-3"></a>
 
-## B-3 · `GET /me/ficha/resumen` (nuevo endpoint)
+## B-3 · `GET /me/ficha/resumen` (nuevo endpoint) — ✅ HECHO (2026-05-17)
 
 **Origen:** `apps/web/src/features/me/api/obtener-ficha-resumen.api.ts`,
 `apps/web/src/shared/api/mocks/handlers-participante.ts:1072-1102`.

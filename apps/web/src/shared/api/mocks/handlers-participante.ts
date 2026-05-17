@@ -3,6 +3,7 @@ import type {
   EntradaHistoricoNotaSkill,
   EventoHistorialFicha,
   FichaResponse,
+  FichaResumenResponse,
   MeBandejaResponse,
   MeCursoResumen,
   NotificacionBadgeResponse,
@@ -38,22 +39,6 @@ const RTE_CURSOS_DISPONIBLES = /^\/cursos\/disponibles-voluntario(\?.*)?$/
 const RGX_MARCAR_LEIDA_ID = /^\/notificaciones\/([^/]+)\/marcar-leida$/
 const RGX_ARCHIVAR_ID = /^\/notificaciones\/([^/]+)\/archivar$/
 const RGX_DETALLE_ID = /^\/notificaciones\/([^/]+)$/
-
-// TODO B-3: cuando el backend implemente `GET /me/ficha/resumen`, mover este
-// tipo a `@nexott-learn/shared-types` y borrar.
-interface MockFichaResumenResponse {
-  readonly totalAreasConActividad: number
-  readonly topAreas: readonly {
-    readonly areaId: string
-    readonly areaNombre: string
-    readonly areaCodigo: string
-    readonly nivelCualitativo: "solido" | "enDesarrollo" | "inicial"
-  }[]
-  readonly ultimaSkillDemostrada: {
-    readonly skillNombre: string
-    readonly fecha: string
-  } | null
-}
 
 function diasDesdeHoy(diasOffset: number): string {
   const fecha = new Date()
@@ -1069,9 +1054,7 @@ const HISTORICO_POR_SKILL: Readonly<Record<string, readonly EntradaHistoricoNota
   ],
 }
 
-// TODO B-3: backend debe implementar `GET /me/ficha/resumen` con el shape
-// definido en el_viaje_colaborador.md.
-function handlerMeFichaResumen(_req: MockRequest): MockFichaResumenResponse {
+function handlerMeFichaResumen(_req: MockRequest): FichaResumenResponse {
   return {
     totalAreasConActividad: 6,
     topAreas: [

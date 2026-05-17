@@ -9,6 +9,7 @@ import { MeAvanceService } from "./me-avance.service"
 import { MeBandejaService } from "./me-bandeja.service"
 import { MeCursoArbolService } from "./me-curso-arbol.service"
 import { MeCursosService } from "./me-cursos.service"
+import { MeFichaResumenService } from "./me-ficha-resumen.service"
 import { MeController } from "./me.controller"
 
 /**
@@ -34,6 +35,7 @@ import { MeController } from "./me.controller"
     MeBandejaService,
     MeCursoArbolService,
     MeCursosService,
+    MeFichaResumenService,
   ],
   exports: [
     ColaboradoresService,
@@ -43,6 +45,7 @@ import { MeController } from "./me.controller"
     MeBandejaService,
     MeCursoArbolService,
     MeCursosService,
+    MeFichaResumenService,
   ],
 })
 export class ColaboradoresModule {}

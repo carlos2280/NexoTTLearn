@@ -1,8 +1,8 @@
 import { useFichaResumen } from "@/features/me/hooks/use-ficha-resumen"
 import { useMiBandeja } from "@/features/me/hooks/use-mi-bandeja"
 import { useMisCursos } from "@/features/me/hooks/use-mis-cursos"
-import type { MeCursoResumen } from "@nexott-learn/shared-types"
-import type { FichaResumenResponse, SiguienteAccionConRevision } from "../types"
+import type { FichaResumenResponse, MeCursoResumen } from "@nexott-learn/shared-types"
+import type { SiguienteAccionConRevision } from "../types"
 
 interface BandejaDatos {
   readonly cargando: boolean

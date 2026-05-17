@@ -33,6 +33,12 @@ export type {
   CursoArbolResponse,
 } from "./me-curso-arbol.types"
 
+export type {
+  FichaResumenResponse,
+  FichaResumenTopArea,
+  NivelCualitativoAreaResumen,
+} from "./me-ficha-resumen.types"
+
 export {
   BANDEJA_TOP_NOVEDADES,
   BANDEJA_TOP_PENDIENTES,

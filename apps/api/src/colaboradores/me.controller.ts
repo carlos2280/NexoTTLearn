@@ -12,6 +12,7 @@ import type {
   CursoArbolResponse,
   ExportarFichaQuery,
   FichaResponse,
+  FichaResumenResponse,
   MeAvanceCursoResponse,
   MeBandejaResponse,
   MeCursoResumen,
@@ -33,6 +34,7 @@ import { MeBandejaService } from "./me-bandeja.service"
 import { MeCursoArbolService } from "./me-curso-arbol.service"
 import { MeCursosService } from "./me-cursos.service"
 import { fichaACsv, fichaAPdf } from "./me-ficha-export.helpers"
+import { MeFichaResumenService } from "./me-ficha-resumen.service"
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -56,6 +58,7 @@ export class MeController {
     private readonly meBandejaService: MeBandejaService,
     private readonly meCursoArbolService: MeCursoArbolService,
     private readonly meCursosService: MeCursosService,
+    private readonly meFichaResumenService: MeFichaResumenService,
     private readonly auditLog: AuditLogService,
   ) {}
 
@@ -72,6 +75,15 @@ export class MeController {
   async obtenerMiFicha(@CurrentUser() usuario: SesionUsuario | undefined): Promise<FichaResponse> {
     const sesion = this.requireUsuario(usuario)
     return await this.fichaService.obtenerFichaDeUsuario(sesion.usuarioId, sesion)
+  }
+
+  @Get("ficha/resumen")
+  @Roles(RolUsuario.PARTICIPANTE, RolUsuario.ADMIN)
+  obtenerMiFichaResumen(
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<FichaResumenResponse> {
+    const sesion = this.requireUsuario(usuario)
+    return this.meFichaResumenService.obtenerResumen(sesion.usuarioId)
   }
 
   @Get("cursos")

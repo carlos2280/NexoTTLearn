@@ -633,6 +633,13 @@ export type {
   FormatoExportColaboradores,
 } from "./colaboradores"
 
+// Resumen cualitativo de ficha (widget "Tu camino" en bandeja participante).
+export type {
+  FichaResumenResponse,
+  FichaResumenTopArea,
+  NivelCualitativoAreaResumen,
+} from "./colaboradores"
+
 // Admin — Slice 12 P12: visor de auditoria (activity_logs).
 export {
   ACCIONES_AUDITORIA,

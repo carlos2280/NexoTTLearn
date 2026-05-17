@@ -34,27 +34,6 @@ export type SiguienteAccionConRevision = SiguienteAccion | SiguienteAccionEspera
  */
 export type AtmosferaCarta = "aurora" | "urgencia" | "rutina" | "calmada"
 
-// TODO B-3: cuando el backend implemente `GET /me/ficha/resumen`, mover el
-// tipo a `@nexott-learn/shared-types` y borrar la extensión local.
-export type NivelCualitativoArea = "solido" | "enDesarrollo" | "inicial"
-
-export interface FichaResumenTopArea {
-  readonly areaId: string
-  readonly areaNombre: string
-  /** Slug del catálogo de áreas → mapea a `--color-area-{codigo}`. */
-  readonly areaCodigo: string
-  readonly nivelCualitativo: NivelCualitativoArea
-}
-
-export interface FichaResumenResponse {
-  readonly totalAreasConActividad: number
-  readonly topAreas: readonly FichaResumenTopArea[]
-  readonly ultimaSkillDemostrada: {
-    readonly skillNombre: string
-    readonly fecha: string
-  } | null
-}
-
 export interface CopySiguiente {
   readonly atmosfera: AtmosferaCarta
   readonly ctaVariant: "primary" | "aurora" | "secondary" | "ghost"
