@@ -40,7 +40,10 @@ const CATALOGO_VACIO: CatalogoCursoEntry = {
  *
  * El porcentaje se obtiene del motor canonico `PlanPersonalService.obtenerPorcentajeAvance`
  * (D-S7-B6, FIX-P11b-avance §5.128) — no se duplica la regla de seccion
- * completada. Voluntarios sin plan reciben 0 (D-AS-1).
+ * completada para asignados. Voluntarios (D-AS-1: sin PlanEstudio) usan la
+ * misma formula que `MeAvanceService` para voluntarios: aperturas sobre el
+ * total de secciones del curso (catalogo via `CursoModuloHabilitado`). Esto
+ * evita el 0% perpetuo en la card "Mis cursos activos" de la bandeja.
  *
  * Las lecturas autoservicio no se auditan (D-CAT-3).
  *
@@ -214,7 +217,7 @@ export class MeCursosService {
     const porcentajeAvance =
       row.rol === RolAsignacion.ASIGNADO
         ? await this.planPersonalService.obtenerPorcentajeAvance(row.id)
-        : 0
+        : await this.porcentajeAvanceVoluntario(row.id, row.curso.id)
     return {
       asignacionId: row.id,
       cursoId: row.curso.id,
@@ -230,5 +233,25 @@ export class MeCursosService {
       areaCodigo: catalogo.areaCodigo,
       areaNombre: catalogo.areaNombre,
     }
+  }
+
+  /**
+   * Voluntario (D-AS-1: sin PlanEstudio): denominador = total de secciones
+   * del curso (catalogo via `CursoModuloHabilitado`), numerador = aperturas.
+   * Misma formula que `MeAvanceService.obtenerAvance` para voluntarios para
+   * que el % de la card en la bandeja coincida con el del topbar del
+   * inmersivo. Resultado clamped a [0, 100].
+   */
+  private async porcentajeAvanceVoluntario(asignacionId: string, cursoId: string): Promise<number> {
+    const [aperturas, total] = await Promise.all([
+      this.prisma.aperturaSeccion.count({ where: { asignacionId } }),
+      this.prisma.seccion.count({
+        where: { modulo: { cursosModulosHabilitados: { some: { cursoId } } } },
+      }),
+    ])
+    if (total === 0) {
+      return 0
+    }
+    return Math.min(100, Math.round((aperturas / total) * 100))
   }
 }
