@@ -2,11 +2,13 @@ import { Button } from "@/shared/components/ui/button"
 import { tiempoRelativo } from "@/shared/lib/tiempo-relativo"
 import type { IntentoTransversalParticipanteResponse } from "@nexott-learn/shared-types"
 import { ExternalLink, RefreshCw } from "lucide-react"
+import { HistorialIntentosTransversal } from "./historial-intentos-transversal"
 
 const RGX_HTTPS_PREFIJO = /^https:\/\//
 
 interface VistaAunNoTransversalProps {
   readonly intento: IntentoTransversalParticipanteResponse
+  readonly intentos: readonly IntentoTransversalParticipanteResponse[]
   readonly onIntentarDeNuevo: () => void
 }
 
@@ -16,7 +18,11 @@ interface VistaAunNoTransversalProps {
  * coherente con la calidez sobria del manifiesto. El CTA vuelve al brief
  * (form de envio); el prellenado de URL anterior llega en F3.
  */
-export function VistaAunNoTransversal({ intento, onIntentarDeNuevo }: VistaAunNoTransversalProps) {
+export function VistaAunNoTransversal({
+  intento,
+  intentos,
+  onIntentarDeNuevo,
+}: VistaAunNoTransversalProps) {
   return (
     <section className="flex flex-col gap-8">
       <header className="flex flex-col gap-3">
@@ -48,6 +54,8 @@ export function VistaAunNoTransversal({ intento, onIntentarDeNuevo }: VistaAunNo
         </a>
         <p className="text-caption text-text-tertiary">{tiempoRelativo(intento.fecha)}</p>
       </article>
+
+      <HistorialIntentosTransversal intentos={intentos} />
     </section>
   )
 }

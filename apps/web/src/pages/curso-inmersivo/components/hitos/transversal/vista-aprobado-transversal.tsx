@@ -6,11 +6,13 @@ import type { IntentoTransversalParticipanteResponse } from "@nexott-learn/share
 import { motion, useReducedMotion } from "framer-motion"
 import { ArrowRight, ExternalLink } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import { HistorialIntentosTransversal } from "./historial-intentos-transversal"
 
 const RGX_HTTPS_PREFIJO = /^https:\/\//
 
 interface VistaAprobadoTransversalProps {
   readonly intento: IntentoTransversalParticipanteResponse
+  readonly intentos: readonly IntentoTransversalParticipanteResponse[]
   readonly tieneEntrevistaIa: boolean
   readonly onIrAEntrevistaIa: () => void
 }
@@ -26,6 +28,7 @@ interface VistaAprobadoTransversalProps {
  */
 export function VistaAprobadoTransversal({
   intento,
+  intentos,
   tieneEntrevistaIa,
   onIrAEntrevistaIa,
 }: VistaAprobadoTransversalProps) {
@@ -87,6 +90,8 @@ export function VistaAprobadoTransversal({
         </a>
         <p className="text-caption text-text-tertiary">{tiempoRelativo(intento.fecha)}</p>
       </article>
+
+      <HistorialIntentosTransversal intentos={intentos} />
     </section>
   )
 }

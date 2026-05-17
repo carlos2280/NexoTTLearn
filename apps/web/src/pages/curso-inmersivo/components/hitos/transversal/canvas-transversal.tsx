@@ -1,6 +1,9 @@
 import { useListarIntentosTransversal } from "@/features/transversal/hooks/use-listar-intentos-transversal"
 import { useTransversalCurso } from "@/features/transversal/hooks/use-transversal-curso"
-import type { IntentoTransversalParticipanteResponse } from "@nexott-learn/shared-types"
+import type {
+  IntentoTransversalParticipanteResponse,
+  TransversalResponse,
+} from "@nexott-learn/shared-types"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { useMemo, useState } from "react"
 import { VistaAprobadoTransversal } from "./vista-aprobado-transversal"
@@ -74,31 +77,84 @@ export function CanvasTransversal({
     setIntentoIdRecienCreado(intentoId)
   }
 
+  const listaIntentos = intentos.data ?? []
+
   return (
     <main className="flex flex-1 flex-col overflow-y-auto bg-canvas px-8 py-10">
       <div className="mx-auto flex w-full max-w-2xl flex-col">
-        {forzarBrief || intentoActivo === null ? (
-          <VistaBriefTransversal
-            transversal={transversal.data}
-            asignacionId={asignacionId}
-            onIntentoCreado={onIntentoCreado}
-          />
-        ) : intentoActivo.estado === "EN_EVALUACION" ? (
-          <VistaEvaluandoTransversal intento={intentoActivo} />
-        ) : intentoActivo.aprobado ? (
-          <VistaAprobadoTransversal
-            intento={intentoActivo}
-            tieneEntrevistaIa={tieneEntrevistaIa}
-            onIrAEntrevistaIa={onIrAEntrevistaIa}
-          />
-        ) : (
-          <VistaAunNoTransversal
-            intento={intentoActivo}
-            onIntentarDeNuevo={() => setForzarBrief(true)}
-          />
-        )}
+        <ContenidoTransversal
+          transversal={transversal.data}
+          asignacionId={asignacionId}
+          intentoActivo={intentoActivo}
+          intentos={listaIntentos}
+          forzarBrief={forzarBrief}
+          tieneEntrevistaIa={tieneEntrevistaIa}
+          onIntentoCreado={onIntentoCreado}
+          onIrAEntrevistaIa={onIrAEntrevistaIa}
+          onIntentarDeNuevo={() => setForzarBrief(true)}
+        />
       </div>
     </main>
+  )
+}
+
+interface ContenidoTransversalProps {
+  readonly transversal: TransversalResponse
+  readonly asignacionId: string
+  readonly intentoActivo: IntentoTransversalParticipanteResponse | null
+  readonly intentos: readonly IntentoTransversalParticipanteResponse[]
+  readonly forzarBrief: boolean
+  readonly tieneEntrevistaIa: boolean
+  readonly onIntentoCreado: (intentoId: string) => void
+  readonly onIrAEntrevistaIa: () => void
+  readonly onIntentarDeNuevo: () => void
+}
+
+function ContenidoTransversal(props: ContenidoTransversalProps) {
+  const {
+    transversal,
+    asignacionId,
+    intentoActivo,
+    intentos,
+    forzarBrief,
+    tieneEntrevistaIa,
+    onIntentoCreado,
+    onIrAEntrevistaIa,
+    onIntentarDeNuevo,
+  } = props
+
+  if (forzarBrief || intentoActivo === null) {
+    // Al reintentar desde vista 3b, prellenamos el form con la URL del ultimo
+    // intento (spec 05 — "el participante manda otro; el mejor cuenta").
+    const urlInicial = forzarBrief ? intentos[0]?.repoOArtefacto.url : undefined
+    return (
+      <VistaBriefTransversal
+        transversal={transversal}
+        asignacionId={asignacionId}
+        onIntentoCreado={onIntentoCreado}
+        urlInicial={urlInicial}
+      />
+    )
+  }
+  if (intentoActivo.estado === "EN_EVALUACION") {
+    return <VistaEvaluandoTransversal intento={intentoActivo} />
+  }
+  if (intentoActivo.aprobado) {
+    return (
+      <VistaAprobadoTransversal
+        intento={intentoActivo}
+        intentos={intentos}
+        tieneEntrevistaIa={tieneEntrevistaIa}
+        onIrAEntrevistaIa={onIrAEntrevistaIa}
+      />
+    )
+  }
+  return (
+    <VistaAunNoTransversal
+      intento={intentoActivo}
+      intentos={intentos}
+      onIntentarDeNuevo={onIntentarDeNuevo}
+    />
   )
 }
 
