@@ -576,12 +576,14 @@ export {
   meCursosQuerySchema,
   exportarFichaQuerySchema,
   formatoExportFichaSchema,
+  historialFichaQuerySchema,
 } from "./colaboradores"
 export type {
   MeCursoResumen,
   MeCursosQuery,
   ExportarFichaQuery,
   FormatoExportFicha,
+  HistorialFichaQuery,
 } from "./colaboradores"
 
 // Colaboradores — arbol unificado de curso (modo asignado/voluntario/preview).

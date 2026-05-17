@@ -2,12 +2,14 @@ export {
   meCursosQuerySchema,
   exportarFichaQuerySchema,
   formatoExportFichaSchema,
+  historialFichaQuerySchema,
 } from "./me-cursos.types"
 export type {
   MeCursoResumen,
   MeCursosQuery,
   ExportarFichaQuery,
   FormatoExportFicha,
+  HistorialFichaQuery,
 } from "./me-cursos.types"
 
 export {

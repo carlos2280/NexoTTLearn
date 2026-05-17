@@ -69,3 +69,19 @@ export const exportarFichaQuerySchema = z.object({
   formato: formatoExportFichaSchema,
 })
 export type ExportarFichaQuery = z.infer<typeof exportarFichaQuerySchema>
+
+/**
+ * `GET /api/v1/me/ficha/historial` (B-24) — timeline cronologico unificado del
+ * colaborador para la seccion "Tu historial" de /mi-ficha. UNION de
+ * `historico_notas_skill` + hitos de cada `AsignacionCurso` (iniciado /
+ * completado), ordenado por fecha DESC.
+ *
+ * Paginacion: por ahora solo `limite` (default 50, max 100). El frontend
+ * pagina en memoria. La paginacion cursor real se anadira si surge necesidad
+ * por volumen — el shape soporta el cursor opcional.
+ */
+export const historialFichaQuerySchema = z.object({
+  cursor: z.string().min(1).optional(),
+  limite: z.coerce.number().int().min(1).max(100).default(50),
+})
+export type HistorialFichaQuery = z.infer<typeof historialFichaQuerySchema>

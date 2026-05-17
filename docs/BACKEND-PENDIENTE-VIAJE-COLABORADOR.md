@@ -14,8 +14,9 @@
 >
 > **Sprint 2 COMPLETO ✅:** B-4, B-26.
 >
-> **Sprint 3 en curso:** B-1 (`ESPERANDO_REVISION`) ✅ HECHO. Faltan
-> B-24 (`GET /me/ficha/historial`) y B-25 (`GET /me/ficha/exportar`).
+> **Sprint 3 en curso:** B-1 ✅ HECHO. B-24
+> (`GET /me/ficha/historial`) ✅ HECHO. Falta B-25
+> (`GET /me/ficha/exportar`).
 >
 > **Convenciones API:** todas las rutas bajo `/api/v1/...`. Autenticación
 > por sesión (`req.session`, cookie `nexott.sid`). CSRF doble token
@@ -359,7 +360,7 @@ Al implementar, **borrar las extensiones locales** en
 
 <a id="b-24"></a>
 
-## B-24 · `GET /me/ficha/historial` (nuevo endpoint)
+## B-24 · `GET /me/ficha/historial` (nuevo endpoint) — ✅ HECHO (2026-05-17)
 
 **Origen:** `packages/shared-types/src/evaluacion-inicial/ficha.schema.ts:81-128`
 (tipo `EventoHistorialFicha` ya definido),

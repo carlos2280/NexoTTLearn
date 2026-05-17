@@ -10,16 +10,22 @@ import {
 import { Throttle } from "@nestjs/throttler"
 import type {
   CursoArbolResponse,
+  EventoHistorialFicha,
   ExportarFichaQuery,
   FichaResponse,
   FichaResumenResponse,
+  HistorialFichaQuery,
   MeAvanceCursoResponse,
   MeBandejaResponse,
   MeCursoResumen,
   MeCursosQuery,
   ResumenCierreCurso,
 } from "@nexott-learn/shared-types"
-import { exportarFichaQuerySchema, meCursosQuerySchema } from "@nexott-learn/shared-types"
+import {
+  exportarFichaQuerySchema,
+  historialFichaQuerySchema,
+  meCursosQuerySchema,
+} from "@nexott-learn/shared-types"
 import { AccionAuditoria, RolUsuario } from "@prisma/client"
 import type { Response } from "express"
 import { AuditLogService } from "../common/audit/audit-log.service"
@@ -35,6 +41,7 @@ import { MeBandejaService } from "./me-bandeja.service"
 import { MeCursoArbolService } from "./me-curso-arbol.service"
 import { MeCursosService } from "./me-cursos.service"
 import { fichaACsv, fichaAPdf } from "./me-ficha-export.helpers"
+import { MeFichaHistorialService } from "./me-ficha-historial.service"
 import { MeFichaResumenService } from "./me-ficha-resumen.service"
 import { MeResumenCierreService } from "./me-resumen-cierre.service"
 
@@ -60,6 +67,7 @@ export class MeController {
     private readonly meBandejaService: MeBandejaService,
     private readonly meCursoArbolService: MeCursoArbolService,
     private readonly meCursosService: MeCursosService,
+    private readonly meFichaHistorialService: MeFichaHistorialService,
     private readonly meFichaResumenService: MeFichaResumenService,
     private readonly meResumenCierreService: MeResumenCierreService,
     private readonly auditLog: AuditLogService,
@@ -87,6 +95,22 @@ export class MeController {
   ): Promise<FichaResumenResponse> {
     const sesion = this.requireUsuario(usuario)
     return this.meFichaResumenService.obtenerResumen(sesion.usuarioId)
+  }
+
+  /**
+   * `GET /me/ficha/historial` (B-24). Timeline cronologico unificado del
+   * colaborador para la seccion "Tu historial" de /mi-ficha. Devuelve la
+   * union ordenada por fecha DESC de cambios de skill + hitos de curso.
+   */
+  @Get("ficha/historial")
+  @Roles(RolUsuario.PARTICIPANTE, RolUsuario.ADMIN)
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  obtenerMiHistorialFicha(
+    @CurrentUser() usuario: SesionUsuario | undefined,
+    @Query(new ZodValidationPipe(historialFichaQuerySchema)) query: HistorialFichaQuery,
+  ): Promise<readonly EventoHistorialFicha[]> {
+    const sesion = this.requireUsuario(usuario)
+    return this.meFichaHistorialService.obtenerHistorialDeUsuario(sesion.usuarioId, query.limite)
   }
 
   @Get("cursos")

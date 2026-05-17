@@ -1,0 +1,242 @@
+import { Injectable, NotFoundException } from "@nestjs/common"
+import type { EventoHistorialFicha, NivelCualitativoArea } from "@nexott-learn/shared-types"
+import { EstadoAsignado, EstadoVoluntario, OrigenNotaSkill, RolAsignacion } from "@prisma/client"
+import { apiErrorCodes } from "../common/errors/api-error.codes"
+import { PrismaService } from "../common/prisma/prisma.service"
+
+const UMBRAL_EXCELENCIA = 85
+const UMBRAL_SOLIDO = 70
+const UMBRAL_DESARROLLO = 50
+
+/**
+ * `MeFichaHistorialService` — B-24. UNION cronologico de hitos del colaborador
+ * para la seccion "Tu historial" de `/mi-ficha`:
+ *
+ *  - `SKILL_DEMOSTRADA` desde `HistoricoNotaSkill` (entradas con `valor` no
+ *    nulo; las marcas "sin evidencia" no son hitos visibles).
+ *  - `CURSO_INICIADO` desde `AsignacionCurso.createdAt`.
+ *  - `CURSO_COMPLETADO` desde `AsignacionCurso.fechaCierre` cuando el estado
+ *    es APTO/NO_APTO (asignado) o COMPLETADO (voluntario).
+ *
+ * Devuelve la union ordenada por fecha DESC, cortada al `limite` solicitado.
+ * El frontend (`tu-historial.tsx`) pagina en memoria con un boton "Ver mas".
+ * El parametro `cursor` esta en el contrato pero todavia no se interpreta —
+ * cuando el volumen crezca se evolucionara a cursor real `(fecha, id)`.
+ */
+@Injectable()
+export class MeFichaHistorialService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async obtenerHistorialDeUsuario(
+    usuarioId: string,
+    limite: number,
+  ): Promise<readonly EventoHistorialFicha[]> {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: usuarioId },
+      select: { colaboradorId: true },
+    })
+    if (!usuario?.colaboradorId) {
+      throw new NotFoundException({
+        code: apiErrorCodes.colaboradorNoEncontrado,
+        message: "Colaborador no encontrado.",
+      })
+    }
+    return this.obtenerHistorial(usuario.colaboradorId, limite)
+  }
+
+  async obtenerHistorial(
+    colaboradorId: string,
+    limite: number,
+  ): Promise<readonly EventoHistorialFicha[]> {
+    const [historicoSkills, asignaciones] = await Promise.all([
+      this.cargarHistoricoSkills(colaboradorId, limite),
+      this.cargarAsignaciones(colaboradorId, limite),
+    ])
+
+    const eventos: EventoHistorialFicha[] = [
+      ...historicoSkills.map(toEventoSkillDemostrada),
+      ...asignaciones.flatMap(toEventosCurso),
+    ]
+
+    return eventos.sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, limite)
+  }
+
+  private cargarHistoricoSkills(
+    colaboradorId: string,
+    limite: number,
+  ): Promise<readonly HistoricoSkillRow[]> {
+    return this.prisma.historicoNotaSkill.findMany({
+      where: {
+        valor: { not: null },
+        notaSkill: { colaboradorId },
+      },
+      select: {
+        id: true,
+        fecha: true,
+        valor: true,
+        origen: true,
+        referencia: true,
+        notaSkill: {
+          select: {
+            skill: {
+              select: {
+                id: true,
+                etiquetaVisible: true,
+                area: { select: { id: true, nombre: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { fecha: "desc" },
+      take: limite,
+    })
+  }
+
+  private cargarAsignaciones(
+    colaboradorId: string,
+    limite: number,
+  ): Promise<readonly AsignacionRow[]> {
+    return this.prisma.asignacionCurso.findMany({
+      where: { colaboradorId },
+      select: {
+        id: true,
+        rol: true,
+        estadoAsignado: true,
+        estadoVoluntario: true,
+        createdAt: true,
+        fechaCierre: true,
+        curso: { select: { id: true, titulo: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      // Cada asignacion puede generar hasta 2 eventos (iniciado + completado),
+      // por eso tomamos `limite` y no `limite/2`. Luego el sort + slice corta.
+      take: limite,
+    })
+  }
+}
+
+interface HistoricoSkillRow {
+  readonly id: string
+  readonly fecha: Date
+  readonly valor: { toString(): string } | null
+  readonly origen: OrigenNotaSkill
+  readonly referencia: unknown
+  readonly notaSkill: {
+    readonly skill: {
+      readonly id: string
+      readonly etiquetaVisible: string
+      readonly area: { readonly id: string; readonly nombre: string }
+    }
+  }
+}
+
+interface AsignacionRow {
+  readonly id: string
+  readonly rol: RolAsignacion
+  readonly estadoAsignado: EstadoAsignado | null
+  readonly estadoVoluntario: EstadoVoluntario | null
+  readonly createdAt: Date
+  readonly fechaCierre: Date | null
+  readonly curso: { readonly id: string; readonly titulo: string }
+}
+
+function toEventoSkillDemostrada(row: HistoricoSkillRow): EventoHistorialFicha {
+  const valor = row.valor === null ? null : Number(row.valor.toString())
+  return {
+    tipo: "SKILL_DEMOSTRADA",
+    id: row.id,
+    fecha: row.fecha.toISOString(),
+    skillId: row.notaSkill.skill.id,
+    skillNombre: row.notaSkill.skill.etiquetaVisible,
+    areaId: row.notaSkill.skill.area.id,
+    areaNombre: row.notaSkill.skill.area.nombre,
+    nivelCualitativo: nivelDesdeNota(valor),
+    origenNarrativo: narrarOrigen(row.origen),
+    origen: row.origen,
+    ...(extraerIntentoIaId(row.origen, row.referencia) !== null
+      ? { referenciaIntentoIaId: extraerIntentoIaId(row.origen, row.referencia) ?? undefined }
+      : {}),
+  }
+}
+
+function toEventosCurso(asig: AsignacionRow): readonly EventoHistorialFicha[] {
+  const eventos: EventoHistorialFicha[] = [
+    {
+      tipo: "CURSO_INICIADO",
+      id: `curso-iniciado-${asig.id}`,
+      fecha: asig.createdAt.toISOString(),
+      cursoId: asig.curso.id,
+      cursoTitulo: asig.curso.titulo,
+    },
+  ]
+  if (asig.fechaCierre !== null && esCompletadoVisible(asig)) {
+    eventos.push({
+      tipo: "CURSO_COMPLETADO",
+      id: `curso-completado-${asig.id}`,
+      fecha: asig.fechaCierre.toISOString(),
+      cursoId: asig.curso.id,
+      cursoTitulo: asig.curso.titulo,
+    })
+  }
+  return eventos
+}
+
+function esCompletadoVisible(asig: AsignacionRow): boolean {
+  if (asig.rol === RolAsignacion.ASIGNADO) {
+    return (
+      asig.estadoAsignado === EstadoAsignado.APTO || asig.estadoAsignado === EstadoAsignado.NO_APTO
+    )
+  }
+  return asig.estadoVoluntario === EstadoVoluntario.COMPLETADO
+}
+
+function nivelDesdeNota(nota: number | null): NivelCualitativoArea {
+  if (nota === null) {
+    return "sinTocar"
+  }
+  if (nota >= UMBRAL_EXCELENCIA) {
+    return "excelencia"
+  }
+  if (nota >= UMBRAL_SOLIDO) {
+    return "solido"
+  }
+  if (nota >= UMBRAL_DESARROLLO) {
+    return "enDesarrollo"
+  }
+  return "inicial"
+}
+
+/**
+ * Narrativa humanizada del origen de la skill. Mantengo intencionalmente
+ * generica (sin lookup cruzado a curso/bloque) para no introducir N+1; un
+ * sprint posterior puede enriquecer con `cursoTitulo` resuelto desde
+ * `referencia.cursoId` cuando sea critico para UX.
+ */
+function narrarOrigen(origen: OrigenNotaSkill): string {
+  switch (origen) {
+    case OrigenNotaSkill.ENTREVISTA_INICIAL:
+      return "Entrevista inicial"
+    case OrigenNotaSkill.BLOQUE:
+      return "Bloque evaluable"
+    case OrigenNotaSkill.TRANSVERSAL:
+      return "Proyecto transversal"
+    case OrigenNotaSkill.ENTREVISTA_IA:
+      return "Entrevista IA"
+    case OrigenNotaSkill.MANUAL:
+      return "Ajuste del administrador"
+    default:
+      return "Actualizacion"
+  }
+}
+
+function extraerIntentoIaId(origen: OrigenNotaSkill, referencia: unknown): string | null {
+  if (origen !== OrigenNotaSkill.ENTREVISTA_IA) {
+    return null
+  }
+  if (referencia === null || typeof referencia !== "object" || Array.isArray(referencia)) {
+    return null
+  }
+  const valor = (referencia as Record<string, unknown>).intentoEntrevistaIaId
+  return typeof valor === "string" ? valor : null
+}

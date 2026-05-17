@@ -9,6 +9,7 @@ import { MeAvanceService } from "./me-avance.service"
 import { MeBandejaService } from "./me-bandeja.service"
 import { MeCursoArbolService } from "./me-curso-arbol.service"
 import { MeCursosService } from "./me-cursos.service"
+import { MeFichaHistorialService } from "./me-ficha-historial.service"
 import { MeFichaResumenService } from "./me-ficha-resumen.service"
 import { MeResumenCierreService } from "./me-resumen-cierre.service"
 import { MeController } from "./me.controller"
@@ -36,6 +37,7 @@ import { MeController } from "./me.controller"
     MeBandejaService,
     MeCursoArbolService,
     MeCursosService,
+    MeFichaHistorialService,
     MeFichaResumenService,
     MeResumenCierreService,
   ],
@@ -47,6 +49,7 @@ import { MeController } from "./me.controller"
     MeBandejaService,
     MeCursoArbolService,
     MeCursosService,
+    MeFichaHistorialService,
     MeFichaResumenService,
     MeResumenCierreService,
   ],
