@@ -3,6 +3,7 @@ import type {
   CursoDetalle,
   DisponibilidadEntrevistaIaResponse,
   DisponibilidadTransversalResponse,
+  EtiquetaCualitativa,
   MeAvanceCursoResponse,
   PlanResponseParticipante,
 } from "@nexott-learn/shared-types"
@@ -711,13 +712,60 @@ function handlerAvanceCurso(req: MockRequest): MockAvanceConCamino {
   if (!cursoId) {
     throw new ApiError(404, "NOT_FOUND", "Curso no encontrado")
   }
+  let base: MockAvanceConCamino
   if (cursoId === "curso-java-senior") {
-    return AVANCE_JAVA
+    base = AVANCE_JAVA
+  } else if (cursoId === "curso-fullstack-devops") {
+    base = AVANCE_FULLSTACK
+  } else {
+    base = buildAvanceFallback(cursoId)
   }
-  if (cursoId === "curso-fullstack-devops") {
-    return AVANCE_FULLSTACK
+  return aplicarCierreSiCorresponde(base, cursoId)
+}
+
+// Permite alternar el banner persistente "Curso cerrado" del inmersivo desde
+// devtools. Setea en consola:
+//   localStorage.setItem("nexott-mock:cursos-cerrados", "curso-java-senior,curso-cierre-no-apto")
+// y recarga el inmersivo del curso. Borra la clave para volver a flujo normal.
+const STORAGE_KEY_CURSOS_CERRADOS = "nexott-mock:cursos-cerrados"
+
+const CIERRE_POR_CURSO: Readonly<Record<string, { etiqueta: EtiquetaCualitativa; nota: number }>> =
+  {
+    "curso-fullstack-devops": { etiqueta: "excelencia", nota: 88 },
+    "curso-java-senior": { etiqueta: "solido", nota: 78 },
+    "curso-cierre-no-apto": { etiqueta: "enDesarrollo", nota: 62 },
   }
-  return buildAvanceFallback(cursoId)
+
+function leerCursosCerrados(): ReadonlySet<string> {
+  if (typeof window === "undefined") {
+    return new Set()
+  }
+  const raw = window.localStorage.getItem(STORAGE_KEY_CURSOS_CERRADOS)
+  if (!raw) {
+    return new Set()
+  }
+  return new Set(
+    raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  )
+}
+
+function aplicarCierreSiCorresponde(
+  base: MockAvanceConCamino,
+  cursoId: string,
+): MockAvanceConCamino {
+  if (!leerCursosCerrados().has(cursoId)) {
+    return base
+  }
+  const cierre = CIERRE_POR_CURSO[cursoId] ?? { etiqueta: "solido" as const, nota: 70 }
+  return {
+    ...base,
+    estaCerrado: true,
+    etiquetaCualitativaFinal: cierre.etiqueta,
+    notaGlobalFinal: cierre.nota,
+  }
 }
 
 function handlerPlan(req: MockRequest): PlanResponseParticipante {

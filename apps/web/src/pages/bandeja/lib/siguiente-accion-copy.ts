@@ -165,8 +165,8 @@ function obtenerCopyResultadoCierre(accion: {
       eyebrow: "Curso completado",
       titulo: "Listo para presentarte al cliente.",
       descripcion: `Cerraste «${accion.cursoTitulo}» como APTO. La consultora decide si te presenta a la entrevista real.`,
-      cta: "Ver resultado",
-      ruta: RUTAS.participante.cursoDetalle(accion.cursoId),
+      cta: "Ver cómo te fue",
+      ruta: RUTAS.participante.cursoCerrado(accion.cursoId),
       icono: Award,
       porQueAqui: "Cierre reciente como APTO.",
     }
@@ -178,8 +178,8 @@ function obtenerCopyResultadoCierre(accion: {
       eyebrow: "Curso completado",
       titulo: "Lo que aprendiste quedó en tu ficha.",
       descripcion: `Terminaste «${accion.cursoTitulo}» como voluntario. Las skills demostradas suman a tu ficha personal.`,
-      cta: "Ver resultado",
-      ruta: RUTAS.participante.cursoDetalle(accion.cursoId),
+      cta: "Ver cómo te fue",
+      ruta: RUTAS.participante.cursoCerrado(accion.cursoId),
       icono: Award,
       porQueAqui: "Cierre reciente como voluntario.",
     }
@@ -191,8 +191,8 @@ function obtenerCopyResultadoCierre(accion: {
     titulo: accion.cursoTitulo,
     descripcion:
       "El curso cerró con resultado no apto. Revisa observaciones y áreas a reforzar; el administrador puede reabrir tu caso si conviene.",
-    cta: "Ver detalle",
-    ruta: RUTAS.participante.cursoDetalle(accion.cursoId),
+    cta: "Ver cómo te fue",
+    ruta: RUTAS.participante.cursoCerrado(accion.cursoId),
     icono: RotateCcw,
     porQueAqui: "Cierre reciente como NO APTO.",
   }

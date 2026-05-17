@@ -150,10 +150,13 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
   return (
     <div className="nx-motion-immersive flex h-screen flex-col bg-canvas">
       <TopbarInmersivo
+        cursoId={arbol.curso.id}
         cursoTitulo={arbol.curso.titulo}
         clienteNombre={arbol.curso.cliente.nombre}
         areaPrincipal={arbol.curso.areaPrincipal}
         porcentajeAvance={avance?.porcentajeAvance ?? null}
+        estaCerrado={avance?.estaCerrado ?? false}
+        etiquetaCualitativaFinal={avance?.etiquetaCualitativaFinal ?? null}
       />
       <div className={grid}>
         <SidebarPlan

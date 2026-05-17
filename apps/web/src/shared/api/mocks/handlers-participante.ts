@@ -331,16 +331,24 @@ function handlerMeCursos(req: MockRequest): Paginated<MockMeCursoResumen> {
   return paginar(filtrados, page, pageSize)
 }
 
+// Permite alternar el "siguiente paso" desde devtools para validar pantallas
+// dependientes (ej. trigger del cierre en la pantalla 08). Setea en consola:
+//   localStorage.setItem("nexott-mock:bandeja-escenario", "cierre-apto")
+//   localStorage.setItem("nexott-mock:bandeja-escenario", "cierre-apto-comentario")
+//   localStorage.setItem("nexott-mock:bandeja-escenario", "cierre-no-apto")
+// Borrar la clave o setear "continuar" devuelve al flujo normal.
+const STORAGE_KEY_BANDEJA = "nexott-mock:bandeja-escenario"
+
+function leerEscenarioBandeja(): string {
+  if (typeof window === "undefined") {
+    return "continuar"
+  }
+  return window.localStorage.getItem(STORAGE_KEY_BANDEJA) ?? "continuar"
+}
+
 function handlerMeBandeja(_req: MockRequest): MeBandejaResponse {
   return {
-    siguienteAccion: {
-      tipo: "CONTINUAR_CURSO",
-      asignacionId: "asg-java-001",
-      cursoId: "curso-java-senior",
-      cursoTitulo: "Java Senior",
-      porcentajeAvance: 62,
-      siguienteSeccionTitulo: "APIs REST con Spring",
-    },
+    siguienteAccion: siguienteAccionPorEscenario(leerEscenarioBandeja()),
     // Bandas legacy — el nuevo diseño solo consume `siguienteAccion`.
     pendientes: [],
     novedades: [],
@@ -349,6 +357,47 @@ function handlerMeBandeja(_req: MockRequest): MeBandejaResponse {
       cursosVoluntariadoAbiertos: MOCK_VOLUNTARIADO_TOTAL,
       cursosActivos: MOCK_MIS_CURSOS.filter((c) => c.cursoEstado === "ACTIVO").length,
     },
+  }
+}
+
+function siguienteAccionPorEscenario(escenario: string): MeBandejaResponse["siguienteAccion"] {
+  switch (escenario) {
+    case "cierre-apto":
+      return {
+        tipo: "RESULTADO_CIERRE_LISTO",
+        asignacionId: "asg-fullstack-013",
+        cursoId: "curso-fullstack-devops",
+        cursoTitulo: "Fundamentos Full-Stack & DevOps",
+        resultado: "APTO",
+        fechaCierre: diasDesdeHoy(-1),
+      }
+    case "cierre-apto-comentario":
+      return {
+        tipo: "RESULTADO_CIERRE_LISTO",
+        asignacionId: "asg-java-001",
+        cursoId: "curso-java-senior",
+        cursoTitulo: "Java Senior",
+        resultado: "APTO",
+        fechaCierre: diasDesdeHoy(-2),
+      }
+    case "cierre-no-apto":
+      return {
+        tipo: "RESULTADO_CIERRE_LISTO",
+        asignacionId: "asg-ams-014",
+        cursoId: "curso-cierre-no-apto",
+        cursoTitulo: "AMS Frontend + Backend Django",
+        resultado: "NO_APTO",
+        fechaCierre: diasDesdeHoy(-1),
+      }
+    default:
+      return {
+        tipo: "CONTINUAR_CURSO",
+        asignacionId: "asg-java-001",
+        cursoId: "curso-java-senior",
+        cursoTitulo: "Java Senior",
+        porcentajeAvance: 62,
+        siguienteSeccionTitulo: "APIs REST con Spring",
+      }
   }
 }
 
