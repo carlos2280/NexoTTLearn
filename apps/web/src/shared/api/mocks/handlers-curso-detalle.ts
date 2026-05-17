@@ -334,6 +334,13 @@ const PLAN_FULLSTACK: PlanResponseParticipante = {
           completada: false,
           avance: { bloquesCompletados: 2, bloquesTotales: 5 },
         },
+        {
+          seccionId: "sec-fs-2-quiz",
+          titulo: "Quiz de repaso · Python para APIs",
+          caracter: "OBLIGATORIA",
+          completada: false,
+          avance: { bloquesCompletados: 0, bloquesTotales: 1 },
+        },
       ],
     },
     {

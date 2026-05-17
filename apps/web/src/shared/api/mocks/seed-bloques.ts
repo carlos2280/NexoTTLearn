@@ -1110,6 +1110,91 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     { esEvaluable: true, skillQueMideId: ID_SKILL_PYTHON },
   ),
 
+  // -- sec-fs-2-quiz: Quiz de repaso (4 subtipos) --
+  nuevoBloque(uuid("fa-qz-intro"), "sec-fs-2-quiz", 1, "PARRAFO", {
+    html: "<h2>Repaso · Python y FastAPI</h2><p>Cuatro preguntas cortas para anclar lo que acabas de leer. La solución se muestra al aprobar; cada explicación te dice <em>por qué</em>, no solo <em>qué</em>.</p>",
+    textoPlano: "Quiz corto de repaso sobre Python y FastAPI.",
+    tiempoLecturaMin: 1,
+  }),
+  nuevoBloque(
+    uuid("fa-qz-quiz"),
+    "sec-fs-2-quiz",
+    2,
+    "QUIZ",
+    {
+      intentosMax: null,
+      solucionVisible: "al_aprobar",
+      ordenAleatorio: false,
+      notaMinima: 60,
+      preguntas: [
+        {
+          id: "qzr-p1",
+          tipo: "OPCION_UNICA",
+          enunciado:
+            "¿Qué librería usa FastAPI para validar el body de un request a partir de type hints?",
+          opciones: [
+            { id: "qzr-p1-a", texto: "Marshmallow", esCorrecta: false },
+            { id: "qzr-p1-b", texto: "Pydantic", esCorrecta: true },
+            { id: "qzr-p1-c", texto: "attrs", esCorrecta: false },
+            { id: "qzr-p1-d", texto: "dataclasses puro", esCorrecta: false },
+          ],
+          explicacion:
+            "Pydantic interpreta los type hints como contrato y devuelve errores estructurados. FastAPI lo enchufa por defecto.",
+        },
+        {
+          id: "qzr-p2",
+          tipo: "OPCION_MULTIPLE",
+          enunciado:
+            "¿Cuáles de estas afirmaciones sobre FastAPI son ciertas? (marca todas las que apliquen)",
+          opciones: [
+            {
+              id: "qzr-p2-a",
+              texto: "Genera documentación OpenAPI automáticamente a partir de los handlers.",
+              esCorrecta: true,
+            },
+            {
+              id: "qzr-p2-b",
+              texto: "Solo soporta endpoints síncronos; no admite async/await.",
+              esCorrecta: false,
+            },
+            {
+              id: "qzr-p2-c",
+              texto: "Permite usar Pydantic models como tipo del parámetro del handler.",
+              esCorrecta: true,
+            },
+            {
+              id: "qzr-p2-d",
+              texto:
+                "Reemplaza por completo al servidor (incluye su propio web server en producción).",
+              esCorrecta: false,
+            },
+          ],
+          explicacion:
+            "FastAPI documenta y valida solo. Para producción se monta detrás de Uvicorn/Gunicorn — no trae web server propio para alta carga.",
+        },
+        {
+          id: "qzr-p3",
+          tipo: "VERDADERO_FALSO",
+          enunciado:
+            "En Python, una función definida con `async def` siempre se ejecuta en paralelo en varios hilos.",
+          correcta: false,
+          explicacion:
+            "async no significa multi-thread. Se ejecuta cooperativamente en un único hilo del event loop; cede el control con `await`.",
+        },
+        {
+          id: "qzr-p4",
+          tipo: "RESPUESTA_CORTA",
+          enunciado:
+            "¿Cuál es el binario más común para arrancar una app FastAPI en desarrollo? (una sola palabra)",
+          respuestasAceptadas: ["uvicorn"],
+          explicacion:
+            "Uvicorn es el ASGI server estándar para FastAPI en dev. La forma típica es `uvicorn main:app --reload`.",
+        },
+      ],
+    },
+    { esEvaluable: true, skillQueMideId: ID_SKILL_PYTHON },
+  ),
+
   // -- sec-fs-3-1: Git workflow basico --
   nuevoBloque(uuid("fa21"), "sec-fs-3-1", 1, "PARRAFO", {
     html: "<h2>El ciclo del dia a dia</h2><p>El 90% del trabajo con Git es la misma secuencia: <code>status</code> para ver donde estas, <code>add</code> para preparar cambios, <code>commit</code> para guardarlos con mensaje, y <code>push</code> para publicarlos al remoto.</p>",
