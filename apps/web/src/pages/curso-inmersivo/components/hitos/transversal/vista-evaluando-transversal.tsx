@@ -1,18 +1,19 @@
+import { tiempoRelativo } from "@/shared/lib/tiempo-relativo"
 import type { IntentoTransversalParticipanteResponse } from "@nexott-learn/shared-types"
 import { ExternalLink } from "lucide-react"
 
 const RGX_HTTPS_PREFIJO = /^https:\/\//
 
-interface VistaEvaluandoStubProps {
+interface VistaEvaluandoTransversalProps {
   readonly intento: IntentoTransversalParticipanteResponse
 }
 
 /**
- * Placeholder de la "vista 2" del transversal (en evaluacion) para F1. Aun no
- * polleamos — esta version solo confirma visualmente que el envio se persistio
- * y muestra el intento creado. La vista 2 completa con polling viene en F2.
+ * Vista 2 del transversal (spec 05) — intento en evaluacion. El polling vive
+ * en el orquestador via `useListarIntentosTransversal({ pollingActivo: true })`;
+ * cuando el intento finaliza, el orquestador conmuta a vista 3a o 3b.
  */
-export function VistaEvaluandoStub({ intento }: VistaEvaluandoStubProps) {
+export function VistaEvaluandoTransversal({ intento }: VistaEvaluandoTransversalProps) {
   return (
     <section className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
@@ -27,18 +28,17 @@ export function VistaEvaluandoStub({ intento }: VistaEvaluandoStubProps) {
 
       <article className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-6">
         <span className="nx-eyebrow text-text-tertiary">Tu intento</span>
-        <div className="flex items-center gap-3">
-          <a
-            href={intento.repoOArtefacto.url}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="inline-flex items-center gap-1.5 font-mono text-accent text-body-sm hover:underline"
-          >
-            {intento.repoOArtefacto.url.replace(RGX_HTTPS_PREFIJO, "")}
-            <ExternalLink className="h-3 w-3" aria-hidden={true} />
-          </a>
-        </div>
-        <div className="flex items-center gap-2">
+        <a
+          href={intento.repoOArtefacto.url}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="inline-flex w-fit items-center gap-1.5 font-mono text-accent text-body-sm hover:underline"
+        >
+          {intento.repoOArtefacto.url.replace(RGX_HTTPS_PREFIJO, "")}
+          <ExternalLink className="h-3 w-3" aria-hidden={true} />
+        </a>
+        <p className="text-caption text-text-tertiary">Enviado {tiempoRelativo(intento.fecha)}</p>
+        <div className="mt-1 flex items-center gap-2">
           <span
             aria-hidden={true}
             className="nx-pulse-dot inline-block h-2 w-2 rounded-pill bg-aurora-cyan"

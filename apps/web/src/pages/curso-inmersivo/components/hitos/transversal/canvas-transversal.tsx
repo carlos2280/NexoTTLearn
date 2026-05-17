@@ -1,34 +1,54 @@
 import { useListarIntentosTransversal } from "@/features/transversal/hooks/use-listar-intentos-transversal"
 import { useTransversalCurso } from "@/features/transversal/hooks/use-transversal-curso"
+import type { IntentoTransversalParticipanteResponse } from "@nexott-learn/shared-types"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { useMemo, useState } from "react"
+import { VistaAprobadoTransversal } from "./vista-aprobado-transversal"
+import { VistaAunNoTransversal } from "./vista-aun-no-transversal"
 import { VistaBriefTransversal } from "./vista-brief-transversal"
-import { VistaEvaluandoStub } from "./vista-evaluando-stub"
+import { VistaEvaluandoTransversal } from "./vista-evaluando-transversal"
 
 interface CanvasTransversalProps {
   readonly cursoId: string
   readonly asignacionId: string | null
+  readonly tieneEntrevistaIa: boolean
+  readonly onIrAEntrevistaIa: () => void
 }
 
 /**
- * Orquestador del canvas del proyecto transversal (spec 05). En F1 cubre:
- *  - Vista 1 (brief + envio) cuando no hay intento previo activo.
- *  - Vista evaluando (stub) cuando ya existe un intento `EN_EVALUACION`.
+ * Orquestador del canvas del proyecto transversal (spec 05). Decide que vista
+ * renderizar segun el estado del ultimo intento:
  *
- * Vistas 3a/3b (aprobado / aun no) y polling completo llegan en F2.
+ *  - `forzarBrief` activo (click "Enviar otro intento") → Vista 1.
+ *  - Intento EN_EVALUACION → Vista 2 (con polling cada 10s).
+ *  - Intento FINALIZADO + aprobado → Vista 3a (recompensa cumbre).
+ *  - Intento FINALIZADO + !aprobado → Vista 3b (sin rojo, motivadora).
+ *  - Sin intentos → Vista 1 (brief).
+ *
+ * El polling se enciende solo si hay intento en evaluacion, asi evitamos
+ * requests innecesarios cuando el participante consulta un historico.
  */
-export function CanvasTransversal({ cursoId, asignacionId }: CanvasTransversalProps) {
-  const transversal = useTransversalCurso(cursoId)
-  const intentos = useListarIntentosTransversal(asignacionId)
+export function CanvasTransversal({
+  cursoId,
+  asignacionId,
+  tieneEntrevistaIa,
+  onIrAEntrevistaIa,
+}: CanvasTransversalProps) {
+  const [forzarBrief, setForzarBrief] = useState(false)
   const [intentoIdRecienCreado, setIntentoIdRecienCreado] = useState<string | null>(null)
 
-  const intentoEnEvaluacion = useMemo(() => {
-    const lista = intentos.data ?? []
-    if (intentoIdRecienCreado) {
-      return lista.find((i) => i.intentoId === intentoIdRecienCreado) ?? null
-    }
-    return lista.find((i) => i.estado === "EN_EVALUACION") ?? null
-  }, [intentos.data, intentoIdRecienCreado])
+  const transversal = useTransversalCurso(cursoId)
+
+  const intentos = useListarIntentosTransversal(asignacionId)
+  const haySondeable = (intentos.data ?? []).some((i) => i.estado === "EN_EVALUACION")
+  // Segunda lectura con polling activo si hay intento en evaluacion. Tanstack
+  // dedupe por queryKey, asi que esto NO dispara dos requests.
+  useListarIntentosTransversal(asignacionId, { pollingActivo: haySondeable })
+
+  const intentoActivo = useMemo(
+    () => decidirIntentoActivo(intentos.data ?? [], intentoIdRecienCreado),
+    [intentos.data, intentoIdRecienCreado],
+  )
 
   if (transversal.isLoading || intentos.isLoading) {
     return (
@@ -42,49 +62,90 @@ export function CanvasTransversal({ cursoId, asignacionId }: CanvasTransversalPr
   }
 
   if (transversal.error || !transversal.data) {
-    return (
-      <main className="flex flex-1 items-center justify-center bg-canvas px-6 py-10">
-        <article className="flex max-w-md flex-col items-start gap-3">
-          <span className="nx-eyebrow inline-flex items-center gap-2 text-text-tertiary">
-            <AlertCircle className="h-3.5 w-3.5" aria-hidden={true} />
-            Hito de cierre
-          </span>
-          <h2 className="text-h2 text-text-primary">No pudimos cargar el proyecto transversal.</h2>
-          <p className="text-body-sm text-text-secondary">
-            Reintenta en un momento. Si persiste, avisa al administrador del curso.
-          </p>
-        </article>
-      </main>
-    )
+    return <ErrorCanvas />
   }
 
   if (!asignacionId) {
-    return (
-      <main className="flex flex-1 items-center justify-center bg-canvas px-6 py-10">
-        <article className="flex max-w-md flex-col items-start gap-3">
-          <span className="nx-eyebrow text-text-tertiary">Hito de cierre</span>
-          <h2 className="text-h2 text-text-primary">Proyecto transversal</h2>
-          <p className="text-body-sm text-text-secondary">
-            Necesitas estar inscrito en el curso para enviar tu proyecto.
-          </p>
-        </article>
-      </main>
-    )
+    return <SinAsignacion />
+  }
+
+  const onIntentoCreado = (intentoId: string): void => {
+    setForzarBrief(false)
+    setIntentoIdRecienCreado(intentoId)
   }
 
   return (
     <main className="flex flex-1 flex-col overflow-y-auto bg-canvas px-8 py-10">
       <div className="mx-auto flex w-full max-w-2xl flex-col">
-        {intentoEnEvaluacion ? (
-          <VistaEvaluandoStub intento={intentoEnEvaluacion} />
-        ) : (
+        {forzarBrief || intentoActivo === null ? (
           <VistaBriefTransversal
             transversal={transversal.data}
             asignacionId={asignacionId}
-            onIntentoCreado={setIntentoIdRecienCreado}
+            onIntentoCreado={onIntentoCreado}
+          />
+        ) : intentoActivo.estado === "EN_EVALUACION" ? (
+          <VistaEvaluandoTransversal intento={intentoActivo} />
+        ) : intentoActivo.aprobado ? (
+          <VistaAprobadoTransversal
+            intento={intentoActivo}
+            tieneEntrevistaIa={tieneEntrevistaIa}
+            onIrAEntrevistaIa={onIrAEntrevistaIa}
+          />
+        ) : (
+          <VistaAunNoTransversal
+            intento={intentoActivo}
+            onIntentarDeNuevo={() => setForzarBrief(true)}
           />
         )}
       </div>
+    </main>
+  )
+}
+
+function decidirIntentoActivo(
+  lista: readonly IntentoTransversalParticipanteResponse[],
+  intentoIdRecienCreado: string | null,
+): IntentoTransversalParticipanteResponse | null {
+  if (intentoIdRecienCreado) {
+    const reciente = lista.find((i) => i.intentoId === intentoIdRecienCreado)
+    if (reciente) {
+      return reciente
+    }
+  }
+  const enEvaluacion = lista.find((i) => i.estado === "EN_EVALUACION")
+  if (enEvaluacion) {
+    return enEvaluacion
+  }
+  return lista[0] ?? null
+}
+
+function ErrorCanvas() {
+  return (
+    <main className="flex flex-1 items-center justify-center bg-canvas px-6 py-10">
+      <article className="flex max-w-md flex-col items-start gap-3">
+        <span className="nx-eyebrow inline-flex items-center gap-2 text-text-tertiary">
+          <AlertCircle className="h-3.5 w-3.5" aria-hidden={true} />
+          Hito de cierre
+        </span>
+        <h2 className="text-h2 text-text-primary">No pudimos cargar el proyecto transversal.</h2>
+        <p className="text-body-sm text-text-secondary">
+          Reintenta en un momento. Si persiste, avisa al administrador del curso.
+        </p>
+      </article>
+    </main>
+  )
+}
+
+function SinAsignacion() {
+  return (
+    <main className="flex flex-1 items-center justify-center bg-canvas px-6 py-10">
+      <article className="flex max-w-md flex-col items-start gap-3">
+        <span className="nx-eyebrow text-text-tertiary">Hito de cierre</span>
+        <h2 className="text-h2 text-text-primary">Proyecto transversal</h2>
+        <p className="text-body-sm text-text-secondary">
+          Necesitas estar inscrito en el curso para enviar tu proyecto.
+        </p>
+      </article>
     </main>
   )
 }

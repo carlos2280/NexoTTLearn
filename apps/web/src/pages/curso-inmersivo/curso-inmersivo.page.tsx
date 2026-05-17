@@ -187,7 +187,13 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
             soloLectura={soloLectura}
           />
         ) : (
-          <CanvasHito hito={hitoActivo} cursoId={arbol.curso.id} asignacionId={asignacionId} />
+          <CanvasHito
+            hito={hitoActivo}
+            cursoId={arbol.curso.id}
+            asignacionId={asignacionId}
+            tieneEntrevistaIa={entrevistaIa !== undefined}
+            onAbrirHito={onAbrirHito}
+          />
         )}
         {muestraPanelContexto && avance ? (
           <PanelContexto
