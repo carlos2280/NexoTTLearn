@@ -1,5 +1,6 @@
 import { Button } from "@/shared/components/ui/button"
 import { RUTAS } from "@/shared/constants/rutas"
+import { cn } from "@/shared/lib/cn"
 import type { AreaTagEmbed, EtiquetaCualitativa } from "@nexott-learn/shared-types"
 import { ChevronLeft } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
@@ -14,6 +15,11 @@ interface TopbarInmersivoProps {
   readonly porcentajeAvance: number | null
   readonly estaCerrado: boolean
   readonly etiquetaCualitativaFinal: EtiquetaCualitativa | null
+  /**
+   * Modo focus de la entrevista IA: atenua el topbar para que el chat tenga
+   * foco absoluto (V3 de F2 spec 06).
+   */
+  readonly atenuado?: boolean
 }
 
 const COLOR_ESTADO_CIERRE: Record<EtiquetaCualitativa, string> = {
@@ -46,11 +52,16 @@ export function TopbarInmersivo({
   porcentajeAvance,
   estaCerrado,
   etiquetaCualitativaFinal,
+  atenuado,
 }: TopbarInmersivoProps) {
   const navigate = useNavigate()
   return (
     <header
-      className="flex items-center gap-4 border-border border-b bg-surface px-6 py-3"
+      className={cn(
+        "flex items-center gap-4 border-border border-b bg-surface px-6 py-3",
+        "transition-[opacity,filter] duration-cinematic ease-default",
+        atenuado ? "pointer-events-none opacity-30 blur-[1px]" : "",
+      )}
       style={{ boxShadow: "var(--shadow-sm)" }}
     >
       <Button

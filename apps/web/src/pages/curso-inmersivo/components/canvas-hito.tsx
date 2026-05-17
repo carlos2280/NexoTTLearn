@@ -9,6 +9,11 @@ interface CanvasHitoProps {
   readonly asignacionId: string | null
   readonly tieneEntrevistaIa: boolean
   readonly onAbrirHito: (hito: HitoTipo) => void
+  /**
+   * Propagado por el chat de entrevista IA cuando arranca/termina. Permite
+   * que el page atenue sidebar y topbar mientras dura la conversacion.
+   */
+  readonly onChatEntrevistaIaActivo?: (activo: boolean) => void
 }
 
 /**
@@ -25,6 +30,7 @@ export function CanvasHito({
   asignacionId,
   tieneEntrevistaIa,
   onAbrirHito,
+  onChatEntrevistaIaActivo,
 }: CanvasHitoProps) {
   if (hito === "transversal") {
     return (
@@ -36,5 +42,11 @@ export function CanvasHito({
       />
     )
   }
-  return <CanvasEntrevistaIa cursoId={cursoId} asignacionId={asignacionId} />
+  return (
+    <CanvasEntrevistaIa
+      cursoId={cursoId}
+      asignacionId={asignacionId}
+      onChatActivoChange={onChatEntrevistaIaActivo}
+    />
+  )
 }

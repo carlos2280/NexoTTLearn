@@ -43,10 +43,12 @@ export function CursoInmersivoPage() {
     avance: detalle.avance,
   })
   const [hitoActivo, setHitoActivo] = useState<HitoTipo | null>(null)
+  const [chatEntrevistaIaActivo, setChatEntrevistaIaActivo] = useState(false)
 
   const seleccionarSeccion = useCallback(
     (seccionId: string) => {
       setHitoActivo(null)
+      setChatEntrevistaIaActivo(false)
       seccion.seleccionar(seccionId)
     },
     [seccion],
@@ -108,6 +110,8 @@ export function CursoInmersivoPage() {
       colaboradorId={usuario?.colaboradorId ?? null}
       soloLectura={detalle.avance?.estaCerrado ?? false}
       asignacionId={detalle.asignacionId}
+      modoFocus={chatEntrevistaIaActivo}
+      onChatEntrevistaIaActivo={setChatEntrevistaIaActivo}
     />
   )
 }
@@ -127,6 +131,8 @@ interface CursoInmersivoLayoutProps {
   readonly colaboradorId: string | null
   readonly soloLectura: boolean
   readonly asignacionId: string | null
+  readonly modoFocus: boolean
+  readonly onChatEntrevistaIaActivo: (activo: boolean) => void
 }
 
 function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
@@ -145,6 +151,8 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
     colaboradorId,
     soloLectura,
     asignacionId,
+    modoFocus,
+    onChatEntrevistaIaActivo,
   } = props
   const seccionActivaId = hitoActivo === null ? (seccionActiva?.seccionId ?? null) : null
   const esPreview = modo === "preview"
@@ -163,6 +171,7 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
         porcentajeAvance={avance?.porcentajeAvance ?? null}
         estaCerrado={avance?.estaCerrado ?? false}
         etiquetaCualitativaFinal={avance?.etiquetaCualitativaFinal ?? null}
+        atenuado={modoFocus}
       />
       <div className={grid}>
         <SidebarPlan
@@ -177,6 +186,7 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
           hitoActivo={hitoActivo}
           onAbrirHito={onAbrirHito}
           soloLectura={soloLectura}
+          atenuado={modoFocus}
         />
         {hitoActivo === null ? (
           <CanvasSeccion
@@ -193,6 +203,7 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
             asignacionId={asignacionId}
             tieneEntrevistaIa={entrevistaIa !== undefined}
             onAbrirHito={onAbrirHito}
+            onChatEntrevistaIaActivo={onChatEntrevistaIaActivo}
           />
         )}
         {muestraPanelContexto && avance ? (

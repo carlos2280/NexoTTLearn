@@ -1,26 +1,45 @@
+import { useCrearIntentoEntrevistaIa } from "@/features/entrevista-ia/hooks/use-crear-intento-entrevista-ia"
 import { useDisponibilidadEntrevistaIa } from "@/features/entrevista-ia/hooks/use-disponibilidad-entrevista-ia"
 import { useEntrevistaIaCurso } from "@/features/entrevista-ia/hooks/use-entrevista-ia-curso"
+import type { IntentoEntrevistaIaParticipanteResponse } from "@nexott-learn/shared-types"
 import { AlertCircle, Loader2 } from "lucide-react"
+import { useEffect, useState } from "react"
+import { ChatEntrevistaIa } from "./chat/chat-entrevista-ia"
 import { VistaBloqueadaEntrevistaIa } from "./vista-bloqueada-entrevista-ia"
 import { VistaBriefEntrevistaIa } from "./vista-brief-entrevista-ia"
 
 interface CanvasEntrevistaIaProps {
   readonly cursoId: string
   readonly asignacionId: string | null
+  /**
+   * Notifica al page cuando el chat esta activo (foco absoluto) para que
+   * atenue sidebar y topbar (decision V3 de F2 — modo focus).
+   */
+  readonly onChatActivoChange?: (activo: boolean) => void
 }
 
 /**
- * Orquestador del canvas de la Entrevista IA (spec 06). En F1 cubre:
- *  - Vista 1 (brief) cuando la entrevista esta disponible.
- *  - Vista 5 (bloqueada) con microcopy fijo por razon.
- *
- * Vistas 2 (chat), 3a/3b (resultado) y 4 (drawer releer) llegan en F2/F3.
- * CTA "Empezar entrevista" hoy es no-op en F1; se cableara con el flujo
- * real de creacion de intento en F2.
+ * Orquestador del canvas de la Entrevista IA. F2: brief → click "Iniciar
+ * entrevista" → crea intento → conmuta a chat activo. Cuando la IA cierra
+ * la conversacion, el chat muestra `VistaCierreStub` (vistas 3a/3b reales
+ * en F3). Vista 5 (bloqueada) se mantiene como puerta de entrada.
  */
-export function CanvasEntrevistaIa({ cursoId, asignacionId }: CanvasEntrevistaIaProps) {
+export function CanvasEntrevistaIa({
+  cursoId,
+  asignacionId,
+  onChatActivoChange,
+}: CanvasEntrevistaIaProps) {
   const entrevista = useEntrevistaIaCurso(cursoId)
   const disponibilidad = useDisponibilidadEntrevistaIa(asignacionId)
+  const crear = useCrearIntentoEntrevistaIa()
+  const [intentoActivo, setIntentoActivo] =
+    useState<IntentoEntrevistaIaParticipanteResponse | null>(null)
+
+  const chatActivo = intentoActivo !== null
+  useEffect(() => {
+    onChatActivoChange?.(chatActivo)
+    return () => onChatActivoChange?.(false)
+  }, [chatActivo, onChatActivoChange])
 
   if (entrevista.isLoading || disponibilidad.isLoading) {
     return (
@@ -41,20 +60,52 @@ export function CanvasEntrevistaIa({ cursoId, asignacionId }: CanvasEntrevistaIa
     return <SinAsignacion />
   }
 
+  if (intentoActivo) {
+    return <ChatEntrevistaIa intentoInicial={intentoActivo} />
+  }
+
+  if (!disponibilidad.data.disponible) {
+    return (
+      <main className="flex flex-1 flex-col overflow-y-auto bg-canvas px-8 py-10">
+        <div className="mx-auto flex w-full max-w-2xl flex-col">
+          <VistaBloqueadaEntrevistaIa disponibilidad={disponibilidad.data} />
+        </div>
+      </main>
+    )
+  }
+
+  const onEmpezar = async (): Promise<void> => {
+    const resp = await crear.mutateAsync({ asignacionId })
+    const ahora = new Date().toISOString()
+    setIntentoActivo({
+      intentoId: resp.intentoId,
+      estado: "EN_PROGRESO",
+      fecha: ahora,
+      transcripcion: [
+        {
+          rol: "ASISTENTE",
+          mensaje: resp.primeraPregunta,
+          timestamp: ahora,
+        },
+      ],
+      notaGlobal: null,
+      aprobado: null,
+      anulado: false,
+      notasPorArea: [],
+    })
+  }
+
   return (
     <main className="flex flex-1 flex-col overflow-y-auto bg-canvas px-8 py-10">
       <div className="mx-auto flex w-full max-w-2xl flex-col">
-        {disponibilidad.data.disponible ? (
-          <VistaBriefEntrevistaIa
-            entrevista={entrevista.data}
-            onEmpezar={() => {
-              // F2: aqui llamamos POST /asignaciones/:id/intentos-entrevista-ia
-              // y conmutamos a la vista 2 (chat).
-            }}
-          />
-        ) : (
-          <VistaBloqueadaEntrevistaIa disponibilidad={disponibilidad.data} />
-        )}
+        <VistaBriefEntrevistaIa
+          entrevista={entrevista.data}
+          onEmpezar={() => {
+            onEmpezar().catch(() => {
+              // Errores los maneja el state de la mutation; basta con no romper la promise.
+            })
+          }}
+        />
       </div>
     </main>
   )

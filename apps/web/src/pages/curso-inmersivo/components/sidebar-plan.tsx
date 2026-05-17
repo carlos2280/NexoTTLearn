@@ -32,6 +32,11 @@ interface SidebarPlanProps {
    * todas las secciones con check verde, contador en x/x, sin avance dinamico.
    */
   readonly soloLectura: boolean
+  /**
+   * Modo focus de la entrevista IA: atenua el sidebar con opacity baja +
+   * blur sutil para que el chat tenga foco absoluto. Mantiene el grid intacto.
+   */
+  readonly atenuado?: boolean
 }
 
 /**
@@ -53,10 +58,19 @@ export function SidebarPlan({
   hitoActivo,
   onAbrirHito,
   soloLectura,
+  atenuado,
 }: SidebarPlanProps) {
+  const claseAtenuado = atenuado
+    ? "pointer-events-none opacity-30 blur-[1px] transition-[opacity,filter] duration-cinematic ease-default"
+    : "transition-[opacity,filter] duration-cinematic ease-default"
   if (modo === "asignado" && !soloLectura && errorPlan && (!plan || plan.items.length === 0)) {
     return (
-      <aside className="flex flex-col gap-3 overflow-y-auto border-border border-r bg-subtle p-5">
+      <aside
+        className={cn(
+          "flex flex-col gap-3 overflow-y-auto border-border border-r bg-subtle p-5",
+          claseAtenuado,
+        )}
+      >
         <h2 className="nx-eyebrow text-text-tertiary">Plan de estudio</h2>
         <p className="text-body-sm text-danger-on-soft">
           No pudimos cargar el plan. Reintenta en un momento.
@@ -67,7 +81,12 @@ export function SidebarPlan({
 
   if (arbol.length === 0) {
     return (
-      <aside className="flex flex-col gap-3 overflow-y-auto border-border border-r bg-subtle p-5">
+      <aside
+        className={cn(
+          "flex flex-col gap-3 overflow-y-auto border-border border-r bg-subtle p-5",
+          claseAtenuado,
+        )}
+      >
         <h2 className="nx-eyebrow text-text-tertiary">Contenido</h2>
         <p className="text-body-sm text-text-secondary">
           Este curso aún no tiene módulos publicados.
@@ -80,7 +99,12 @@ export function SidebarPlan({
   const totalSecciones = arbol.reduce((acc, modulo) => acc + modulo.secciones.length, 0)
 
   return (
-    <aside className="flex flex-col overflow-hidden border-border border-r bg-subtle">
+    <aside
+      className={cn(
+        "flex flex-col overflow-hidden border-border border-r bg-subtle",
+        claseAtenuado,
+      )}
+    >
       <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-5 py-6">
         <header className="flex items-baseline justify-between gap-2">
           <h2 className="nx-eyebrow text-text-tertiary">{eyebrowSidebar(modo, soloLectura)}</h2>
