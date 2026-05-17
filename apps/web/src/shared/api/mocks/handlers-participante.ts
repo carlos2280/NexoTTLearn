@@ -6,10 +6,12 @@ import type {
   MeBandejaResponse,
   MeCursoResumen,
   NotificacionBadgeResponse,
+  NotificacionResponse,
   NotificacionResumen,
   Paginated,
   ResumenCierreCurso,
 } from "@nexott-learn/shared-types"
+import { ApiError } from "../api-error"
 import { type MockRequest, defineRoute } from "./router"
 
 const RTE_ME_BANDEJA = /^\/me\/bandeja$/
@@ -23,12 +25,14 @@ const RTE_RESUMEN_CIERRE = /^\/me\/cursos\/[^/]+\/resumen-cierre$/
 const RGX_RESUMEN_CIERRE = /^\/me\/cursos\/([^/]+)\/resumen-cierre$/
 const RTE_NOTIFICACIONES_BADGE = /^\/notificaciones\/badge$/
 const RTE_NOTIFICACIONES = /^\/notificaciones(\?.*)?$/
+const RTE_NOTIFICACION_DETALLE = /^\/notificaciones\/[^/]+$/
 const RTE_NOTIFICACION_MARCAR_LEIDA = /^\/notificaciones\/[^/]+\/marcar-leida$/
 const RTE_NOTIFICACIONES_MARCAR_TODAS = /^\/notificaciones\/marcar-todas-leidas$/
 const RTE_NOTIFICACION_ARCHIVAR = /^\/notificaciones\/[^/]+\/archivar$/
 const RTE_CURSOS_DISPONIBLES = /^\/cursos\/disponibles-voluntario(\?.*)?$/
 const RGX_MARCAR_LEIDA_ID = /^\/notificaciones\/([^/]+)\/marcar-leida$/
 const RGX_ARCHIVAR_ID = /^\/notificaciones\/([^/]+)\/archivar$/
+const RGX_DETALLE_ID = /^\/notificaciones\/([^/]+)$/
 
 // TODO B-2: cuando el backend implemente `skillsPendientesCount` en
 // `MeCursoResumen`, mover al schema oficial y borrar.
@@ -1188,6 +1192,83 @@ function handlerMarcarTodasLeidas(): void {
   )
 }
 
+// Payloads mockeados por notificacion id. Cuando el backend exponga el
+// payload en el listado resumido, esto desaparece y el centro evita un
+// fetch por item.
+const PAYLOAD_POR_ID: ReadonlyMap<string, Record<string, unknown>> = new Map([
+  [
+    "notif-1",
+    { asignacionId: "asg-java-001", cursoId: "curso-java-senior", cursoTitulo: "Java Senior" },
+  ],
+  [
+    "notif-2",
+    {
+      asignacionId: "asg-fullstack-013",
+      cursoId: "curso-fullstack-devops",
+      cursoTitulo: "Fundamentos Full-Stack & DevOps",
+    },
+  ],
+  [
+    "notif-3",
+    { asignacionId: "asg-java-001", cursoId: "curso-java-senior", cursoTitulo: "Java Senior" },
+  ],
+  [
+    "notif-4",
+    {
+      asignacionId: "asg-fullstack-013",
+      cursoId: "curso-fullstack-devops",
+      cursoTitulo: "Fundamentos Full-Stack & DevOps",
+    },
+  ],
+  [
+    "notif-5",
+    { asignacionId: "asg-java-001", cursoId: "curso-java-senior", cursoTitulo: "Java Senior" },
+  ],
+  [
+    "notif-6",
+    {
+      asignacionId: "asg-react-007",
+      cursoId: "curso-react-frontend-mid",
+      cursoTitulo: "React Frontend Mid",
+    },
+  ],
+  [
+    "notif-7",
+    {
+      asignacionId: "asg-fullstack-013",
+      cursoId: "curso-fullstack-devops",
+      cursoTitulo: "Fundamentos Full-Stack & DevOps",
+    },
+  ],
+  [
+    "notif-8",
+    {
+      asignacionId: "asg-react-007",
+      cursoId: "curso-react-frontend-mid",
+      cursoTitulo: "React Frontend Mid",
+    },
+  ],
+  [
+    "notif-archived-1",
+    { asignacionId: "asg-java-001", cursoId: "curso-java-senior", cursoTitulo: "Java Senior" },
+  ],
+])
+
+function handlerDetalleNotificacion(req: MockRequest): NotificacionResponse {
+  const match = req.path.match(RGX_DETALLE_ID)
+  const id = match?.[1] ?? null
+  const notif = id ? stateNotificaciones.notificaciones.find((n) => n.id === id) : null
+  if (!notif) {
+    throw new ApiError(404, "NOTIFICACION_NO_ENCONTRADA", "No encuentro esa notificación.")
+  }
+  return {
+    ...notif,
+    payload: PAYLOAD_POR_ID.get(notif.id) ?? {},
+    canalesEnviados: ["IN_APP"],
+    errorCorreo: null,
+  }
+}
+
 function handlerArchivar(req: MockRequest): void {
   const match = req.path.match(RGX_ARCHIVAR_ID)
   if (!match) {
@@ -1218,5 +1299,6 @@ export const handlersParticipante = [
   defineRoute("POST", RTE_NOTIFICACION_MARCAR_LEIDA, handlerMarcarLeida),
   defineRoute("POST", RTE_NOTIFICACIONES_MARCAR_TODAS, handlerMarcarTodasLeidas),
   defineRoute("POST", RTE_NOTIFICACION_ARCHIVAR, handlerArchivar),
+  defineRoute("GET", RTE_NOTIFICACION_DETALLE, handlerDetalleNotificacion),
   defineRoute("GET", RTE_CURSOS_DISPONIBLES, handlerCursosDisponibles),
 ]

@@ -25,6 +25,7 @@ import { LoginPage } from "@/pages/login/login.page"
 import { LogoutPage } from "@/pages/logout/logout.page"
 import { MiFichaPage } from "@/pages/mi-ficha/mi-ficha.page"
 import { MisCursosPage } from "@/pages/mis-cursos/mis-cursos.page"
+import { NotificacionesPage } from "@/pages/notificaciones/notificaciones.page"
 import { PlaygroundPage } from "@/pages/playground/playground.page"
 import { RUTAS } from "@/shared/constants/rutas"
 import { Navigate, Route, Routes } from "react-router-dom"
@@ -50,6 +51,7 @@ export function AppRoutes() {
         <Route path={RUTAS.participante.misCursos} element={<MisCursosPage />} />
         <Route path={RUTAS.participante.miFicha} element={<MiFichaPage />} />
         <Route path={RUTAS.participante.catalogo} element={<CatalogoParticipantePage />} />
+        <Route path={RUTAS.notificaciones} element={<NotificacionesPage />} />
       </Route>
       {/*
         Curso cerrado (pantalla 08): ceremonia del veredicto. Ruta dedicada
