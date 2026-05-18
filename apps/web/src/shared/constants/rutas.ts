@@ -24,5 +24,6 @@ export const RUTAS = {
     catalogoModuloDetalle: (id: string) => `/admin/catalogo/modulos/${id}`,
     reportes: "/admin/reportes",
     sistema: "/admin/sistema",
+    intentoEntrevistaIa: (intentoId: string) => `/admin/intentos-entrevista-ia/${intentoId}`,
   },
 } as const

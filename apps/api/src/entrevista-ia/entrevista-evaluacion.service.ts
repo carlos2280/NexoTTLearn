@@ -114,6 +114,12 @@ export class EntrevistaEvaluacionService {
           notaGlobal: new Prisma.Decimal(resultado.notaGlobal),
           aprobado,
           transcripcionOLog: internaFinal as unknown as Prisma.InputJsonValue,
+          reporteEvaluador: {
+            fortalezas: resultado.reporte.fortalezas,
+            mejoras: resultado.reporte.mejoras,
+            justificacion: resultado.reporte.justificacion,
+            generadoEn: new Date().toISOString(),
+          } satisfies Prisma.InputJsonObject,
         },
       })
       for (const { areaId, nota } of notasFinales) {

@@ -667,13 +667,14 @@ function handlerMeFicha(_req: MockRequest): FichaResponse {
 // Mock de `GET /colaboradores/:id/ficha/skills/:skillId/historico`.
 // Devuelve un historico determinista por `skillId`. Si el skillId no aparece,
 // se devuelve un historico vacio (skill aun no demostrada).
-function handlerHistoricoSkill(req: MockRequest): readonly EntradaHistoricoNotaSkill[] {
+function handlerHistoricoSkill(req: MockRequest): Paginated<EntradaHistoricoNotaSkill> {
   const match = req.path.match(RGX_HISTORICO_SKILL)
-  if (!match) {
-    return []
+  const skillId = match?.[1] ?? ""
+  const data = match ? (HISTORICO_POR_SKILL[skillId] ?? []) : []
+  return {
+    data,
+    meta: { page: 1, pageSize: data.length || 1, total: data.length, totalPages: 1 },
   }
-  const skillId = match[1] ?? ""
-  return HISTORICO_POR_SKILL[skillId] ?? []
 }
 
 const HISTORICO_POR_SKILL: Readonly<Record<string, readonly EntradaHistoricoNotaSkill[]>> = {

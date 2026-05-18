@@ -16,10 +16,11 @@ Heredadas del paraguas: ver `../../.claude/rules/prisma-schema.md`.
 - **BD**: PostgreSQL 16 en Docker (`make db-up`).
 - **Schema**: `apps/api/prisma/schema.prisma`.
 - **Migrations**: `apps/api/prisma/migrations/`.
-- **Seed**: `apps/api/prisma/seed.ts` (admin@nexott.local / Admin1234!).
+- **Seed**: orquestador `apps/api/prisma/seed.ts` + módulos en `apps/api/prisma/seeds/`. Siembra el curso "Frontend para devs backend" con 3 admins (password `Cambiar2026!`) y 10 participantes (password `Qa1234!`). Ver `apps/api/prisma/seeds/README.md`.
 - **Comandos**:
   - Migrar (dev): `make db-migrate`
   - Seed: `make db-seed`
+  - Reset + seed en un comando: `make db-seed-fresh`
   - Studio: `make db-studio`
   - Reset destructivo: `make db-reset` (CONFIRMAR antes con el usuario).
 

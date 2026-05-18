@@ -824,6 +824,7 @@ function construirDisp(razon: RazonDisp): DisponibilidadEntrevistaIaResponse {
     motivoBloqueo: disponible
       ? null
       : (MOTIVO_ENTREVISTA_IA.get(razon as Exclude<RazonDisp, "DISPONIBLE">) ?? null),
+    intentoEnCursoId: null,
   }
 }
 

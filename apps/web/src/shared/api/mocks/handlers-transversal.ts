@@ -1,6 +1,7 @@
 import type {
   CrearIntentoTransversalResponse,
   IntentoTransversalParticipanteResponse,
+  Paginated,
   TransversalResponse,
 } from "@nexott-learn/shared-types"
 import { ApiError } from "../api-error"
@@ -193,13 +194,17 @@ function handlerCrearIntento(req: MockRequest): CrearIntentoTransversalResponse 
 
 function handlerListarIntentos(
   req: MockRequest,
-): readonly IntentoTransversalParticipanteResponse[] {
+): Paginated<IntentoTransversalParticipanteResponse> {
   resolverIntentosVencidos()
   const match = req.path.match(RGX_ASIG_ID)
   const asignacionId = match?.[1] ?? "asg-unknown"
-  return cargarIntentos()
+  const data = cargarIntentos()
     .filter((intento) => intento.asignacionId === asignacionId)
     .map(({ asignacionId: _ignored, resolvedAt: _resolved, ...rest }) => rest)
+  return {
+    data,
+    meta: { page: 1, pageSize: data.length || 1, total: data.length, totalPages: 1 },
+  }
 }
 
 export const handlersTransversal = [

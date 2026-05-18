@@ -3,6 +3,7 @@ import type {
   CrearIntentoEntrevistaIaResponse,
   EnviarTurnoInput,
   EnviarTurnoResponse,
+  IntentoEntrevistaIaAdminResponse,
   IntentoEntrevistaIaParticipanteResponse,
 } from "@nexott-learn/shared-types"
 
@@ -16,6 +17,7 @@ export function crearIntentoEntrevistaIa(
   return httpClient.post<CrearIntentoEntrevistaIaResponse>(
     `/asignaciones/${asignacionId}/intentos-entrevista-ia`,
     {},
+    { idempotencyKey: crypto.randomUUID() },
   )
 }
 
@@ -45,4 +47,15 @@ export function obtenerIntentoEntrevistaIa(
   return httpClient.get<IntentoEntrevistaIaParticipanteResponse>(
     `/intentos-entrevista-ia/${intentoId}`,
   )
+}
+
+/**
+ * `GET /api/v1/intentos-entrevista-ia/:intentoId` — variante ADMIN. El
+ * endpoint es el mismo; el backend ajusta la proyeccion segun el rol y
+ * devuelve `colaborador`, `curso`, `notaAjustadaAdmin` y `motivoAjusteOAnulacion`.
+ */
+export function obtenerIntentoEntrevistaIaAdmin(
+  intentoId: string,
+): Promise<IntentoEntrevistaIaAdminResponse> {
+  return httpClient.get<IntentoEntrevistaIaAdminResponse>(`/intentos-entrevista-ia/${intentoId}`)
 }

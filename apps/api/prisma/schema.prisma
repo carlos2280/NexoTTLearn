@@ -1123,6 +1123,7 @@ model IntentoEntrevistaIA {
   notaAjustadaAdmin      Decimal?                 @map("nota_ajustada_admin") @db.Decimal(5, 2)
   anulado                Boolean                  @default(false)
   motivoAjusteOAnulacion String?                  @map("motivo_ajuste_o_anulacion")
+  reporteEvaluador       Json?                    @map("reporte_evaluador") @db.JsonB
 
   entrevistaIA  EntrevistaIA                     @relation(fields: [entrevistaIaId], references: [id], onDelete: Restrict)
   colaborador   Colaborador                      @relation(fields: [colaboradorId], references: [id], onDelete: Restrict)

@@ -3,6 +3,7 @@ import type {
   CrearIntentoTransversalInput,
   CrearIntentoTransversalResponse,
   IntentoTransversalParticipanteResponse,
+  Paginated,
 } from "@nexott-learn/shared-types"
 
 /**
@@ -17,6 +18,7 @@ export function crearIntentoTransversal(input: {
   return httpClient.post<CrearIntentoTransversalResponse>(
     `/asignaciones/${input.asignacionId}/intentos-transversal`,
     input.body,
+    { idempotencyKey: crypto.randomUUID() },
   )
 }
 
@@ -25,10 +27,11 @@ export function crearIntentoTransversal(input: {
  * intentos del participante en este transversal. PARTICIPANTE solo recibe la
  * proyeccion sin notas internas (D-S8-C2 / D-S8-C3).
  */
-export function listarIntentosTransversal(
+export async function listarIntentosTransversal(
   asignacionId: string,
 ): Promise<readonly IntentoTransversalParticipanteResponse[]> {
-  return httpClient.get<readonly IntentoTransversalParticipanteResponse[]>(
+  const respuesta = await httpClient.get<Paginated<IntentoTransversalParticipanteResponse>>(
     `/asignaciones/${asignacionId}/intentos-transversal`,
   )
+  return respuesta.data
 }

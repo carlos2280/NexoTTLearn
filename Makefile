@@ -87,20 +87,15 @@ db-migrate: ## Aplica migraciones Prisma
 	pnpm db:migrate
 
 .PHONY: db-seed
-db-seed: ## Ejecuta seed (admin@nexott.local / Admin1234!)
+db-seed: ## Ejecuta seed (curso 'Frontend para devs backend' + 3 admins + 10 participantes)
 	pnpm db:seed
 
-.PHONY: db-seed-amsa
-db-seed-amsa: ## Pueble la BD con la demo AMSA (curso fullstack React+Django, 3 admins + 13 colabs)
-	cd apps/api && pnpm db:seed:amsa
-
-.PHONY: demo-amsa
-demo-amsa: ## ⚠ Reset destructivo + migrate + seed base + seed AMSA (entorno de demo limpio)
-	@printf "$(C_RED)⚠  Esto borrará TODOS los datos y cargará la demo AMSA desde cero.$(C_RESET)\n"
+.PHONY: db-seed-fresh
+db-seed-fresh: ## ⚠ Reset destructivo + migrate + seed (entorno limpio en un comando)
+	@printf "$(C_RED)⚠  Esto borrará TODOS los datos y volverá a sembrar desde cero.$(C_RESET)\n"
 	cd apps/api && pnpm exec prisma migrate reset --force --skip-seed
 	cd apps/api && pnpm db:seed
-	cd apps/api && pnpm db:seed:amsa
-	@printf "$(C_GREEN)✓ Demo AMSA lista. Levanta la app con 'make dev'.$(C_RESET)\n"
+	@printf "$(C_GREEN)✓ BD sembrada. Levanta la app con 'make dev'.$(C_RESET)\n"
 
 .PHONY: db-studio
 db-studio: ## Abre Prisma Studio

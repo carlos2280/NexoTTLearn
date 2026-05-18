@@ -1,11 +1,12 @@
 import { httpClient } from "@/shared/api/http-client"
-import type { EntradaHistoricoNotaSkill } from "@nexott-learn/shared-types"
+import type { EntradaHistoricoNotaSkill, Paginated } from "@nexott-learn/shared-types"
 
-export function obtenerHistoricoSkill(
+export async function obtenerHistoricoSkill(
   colaboradorId: string,
   skillId: string,
 ): Promise<readonly EntradaHistoricoNotaSkill[]> {
-  return httpClient.get<readonly EntradaHistoricoNotaSkill[]>(
+  const respuesta = await httpClient.get<Paginated<EntradaHistoricoNotaSkill>>(
     `/colaboradores/${colaboradorId}/ficha/skills/${skillId}/historico`,
   )
+  return respuesta.data
 }

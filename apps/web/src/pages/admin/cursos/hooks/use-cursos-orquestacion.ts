@@ -61,7 +61,7 @@ export function useCursosOrquestacion() {
   async function conCursoEIdempotency(
     op: (c: CursoResumen, idempotencyKey: string) => Promise<void>,
   ) {
-    if (!dialog.curso || !dialog.idempotencyKey) {
+    if (!(dialog.curso && dialog.idempotencyKey)) {
       return
     }
     await op(dialog.curso, dialog.idempotencyKey)

@@ -6,6 +6,7 @@ import { ModuloBuilderPage } from "@/pages/admin/catalogo/modulo-builder/modulo-
 import { CursoDetallePage } from "@/pages/admin/cursos/curso-detalle.page"
 import { CursosPage } from "@/pages/admin/cursos/cursos.page"
 import { InicioPage } from "@/pages/admin/inicio/inicio.page"
+import { IntentoEntrevistaIaDetallePage } from "@/pages/admin/intentos-entrevista-ia/intento-ia-detalle.page"
 import { PersonasPage } from "@/pages/admin/personas/personas.page"
 import { ProximamentePage } from "@/pages/admin/proximamente/proximamente.page"
 import { AvanceCursoPage } from "@/pages/admin/reportes/avance-curso/avance-curso.page"
@@ -122,6 +123,10 @@ export function AppRoutes() {
         <Route path="cursos" element={<CursosPage />} />
         <Route path="cursos/:cursoId" element={<CursoDetallePage />} />
         <Route path="cursos/:cursoId/asignaciones" element={<AsignacionesPage />} />
+        <Route
+          path="intentos-entrevista-ia/:intentoId"
+          element={<IntentoEntrevistaIaDetallePage />}
+        />
         <Route path="personas" element={<PersonasPage />} />
         <Route path="reportes" element={<ReportesPage />} />
         <Route path="reportes/eficacia-plataforma" element={<EficaciaPlataformaPage />} />

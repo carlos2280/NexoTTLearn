@@ -47,8 +47,8 @@ export function DrawerHistorico({
       {data && data.length > 0 ? (
         <>
           <ol className="flex flex-col gap-5">
-            {data.map((entrada) => (
-              <EntradaItem key={entrada.id} entrada={entrada} />
+            {data.map((entrada, idx) => (
+              <EntradaItem key={entrada.id} entrada={entrada} esActual={idx === 0} />
             ))}
           </ol>
           {data.some((e) => e.valor !== null) ? (
@@ -70,9 +70,15 @@ export function DrawerHistorico({
 
 interface EntradaItemProps {
   readonly entrada: EntradaHistoricoNotaSkill
+  /**
+   * `true` para el ultimo hito (cronologicamente, mas reciente) — recibe el
+   * dot aurora-cyan con pulse para comunicar "donde estas hoy". El resto se
+   * muestra en gris segun la regla "lo cumplido se desvanece".
+   */
+  readonly esActual: boolean
 }
 
-function EntradaItem({ entrada }: EntradaItemProps) {
+function EntradaItem({ entrada, esActual }: EntradaItemProps) {
   const nivel = nivelDeNotaSkill(entrada.valor)
   const fechaRel = relativizarFecha(entrada.fecha)
   const referencia = describirReferencia(entrada)
@@ -81,7 +87,11 @@ function EntradaItem({ entrada }: EntradaItemProps) {
     <li className="relative flex gap-4 pl-5">
       <span
         aria-hidden="true"
-        className="absolute top-1.5 left-0 h-2 w-2 rounded-full bg-text-tertiary"
+        className={
+          esActual
+            ? "nx-pulse-dot absolute top-1.5 left-0 h-2 w-2 rounded-full bg-aurora-cyan"
+            : "absolute top-1.5 left-0 h-2 w-2 rounded-full bg-text-tertiary"
+        }
       />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-center justify-between gap-3">

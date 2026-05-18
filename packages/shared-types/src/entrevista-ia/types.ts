@@ -64,6 +64,12 @@ export const disponibilidadEntrevistaIaResponseSchema = z
     intentosUsadosHoy: z.number().int().min(0),
     maxPorHora: z.literal(5),
     motivoBloqueo: z.string().nullable(),
+    /**
+     * UUID del intento EN_PROGRESO si `razon === "INTENTO_EN_CURSO"`; `null`
+     * en cualquier otra razon. Permite al frontend reanudar el chat sin
+     * tener que listar intentos.
+     */
+    intentoEnCursoId: z.string().uuid().nullable(),
   })
   .strict()
 
@@ -129,10 +135,48 @@ export type IntentoEntrevistaIaParticipanteResponse = z.infer<
   typeof intentoEntrevistaIaParticipanteResponseSchema
 >
 
+/**
+ * Reporte cualitativo generado por la IA al finalizar el intento. Persiste en
+ * `intentos_entrevista_ia.reporte_evaluador` y se reutiliza al consultar el
+ * intento (sin re-llamar al modelo). Iteracion 2 — pantalla admin; el
+ * participante lo recibira en una iteracion posterior.
+ */
+export const reporteEvaluadorEntrevistaIaSchema = z
+  .object({
+    fortalezas: z.array(z.string().min(1).max(200)).min(1).max(5),
+    mejoras: z.array(z.string().min(1).max(200)).min(0).max(5),
+    justificacion: z.string().min(1).max(800),
+    generadoEn: z.string(),
+  })
+  .strict()
+
+export type ReporteEvaluadorEntrevistaIa = z.infer<typeof reporteEvaluadorEntrevistaIaSchema>
+
 export const intentoEntrevistaIaAdminResponseSchema = intentoEntrevistaIaBaseSchema
   .extend({
     notaAjustadaAdmin: z.number().min(0).max(100).nullable(),
     motivoAjusteOAnulacion: z.string().nullable(),
+    reporteEvaluador: reporteEvaluadorEntrevistaIaSchema.nullable(),
+    /**
+     * Contexto del intento para que la pantalla admin no tenga que hacer
+     * lookups adicionales por colaborador/curso. Incluido solo en la
+     * proyeccion admin (los participantes solo ven los suyos).
+     */
+    colaborador: z
+      .object({
+        id: z.string().uuid(),
+        nombre: z.string(),
+        email: z.string(),
+      })
+      .strict(),
+    curso: z
+      .object({
+        id: z.string().uuid(),
+        titulo: z.string(),
+        umbralAprobacion: z.number().min(0).max(100),
+      })
+      .strict(),
+    asignacionId: z.string().uuid(),
   })
   .strict()
 
