@@ -25,5 +25,6 @@ export const RUTAS = {
     reportes: "/admin/reportes",
     sistema: "/admin/sistema",
     intentoEntrevistaIa: (intentoId: string) => `/admin/intentos-entrevista-ia/${intentoId}`,
+    intentoTransversal: (intentoId: string) => `/admin/intentos-transversal/${intentoId}`,
   },
 } as const

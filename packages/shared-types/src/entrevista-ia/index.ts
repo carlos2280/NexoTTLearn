@@ -57,3 +57,12 @@ export type {
   AnularEntrevistaResponse,
   TurnoEntrevistaIa,
 } from "./types"
+
+export {
+  listarIntentosEntrevistaIaCursoQuerySchema,
+  intentoEntrevistaIaListadoItemSchema,
+} from "./listado-curso.schema"
+export type {
+  ListarIntentosEntrevistaIaCursoQuery,
+  IntentoEntrevistaIaListadoItem,
+} from "./listado-curso.schema"

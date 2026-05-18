@@ -17,7 +17,9 @@ import {
   EditarSkillsTransversalResponse,
   FinalizarTransversalResponse,
   IntentoTransversalAdminResponse,
+  IntentoTransversalListadoItem,
   IntentoTransversalParticipanteResponse,
+  ListarIntentosTransversalCursoQuery,
   ListarIntentosTransversalQuery,
   TransversalResponse,
 } from "@nexott-learn/shared-types"
@@ -489,6 +491,98 @@ export class TransversalService {
     ])
     const mapper = input.usuario.rol === RolUsuario.ADMIN ? toIntentoAdmin : toIntentoParticipante
     return buildPaginatedResponse(data.map(mapper), total, page, pageSize)
+  }
+
+  // =========================================================================
+  // E6b. GET /api/v1/cursos/:cursoId/intentos-transversal
+  //
+  // Listado admin paginado de todos los intentos del proyecto transversal del
+  // curso. Alimenta el tab "Evaluaciones > Transversal" de la pantalla admin
+  // del curso. Devuelve un shape ligero (sin detalleCapas ni evaluacionesCapas)
+  // — el detalle se hidrata al abrir el intento individual.
+  // =========================================================================
+
+  async listarIntentosPorCurso(input: {
+    readonly cursoId: string
+    readonly query: ListarIntentosTransversalCursoQuery
+  }): Promise<Paginated<IntentoTransversalListadoItem>> {
+    const curso = await this.prisma.curso.findUnique({
+      where: { id: input.cursoId },
+      select: { id: true, transversalId: true },
+    })
+    if (!curso) {
+      throw new NotFoundException({
+        code: apiErrorCodes.cursoNoEncontrado,
+        message: `Curso ${input.cursoId} no encontrado.`,
+      })
+    }
+    if (curso.transversalId === null) {
+      throw new NotFoundException({
+        code: apiErrorCodes.transversalNoEncontrado,
+        message: "El curso no tiene proyecto transversal configurado.",
+      })
+    }
+
+    const { skip, take, page, pageSize } = resolvePaginacion(input.query)
+    const busqueda = input.query.busqueda?.trim()
+    const where: Prisma.IntentoTransversalWhereInput = {
+      transversalId: curso.transversalId,
+      ...(input.query.estado ? { estado: input.query.estado } : {}),
+      ...(busqueda && busqueda.length > 0
+        ? {
+            colaborador: {
+              // biome-ignore lint/style/useNamingConvention: `OR` es operador de Prisma, no propiedad del dominio.
+              OR: [
+                { nombre: { contains: busqueda, mode: "insensitive" } },
+                { email: { contains: busqueda, mode: "insensitive" } },
+              ],
+            },
+          }
+        : {}),
+    }
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.intentoTransversal.findMany({
+        where,
+        select: {
+          id: true,
+          fecha: true,
+          estado: true,
+          notaGlobal: true,
+          aprobado: true,
+          anulado: true,
+          notaCapaTests: true,
+          notaCapaCualitativa: true,
+          notaCapaComprension: true,
+          colaborador: {
+            select: { id: true, nombre: true, email: true },
+          },
+        },
+        orderBy: { fecha: "desc" },
+        skip,
+        take,
+      }),
+      this.prisma.intentoTransversal.count({ where }),
+    ])
+
+    const items: IntentoTransversalListadoItem[] = data.map((intento) => {
+      const capasCargadas =
+        (intento.notaCapaTests !== null ? 1 : 0) +
+        (intento.notaCapaCualitativa !== null ? 1 : 0) +
+        (intento.notaCapaComprension !== null ? 1 : 0)
+      return {
+        intentoId: intento.id,
+        fecha: intento.fecha.toISOString(),
+        estado: intento.estado,
+        notaGlobal: intento.notaGlobal === null ? null : Number(intento.notaGlobal.toString()),
+        aprobado: intento.aprobado,
+        anulado: intento.anulado,
+        capasCargadas,
+        colaborador: intento.colaborador,
+      }
+    })
+
+    return buildPaginatedResponse(items, total, page, pageSize)
   }
 
   // =========================================================================

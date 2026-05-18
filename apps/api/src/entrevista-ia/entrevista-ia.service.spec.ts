@@ -734,6 +734,84 @@ describe("E18 listar intentos", () => {
   })
 })
 
+describe("E21 GET /cursos/:cursoId/intentos-entrevista-ia (listado por curso, admin)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("404 si el curso no existe", async () => {
+    const { service, prisma } = buildService()
+    prisma.curso.findUnique.mockResolvedValue(null)
+    await expect(
+      service.listarIntentosPorCurso({
+        cursoId: CURSO_ID,
+        query: { page: 1, pageSize: 20 },
+      }),
+    ).rejects.toThrow(NotFoundException)
+  })
+
+  it("404 si el curso no tiene entrevistaIa configurada", async () => {
+    const { service, prisma } = buildService()
+    prisma.curso.findUnique.mockResolvedValue({ id: CURSO_ID, entrevistaIaId: null })
+    await expect(
+      service.listarIntentosPorCurso({
+        cursoId: CURSO_ID,
+        query: { page: 1, pageSize: 20 },
+      }),
+    ).rejects.toThrow(NotFoundException)
+  })
+
+  it("happy: devuelve items ligeros con colaborador y meta paginada", async () => {
+    const { service, prisma } = buildService()
+    prisma.curso.findUnique.mockResolvedValue({ id: CURSO_ID, entrevistaIaId: ENTREVISTA_IA_ID })
+    prisma.$transaction.mockResolvedValue([
+      [
+        {
+          id: INTENTO_ID,
+          fecha: new Date("2026-05-18T12:00:00Z"),
+          estado: "FINALIZADO" as const,
+          notaGlobal: new Prisma.Decimal(84),
+          notaAjustadaAdmin: null,
+          aprobado: true,
+          anulado: false,
+          colaborador: { id: COLABORADOR_ID, nombre: "Javier", email: "j@nttdata.test" },
+        },
+      ],
+      1,
+    ])
+    const r = await service.listarIntentosPorCurso({
+      cursoId: CURSO_ID,
+      query: { page: 1, pageSize: 20 },
+    })
+    expect(r.meta).toEqual({ page: 1, pageSize: 20, total: 1, totalPages: 1 })
+    expect(r.data[0]).toEqual({
+      intentoId: INTENTO_ID,
+      fecha: "2026-05-18T12:00:00.000Z",
+      estado: "FINALIZADO",
+      notaGlobal: 84,
+      notaAjustadaAdmin: null,
+      aprobado: true,
+      anulado: false,
+      colaborador: { id: COLABORADOR_ID, nombre: "Javier", email: "j@nttdata.test" },
+    })
+  })
+
+  it("propaga filtro de busqueda al WHERE (colaborador.nombre OR email, case-insensitive)", async () => {
+    const { service, prisma } = buildService()
+    prisma.curso.findUnique.mockResolvedValue({ id: CURSO_ID, entrevistaIaId: ENTREVISTA_IA_ID })
+    prisma.$transaction.mockResolvedValue([[], 0])
+    await service.listarIntentosPorCurso({
+      cursoId: CURSO_ID,
+      query: { page: 1, pageSize: 20, busqueda: "javi" },
+    })
+    const findManyCall = prisma.intentoEntrevistaIA.findMany.mock.calls[0]?.[0]
+    expect(findManyCall?.where?.colaborador?.OR).toEqual([
+      { nombre: { contains: "javi", mode: "insensitive" } },
+      { email: { contains: "javi", mode: "insensitive" } },
+    ])
+  })
+})
+
 describe("E19 ajustar (admin + X-Motivo + recalculo)", () => {
   it("happy: usa notaAjustadaAdmin en el recalculo", async () => {
     const { service, prisma, notaSkill } = buildService()

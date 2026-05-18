@@ -18,6 +18,7 @@ import { useCursosOrquestacion } from "./hooks/use-cursos-orquestacion"
 const TABS: readonly { readonly id: TabDetalle; readonly etiqueta: string }[] = [
   { id: "resumen", etiqueta: "Resumen" },
   { id: "asignados", etiqueta: "Asignados" },
+  { id: "evaluaciones", etiqueta: "Evaluaciones" },
   { id: "configuracion", etiqueta: "Configuración" },
 ]
 

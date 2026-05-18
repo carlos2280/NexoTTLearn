@@ -145,6 +145,31 @@ export const intentoTransversalAdminResponseSchema = intentoTransversalBaseSchem
     aprobado: z.boolean().nullable(),
     anulado: z.boolean(),
     motivoAnulacion: z.string().nullable(),
+    /**
+     * Contexto del intento para que la pantalla admin no tenga que hacer
+     * lookups adicionales por colaborador/curso/transversal. Solo admin
+     * (visibilidad campo-a-campo; los participantes solo ven los propios).
+     */
+    colaborador: z
+      .object({
+        id: z.string().uuid(),
+        nombre: z.string(),
+        email: z.string(),
+      })
+      .strict(),
+    curso: z
+      .object({
+        id: z.string().uuid(),
+        titulo: z.string(),
+      })
+      .strict(),
+    transversal: z
+      .object({
+        id: z.string().uuid(),
+        descripcion: z.string(),
+        umbralAprobacion: z.number().min(0).max(100),
+      })
+      .strict(),
   })
   .strict()
 

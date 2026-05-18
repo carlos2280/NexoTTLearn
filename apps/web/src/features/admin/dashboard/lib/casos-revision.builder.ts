@@ -80,6 +80,7 @@ function casoTransversal(fila: FilaCentroRevisionTransversal): CasoRevision {
     prioridad: prioridadPorEspera(dias),
     slaRestante: textoEspera(dias),
     responsable: "Equipo evaluación",
+    intentoTransversalId: fila.intentoId,
   }
 }
 

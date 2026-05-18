@@ -26,12 +26,15 @@ import {
   FinalizarEntrevistaBodyInput,
   FinalizarEntrevistaResponse,
   IntentoEntrevistaIaAdminResponse,
+  IntentoEntrevistaIaListadoItem,
   IntentoEntrevistaIaParticipanteResponse,
+  ListarIntentosEntrevistaIaCursoQuery,
   ListarIntentosEntrevistaIaQuery,
   ajustarEntrevistaBodySchema,
   anularEntrevistaBodySchema,
   enviarTurnoSchema,
   finalizarEntrevistaBodySchema,
+  listarIntentosEntrevistaIaCursoQuerySchema,
   listarIntentosEntrevistaIaQuerySchema,
 } from "@nexott-learn/shared-types"
 import { AccionAuditoria, RolUsuario } from "@prisma/client"
@@ -74,6 +77,7 @@ function requireIdempotencyKeyUuid(headerValue: string | undefined): string {
  *  - GET    /asignaciones/:id/intentos-entrevista-ia                    E18
  *  - POST   /intentos-entrevista-ia/:id/ajustar                         E19 (admin + X-Motivo)
  *  - POST   /intentos-entrevista-ia/:id/anular                          E20 (admin + X-Motivo + idempotent)
+ *  - GET    /cursos/:cursoId/intentos-entrevista-ia                     E21 (admin, listado del curso)
  */
 @Controller()
 export class EntrevistaIaController {
@@ -202,6 +206,19 @@ export class EntrevistaIaController {
       query,
       usuario: this.requireUsuario(usuario),
     })
+  }
+
+  // E21
+  @Get("cursos/:cursoId/intentos-entrevista-ia")
+  @Roles(RolUsuario.ADMIN)
+  listarIntentosPorCurso(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+    @Query(new ZodValidationPipe(listarIntentosEntrevistaIaCursoQuerySchema))
+    query: ListarIntentosEntrevistaIaCursoQuery,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<Paginated<IntentoEntrevistaIaListadoItem>> {
+    this.requireUsuario(usuario)
+    return this.entrevista.listarIntentosPorCurso({ cursoId, query })
   }
 
   // E19

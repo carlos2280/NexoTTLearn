@@ -7,6 +7,7 @@ import { CursoDetallePage } from "@/pages/admin/cursos/curso-detalle.page"
 import { CursosPage } from "@/pages/admin/cursos/cursos.page"
 import { InicioPage } from "@/pages/admin/inicio/inicio.page"
 import { IntentoEntrevistaIaDetallePage } from "@/pages/admin/intentos-entrevista-ia/intento-ia-detalle.page"
+import { IntentoTransversalDetallePage } from "@/pages/admin/intentos-transversal/intento-transversal-detalle.page"
 import { PersonasPage } from "@/pages/admin/personas/personas.page"
 import { ProximamentePage } from "@/pages/admin/proximamente/proximamente.page"
 import { AvanceCursoPage } from "@/pages/admin/reportes/avance-curso/avance-curso.page"
@@ -127,6 +128,7 @@ export function AppRoutes() {
           path="intentos-entrevista-ia/:intentoId"
           element={<IntentoEntrevistaIaDetallePage />}
         />
+        <Route path="intentos-transversal/:intentoId" element={<IntentoTransversalDetallePage />} />
         <Route path="personas" element={<PersonasPage />} />
         <Route path="reportes" element={<ReportesPage />} />
         <Route path="reportes/eficacia-plataforma" element={<EficaciaPlataformaPage />} />
