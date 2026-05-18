@@ -161,6 +161,7 @@ export type {
   DuplicarCursoResponse,
   CursoConfiguracionResponse,
 } from "./cursos/curso.types"
+export type { EvaluacionesDisponibles } from "./cursos/evaluaciones-disponibles.types"
 export { crearCursoSchema } from "./cursos/crear-curso.schema"
 export type { CrearCursoInput } from "./cursos/crear-curso.schema"
 export { actualizarCursoSchema } from "./cursos/actualizar-curso.schema"

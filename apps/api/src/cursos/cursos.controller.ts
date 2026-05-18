@@ -29,6 +29,7 @@ import {
   CursoResumen,
   DuplicarCursoInput,
   DuplicarCursoResponse,
+  EvaluacionesDisponibles,
   ListarCursosQuery,
   ListarLogCambiosQuery,
   LogCambioCurso,
@@ -85,6 +86,19 @@ export class CursosController {
     @CurrentUser() usuario: SesionUsuario | undefined,
   ): Promise<CursoDetalle> {
     return await this.cursosService.obtenerDetalle(cursoId, this.requireUsuario(usuario))
+  }
+
+  /**
+   * Flags por curso para que el PanelEvaluaciones del admin renderice solo
+   * los subtabs aplicables (Entrevista IA / Transversal / Bloques evaluables).
+   * Solo ADMIN: los participantes no consumen este panel.
+   */
+  @Get(":cursoId/evaluaciones-disponibles")
+  @Roles(RolUsuario.ADMIN)
+  async obtenerEvaluacionesDisponibles(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+  ): Promise<EvaluacionesDisponibles> {
+    return await this.cursosService.obtenerEvaluacionesDisponibles(cursoId)
   }
 
   @Post()
