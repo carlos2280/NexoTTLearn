@@ -984,6 +984,11 @@ model IntentoBloque {
   nota           Decimal  @db.Decimal(5, 2)
   esMejorIntento Boolean  @default(false) @map("es_mejor_intento")
   respuestas     Json     @default("{}") @db.JsonB
+  /// B-extra.2 punto 4: lista de `preguntaId` que el participante no acerto
+  /// en este intento (solo se llena para bloques QUIZ). El frontend lo usa
+  /// para marcar solo las preguntas falladas en "mostrar solucion" sin
+  /// recomputar la correccion en cliente.
+  preguntasFalladas Json?   @map("preguntas_falladas") @db.JsonB
   versionBloque  Int      @map("version_bloque")
   estaInvalidado Boolean  @default(false) @map("esta_invalidado")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -1118,6 +1123,7 @@ model IntentoEntrevistaIA {
   notaAjustadaAdmin      Decimal?                 @map("nota_ajustada_admin") @db.Decimal(5, 2)
   anulado                Boolean                  @default(false)
   motivoAjusteOAnulacion String?                  @map("motivo_ajuste_o_anulacion")
+  reporteEvaluador       Json?                    @map("reporte_evaluador") @db.JsonB
 
   entrevistaIA  EntrevistaIA                     @relation(fields: [entrevistaIaId], references: [id], onDelete: Restrict)
   colaborador   Colaborador                      @relation(fields: [colaboradorId], references: [id], onDelete: Restrict)

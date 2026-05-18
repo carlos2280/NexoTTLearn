@@ -92,6 +92,7 @@ function casoEntrevistaIa(fila: FilaCentroRevisionEntrevistaIa): CasoRevision {
     prioridad: prioridadPorEspera(dias),
     slaRestante: textoEspera(dias),
     responsable: "Admin",
+    intentoEntrevistaIaId: fila.intentoId,
   }
 }
 

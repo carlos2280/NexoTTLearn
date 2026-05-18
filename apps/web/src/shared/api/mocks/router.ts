@@ -4,10 +4,14 @@ import { handlersAuth } from "./handlers-auth"
 import { handlersBloques } from "./handlers-bloques"
 import { handlersCatalogo } from "./handlers-catalogo"
 import { handlersCursoDetalle } from "./handlers-curso-detalle"
+import { handlersEntrevistaIa } from "./handlers-entrevista-ia"
+import { handlersIntentosBloque } from "./handlers-intentos-bloque"
+import { handlersIntentosEntrevistaIa } from "./handlers-intentos-entrevista-ia"
 import { handlersParticipante } from "./handlers-participante"
 import { handlersPersonas } from "./handlers-personas"
 import { handlersReportes } from "./handlers-reportes"
 import { handlersSecciones } from "./handlers-secciones"
+import { handlersTransversal } from "./handlers-transversal"
 
 export interface MockRequest {
   method: string
@@ -34,6 +38,10 @@ const routes: RouteEntry[] = [
   ...handlersPersonas,
   ...handlersParticipante,
   ...handlersCursoDetalle,
+  ...handlersIntentosBloque,
+  ...handlersTransversal,
+  ...handlersEntrevistaIa,
+  ...handlersIntentosEntrevistaIa,
 ]
 
 const MOCK_LATENCY_MS = 280

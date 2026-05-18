@@ -1,4 +1,4 @@
-import { ThemeSync } from "@/shared/components/ui/theme-toggle"
+import { ThemeSync } from "@/shared/components/ui/theme-sync"
 import { BrowserRouter } from "react-router-dom"
 import { Toaster } from "sonner"
 import { QueryProvider } from "./providers/query.provider"

@@ -1,54 +1,55 @@
 import { cn } from "@/shared/lib/cn"
 import { sanitizarHtml } from "@/shared/lib/sanitize-html"
 import { type VarianteTip, contenidoTipSchema } from "@nexott-learn/shared-types"
-import { CheckCircle2, Info, TriangleAlert } from "lucide-react"
+import { CheckCircle2, Info, type LucideIcon, TriangleAlert } from "lucide-react"
 
 interface BloqueTipProps {
   readonly contenido: Record<string, unknown> | null
 }
 
-const ESTILOS: Record<
-  VarianteTip,
-  {
-    readonly borde: string
-    readonly bg: string
-    readonly icono: typeof Info
-    readonly iconoColor: string
-    readonly eyebrow: string
-    readonly eyebrowColor: string
-  }
-> = {
+/**
+ * Render del bloque TIP — callout editorial NexoTT.
+ *
+ * El TIP es **contenido pedagógico** del curso, no feedback funcional
+ * del sistema. Por eso NO usa `<Banner>` (que es para feedback con
+ * saturación semántica fuerte tipo "credenciales inválidas").
+ *
+ * El contenedor es siempre el mismo (bg-surface + borde sutil + tipografía
+ * editorial, estilo Notion/Apple). Lo que cambia entre variantes es solo
+ * el color del icono (en círculo soft) y el título de la cabecera. Así
+ * todos los TIPs respiran identidad NexoTT, mantengan o no la variante.
+ *
+ * Manifiesto §3 capas: usamos los colores semánticos (info/warning/success)
+ * SOLO para el chip del icono — el "papel" sigue siendo neutro editorial.
+ */
+interface EstiloVariante {
+  readonly icono: LucideIcon
+  readonly chipBg: string
+  readonly chipText: string
+  readonly titulo: string
+}
+
+const ESTILO_POR_VARIANTE: Record<VarianteTip, EstiloVariante> = {
   info: {
-    borde: "border-info/30",
-    bg: "bg-info-soft",
     icono: Info,
-    iconoColor: "text-info",
-    eyebrow: "Info",
-    eyebrowColor: "text-info-on-soft",
+    chipBg: "bg-info-soft",
+    chipText: "text-info-on-soft",
+    titulo: "Nota",
   },
   warning: {
-    borde: "border-warning/30",
-    bg: "bg-warning-soft",
     icono: TriangleAlert,
-    iconoColor: "text-warning",
-    eyebrow: "Atención",
-    eyebrowColor: "text-warning-on-soft",
+    chipBg: "bg-warning-soft",
+    chipText: "text-warning-on-soft",
+    titulo: "Atención",
   },
   exito: {
-    borde: "border-success/30",
-    bg: "bg-success-soft",
     icono: CheckCircle2,
-    iconoColor: "text-success",
-    eyebrow: "Buena práctica",
-    eyebrowColor: "text-success-on-soft",
+    chipBg: "bg-success-soft",
+    chipText: "text-success-on-soft",
+    titulo: "Buena práctica",
   },
 }
 
-/**
- * Render del bloque TIP. Callout con borde semántico izquierdo (4px) + bg
- * soft + icono. Las 3 variantes (info, warning, éxito) son colores de la
- * capa "feedback" (manifiesto §3 capas).
- */
 export function BloqueTip({ contenido }: BloqueTipProps) {
   const parsed = contenidoTipSchema.safeParse(contenido)
   if (!parsed.success) {
@@ -58,30 +59,29 @@ export function BloqueTip({ contenido }: BloqueTipProps) {
   if (html.trim().length === 0) {
     return null
   }
-  const estilo = ESTILOS[parsed.data.variante]
+  const estilo = ESTILO_POR_VARIANTE[parsed.data.variante]
   const Icono = estilo.icono
 
   return (
-    <aside
-      className={cn(
-        "relative flex flex-col gap-2 overflow-hidden rounded-2xl border p-5 pl-6",
-        estilo.borde,
-        estilo.bg,
-      )}
-    >
-      <span
-        aria-hidden={true}
-        className={cn("absolute inset-y-0 left-0 w-1", estilo.iconoColor.replace("text-", "bg-"))}
-      />
-      <div className="flex items-center gap-2">
-        <Icono className={cn("h-4 w-4", estilo.iconoColor)} aria-hidden={true} />
-        <span className={cn("nx-eyebrow", estilo.eyebrowColor)}>{estilo.eyebrow}</span>
-      </div>
+    <aside className="flex items-start gap-3 rounded-2xl border border-border bg-surface px-5 py-4">
       <div
-        className="tiptap max-w-prose text-body-sm text-text-primary"
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML del editor Tiptap, sanitizado.
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+        aria-hidden={true}
+        className={cn(
+          "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
+          estilo.chipBg,
+          estilo.chipText,
+        )}
+      >
+        <Icono className="h-4 w-4" strokeWidth={1.5} />
+      </div>
+      <div className="flex flex-col gap-1 pt-1">
+        <p className="font-medium text-body text-text-primary">{estilo.titulo}</p>
+        <div
+          className="tiptap max-w-prose text-body-sm text-text-secondary"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML del editor Tiptap, sanitizado.
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      </div>
     </aside>
   )
 }

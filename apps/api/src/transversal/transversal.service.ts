@@ -41,6 +41,7 @@ import { SesionUsuario } from "../common/types/sesion.types"
 import { NotaSkillService } from "../nota-skill/nota-skill.service"
 import { NotificacionesService } from "../notificaciones/notificaciones.service"
 import { PUNTAJES_FALTANTES_ERROR, calcularNotaTransversal } from "./calcular-nota-transversal"
+import { motivoTransversal } from "./disponibilidad-motivo.helpers"
 import { JobEvaluacionTransversalService } from "./job-evaluacion-transversal.service"
 import { type CargarCapaResult, TransversalCapasService } from "./transversal-capas.service"
 import { toIntentoAdmin, toIntentoParticipante } from "./transversal.helpers"
@@ -277,13 +278,23 @@ export class TransversalService {
     }
 
     if (asignacion.curso.desbloqueo === DesbloqueoCurso.SIEMPRE) {
-      return { disponible: true, razon: "SIEMPRE", fechaDisponibleDesde: null }
+      return {
+        disponible: true,
+        razon: "SIEMPRE",
+        fechaDisponibleDesde: null,
+        motivoBloqueo: null,
+      }
     }
     if (asignacion.curso.desbloqueo === DesbloqueoCurso.DESDE_FECHA) {
       const fecha = asignacion.curso.fechaDesbloqueo
       const fechaIso = fecha ? fecha.toISOString() : null
       const disponible = fecha !== null && Date.now() >= fecha.getTime()
-      return { disponible, razon: "DESDE_FECHA", fechaDisponibleDesde: fechaIso }
+      return {
+        disponible,
+        razon: "DESDE_FECHA",
+        fechaDisponibleDesde: fechaIso,
+        motivoBloqueo: disponible ? null : motivoTransversal("DESDE_FECHA", fecha),
+      }
     }
     // ENCADENADO
     const evaluacion = await evaluarCondicionesListo(this.prisma, asignacionId, {
@@ -291,12 +302,18 @@ export class TransversalService {
       entrevistaIaId: asignacion.curso.entrevistaIaId,
     })
     if (evaluacion.planCompleto) {
-      return { disponible: true, razon: "PLAN_COMPLETADO", fechaDisponibleDesde: null }
+      return {
+        disponible: true,
+        razon: "PLAN_COMPLETADO",
+        fechaDisponibleDesde: null,
+        motivoBloqueo: null,
+      }
     }
     return {
       disponible: false,
       razon: "BLOQUEADO_PLAN_INCOMPLETO",
       fechaDisponibleDesde: null,
+      motivoBloqueo: motivoTransversal("BLOQUEADO_PLAN_INCOMPLETO", null),
     }
   }
 

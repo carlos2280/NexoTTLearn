@@ -55,7 +55,7 @@ export function CatalogoCard({ curso }: CatalogoCardProps) {
         }}
       >
         <div className="nx-grain absolute inset-0 opacity-30" />
-        <span className="absolute top-3 right-3 inline-flex items-center rounded-pill bg-white/95 px-2.5 py-0.5 font-mono font-semibold text-[10px] text-text-primary uppercase tracking-wider">
+        <span className="absolute top-3 right-3 inline-flex items-center rounded-pill bg-white/95 px-2.5 py-0.5 font-mono font-semibold text-[10px] text-stone-900 uppercase tracking-wider">
           {codigo}
         </span>
       </div>
@@ -92,10 +92,12 @@ export function CatalogoCard({ curso }: CatalogoCardProps) {
             <CalendarClock className="h-3.5 w-3.5" aria-hidden={true} />
             {formatearRangoFechas(curso.fechaInicio, curso.fechaDeadline)}
           </span>
-          <span className="inline-flex items-center gap-1.5">
-            <Users className="h-3.5 w-3.5" aria-hidden={true} />
-            {curso.voluntariosInscritos}
-          </span>
+          {curso.voluntariosInscritos > 0 ? (
+            <span className="inline-flex items-center gap-1.5">
+              <Users className="h-3.5 w-3.5" aria-hidden={true} />
+              {curso.voluntariosInscritos} estudiando
+            </span>
+          ) : null}
         </div>
 
         <div className="mt-auto flex items-center justify-end pt-2">

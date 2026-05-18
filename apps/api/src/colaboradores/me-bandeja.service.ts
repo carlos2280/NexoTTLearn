@@ -19,6 +19,7 @@ import {
 import {
   EstadoAsignado,
   EstadoCurso,
+  EstadoIntentoTransversal,
   EstadoVoluntario,
   Prisma,
   RolAsignacion,
@@ -116,6 +117,7 @@ export class MeBandejaService {
       totalNoLeidas,
       totalVoluntariadoAbierto,
       historicoReaperturasRaw,
+      intentosTransversalEnRevision,
     ] = await Promise.all([
       this.cargarAsignacionesActivas(colaboradorId),
       this.cargarAsignacionesCerradasRecientes(colaboradorId, limiteAvisos),
@@ -123,6 +125,7 @@ export class MeBandejaService {
       this.contarNotificacionesNoLeidas(usuarioId),
       this.contarVoluntariadoAbierto(colaboradorId),
       this.cargarReaperturasRecientes(colaboradorId, limiteAvisos),
+      this.cargarIntentosTransversalEnRevision(colaboradorId),
     ])
 
     const asignacionesActivas = await this.enriquecerAsignaciones(asignacionesActivasRaw)
@@ -130,6 +133,7 @@ export class MeBandejaService {
       asignacionesActivas,
       reaperturas: historicoReaperturasRaw,
       cierresRecientes: asignacionesCerradasRecientesRaw,
+      intentosTransversalEnRevision,
       totalVoluntariadoAbierto,
       ahora,
     })
@@ -215,6 +219,27 @@ export class MeBandejaService {
   }
 
   /**
+   * Intentos transversal del colaborador con `estado=EN_EVALUACION` y no
+   * anulados (B-1). Se usa para detectar `ESPERANDO_REVISION`. Solo aplica
+   * para proyecto transversal porque el modelo de entrevista IA no tiene un
+   * estado "en revision" — la IA evalua al instante. El shape de
+   * `SiguienteAccion` permite `enRevision: 'entrevistaIa'` para futuro.
+   */
+  private cargarIntentosTransversalEnRevision(
+    colaboradorId: string,
+  ): Promise<readonly IntentoTransversalEnRevisionRow[]> {
+    return this.prisma.intentoTransversal.findMany({
+      where: {
+        colaboradorId,
+        anulado: false,
+        estado: EstadoIntentoTransversal.EN_EVALUACION,
+      },
+      select: { id: true, transversalId: true, fecha: true },
+      orderBy: { fecha: "desc" },
+    })
+  }
+
+  /**
    * Reaperturas recientes: entradas del historico donde el estado anterior era
    * APTO/NO_APTO y paso a EN_PROGRESO. La regla la valida `AsignacionesService`
    * al ejecutar reabrir-caso (D-AS-11); aqui solo leemos la huella.
@@ -285,11 +310,18 @@ export class MeBandejaService {
     readonly asignacionesActivas: readonly AsignacionEnriquecida[]
     readonly reaperturas: readonly HistoricoReaperturaRow[]
     readonly cierresRecientes: readonly AsignacionRow[]
+    readonly intentosTransversalEnRevision: readonly IntentoTransversalEnRevisionRow[]
     readonly totalVoluntariadoAbierto: number
     readonly ahora: Date
   }): SiguienteAccion | null {
-    const { asignacionesActivas, reaperturas, cierresRecientes, totalVoluntariadoAbierto, ahora } =
-      input
+    const {
+      asignacionesActivas,
+      reaperturas,
+      cierresRecientes,
+      intentosTransversalEnRevision,
+      totalVoluntariadoAbierto,
+      ahora,
+    } = input
 
     // 1. CASO_REABIERTO — solo aplica si la asignacion sigue activa (no fue
     // retirada despues). Si el curso ya no esta ACTIVO, lo ignoramos.
@@ -323,7 +355,18 @@ export class MeBandejaService {
       }
     }
 
-    // 3. ENTREVISTA_IA_DISPONIBLE — plan completo + transversal OK (o NO_APLICA)
+    // 3. ESPERANDO_REVISION — hay un intento transversal EN_EVALUACION del
+    // colaborador cuya asignacion esta activa. Gana sobre los `..._DISPONIBLE`
+    // porque si esta en revision, no hay accion del usuario para ese hito.
+    const esperandoRevision = construirEsperandoRevision(
+      asignacionesActivas,
+      intentosTransversalEnRevision,
+    )
+    if (esperandoRevision) {
+      return esperandoRevision
+    }
+
+    // 4. ENTREVISTA_IA_DISPONIBLE — plan completo + transversal OK (o NO_APLICA)
     // + entrevista NO_APROBADA y curso tiene entrevistaIa.
     const entrevistaListaParaIr = asignacionesActivas.find(
       (a) =>
@@ -341,7 +384,7 @@ export class MeBandejaService {
       }
     }
 
-    // 4. TRANSVERSAL_DISPONIBLE — plan completo + transversal NO_APROBADO.
+    // 5. TRANSVERSAL_DISPONIBLE — plan completo + transversal NO_APROBADO.
     const transversalListoParaIr = asignacionesActivas.find(
       (a) =>
         a.row.curso.transversalId !== null &&
@@ -357,7 +400,7 @@ export class MeBandejaService {
       }
     }
 
-    // 5. DEADLINE_CRITICO — deadline en <=7 dias, avance < 80, no completado.
+    // 6. DEADLINE_CRITICO — deadline en <=7 dias, avance < 80, no completado.
     const critico = asignacionesActivas
       .map((a) => ({ a, dias: diasRestantes(a.row.curso.fechaDeadline, ahora) }))
       .filter(({ a, dias }) => {
@@ -385,7 +428,7 @@ export class MeBandejaService {
       }
     }
 
-    // 6. ASIGNACION_NUEVA — creada hace < 48h y todavia en ASIGNADO (no entro).
+    // 7. ASIGNACION_NUEVA — creada hace < 48h y todavia en ASIGNADO (no entro).
     const limiteNuevas = new Date(ahora.getTime() - UMBRAL_ASIGNACION_NUEVA_HORAS * MS_POR_HORA)
     const reciente = asignacionesActivas.find(
       (a) =>
@@ -403,7 +446,7 @@ export class MeBandejaService {
       }
     }
 
-    // 7. CONTINUAR_CURSO — primer curso ACTIVO con avance < 100 (ya ordenado
+    // 8. CONTINUAR_CURSO — primer curso ACTIVO con avance < 100 (ya ordenado
     // por deadline asc). Voluntarios al final.
     const ordenadas = [...asignacionesActivas].sort((a, b) => {
       // ASIGNADO antes que VOLUNTARIO.
@@ -424,7 +467,7 @@ export class MeBandejaService {
       }
     }
 
-    // 8. EXPLORAR_VOLUNTARIADO — sin cursos activos pero hay catalogo abierto.
+    // 9. EXPLORAR_VOLUNTARIADO — sin cursos activos pero hay catalogo abierto.
     if (asignacionesActivas.length === 0 && totalVoluntariadoAbierto > 0) {
       return {
         tipo: "EXPLORAR_VOLUNTARIADO",
@@ -490,6 +533,12 @@ interface HistoricoReaperturaRow {
   }
 }
 
+interface IntentoTransversalEnRevisionRow {
+  readonly id: string
+  readonly transversalId: string
+  readonly fecha: Date
+}
+
 function toNotificacionResumen(row: NotificacionRow): NotificacionResumen {
   return {
     id: row.id,
@@ -515,6 +564,34 @@ function tonoPorDias(dias: number): TonoDeadline {
     return "cercano"
   }
   return "lejos"
+}
+
+function construirEsperandoRevision(
+  asignaciones: readonly AsignacionEnriquecida[],
+  intentos: readonly IntentoTransversalEnRevisionRow[],
+): SiguienteAccion | null {
+  if (intentos.length === 0) {
+    return null
+  }
+  const transversalIds = new Set(intentos.map((i) => i.transversalId))
+  const asignacion = asignaciones.find(
+    (a) => a.row.curso.transversalId !== null && transversalIds.has(a.row.curso.transversalId),
+  )
+  if (!asignacion) {
+    return null
+  }
+  const intento = intentos.find((i) => i.transversalId === asignacion.row.curso.transversalId)
+  if (!intento) {
+    return null
+  }
+  return {
+    tipo: "ESPERANDO_REVISION",
+    asignacionId: asignacion.row.id,
+    cursoId: asignacion.row.curso.id,
+    cursoTitulo: asignacion.row.curso.titulo,
+    enRevision: "transversal",
+    fechaEnvio: intento.fecha.toISOString(),
+  }
 }
 
 function mapResultadoCierre(row: AsignacionRow): ResultadoCierreVisible | null {

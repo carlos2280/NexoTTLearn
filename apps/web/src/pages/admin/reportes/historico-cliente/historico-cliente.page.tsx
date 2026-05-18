@@ -87,8 +87,7 @@ export function HistoricoClientePage() {
         </Banner>
       )}
 
-      {!sinClientes &&
-        !error &&
+      {!(sinClientes || error) &&
         (isLoading || cargandoClientes ? (
           <Skeleton />
         ) : data ? (

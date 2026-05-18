@@ -45,10 +45,12 @@ interface MockPrisma {
   asignacionCurso: {
     findUnique: ReturnType<typeof vi.fn>
     findUniqueOrThrow: ReturnType<typeof vi.fn>
+    findFirst: ReturnType<typeof vi.fn>
   }
   usuario: { findUnique: ReturnType<typeof vi.fn> }
   intentoEntrevistaIA: {
     findUnique: ReturnType<typeof vi.fn>
+    findFirst: ReturnType<typeof vi.fn>
     findMany: ReturnType<typeof vi.fn>
     count: ReturnType<typeof vi.fn>
     create: ReturnType<typeof vi.fn>
@@ -89,10 +91,15 @@ function buildPrismaMock(): MockPrisma {
         },
       }),
       findUniqueOrThrow: vi.fn().mockResolvedValue({ colaboradorId: COLABORADOR_ID }),
+      // Necesario para resolverAsignacionIdParaIntento (obtenerIntento E17 / listado E18).
+      findFirst: vi.fn().mockResolvedValue({ id: ASIGNACION_ID }),
     },
     usuario: { findUnique: vi.fn().mockResolvedValue({ colaboradorId: COLABORADOR_ID }) },
     intentoEntrevistaIA: {
       findUnique: vi.fn(),
+      // §5.119: intentoEnCurso lee por columna `estado` con findFirst. Default
+      // null = "no hay intento EN_PROGRESO" para no romper happy paths.
+      findFirst: vi.fn().mockResolvedValue(null),
       findMany: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
       create: vi.fn(),
@@ -134,6 +141,11 @@ function buildAiMock(): AiService {
     calcularNotasFinalEntrevista: vi.fn().mockResolvedValue({
       notaGlobal: 75,
       notasPorArea: [{ areaId: AREA_ID, nota: 75 }],
+      reporte: {
+        fortalezas: ["mock: dominio claro del flujo principal"],
+        mejoras: ["mock: profundizar en testing"],
+        justificacion: "mock: justificacion plausible del 75/100.",
+      },
     }),
   } as unknown as AiService
 }
@@ -220,6 +232,11 @@ const INTENTO_BASE_MOCK = {
   entrevistaIaId: ENTREVISTA_IA_ID,
   colaboradorId: COLABORADOR_ID,
   fecha: new Date("2026-05-10T10:00:00Z"),
+  // §5.119: columnas dedicadas estado/fechaFinalizacion + seccionesBaseSnapshot
+  // del SELECT del service. El mock debe replicarlas para que el mapper no
+  // explote (la duplicidad JSONB queda como sombra).
+  fechaFinalizacion: null,
+  estado: "EN_PROGRESO" as const,
   notaGlobal: new Prisma.Decimal(0),
   aprobado: false,
   transcripcionOLog: {
@@ -230,16 +247,20 @@ const INTENTO_BASE_MOCK = {
     fechaFinalizacion: null,
   },
   rubricaSnapshot: {},
+  seccionesBaseSnapshot: null,
   notaAjustadaAdmin: null,
   anulado: false,
   motivoAjusteOAnulacion: null,
+  reporteEvaluador: null,
   notasPorArea: [],
   entrevistaIA: {
     cursoId: CURSO_ID,
     profundidad: "SEMI_SENIOR" as const,
     umbralAprobacion: new Prisma.Decimal(70),
     rubrica: [{ areaId: AREA_ID, peso: new Prisma.Decimal(100) }],
+    curso: { id: CURSO_ID, titulo: "Curso mock" },
   },
+  colaborador: { id: COLABORADOR_ID, nombre: "Colab Mock", email: "colab@nttdata.test" },
 }
 
 describe("E12 GET /cursos/:cursoId/entrevista-ia", () => {
@@ -292,6 +313,7 @@ describe("E13 GET disponibilidad", () => {
     const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN_SESION)
     expect(r.disponible).toBe(false)
     expect(r.razon).toBe("ENTREVISTA_IA_NO_CONFIGURADA")
+    expect(r.motivoBloqueo).toBe("Este curso aun no tiene entrevista IA configurada.")
   })
 
   it("RATE_LIMIT_HORA cuando hay 5 intentos en la ultima hora", async () => {
@@ -301,17 +323,18 @@ describe("E13 GET disponibilidad", () => {
     expect(r.disponible).toBe(false)
     expect(r.razon).toBe("RATE_LIMIT_HORA")
     expect(r.intentosUsadosHoy).toBe(5)
+    expect(r.motivoBloqueo).toContain("5 intentos")
   })
 
   it("INTENTO_EN_CURSO si existe uno EN_PROGRESO", async () => {
     const { service, prisma } = buildService()
-    // §5.119: el detector consulta `count({ where: { estado: 'EN_PROGRESO', ... } })`.
-    prisma.intentoEntrevistaIA.count.mockImplementation((args: { where?: { estado?: string } }) =>
-      Promise.resolve(args.where?.estado === "EN_PROGRESO" ? 1 : 0),
-    )
+    // §5.119: el detector consulta `findFirst({ where: { estado: 'EN_PROGRESO', ... } })`.
+    prisma.intentoEntrevistaIA.findFirst.mockResolvedValue({ id: "intento-en-curso-id" })
     const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN_SESION)
     expect(r.disponible).toBe(false)
     expect(r.razon).toBe("INTENTO_EN_CURSO")
+    expect(r.intentoEnCursoId).toBe("intento-en-curso-id")
+    expect(r.motivoBloqueo).toBe("Tienes un intento en curso. Termina ese primero.")
   })
 
   it("PLAN_INCOMPLETO si el plan no esta completo", async () => {
@@ -320,6 +343,7 @@ describe("E13 GET disponibilidad", () => {
     const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN_SESION)
     expect(r.disponible).toBe(false)
     expect(r.razon).toBe("PLAN_INCOMPLETO")
+    expect(r.motivoBloqueo).toBe("Completa primero tu plan de estudio.")
   })
 
   it("DISPONIBLE happy path", async () => {
@@ -328,6 +352,7 @@ describe("E13 GET disponibilidad", () => {
     expect(r.disponible).toBe(true)
     expect(r.razon).toBe("DISPONIBLE")
     expect(r.maxPorHora).toBe(5)
+    expect(r.motivoBloqueo).toBeNull()
   })
 
   it("TRANSVERSAL_NO_APROBADO si el curso encadenado tiene transversal sin aprobar", async () => {
@@ -349,6 +374,7 @@ describe("E13 GET disponibilidad", () => {
     const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN_SESION)
     expect(r.disponible).toBe(false)
     expect(r.razon).toBe("TRANSVERSAL_NO_APROBADO")
+    expect(r.motivoBloqueo).toBe("Aprueba primero el transversal.")
   })
 
   it("DISPONIBLE si el transversal del curso encadenado ya esta aprobado", async () => {
@@ -409,6 +435,7 @@ describe("E13 GET disponibilidad", () => {
     const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN_SESION)
     expect(r.disponible).toBe(false)
     expect(r.razon).toBe("FECHA_NO_ALCANZADA")
+    expect(r.motivoBloqueo).toContain("Disponible desde")
   })
 })
 
@@ -497,12 +524,9 @@ describe("E14 POST crear intento (snapshot + idempotency)", () => {
 
   it("INTENTO_EN_CURSO si hay otro EN_PROGRESO", async () => {
     const { service, prisma } = setupCrearIntentoHappy()
-    // FIX-P8-cierre §5.119: `intentoEnCurso` ahora hace `count({ where: { estado:
-    // 'EN_PROGRESO', ... } })`. Diferenciamos del count del rate-limit por la
-    // forma del where.
-    prisma.intentoEntrevistaIA.count.mockImplementation((args: { where?: { estado?: string } }) =>
-      Promise.resolve(args.where?.estado === "EN_PROGRESO" ? 1 : 0),
-    )
+    // FIX-P8-cierre §5.119: `intentoEnCurso` ahora hace `findFirst({ where: { estado:
+    // 'EN_PROGRESO', ... } })`. El happy path retorna null; lo sobrescribimos.
+    prisma.intentoEntrevistaIA.findFirst.mockResolvedValue({ id: "intento-existente" })
     await expect(
       service.crearIntento({
         asignacionId: ASIGNACION_ID,

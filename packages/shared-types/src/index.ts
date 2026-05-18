@@ -217,10 +217,13 @@ export type {
 export { origenNotaSkillSchema } from "./evaluacion-inicial/ficha.schema"
 export type {
   OrigenNotaSkill,
+  NivelCualitativoArea,
   FichaSkillItem,
+  FichaSkillCatalogoItem,
   FichaPorAreaItem,
   FichaResponse,
   EntradaHistoricoNotaSkill,
+  EventoHistorialFicha,
 } from "./evaluacion-inicial/ficha.schema"
 // Evaluacion inicial — Slice 5 P5b: respuesta del preview (D-EVI-2/6/8).
 export type {
@@ -512,6 +515,13 @@ export type {
   MeAvancePorSkill,
   MeAvanceSiguienteSeccion,
   MeAvanceCursoResponse,
+  NivelCaminoHaciaAptoArea,
+  CaminoHaciaAptoPorArea,
+  CaminoHaciaApto,
+  ResultadoCierreCurso,
+  SkillCosechadaCierre,
+  AreaPorTrabajarCierre,
+  ResumenCierreCurso,
 } from "./reportes"
 
 // Entrevista IA P8c — schemas y tipos del flujo de entrevista IA final (D89).
@@ -532,6 +542,7 @@ export {
   intentoEntrevistaIaBaseSchema,
   intentoEntrevistaIaParticipanteResponseSchema,
   intentoEntrevistaIaAdminResponseSchema,
+  reporteEvaluadorEntrevistaIaSchema,
   listarIntentosEntrevistaIaQuerySchema,
   finalizarEntrevistaResponseSchema,
   ajustarEntrevistaResponseSchema,
@@ -554,6 +565,7 @@ export type {
   IntentoEntrevistaIaBase,
   IntentoEntrevistaIaParticipanteResponse,
   IntentoEntrevistaIaAdminResponse,
+  ReporteEvaluadorEntrevistaIa,
   ListarIntentosEntrevistaIaQuery,
   FinalizarEntrevistaResponse,
   AjustarEntrevistaResponse,
@@ -566,12 +578,14 @@ export {
   meCursosQuerySchema,
   exportarFichaQuerySchema,
   formatoExportFichaSchema,
+  historialFichaQuerySchema,
 } from "./colaboradores"
 export type {
   MeCursoResumen,
   MeCursosQuery,
   ExportarFichaQuery,
   FormatoExportFicha,
+  HistorialFichaQuery,
 } from "./colaboradores"
 
 // Colaboradores — arbol unificado de curso (modo asignado/voluntario/preview).
@@ -603,6 +617,7 @@ export type {
   SiguienteAccionContinuarCurso,
   SiguienteAccionDeadlineCritico,
   SiguienteAccionEntrevistaIaDisponible,
+  SiguienteAccionEsperandoRevision,
   SiguienteAccionExplorarVoluntariado,
   SiguienteAccionResultadoCierre,
   SiguienteAccionTransversalDisponible,
@@ -624,6 +639,13 @@ export type {
   ColaboradorAdminResumen,
   ExportarColaboradoresQuery,
   FormatoExportColaboradores,
+} from "./colaboradores"
+
+// Resumen cualitativo de ficha (widget "Tu camino" en bandeja participante).
+export type {
+  FichaResumenResponse,
+  FichaResumenTopArea,
+  NivelCualitativoAreaResumen,
 } from "./colaboradores"
 
 // Admin — Slice 12 P12: visor de auditoria (activity_logs).

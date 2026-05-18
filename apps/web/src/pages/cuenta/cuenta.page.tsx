@@ -1,20 +1,31 @@
 import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
+import { Button } from "@/shared/components/ui/button"
 import { Skeleton } from "@/shared/components/ui/skeleton"
 import { Tabs } from "@/shared/components/ui/tabs"
+import { RUTAS } from "@/shared/constants/rutas"
+import { LogOut } from "lucide-react"
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
+import { TabNotificaciones } from "./components/tab-notificaciones"
+import { TabPerfil } from "./components/tab-perfil"
+import { TabPrivacidad } from "./components/tab-privacidad"
 import { TabSeguridad } from "./components/tab-seguridad"
 import { TabSesiones } from "./components/tab-sesiones"
 
-type TabCuenta = "seguridad" | "sesiones"
+type TabCuenta = "perfil" | "seguridad" | "sesiones" | "notificaciones" | "privacidad"
 
 const TABS: readonly { readonly id: TabCuenta; readonly etiqueta: string }[] = [
+  { id: "perfil", etiqueta: "Perfil" },
   { id: "seguridad", etiqueta: "Seguridad" },
   { id: "sesiones", etiqueta: "Sesiones" },
+  { id: "notificaciones", etiqueta: "Notificaciones" },
+  { id: "privacidad", etiqueta: "Privacidad" },
 ]
 
 export function CuentaPage() {
-  const [tab, setTab] = useState<TabCuenta>("seguridad")
+  const [tab, setTab] = useState<TabCuenta>("perfil")
   const { data: usuario, isLoading } = useUsuarioActual()
+  const navigate = useNavigate()
 
   if (isLoading || !usuario) {
     return (
@@ -42,9 +53,24 @@ export function CuentaPage() {
       />
 
       <section role="tabpanel" aria-label={TABS.find((t) => t.id === tab)?.etiqueta}>
+        {tab === "perfil" ? <TabPerfil usuario={usuario} /> : null}
         {tab === "seguridad" ? <TabSeguridad usuario={usuario} /> : null}
         {tab === "sesiones" ? <TabSesiones /> : null}
+        {tab === "notificaciones" ? <TabNotificaciones /> : null}
+        {tab === "privacidad" ? <TabPrivacidad /> : null}
       </section>
+
+      <hr className="border-border" />
+
+      <footer className="flex items-center justify-between gap-4 pb-2">
+        <p className="text-body-sm text-text-tertiary">
+          Cuando cierres sesión, tendrás que volver a iniciar sesión en este navegador.
+        </p>
+        <Button variant="ghost" size="sm" onClick={() => navigate(RUTAS.logout)}>
+          <LogOut className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
+          Cerrar sesión
+        </Button>
+      </footer>
     </div>
   )
 }

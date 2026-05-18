@@ -131,9 +131,16 @@ export interface CalcularNotasFinalEntrevistaInput {
   readonly profundidad: ProfundidadEntrevistaIa
 }
 
+export interface ReporteEvaluadorIa {
+  readonly fortalezas: readonly string[]
+  readonly mejoras: readonly string[]
+  readonly justificacion: string
+}
+
 export interface CalcularNotasFinalEntrevistaOutput {
   readonly notaGlobal: number
   readonly notasPorArea: readonly { readonly areaId: string; readonly nota: number }[]
+  readonly reporte: ReporteEvaluadorIa
 }
 
 /**
@@ -158,6 +165,14 @@ export const iniciarEntrevistaResponseSchema = z
 
 export type IniciarEntrevistaResponse = z.infer<typeof iniciarEntrevistaResponseSchema>
 
+export const reporteEvaluadorIaSchema = z
+  .object({
+    fortalezas: z.array(z.string().min(1).max(200)).min(1).max(5),
+    mejoras: z.array(z.string().min(1).max(200)).min(0).max(5),
+    justificacion: z.string().min(1).max(800),
+  })
+  .strict()
+
 export const notasFinalEntrevistaSchema = z
   .object({
     notaGlobal: z.number().min(0).max(100),
@@ -171,6 +186,7 @@ export const notasFinalEntrevistaSchema = z
           .strict(),
       )
       .min(1),
+    reporte: reporteEvaluadorIaSchema,
   })
   .strict()
 

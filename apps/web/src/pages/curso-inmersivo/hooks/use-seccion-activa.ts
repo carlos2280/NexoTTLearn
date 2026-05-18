@@ -9,6 +9,10 @@ import { useEffect, useMemo, useState } from "react"
 export interface SeccionActiva {
   readonly seccionId: string
   readonly moduloId: string
+  /** Posición 1-based del módulo dentro del árbol del curso. */
+  readonly moduloOrden: number
+  /** Título del módulo padre, para el eyebrow del canvas. */
+  readonly moduloTitulo: string
   readonly titulo: string
   /** Solo presente en modo asignado (proviene del plan personal). */
   readonly caracter: SeccionPlanItemParticipante["caracter"] | null
@@ -124,12 +128,14 @@ function indexarArbol(
   if (!arbol) {
     return map
   }
-  for (const modulo of arbol.modulos) {
+  for (const [indiceModulo, modulo] of arbol.modulos.entries()) {
     for (const seccion of modulo.secciones) {
       const plan = anotacionPlan.get(seccion.seccionId)
       map.set(seccion.seccionId, {
         seccionId: seccion.seccionId,
         moduloId: modulo.moduloId,
+        moduloOrden: indiceModulo + 1,
+        moduloTitulo: modulo.titulo,
         titulo: seccion.titulo,
         caracter: plan?.caracter ?? null,
         completada: plan?.completada ?? false,

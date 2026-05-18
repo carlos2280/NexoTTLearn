@@ -28,6 +28,7 @@ import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
 import { NotificacionesService } from "../notificaciones/notificaciones.service"
+import { motivoEntrevistaIa } from "./disponibilidad-motivo.helpers"
 import { EntrevistaEvaluacionService } from "./entrevista-evaluacion.service"
 import {
   IntentoEntrevistaSeleccionado,
@@ -135,12 +136,15 @@ export class EntrevistaIaService {
     usuario: SesionUsuario,
   ): Promise<DisponibilidadEntrevistaIaResponse> {
     const asignacion = await this.resolverAsignacion(asignacionId, usuario)
+    const fechaDesbloqueoCurso = asignacion.curso.fechaDesbloqueo
     if (asignacion.curso.entrevistaIaId === null) {
       return {
         disponible: false,
         razon: "ENTREVISTA_IA_NO_CONFIGURADA",
         intentosUsadosHoy: 0,
         maxPorHora: RATE_LIMIT_MAX,
+        motivoBloqueo: motivoEntrevistaIa("ENTREVISTA_IA_NO_CONFIGURADA", fechaDesbloqueoCurso),
+        intentoEnCursoId: null,
       }
     }
     const intentosUsadosHoy = await this.contarIntentosUltimaHora(
@@ -153,29 +157,41 @@ export class EntrevistaIaService {
         razon: "RATE_LIMIT_HORA",
         intentosUsadosHoy,
         maxPorHora: RATE_LIMIT_MAX,
+        motivoBloqueo: motivoEntrevistaIa("RATE_LIMIT_HORA", fechaDesbloqueoCurso),
+        intentoEnCursoId: null,
       }
     }
     const enCurso = await this.intentoEnCurso(
       asignacion.colaboradorId,
       asignacion.curso.entrevistaIaId,
     )
-    if (enCurso) {
+    if (enCurso !== null) {
       return {
         disponible: false,
         razon: "INTENTO_EN_CURSO",
         intentosUsadosHoy,
         maxPorHora: RATE_LIMIT_MAX,
+        motivoBloqueo: motivoEntrevistaIa("INTENTO_EN_CURSO", fechaDesbloqueoCurso),
+        intentoEnCursoId: enCurso.id,
       }
     }
     const gate = await this.evaluarGateDesbloqueo(asignacion, asignacionId)
     if (gate !== null) {
-      return { ...gate, intentosUsadosHoy, maxPorHora: RATE_LIMIT_MAX }
+      return {
+        ...gate,
+        intentosUsadosHoy,
+        maxPorHora: RATE_LIMIT_MAX,
+        motivoBloqueo: motivoEntrevistaIa(gate.razon, fechaDesbloqueoCurso),
+        intentoEnCursoId: null,
+      }
     }
     return {
       disponible: true,
       razon: "DISPONIBLE",
       intentosUsadosHoy,
       maxPorHora: RATE_LIMIT_MAX,
+      motivoBloqueo: null,
+      intentoEnCursoId: null,
     }
   }
 
@@ -286,7 +302,10 @@ export class EntrevistaIaService {
         message: "Se alcanzo el limite de 5 intentos por hora.",
       })
     }
-    if (await this.intentoEnCurso(asignacion.colaboradorId, asignacion.curso.entrevistaIaId)) {
+    if (
+      (await this.intentoEnCurso(asignacion.colaboradorId, asignacion.curso.entrevistaIaId)) !==
+      null
+    ) {
       throw new ConflictException({
         code: apiErrorCodes.conflictIntentoEntrevistaEnCurso,
         message: "Ya existe un intento de entrevista IA EN_PROGRESO.",
@@ -520,7 +539,33 @@ export class EntrevistaIaService {
     if (usuario.rol === RolUsuario.PARTICIPANTE) {
       return toIntentoParticipante(intento)
     }
-    return toIntentoAdmin(intento)
+    const asignacionId = await this.resolverAsignacionIdParaIntento(intento)
+    return toIntentoAdmin(intento, { asignacionId })
+  }
+
+  /**
+   * Localiza la asignacion del colaborador para el curso del intento. La
+   * pantalla admin necesita este id para enlazar a la ficha de asignacion
+   * y al historial. Si no existe (caso raro: borrada), lanzamos NotFound.
+   */
+  private async resolverAsignacionIdParaIntento(
+    intento: IntentoEntrevistaSeleccionado,
+  ): Promise<string> {
+    const asignacion = await this.prisma.asignacionCurso.findFirst({
+      where: {
+        colaboradorId: intento.colaboradorId,
+        cursoId: intento.entrevistaIA.cursoId,
+      },
+      select: { id: true },
+      orderBy: { fechaInicio: "desc" },
+    })
+    if (!asignacion) {
+      throw new NotFoundException({
+        code: apiErrorCodes.intentoEntrevistaNoEncontrado,
+        message: "No se encontro la asignacion del intento.",
+      })
+    }
+    return asignacion.id
   }
 
   // ===========================================================================
@@ -556,7 +601,10 @@ export class EntrevistaIaService {
       }),
       this.prisma.intentoEntrevistaIA.count({ where }),
     ])
-    const mapper = input.usuario.rol === RolUsuario.ADMIN ? toIntentoAdmin : toIntentoParticipante
+    const mapper = (intento: IntentoEntrevistaSeleccionado) =>
+      input.usuario.rol === RolUsuario.ADMIN
+        ? toIntentoAdmin(intento, { asignacionId: input.asignacionId })
+        : toIntentoParticipante(intento)
     return buildPaginatedResponse(data.map(mapper), total, page, pageSize)
   }
 
@@ -719,18 +767,22 @@ export class EntrevistaIaService {
     return total
   }
 
-  private async intentoEnCurso(colaboradorId: string, entrevistaIaId: string): Promise<boolean> {
+  private intentoEnCurso(
+    colaboradorId: string,
+    entrevistaIaId: string,
+  ): Promise<{ readonly id: string } | null> {
     // §5.119: lectura por columna dedicada `estado`. La duplicidad JSONB queda
     // solo para flujo de turnos.
-    const enCurso = await this.prisma.intentoEntrevistaIA.count({
+    return this.prisma.intentoEntrevistaIA.findFirst({
       where: {
         colaboradorId,
         entrevistaIaId,
         anulado: false,
         estado: "EN_PROGRESO",
       },
+      select: { id: true },
+      orderBy: { fecha: "desc" },
     })
-    return enCurso > 0
   }
 
   private async planEstaCompleto(asignacionId: string): Promise<boolean> {

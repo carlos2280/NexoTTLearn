@@ -10,14 +10,22 @@ import {
 import { Throttle } from "@nestjs/throttler"
 import type {
   CursoArbolResponse,
+  EventoHistorialFicha,
   ExportarFichaQuery,
   FichaResponse,
+  FichaResumenResponse,
+  HistorialFichaQuery,
   MeAvanceCursoResponse,
   MeBandejaResponse,
   MeCursoResumen,
   MeCursosQuery,
+  ResumenCierreCurso,
 } from "@nexott-learn/shared-types"
-import { exportarFichaQuerySchema, meCursosQuerySchema } from "@nexott-learn/shared-types"
+import {
+  exportarFichaQuerySchema,
+  historialFichaQuerySchema,
+  meCursosQuerySchema,
+} from "@nexott-learn/shared-types"
 import { AccionAuditoria, RolUsuario } from "@prisma/client"
 import type { Response } from "express"
 import { AuditLogService } from "../common/audit/audit-log.service"
@@ -32,7 +40,10 @@ import { MeAvanceService } from "./me-avance.service"
 import { MeBandejaService } from "./me-bandeja.service"
 import { MeCursoArbolService } from "./me-curso-arbol.service"
 import { MeCursosService } from "./me-cursos.service"
-import { fichaACsv, fichaAPdf } from "./me-ficha-export.helpers"
+import { fichaACsv, fichaAPdf, slugNombreColaborador } from "./me-ficha-export.helpers"
+import { MeFichaHistorialService } from "./me-ficha-historial.service"
+import { MeFichaResumenService } from "./me-ficha-resumen.service"
+import { MeResumenCierreService } from "./me-resumen-cierre.service"
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -56,6 +67,9 @@ export class MeController {
     private readonly meBandejaService: MeBandejaService,
     private readonly meCursoArbolService: MeCursoArbolService,
     private readonly meCursosService: MeCursosService,
+    private readonly meFichaHistorialService: MeFichaHistorialService,
+    private readonly meFichaResumenService: MeFichaResumenService,
+    private readonly meResumenCierreService: MeResumenCierreService,
     private readonly auditLog: AuditLogService,
   ) {}
 
@@ -72,6 +86,35 @@ export class MeController {
   async obtenerMiFicha(@CurrentUser() usuario: SesionUsuario | undefined): Promise<FichaResponse> {
     const sesion = this.requireUsuario(usuario)
     return await this.fichaService.obtenerFichaDeUsuario(sesion.usuarioId, sesion)
+  }
+
+  @Get("ficha/resumen")
+  @Roles(RolUsuario.PARTICIPANTE, RolUsuario.ADMIN)
+  obtenerMiFichaResumen(
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<FichaResumenResponse> {
+    const sesion = this.requireUsuario(usuario)
+    return this.meFichaResumenService.obtenerResumen(sesion.usuarioId)
+  }
+
+  /**
+   * `GET /me/ficha/historial` (B-24). Timeline cronologico unificado del
+   * colaborador para la seccion "Tu historial" de /mi-ficha. Devuelve la
+   * union ordenada por fecha DESC de cambios de skill + hitos de curso.
+   */
+  @Get("ficha/historial")
+  @Roles(RolUsuario.PARTICIPANTE, RolUsuario.ADMIN)
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  obtenerMiHistorialFicha(
+    @CurrentUser() usuario: SesionUsuario | undefined,
+    @Query(new ZodValidationPipe(historialFichaQuerySchema)) query: HistorialFichaQuery,
+  ): Promise<readonly EventoHistorialFicha[]> {
+    const sesion = this.requireUsuario(usuario)
+    return this.meFichaHistorialService.obtenerHistorialDeUsuario(
+      sesion.usuarioId,
+      query.limite,
+      query.cursor,
+    )
   }
 
   @Get("cursos")
@@ -93,9 +136,12 @@ export class MeController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
     const sesion = this.requireUsuario(usuario)
-    const ficha = await this.fichaService.obtenerFichaDeUsuario(sesion.usuarioId, sesion)
-    const fechaArchivo = new Date().toISOString().slice(0, 10)
-    const baseFilename = `ficha-${ficha.colaboradorId}-${fechaArchivo}`
+    const [ficha, identidad] = await Promise.all([
+      this.fichaService.obtenerFichaDeUsuario(sesion.usuarioId, sesion),
+      this.fichaService.obtenerIdentidadDeUsuario(sesion.usuarioId),
+    ])
+    const fechaArchivo = new Date().toISOString().slice(0, 10).replace(/-/g, "")
+    const baseFilename = `ficha-${slugNombreColaborador(identidad.nombre)}-${fechaArchivo}`
 
     if (query.formato === "csv") {
       const csv = fichaACsv(ficha)
@@ -161,6 +207,28 @@ export class MeController {
       })
     }
     return this.meCursoArbolService.obtenerArbol(sesion.usuarioId, cursoId)
+  }
+
+  /**
+   * `GET /me/cursos/:cursoId/resumen-cierre` (B-26). Veredicto del curso para
+   * la pantalla `/cursos/:cursoId/cerrado`. Devuelve 409 `cursoNoCerrado` si
+   * el curso todavia no esta cerrado o si la fotografia no esta disponible.
+   */
+  @Get("cursos/:cursoId/resumen-cierre")
+  @Roles(RolUsuario.PARTICIPANTE, RolUsuario.ADMIN)
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  obtenerResumenCierreCurso(
+    @CurrentUser() usuario: SesionUsuario | undefined,
+    @Param("cursoId") cursoId: string,
+  ): Promise<ResumenCierreCurso> {
+    const sesion = this.requireUsuario(usuario)
+    if (!UUID_REGEX.test(cursoId)) {
+      throw new BadRequestException({
+        code: apiErrorCodes.invalidQuery,
+        message: "cursoId no es un UUID valido.",
+      })
+    }
+    return this.meResumenCierreService.obtenerResumenCierreDeUsuario(sesion.usuarioId, cursoId)
   }
 
   private requireUsuario(usuario: SesionUsuario | undefined): SesionUsuario {

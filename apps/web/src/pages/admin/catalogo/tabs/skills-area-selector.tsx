@@ -1,5 +1,5 @@
 import { Field } from "@/shared/components/ui/field"
-import { Select } from "@/shared/components/ui/select"
+import { Select, SelectItem } from "@/shared/components/ui/select"
 import type { AreaResponse, SkillResponse } from "@nexott-learn/shared-types"
 import { ArrowRight } from "lucide-react"
 
@@ -36,12 +36,12 @@ export function SkillsAreaSelector({
       />
       <Field label="Área destino">
         {(p) => (
-          <Select {...p} value={areaDestinoId} onChange={(e) => onCambiarDestino(e.target.value)}>
+          <Select {...p} value={areaDestinoId} onValueChange={onCambiarDestino}>
             {areas.map((a) => (
-              <option key={a.id} value={a.id} disabled={a.id === skill?.areaId}>
+              <SelectItem key={a.id} value={a.id} disabled={a.id === skill?.areaId}>
                 {a.nombre}
                 {a.id === skill?.areaId ? " (actual)" : ""}
-              </option>
+              </SelectItem>
             ))}
           </Select>
         )}

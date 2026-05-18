@@ -72,12 +72,32 @@ export function aplanarFichaPorArea(ficha: FichaResponse): FilaFichaPorArea[] {
 }
 
 /**
+ * Slugifica el nombre del colaborador para usarlo en filenames de descarga
+ * (B-25). Quita diacriticos, lower-case, colapsa todo lo no-alfanumerico en
+ * guiones. Devuelve `colaborador` como fallback cuando el resultado queda
+ * vacio (improbable, pero defensivo).
+ */
+export function slugNombreColaborador(nombre: string): string {
+  // \p{Mn} = "Mark, Nonspacing" — diacriticos sueltos tras `normalize('NFD')`.
+  const limpio = nombre
+    .normalize("NFD")
+    .replace(/\p{Mn}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+  return limpio === "" ? "colaborador" : limpio
+}
+
+/**
  * Combina ambos bloques en una sola string CSV con encabezado y separador. El
  * orden replica la lectura natural: resumen por area → detalle por skill.
+ *
+ * Anade un BOM UTF-8 al inicio (`﻿`) para que Excel ES lo detecte como
+ * UTF-8 y no rompa caracteres como `ñ` y tildes (D-S11-C6).
  */
 export function fichaACsv(ficha: FichaResponse): string {
   const lineas: string[] = []
-  lineas.push(`# Ficha de skills — colaborador ${ficha.colaboradorId}`)
+  lineas.push(`﻿# Ficha de skills — colaborador ${ficha.colaboradorId}`)
   lineas.push("")
   lineas.push("## Resumen por area")
   lineas.push(COLUMNAS_FICHA_POR_AREA.map((c) => escaparCsv(c.header)).join(","))

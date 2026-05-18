@@ -179,6 +179,13 @@ export const apiErrorCodes = {
   // Cierre curso P11a (D-S11-A2..A5).
   validacionDecisionFaltante: "VALIDACION_DECISION_FALTANTE",
   conflictCursoFueraVentana7Dias: "CONFLICT_CURSO_FUERA_VENTANA_7_DIAS",
+  // Resumen cierre para el participante (B-26). Codes especificos por rama del
+  // 409 en `GET /me/cursos/:cursoId/resumen-cierre`, asi el frontend distingue
+  // "redirigir a vista activa" (cursoNoCerrado) de "mostrar mensaje en sitio"
+  // (snapshot ausente / legacy / sin veredicto).
+  snapshotCierreNoDisponible: "SNAPSHOT_CIERRE_NO_DISPONIBLE",
+  snapshotCierreFormatoNoSoportado: "SNAPSHOT_CIERRE_FORMATO_NO_SOPORTADO",
+  veredictoCierreNoDisponible: "VEREDICTO_CIERRE_NO_DISPONIBLE",
   // Reportes P11b operativos (D-S11-B7, P11b §2 alcance).
   fotografiaNoEncontrada: "FOTOGRAFIA_NO_ENCONTRADA",
   vistaNoSoportada: "VISTA_NO_SOPORTADA",

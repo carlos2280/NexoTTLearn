@@ -35,6 +35,23 @@ export function ConfirmDialog({
     }
   }
 
+  const acciones = (
+    <>
+      <Button variant="secondary" size="sm" type="button" onClick={() => onCambiarAbierto(false)}>
+        Cancelar
+      </Button>
+      <Button
+        variant={variante}
+        size="sm"
+        type="button"
+        onClick={manejarConfirmar}
+        isLoading={enviando}
+      >
+        {textoConfirmar}
+      </Button>
+    </>
+  )
+
   return (
     <Dialog
       abierto={abierto}
@@ -42,32 +59,23 @@ export function ConfirmDialog({
       titulo={titulo}
       descripcion={descripcion}
     >
-      <div className="flex flex-col gap-4">
-        {error ? (
+      {error ? (
+        <div className="flex flex-col gap-4">
           <p role="alert" className="text-body-sm text-danger-on-soft">
             {error}
           </p>
-        ) : null}
-        <DialogFooter>
-          <Button
-            variant="secondary"
-            size="sm"
-            type="button"
-            onClick={() => onCambiarAbierto(false)}
-          >
-            Cancelar
-          </Button>
-          <Button
-            variant={variante}
-            size="sm"
-            type="button"
-            onClick={manejarConfirmar}
-            isLoading={enviando}
-          >
-            {textoConfirmar}
-          </Button>
-        </DialogFooter>
-      </div>
+          <DialogFooter>{acciones}</DialogFooter>
+        </div>
+      ) : (
+        // Sin error: colapsa el padding interno del Dialog (`-my-5`) y omite
+        // el `border-t` del footer para que quede UNA sola separacion limpia
+        // pegada bajo la cabecera, en vez de un bloque vacio entre dos lineas.
+        <div className="-my-5">
+          <footer className="-mx-6 flex items-center justify-end gap-2 bg-subtle/40 px-6 py-3">
+            {acciones}
+          </footer>
+        </div>
+      )}
     </Dialog>
   )
 }

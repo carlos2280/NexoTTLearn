@@ -18,6 +18,20 @@ export const intentoBloqueResponseSchema = z
     versionBloque: z.number().int().min(1),
     estaInvalidado: z.boolean(),
     fecha: z.string(),
+    /**
+     * B-extra.2 punto 4: ids de las preguntas que el participante no acerto
+     * en este intento. Solo se llena para bloques QUIZ; vacio para los demas
+     * tipos. Permite al frontend mostrar la solucion solo en las falladas sin
+     * recomputar la correccion del lado cliente.
+     */
+    preguntasFalladas: z.array(z.string().uuid()).readonly(),
+    /**
+     * B-extra.2 punto 3: presente solo en la respuesta del POST. `true` cuando
+     * este intento aprueba (nota >= `notaMinima` del bloque) y el mejor previo
+     * NO aprobaba (o no existia). Permite al frontend evitar el snapshot
+     * manual de `mejor.data` antes del POST.
+     */
+    esPrimeraAprobacion: z.boolean().optional(),
   })
   .strict()
 

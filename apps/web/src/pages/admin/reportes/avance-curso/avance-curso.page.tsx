@@ -113,8 +113,7 @@ export function AvanceCursoPage() {
         </Banner>
       )}
 
-      {!sinCursos &&
-        !esFotografiaPendiente &&
+      {!(sinCursos || esFotografiaPendiente) &&
         (isLoading || cargandoCursos ? (
           <Skeleton vista={vista} />
         ) : data ? (

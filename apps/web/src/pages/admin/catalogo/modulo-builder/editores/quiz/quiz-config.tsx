@@ -51,7 +51,7 @@ export function QuizConfig({ config, onCambiar }: QuizConfigProps) {
                 />
                 Ilimitados
               </label>
-              <label className={cn(CHIP_BASE, !intentosIlimitados ? CHIP_ACTIVO : CHIP_INACTIVO)}>
+              <label className={cn(CHIP_BASE, intentosIlimitados ? CHIP_INACTIVO : CHIP_ACTIVO)}>
                 <input
                   type="radio"
                   name="quiz-intentos-modo"

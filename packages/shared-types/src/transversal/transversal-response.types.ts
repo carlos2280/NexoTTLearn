@@ -64,12 +64,19 @@ export type TransversalResponse = z.infer<typeof transversalResponseSchema>
 /**
  * `GET /asignaciones/:asignacionId/transversal/disponibilidad` — D42.
  * `fechaDisponibleDesde` solo se incluye cuando `razon === 'DESDE_FECHA'`.
+ *
+ * B-6: `motivoBloqueo` es una frase amable lista para mostrar al
+ * participante. Siempre `null` cuando `disponible === true`; siempre
+ * string no vacio cuando `disponible === false`. El copy lo decide el
+ * backend para que cambios futuros (i18n, otros clientes) no requieran
+ * tocar cada cliente.
  */
 export const disponibilidadTransversalResponseSchema = z
   .object({
     disponible: z.boolean(),
     razon: razonDisponibilidadTransversalSchema,
     fechaDisponibleDesde: z.string().nullable(),
+    motivoBloqueo: z.string().nullable(),
   })
   .strict()
 

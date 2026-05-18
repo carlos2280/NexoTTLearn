@@ -20,10 +20,17 @@ interface OutputFlujo {
   readonly setCodigo: (valor: string) => void
   readonly reset: () => void
   readonly puedeEjecutar: boolean
+  /** Corre los tests en el navegador sin persistir intento (iteración libre). */
   readonly ejecutar: () => Promise<void>
+  /** Corre los tests Y persiste el intento en el backend (decisión oficial). */
+  readonly enviar: () => Promise<void>
   readonly isEjecutando: boolean
   readonly isEnviando: boolean
   readonly ejecucion: ResultadoEjecucionSuite | null
+  /** Código que se envió al runner en la última ejecución. Útil para detectar
+   * si el participante ha modificado el editor desde entonces (estado "sin
+   * probar"). `null` si nunca se ejecutó. */
+  readonly codigoEjecutado: string | null
   readonly ultimoIntento: IntentoBloqueResponse | null
   readonly errorEjecucion: Error | null
 }
@@ -37,6 +44,7 @@ interface OutputFlujo {
 export function useFlujoCodigoPregunta(input: InputFlujo): OutputFlujo {
   const [codigo, setCodigo] = useState<string>(input.contenido.esqueletoInicial)
   const [ejecucion, setEjecucion] = useState<ResultadoEjecucionSuite | null>(null)
+  const [codigoEjecutado, setCodigoEjecutado] = useState<string | null>(null)
   const [ultimoIntento, setUltimoIntento] = useState<IntentoBloqueResponse | null>(null)
   const ejecutor = useEjecutarCodigo()
   const crear = useCrearIntentoBloque()
@@ -46,26 +54,43 @@ export function useFlujoCodigoPregunta(input: InputFlujo): OutputFlujo {
   const reset = (): void => {
     setCodigo(input.contenido.esqueletoInicial)
     setEjecucion(null)
+    setCodigoEjecutado(null)
     setUltimoIntento(null)
   }
 
-  const ejecutar = async (): Promise<void> => {
+  async function ejecutarLocal(): Promise<ResultadoEjecucionSuite | null> {
     // `puedeEjecutar` implica `contenidoTests !== null`; el check defensivo
     // permite usar `input.contenidoTests` sin `!` abajo.
     if (!puedeEjecutar || input.contenidoTests === null || codigo.trim().length === 0) {
-      return
+      return null
     }
-    setUltimoIntento(null)
     setEjecucion(null)
-
+    const codigoSnapshot = codigo
     const resultado = await ejecutor.mutateAsync({
       lenguaje: input.contenido.lenguaje as InputEjecucionLenguaje,
-      codigo,
+      codigo: codigoSnapshot,
       tests: input.contenidoTests.tests,
       timeoutSegPorTest: input.contenido.tiempoLimiteSeg,
     })
     setEjecucion(resultado)
+    setCodigoEjecutado(codigoSnapshot)
+    return resultado
+  }
 
+  const ejecutar = async (): Promise<void> => {
+    // Acción de iteración libre: no toca el último intento (si lo había, se
+    // mantiene en pantalla) y no hace POST.
+    await ejecutarLocal()
+  }
+
+  const enviar = async (): Promise<void> => {
+    // Acción oficial: corre los tests con el código actual y registra el
+    // intento en el backend para que sume al avance del participante.
+    setUltimoIntento(null)
+    const resultado = await ejecutarLocal()
+    if (!resultado) {
+      return
+    }
     const resultadosTests: ResultadoTestReportado[] = resultado.resultados.map((r) => ({
       testId: r.testId,
       paso: r.paso,
@@ -94,9 +119,11 @@ export function useFlujoCodigoPregunta(input: InputFlujo): OutputFlujo {
     reset,
     puedeEjecutar,
     ejecutar,
+    enviar,
     isEjecutando: ejecutor.isPending,
     isEnviando: crear.isPending,
     ejecucion,
+    codigoEjecutado,
     ultimoIntento,
     errorEjecucion: ejecutor.error,
   }

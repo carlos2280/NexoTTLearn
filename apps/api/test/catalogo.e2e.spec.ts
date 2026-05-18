@@ -206,18 +206,30 @@ describe.runIf(RUN_E2E)("catalogo e2e", () => {
   })
 
   it("filtro skills?areaId=<id>: limita resultados a esa area", async () => {
-    const areas = await agente.get("/api/v1/catalogo/areas")
-    const backend = (areas.body as { data: readonly { id: string; nombre: string }[] }).data.find(
-      (a) => a.nombre === "Backend",
-    )
-    expect(backend).toBeDefined()
+    // Self-contained: el test crea su propia area + skill para no depender de
+    // que el seed contenga "Backend" (cambio en la unificacion del seeder).
+    const area = await prisma.area.upsert({
+      where: { nombre: "Backend" },
+      update: {},
+      create: { nombre: "Backend", descripcion: "Area Backend (test self-setup)" },
+      select: { id: true },
+    })
+    await prisma.skill.upsert({
+      where: { etiquetaVisible: "Backend filtro test skill" },
+      update: { areaId: area.id, estado: "ACTIVA" },
+      create: {
+        etiquetaVisible: "Backend filtro test skill",
+        areaId: area.id,
+        estado: "ACTIVA",
+      },
+    })
 
-    const res = await agente.get(`/api/v1/catalogo/skills?areaId=${backend?.id}`)
+    const res = await agente.get(`/api/v1/catalogo/skills?areaId=${area.id}`)
     expect(res.status).toBe(200)
     const body = res.body as { data: readonly { areaId: string }[] }
     expect(body.data.length).toBeGreaterThanOrEqual(1)
     for (const s of body.data) {
-      expect(s.areaId).toBe(backend?.id)
+      expect(s.areaId).toBe(area.id)
     }
   })
 

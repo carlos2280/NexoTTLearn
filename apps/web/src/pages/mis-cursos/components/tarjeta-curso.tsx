@@ -4,7 +4,7 @@ import { RUTAS } from "@/shared/constants/rutas"
 import { cn } from "@/shared/lib/cn"
 import type { MeCursoResumen } from "@nexott-learn/shared-types"
 import { useNavigate } from "react-router-dom"
-import { tonoEstado } from "../mis-cursos.types"
+import { estaCerrado, tonoEstado } from "../mis-cursos.types"
 
 interface TarjetaCursoProps {
   readonly curso: MeCursoResumen
@@ -20,6 +20,7 @@ export function TarjetaCurso({ curso }: TarjetaCursoProps) {
   const navigate = useNavigate()
   const deadline = formatearDeadline(curso.fechaDeadline)
   const esVoluntario = curso.rol === "VOLUNTARIO"
+  const cerrado = estaCerrado(curso)
   const tono = tonoEstado(curso)
   const colorEstado = `var(--color-state-${tono.slug})`
 
@@ -62,13 +63,15 @@ export function TarjetaCurso({ curso }: TarjetaCursoProps) {
 
       <div className="mt-auto flex items-center justify-between gap-3 pt-1">
         <span className="text-caption text-text-tertiary">
-          {esVoluntario ? "Voluntario" : "Asignado"}
-          <span className="text-text-disabled"> · </span>
-          <span className={cn(CLASES_DEADLINE[deadline.tono])}>
-            {esVoluntario && deadline.tono === "lejos"
-              ? "ritmo libre"
-              : `${deadline.textoFecha} · ${deadline.textoRelativo}`}
-          </span>
+          {cerrado ? (
+            <span className="text-text-tertiary">Cerrado</span>
+          ) : (
+            <span className={cn(CLASES_DEADLINE[deadline.tono])}>
+              {esVoluntario && deadline.tono === "lejos"
+                ? "Ritmo libre"
+                : `${deadline.textoFecha} · ${deadline.textoRelativo}`}
+            </span>
+          )}
         </span>
         <Button
           variant="ghost"
@@ -76,7 +79,7 @@ export function TarjetaCurso({ curso }: TarjetaCursoProps) {
           onClick={() => navigate(RUTAS.participante.cursoDetalle(curso.cursoId))}
           aria-label={`Continuar con ${curso.cursoTitulo}`}
         >
-          Continuar
+          {cerrado ? "Ver" : "Continuar"}
         </Button>
       </div>
     </article>

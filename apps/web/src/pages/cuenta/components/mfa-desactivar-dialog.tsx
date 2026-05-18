@@ -24,14 +24,20 @@ export function MfaDesactivarDialog({ abierto, onCambiarAbierto }: MfaDesactivar
   const mutacion = useDesactivarMfaPropio()
   const apiError = mutacion.error instanceof ApiError ? mutacion.error : null
 
+  // Limpia al cerrar. `mutacion` cambia de ref en cada render (objeto de
+  // Tanstack Query); meterlo en deps + llamar a `reset()` notifica observers
+  // y dispara loop infinito ("Maximum update depth exceeded"). El metodo se
+  // lee siempre por la referencia actual al ejecutarse el effect.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: limpieza ligada solo al cierre del dialog.
   useEffect(() => {
-    if (!abierto) {
-      setCodigo("")
-      setMotivo("")
-      setErrorCodigo(null)
-      mutacion.reset()
+    if (abierto) {
+      return
     }
-  }, [abierto, mutacion])
+    setCodigo("")
+    setMotivo("")
+    setErrorCodigo(null)
+    mutacion.reset()
+  }, [abierto])
 
   const motivoValido = motivo.trim().length > 0
   const codigoValido = REGEX_TOTP.test(codigo)

@@ -1,5 +1,5 @@
 import { SearchField } from "@/shared/components/ui/search-field"
-import { Select } from "@/shared/components/ui/select"
+import { Select, SelectItem } from "@/shared/components/ui/select"
 import { cn } from "@/shared/lib/cn"
 import { Popover, PopoverContent, PopoverPortal, PopoverTrigger } from "@radix-ui/react-popover"
 import { ListFilter, X } from "lucide-react"
@@ -74,12 +74,12 @@ export function PersonasFiltros({ valor, onCambio }: PersonasFiltrosProps) {
                 <Select
                   compact={true}
                   value={valor.rol}
-                  onChange={(e) => onCambio({ ...valor, rol: e.target.value as FiltroRol })}
+                  onValueChange={(v) => onCambio({ ...valor, rol: v as FiltroRol })}
                   aria-label="Filtrar por rol"
                 >
-                  <option value="TODOS">Todos los roles</option>
-                  <option value="ADMIN">Administradores</option>
-                  <option value="PARTICIPANTE">Participantes</option>
+                  <SelectItem value="TODOS">Todos los roles</SelectItem>
+                  <SelectItem value="ADMIN">Administradores</SelectItem>
+                  <SelectItem value="PARTICIPANTE">Participantes</SelectItem>
                 </Select>
               </CampoFiltro>
 
@@ -87,17 +87,14 @@ export function PersonasFiltros({ valor, onCambio }: PersonasFiltrosProps) {
                 <Select
                   compact={true}
                   value={valor.estadoEmpleado}
-                  onChange={(e) =>
-                    onCambio({
-                      ...valor,
-                      estadoEmpleado: e.target.value as FiltroEstadoEmpleado,
-                    })
+                  onValueChange={(v) =>
+                    onCambio({ ...valor, estadoEmpleado: v as FiltroEstadoEmpleado })
                   }
                   aria-label="Filtrar por estado de empleo"
                 >
-                  <option value="TODOS">Activos y ex empleados</option>
-                  <option value="ACTIVO">Solo activos</option>
-                  <option value="EX_EMPLEADO">Solo ex empleados</option>
+                  <SelectItem value="TODOS">Activos y ex empleados</SelectItem>
+                  <SelectItem value="ACTIVO">Solo activos</SelectItem>
+                  <SelectItem value="EX_EMPLEADO">Solo ex empleados</SelectItem>
                 </Select>
               </CampoFiltro>
 
@@ -105,14 +102,12 @@ export function PersonasFiltros({ valor, onCambio }: PersonasFiltrosProps) {
                 <Select
                   compact={true}
                   value={valor.bloqueado}
-                  onChange={(e) =>
-                    onCambio({ ...valor, bloqueado: e.target.value as FiltroBloqueado })
-                  }
+                  onValueChange={(v) => onCambio({ ...valor, bloqueado: v as FiltroBloqueado })}
                   aria-label="Filtrar por bloqueo"
                 >
-                  <option value="TODOS">Todos</option>
-                  <option value="SI">Solo bloqueados</option>
-                  <option value="NO">Solo desbloqueados</option>
+                  <SelectItem value="TODOS">Todos</SelectItem>
+                  <SelectItem value="SI">Solo bloqueados</SelectItem>
+                  <SelectItem value="NO">Solo desbloqueados</SelectItem>
                 </Select>
               </CampoFiltro>
             </div>

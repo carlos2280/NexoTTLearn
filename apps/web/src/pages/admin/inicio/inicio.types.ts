@@ -25,6 +25,12 @@ export interface CasoRevision {
   readonly prioridad: PrioridadCaso
   readonly slaRestante: string
   readonly responsable: string
+  /**
+   * Si el caso corresponde a un intento de entrevista IA, su id; permite
+   * que la fila navegue al detalle admin sin parsear `id`. `undefined` en
+   * otros tipos de caso (transversal) hasta que tengan su pantalla.
+   */
+  readonly intentoEntrevistaIaId?: string
 }
 
 export type TipoEvento = "publicacion" | "matricula" | "evaluacion" | "sistema" | "alerta"

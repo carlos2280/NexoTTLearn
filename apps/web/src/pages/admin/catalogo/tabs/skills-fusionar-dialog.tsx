@@ -1,7 +1,7 @@
 import { Button } from "@/shared/components/ui/button"
 import { Dialog, DialogFooter } from "@/shared/components/ui/dialog"
 import { Field } from "@/shared/components/ui/field"
-import { Select } from "@/shared/components/ui/select"
+import { Select, SelectItem } from "@/shared/components/ui/select"
 import type { AreaResponse, SkillResponse } from "@nexott-learn/shared-types"
 import { Combine } from "lucide-react"
 import { type FormEvent, useEffect, useState } from "react"
@@ -72,28 +72,32 @@ export function SkillsFusionarDialog({
       <form onSubmit={manejarSubmit} className="flex flex-col gap-4">
         <Field label="Ganadora (la que se conserva)">
           {(p) => (
-            <Select {...p} value={ganadoraId} onChange={(e) => setGanadoraId(e.target.value)}>
-              <option value="" disabled={true}>
-                Selecciona…
-              </option>
+            <Select
+              {...p}
+              value={ganadoraId === "" ? undefined : ganadoraId}
+              onValueChange={setGanadoraId}
+              placeholder="Selecciona…"
+            >
               {skills.map((s) => (
-                <option key={s.id} value={s.id}>
+                <SelectItem key={s.id} value={s.id}>
                   {s.etiquetaVisible} · {nombreArea(areas, s.areaId)}
-                </option>
+                </SelectItem>
               ))}
             </Select>
           )}
         </Field>
         <Field label="Perdedora (queda archivada)">
           {(p) => (
-            <Select {...p} value={perdedoraId} onChange={(e) => setPerdedoraId(e.target.value)}>
-              <option value="" disabled={true}>
-                Selecciona…
-              </option>
+            <Select
+              {...p}
+              value={perdedoraId === "" ? undefined : perdedoraId}
+              onValueChange={setPerdedoraId}
+              placeholder="Selecciona…"
+            >
               {skills.map((s) => (
-                <option key={s.id} value={s.id} disabled={s.id === ganadoraId}>
+                <SelectItem key={s.id} value={s.id} disabled={s.id === ganadoraId}>
                   {s.etiquetaVisible} · {nombreArea(areas, s.areaId)}
-                </option>
+                </SelectItem>
               ))}
             </Select>
           )}

@@ -5,7 +5,10 @@ import { obtenerBadgeNotificaciones } from "../api/badge.api"
 
 export const NOTIFICACIONES_BADGE_KEY = ["notificaciones", "badge"] as const
 
-const REFETCH_BADGE_MS = 60_000
+// Polling segun spec 10: 30s con foco activo, deshabilitado en background,
+// refetch inmediato al recibir foco. Backend permite 5/seg pero abusarlo
+// seria desperdicio para una campanita.
+const REFETCH_BADGE_MS = 30_000
 
 export function useNotificacionesBadge(): UseQueryResult<NotificacionBadgeResponse, ApiError> {
   return useQuery<NotificacionBadgeResponse, ApiError>({
@@ -14,5 +17,6 @@ export function useNotificacionesBadge(): UseQueryResult<NotificacionBadgeRespon
     staleTime: REFETCH_BADGE_MS / 2,
     refetchInterval: REFETCH_BADGE_MS,
     refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   })
 }

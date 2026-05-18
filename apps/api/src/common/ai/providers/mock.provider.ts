@@ -124,6 +124,18 @@ export class MockAiProvider implements IAiProvider {
     return Promise.resolve({
       notaGlobal: MockAiProvider.NOTA_ENTREVISTA_IA_GLOBAL_MOCK,
       notasPorArea,
+      reporte: {
+        fortalezas: [
+          "mock: explico con claridad el flujo principal del curso",
+          "mock: identifico correctamente las dependencias entre modulos",
+        ],
+        mejoras: [
+          "mock: profundizar en patrones de testing avanzados",
+          "mock: practicar mas el despliegue end-to-end",
+        ],
+        justificacion:
+          "mock: respuesta generada por el proveedor mock. Cubre el shape exigido por el contrato pero no refleja la transcripcion real.",
+      },
     })
   }
 }

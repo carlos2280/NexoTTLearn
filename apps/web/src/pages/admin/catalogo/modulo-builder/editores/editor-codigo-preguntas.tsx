@@ -1,12 +1,13 @@
 import { Banner } from "@/shared/components/ui/banner"
 import { Field } from "@/shared/components/ui/field"
 import { Input } from "@/shared/components/ui/input"
-import { Textarea } from "@/shared/components/ui/textarea"
 import type { BloqueDetalleResponse } from "@nexott-learn/shared-types"
 import { useRef, useState } from "react"
 import { CodeEditor } from "./shared/code-editor"
 import { EditorBloqueShell } from "./shared/editor-bloque-shell"
 import { SelectLenguaje } from "./shared/select-lenguaje"
+import { TiptapEditor } from "./shared/tiptap-editor"
+import { extensionesMinimas } from "./shared/tiptap-extensiones"
 import { useAutoGuardarBloque } from "./shared/use-auto-guardar-bloque"
 
 interface EditorCodigoPreguntasProps {
@@ -100,14 +101,18 @@ export function EditorCodigoPreguntas({ bloque }: EditorCodigoPreguntasProps) {
         </Field>
       </div>
 
-      <Field label="Enunciado">
-        {(attrs) => (
-          <Textarea
-            {...attrs}
-            rows={4}
-            value={datos.enunciado}
-            onChange={(e) => actualizar({ enunciado: e.target.value })}
-            placeholder="Implementa un método que reciba… y retorne…"
+      <Field
+        label="Enunciado"
+        hint="Acepta formato: negrita, cursiva, listas, código inline y enlaces."
+      >
+        {(_attrs) => (
+          <TiptapEditor
+            key={bloque.id}
+            htmlInicial={datos.enunciado}
+            extensiones={extensionesMinimas("Implementa un método que reciba… y retorne…")}
+            variante="minima"
+            altoMin="160px"
+            onCambio={(html) => actualizar({ enunciado: html })}
           />
         )}
       </Field>

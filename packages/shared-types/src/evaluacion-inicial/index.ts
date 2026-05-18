@@ -1,10 +1,13 @@
 export { origenNotaSkillSchema } from "./ficha.schema"
 export type {
   OrigenNotaSkill,
+  NivelCualitativoArea,
   FichaSkillItem,
+  FichaSkillCatalogoItem,
   FichaPorAreaItem,
   FichaResponse,
   EntradaHistoricoNotaSkill,
+  EventoHistorialFicha,
 } from "./ficha.schema"
 export type {
   FuenteCambioPreview,

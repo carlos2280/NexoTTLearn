@@ -2,12 +2,14 @@ export {
   meCursosQuerySchema,
   exportarFichaQuerySchema,
   formatoExportFichaSchema,
+  historialFichaQuerySchema,
 } from "./me-cursos.types"
 export type {
   MeCursoResumen,
   MeCursosQuery,
   ExportarFichaQuery,
   FormatoExportFicha,
+  HistorialFichaQuery,
 } from "./me-cursos.types"
 
 export {
@@ -33,6 +35,12 @@ export type {
   CursoArbolResponse,
 } from "./me-curso-arbol.types"
 
+export type {
+  FichaResumenResponse,
+  FichaResumenTopArea,
+  NivelCualitativoAreaResumen,
+} from "./me-ficha-resumen.types"
+
 export {
   BANDEJA_TOP_NOVEDADES,
   BANDEJA_TOP_PENDIENTES,
@@ -52,6 +60,7 @@ export type {
   SiguienteAccionContinuarCurso,
   SiguienteAccionDeadlineCritico,
   SiguienteAccionEntrevistaIaDisponible,
+  SiguienteAccionEsperandoRevision,
   SiguienteAccionExplorarVoluntariado,
   SiguienteAccionResultadoCierre,
   SiguienteAccionTransversalDisponible,

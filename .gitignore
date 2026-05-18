@@ -32,6 +32,7 @@ pgdata/
 apps/api/prisma/migrations/dev.db*
 apps/api/prisma/seed-demo.local.ts
 apps/api/prisma/seed-amsa.local.ts
+apps/api/prisma/seed-qa.local.ts
 
 # Storage local (archivos subidos en dev/test). En prod va a Railway Volumes
 # o equivalente y nunca al repo. D-EVI-1.

@@ -4,7 +4,7 @@ import { DataTable } from "@/shared/components/ui/data-table"
 import { MenuAcciones } from "@/shared/components/ui/menu-acciones"
 import { Pagination } from "@/shared/components/ui/pagination"
 import { SearchField } from "@/shared/components/ui/search-field"
-import { Select } from "@/shared/components/ui/select"
+import { Select, SelectItem } from "@/shared/components/ui/select"
 import { RUTAS } from "@/shared/constants/rutas"
 import type { EstadoModulo } from "@nexott-learn/shared-types"
 import { Library, Plus } from "lucide-react"
@@ -47,16 +47,16 @@ export function TabModulos() {
           <Select
             compact={true}
             value={estadoFiltro}
-            onChange={(e) => {
-              setEstadoFiltro(e.target.value as FiltroEstado)
+            onValueChange={(v) => {
+              setEstadoFiltro(v as FiltroEstado)
               setPage(1)
             }}
             aria-label="Filtrar por estado"
             className="min-w-[140px]"
           >
-            <option value="TODOS">Todos los estados</option>
-            <option value="ACTIVO">Activos</option>
-            <option value="ARCHIVADO">Archivados</option>
+            <SelectItem value="TODOS">Todos los estados</SelectItem>
+            <SelectItem value="ACTIVO">Activos</SelectItem>
+            <SelectItem value="ARCHIVADO">Archivados</SelectItem>
           </Select>
         </div>
         <Button variant="primary" size="md" onClick={() => orq.abrir("crear")}>

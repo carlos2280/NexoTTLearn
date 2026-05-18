@@ -3,6 +3,7 @@ import {
   EntradaHistoricoNotaSkill,
   FichaPorAreaItem,
   FichaResponse,
+  FichaSkillCatalogoItem,
   FichaSkillItem,
   OrigenNotaSkill,
 } from "@nexott-learn/shared-types"
@@ -12,6 +13,7 @@ import { Paginated, buildPaginatedResponse, resolvePaginacion } from "../../comm
 import { decimalAnumero } from "../../common/prisma/decimal"
 import { PrismaService } from "../../common/prisma/prisma.service"
 import { SesionUsuario } from "../../common/types/sesion.types"
+import { nivelCualitativoAreaDesdePromedio } from "../nivel-cualitativo.helpers"
 
 const SELECT_SKILL_FICHA_FIELDS = {
   id: true,
@@ -25,6 +27,7 @@ const SELECT_NOTA_SKILL_FIELDS = {
   skillId: true,
   notaActual: true,
   origenActual: true,
+  updatedAt: true,
 } as const satisfies Prisma.NotaSkillSelect
 
 const SELECT_HISTORICO_FIELDS = {
@@ -85,6 +88,28 @@ export class FichaService {
       })
     }
     return this.obtenerFicha(usuario.colaboradorId, sesion)
+  }
+
+  /**
+   * Devuelve `(colaboradorId, nombre)` para el usuario en sesion. Usado por
+   * `MeController` para construir filenames humanos en la descarga de la
+   * ficha (B-25). Lookup separado para no acoplar `FichaResponse` con el
+   * nombre del colaborador (es info de identidad, no de ficha).
+   */
+  async obtenerIdentidadDeUsuario(
+    usuarioId: string,
+  ): Promise<{ readonly colaboradorId: string; readonly nombre: string }> {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: usuarioId },
+      select: { colaborador: { select: { id: true, nombre: true } } },
+    })
+    if (!usuario?.colaborador) {
+      throw new NotFoundException({
+        code: apiErrorCodes.colaboradorNoEncontrado,
+        message: "Colaborador no encontrado.",
+      })
+    }
+    return { colaboradorId: usuario.colaborador.id, nombre: usuario.colaborador.nombre }
   }
 
   async obtenerFicha(colaboradorId: string, sesion: SesionUsuario): Promise<FichaResponse> {
@@ -202,6 +227,10 @@ export class FichaService {
       areaNombre: skill.area.nombre,
       notaActual: nota ? decimalAnumero(nota.notaActual) : null,
       origenActual: nota ? jsonObjectOrNull(nota.origenActual) : null,
+      // `NotaSkill.updatedAt` solo cambia al mutar `notaActual` u `origenActual`
+      // (los unicos campos no-clave del modelo), asi que equivale a la fecha
+      // del ultimo cambio de nota sin necesidad de query a `historicoNotaSkill`.
+      fechaUltimoCambio: nota ? nota.updatedAt.toISOString() : null,
     }
   }
 
@@ -226,6 +255,7 @@ export class FichaService {
       total: number
       conNota: number
       suma: number
+      catalogo: FichaSkillCatalogoItem[]
     }
     const map = new Map<string, Acc>()
     for (let i = 0; i < skills.length; i += 1) {
@@ -240,8 +270,10 @@ export class FichaService {
         total: 0,
         conNota: 0,
         suma: 0,
+        catalogo: [],
       }
       acc.total += 1
+      acc.catalogo.push({ skillId: skill.id, etiquetaVisible: skill.etiquetaVisible })
       if (item.notaActual !== null) {
         acc.conNota += 1
         acc.suma += item.notaActual
@@ -249,13 +281,18 @@ export class FichaService {
       map.set(skill.areaId, acc)
     }
     return Array.from(map.values())
-      .map((acc) => ({
-        areaId: acc.areaId,
-        nombre: acc.nombre,
-        promedio: acc.conNota === 0 ? null : Number((acc.suma / acc.conNota).toFixed(2)),
-        skillsConNota: acc.conNota,
-        skillsTotales: acc.total,
-      }))
+      .map((acc) => {
+        const promedio = acc.conNota === 0 ? null : Number((acc.suma / acc.conNota).toFixed(2))
+        return {
+          areaId: acc.areaId,
+          nombre: acc.nombre,
+          promedio,
+          skillsConNota: acc.conNota,
+          skillsTotales: acc.total,
+          nivelCualitativo: nivelCualitativoAreaDesdePromedio(promedio, acc.conNota),
+          skillsCatalogo: acc.catalogo,
+        }
+      })
       .sort((a, b) => a.nombre.localeCompare(b.nombre))
   }
 }

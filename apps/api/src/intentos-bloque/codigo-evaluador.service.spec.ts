@@ -80,7 +80,12 @@ describe("CodigoEvaluadorService", () => {
       resultadosReportados: [reportado("t1", true), reportado("t2", true), reportado("t3", true)],
     })
 
-    expect(resultado.calculo).toEqual({ nota: 100, puntosObtenidos: 3, puntosTotales: 3 })
+    expect(resultado.calculo).toEqual({
+      nota: 100,
+      puntosObtenidos: 3,
+      puntosTotales: 3,
+      preguntasFalladasIds: [],
+    })
     expect(resultado.lenguaje).toBe("typescript")
     expect(resultado.resultadosTests.every((r) => r.paso)).toBe(true)
   })
@@ -104,6 +109,7 @@ describe("CodigoEvaluadorService", () => {
       nota: 33.33,
       puntosObtenidos: 1,
       puntosTotales: 3,
+      preguntasFalladasIds: [],
     })
     const [r1, r2, r3] = resultado.resultadosTests
     expect(r1?.paso).toBe(true)

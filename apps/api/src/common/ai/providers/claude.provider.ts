@@ -194,6 +194,7 @@ export class ClaudeProvider implements IAiProvider {
     return {
       notaGlobal: parsed.data.notaGlobal,
       notasPorArea: parsed.data.notasPorArea,
+      reporte: parsed.data.reporte,
     }
   }
 

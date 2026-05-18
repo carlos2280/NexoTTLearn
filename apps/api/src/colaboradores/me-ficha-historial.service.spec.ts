@@ -1,0 +1,337 @@
+import { NotFoundException } from "@nestjs/common"
+import { OrigenNotaSkill, RolAsignacion } from "@prisma/client"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+import { PrismaService } from "../common/prisma/prisma.service"
+import { MeFichaHistorialService } from "./me-ficha-historial.service"
+
+interface PrismaMock {
+  usuario: { findUnique: ReturnType<typeof vi.fn> }
+  historicoNotaSkill: { findMany: ReturnType<typeof vi.fn> }
+  asignacionCurso: { findMany: ReturnType<typeof vi.fn> }
+  intentoBloque: { findMany: ReturnType<typeof vi.fn> }
+  intentoTransversal: { findMany: ReturnType<typeof vi.fn> }
+  intentoEntrevistaIA: { findMany: ReturnType<typeof vi.fn> }
+}
+
+function buildPrismaMock(): PrismaMock {
+  return {
+    usuario: { findUnique: vi.fn() },
+    historicoNotaSkill: { findMany: vi.fn().mockResolvedValue([]) },
+    asignacionCurso: { findMany: vi.fn().mockResolvedValue([]) },
+    intentoBloque: { findMany: vi.fn().mockResolvedValue([]) },
+    intentoTransversal: { findMany: vi.fn().mockResolvedValue([]) },
+    intentoEntrevistaIA: { findMany: vi.fn().mockResolvedValue([]) },
+  }
+}
+
+const COLAB = "11111111-1111-1111-1111-111111111111"
+const USER = "33333333-3333-3333-3333-333333333333"
+const AREA_BACK = { id: "area-back", nombre: "Backend" }
+const SKILL_DJANGO = {
+  id: "skill-django",
+  etiquetaVisible: "Django REST",
+  area: AREA_BACK,
+}
+
+describe("MeFichaHistorialService.obtenerHistorial", () => {
+  let prisma: PrismaMock
+  let service: MeFichaHistorialService
+
+  beforeEach(() => {
+    prisma = buildPrismaMock()
+    service = new MeFichaHistorialService(prisma as unknown as PrismaService)
+  })
+
+  it("vacio si el colaborador no tiene historial ni asignaciones", async () => {
+    const out = await service.obtenerHistorial(COLAB, 50)
+    expect(out).toEqual([])
+  })
+
+  it("mapea HistoricoNotaSkill a SKILL_DEMOSTRADA con nivel cualitativo derivado de la nota", async () => {
+    prisma.historicoNotaSkill.findMany.mockResolvedValueOnce([
+      {
+        id: "hist-1",
+        fecha: new Date("2026-05-14T10:00:00Z"),
+        valor: 90,
+        origen: OrigenNotaSkill.BLOQUE,
+        referencia: null,
+        notaSkill: { skill: SKILL_DJANGO },
+      },
+    ])
+
+    const out = await service.obtenerHistorial(COLAB, 50)
+
+    expect(out).toEqual([
+      {
+        tipo: "SKILL_DEMOSTRADA",
+        id: "hist-1",
+        fecha: "2026-05-14T10:00:00.000Z",
+        skillId: "skill-django",
+        skillNombre: "Django REST",
+        areaId: AREA_BACK.id,
+        areaNombre: "Backend",
+        nivelCualitativo: "excelencia",
+        origenNarrativo: "Bloque evaluable",
+        origen: OrigenNotaSkill.BLOQUE,
+      },
+    ])
+  })
+
+  it("extrae referenciaIntentoIaId cuando origen es ENTREVISTA_IA y referencia lo tiene", async () => {
+    prisma.historicoNotaSkill.findMany.mockResolvedValueOnce([
+      {
+        id: "hist-ia",
+        fecha: new Date("2026-05-14T10:00:00Z"),
+        valor: 75,
+        origen: OrigenNotaSkill.ENTREVISTA_IA,
+        referencia: { intentoEntrevistaIaId: "intento-9", evento: "FINALIZADO" },
+        notaSkill: { skill: SKILL_DJANGO },
+      },
+    ])
+
+    const [evento] = await service.obtenerHistorial(COLAB, 50)
+
+    expect(evento).toMatchObject({
+      tipo: "SKILL_DEMOSTRADA",
+      origen: OrigenNotaSkill.ENTREVISTA_IA,
+      origenNarrativo: "Entrevista IA",
+      nivelCualitativo: "solido",
+      referenciaIntentoIaId: "intento-9",
+    })
+  })
+
+  it("emite CURSO_INICIADO siempre y CURSO_COMPLETADO solo cuando hay cierre visible", async () => {
+    prisma.asignacionCurso.findMany.mockResolvedValueOnce([
+      {
+        id: "asig-1",
+        rol: RolAsignacion.ASIGNADO,
+        estadoAsignado: "APTO",
+        estadoVoluntario: null,
+        createdAt: new Date("2026-04-01T08:00:00Z"),
+        fechaCierre: new Date("2026-05-12T18:00:00Z"),
+        curso: { id: "curso-1", titulo: "Java Senior" },
+      },
+      {
+        id: "asig-2",
+        rol: RolAsignacion.ASIGNADO,
+        estadoAsignado: "EN_PROGRESO",
+        estadoVoluntario: null,
+        createdAt: new Date("2026-05-10T08:00:00Z"),
+        fechaCierre: null,
+        curso: { id: "curso-2", titulo: "Spring Boot" },
+      },
+    ])
+
+    const out = await service.obtenerHistorial(COLAB, 50)
+
+    expect(out.map((e) => `${e.tipo}-${"cursoTitulo" in e ? e.cursoTitulo : ""}`)).toEqual([
+      "CURSO_COMPLETADO-Java Senior",
+      "CURSO_INICIADO-Spring Boot",
+      "CURSO_INICIADO-Java Senior",
+    ])
+  })
+
+  it("ordena por fecha DESC mezclando skills e hitos de curso", async () => {
+    prisma.historicoNotaSkill.findMany.mockResolvedValueOnce([
+      {
+        id: "hist-old",
+        fecha: new Date("2026-04-10T10:00:00Z"),
+        valor: 60,
+        origen: OrigenNotaSkill.BLOQUE,
+        referencia: null,
+        notaSkill: { skill: SKILL_DJANGO },
+      },
+    ])
+    prisma.asignacionCurso.findMany.mockResolvedValueOnce([
+      {
+        id: "asig-1",
+        rol: RolAsignacion.ASIGNADO,
+        estadoAsignado: "EN_PROGRESO",
+        estadoVoluntario: null,
+        createdAt: new Date("2026-04-15T08:00:00Z"),
+        fechaCierre: null,
+        curso: { id: "curso-1", titulo: "Java" },
+      },
+    ])
+
+    const out = await service.obtenerHistorial(COLAB, 50)
+
+    expect(out[0]?.tipo).toBe("CURSO_INICIADO")
+    expect(out[1]?.tipo).toBe("SKILL_DEMOSTRADA")
+  })
+
+  it("origenNarrativo BLOQUE enriquecido con titulo del curso (DEUDA-B24-1)", async () => {
+    prisma.historicoNotaSkill.findMany.mockResolvedValueOnce([
+      {
+        id: "hist-bloque",
+        fecha: new Date("2026-05-14T10:00:00Z"),
+        valor: 88,
+        origen: OrigenNotaSkill.BLOQUE,
+        referencia: { intentoBloqueId: "int-b-1", bloqueId: "blq-1", evento: "CREADO" },
+        notaSkill: { skill: SKILL_DJANGO },
+      },
+    ])
+    prisma.intentoBloque.findMany.mockResolvedValueOnce([
+      { id: "int-b-1", curso: { titulo: "Java Senior" } },
+    ])
+
+    const [evento] = await service.obtenerHistorial(COLAB, 50)
+    expect(evento).toMatchObject({
+      tipo: "SKILL_DEMOSTRADA",
+      origenNarrativo: 'Curso "Java Senior"',
+    })
+  })
+
+  it("origenNarrativo TRANSVERSAL enriquecido (DEUDA-B24-1)", async () => {
+    prisma.historicoNotaSkill.findMany.mockResolvedValueOnce([
+      {
+        id: "hist-tr",
+        fecha: new Date("2026-05-14T10:00:00Z"),
+        valor: 72,
+        origen: OrigenNotaSkill.TRANSVERSAL,
+        referencia: { intentoTransversalId: "int-t-1", evento: "FINALIZADO" },
+        notaSkill: { skill: SKILL_DJANGO },
+      },
+    ])
+    prisma.intentoTransversal.findMany.mockResolvedValueOnce([
+      { id: "int-t-1", transversal: { curso: { titulo: "Analitica de Datos" } } },
+    ])
+
+    const [evento] = await service.obtenerHistorial(COLAB, 50)
+    expect(evento).toMatchObject({
+      origenNarrativo: 'Proyecto transversal · Curso "Analitica de Datos"',
+    })
+  })
+
+  it("origenNarrativo ENTREVISTA_IA enriquecido (DEUDA-B24-1)", async () => {
+    prisma.historicoNotaSkill.findMany.mockResolvedValueOnce([
+      {
+        id: "hist-ia2",
+        fecha: new Date("2026-05-14T10:00:00Z"),
+        valor: 80,
+        origen: OrigenNotaSkill.ENTREVISTA_IA,
+        referencia: { intentoEntrevistaIaId: "int-ia-1", evento: "FINALIZADO" },
+        notaSkill: { skill: SKILL_DJANGO },
+      },
+    ])
+    prisma.intentoEntrevistaIA.findMany.mockResolvedValueOnce([
+      { id: "int-ia-1", entrevistaIA: { curso: { titulo: "Backend Refresh" } } },
+    ])
+
+    const [evento] = await service.obtenerHistorial(COLAB, 50)
+    expect(evento).toMatchObject({
+      origenNarrativo: 'Entrevista IA · Curso "Backend Refresh"',
+      referenciaIntentoIaId: "int-ia-1",
+    })
+  })
+
+  it("origenNarrativo cae a la version generica si el lookup no encuentra titulo", async () => {
+    prisma.historicoNotaSkill.findMany.mockResolvedValueOnce([
+      {
+        id: "hist-bloque-huerfano",
+        fecha: new Date("2026-05-14T10:00:00Z"),
+        valor: 70,
+        origen: OrigenNotaSkill.BLOQUE,
+        referencia: { intentoBloqueId: "int-borrado", bloqueId: "b-x", evento: "CREADO" },
+        notaSkill: { skill: SKILL_DJANGO },
+      },
+    ])
+    // intentoBloque.findMany devuelve vacio (default del mock) -> sin titulo.
+
+    const [evento] = await service.obtenerHistorial(COLAB, 50)
+    expect(evento).toMatchObject({ origenNarrativo: "Bloque evaluable" })
+  })
+
+  it("cursor: aplica fecha < cursor a HistoricoNotaSkill (DEUDA-B24-2)", async () => {
+    prisma.historicoNotaSkill.findMany.mockResolvedValueOnce([])
+    await service.obtenerHistorial(COLAB, 50, "2026-05-10T00:00:00.000Z")
+    const where = prisma.historicoNotaSkill.findMany.mock.calls[0]?.[0]?.where as {
+      fecha?: { lt?: Date }
+    }
+    expect(where?.fecha?.lt).toEqual(new Date("2026-05-10T00:00:00.000Z"))
+  })
+
+  it("cursor: aplica filtro OR(createdAt < cursor, fechaCierre < cursor) a AsignacionCurso", async () => {
+    prisma.asignacionCurso.findMany.mockResolvedValueOnce([])
+    await service.obtenerHistorial(COLAB, 50, "2026-05-10T00:00:00.000Z")
+    const where = prisma.asignacionCurso.findMany.mock.calls[0]?.[0]?.where as {
+      // biome-ignore lint/style/useNamingConvention: `OR` es operador Prisma.
+      OR?: ReadonlyArray<{ createdAt?: { lt?: Date }; fechaCierre?: { lt?: Date } }>
+    }
+    const cursor = new Date("2026-05-10T00:00:00.000Z")
+    expect(where?.OR).toEqual([{ createdAt: { lt: cursor } }, { fechaCierre: { lt: cursor } }])
+  })
+
+  it("cursor: descarta eventos individuales con fecha >= cursor aunque la fila pase el WHERE", async () => {
+    // Asignacion con CURSO_INICIADO antes del cursor y CURSO_COMPLETADO despues.
+    prisma.asignacionCurso.findMany.mockResolvedValueOnce([
+      {
+        id: "asig-1",
+        rol: RolAsignacion.ASIGNADO,
+        estadoAsignado: "APTO",
+        estadoVoluntario: null,
+        createdAt: new Date("2026-04-01T08:00:00Z"), // antes del cursor
+        fechaCierre: new Date("2026-05-15T18:00:00Z"), // despues del cursor
+        curso: { id: "curso-1", titulo: "Java Senior" },
+      },
+    ])
+    const eventos = await service.obtenerHistorial(COLAB, 50, "2026-05-10T00:00:00.000Z")
+    expect(eventos.map((e) => e.tipo)).toEqual(["CURSO_INICIADO"])
+  })
+
+  it("sin cursor: comportamiento original (sin filtros adicionales)", async () => {
+    prisma.historicoNotaSkill.findMany.mockResolvedValueOnce([])
+    await service.obtenerHistorial(COLAB, 50)
+    const where = prisma.historicoNotaSkill.findMany.mock.calls[0]?.[0]?.where as {
+      fecha?: unknown
+    }
+    expect(where?.fecha).toBeUndefined()
+  })
+
+  it("respeta el limite y corta el array final", async () => {
+    const hoy = new Date("2026-05-14T10:00:00Z")
+    prisma.historicoNotaSkill.findMany.mockResolvedValueOnce(
+      Array.from({ length: 10 }, (_, i) => ({
+        id: `h-${i}`,
+        fecha: new Date(hoy.getTime() - i * 86400_000),
+        valor: 80,
+        origen: OrigenNotaSkill.BLOQUE,
+        referencia: null,
+        notaSkill: { skill: SKILL_DJANGO },
+      })),
+    )
+
+    const out = await service.obtenerHistorial(COLAB, 3)
+    expect(out).toHaveLength(3)
+  })
+})
+
+describe("MeFichaHistorialService.obtenerHistorialDeUsuario", () => {
+  let prisma: PrismaMock
+  let service: MeFichaHistorialService
+
+  beforeEach(() => {
+    prisma = buildPrismaMock()
+    service = new MeFichaHistorialService(prisma as unknown as PrismaService)
+  })
+
+  it("404 si el usuario no tiene colaborador asociado", async () => {
+    prisma.usuario.findUnique.mockResolvedValueOnce(null)
+    await expect(service.obtenerHistorialDeUsuario(USER, 50)).rejects.toBeInstanceOf(
+      NotFoundException,
+    )
+  })
+
+  it("resuelve colaboradorId desde el usuario", async () => {
+    prisma.usuario.findUnique.mockResolvedValueOnce({ colaboradorId: COLAB })
+    const out = await service.obtenerHistorialDeUsuario(USER, 50)
+    expect(out).toEqual([])
+    expect(prisma.historicoNotaSkill.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          notaSkill: { colaboradorId: COLAB },
+        }),
+      }),
+    )
+  })
+})

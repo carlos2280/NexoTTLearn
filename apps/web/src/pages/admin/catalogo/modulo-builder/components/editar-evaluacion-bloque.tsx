@@ -2,7 +2,7 @@ import { useListarSkills } from "@/features/catalogo/hooks/use-listar-skills"
 import { usePatchBloque } from "@/features/catalogo/hooks/use-mutaciones-bloques"
 import { Button } from "@/shared/components/ui/button"
 import { ConfirmMotivoDialog } from "@/shared/components/ui/confirm-motivo-dialog"
-import { Select } from "@/shared/components/ui/select"
+import { Select, SelectItem } from "@/shared/components/ui/select"
 import type { BloqueDetalleResponse } from "@nexott-learn/shared-types"
 import { ShieldAlert } from "lucide-react"
 import { useMemo, useState } from "react"
@@ -82,12 +82,15 @@ export function EditarEvaluacionBloque({ bloque }: EditarEvaluacionBloqueProps) 
       {esEvaluable ? (
         <div className="flex flex-col gap-1">
           <span className="text-caption text-text-tertiary">Skill que mide</span>
-          <Select value={skillId} onChange={(e) => setSkillId(e.target.value)}>
-            <option value="">— Selecciona una skill —</option>
+          <Select
+            value={skillId === "" ? undefined : skillId}
+            onValueChange={setSkillId}
+            placeholder="— Selecciona una skill —"
+          >
             {skills.map((s) => (
-              <option key={s.id} value={s.id}>
+              <SelectItem key={s.id} value={s.id}>
                 {s.etiquetaVisible}
-              </option>
+              </SelectItem>
             ))}
           </Select>
         </div>

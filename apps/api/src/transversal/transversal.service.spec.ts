@@ -222,13 +222,18 @@ describe("E3. GET disponibilidad", () => {
     )
   })
 
-  it("SIEMPRE -> disponible=true", async () => {
+  it("SIEMPRE -> disponible=true, motivoBloqueo=null", async () => {
     configurarAsignacion(prisma, { desbloqueo: DesbloqueoCurso.SIEMPRE })
     const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN)
-    expect(r).toEqual({ disponible: true, razon: "SIEMPRE", fechaDisponibleDesde: null })
+    expect(r).toEqual({
+      disponible: true,
+      razon: "SIEMPRE",
+      fechaDisponibleDesde: null,
+      motivoBloqueo: null,
+    })
   })
 
-  it("DESDE_FECHA con fecha pasada -> disponible=true", async () => {
+  it("DESDE_FECHA con fecha pasada -> disponible=true, motivoBloqueo=null", async () => {
     configurarAsignacion(prisma, {
       desbloqueo: DesbloqueoCurso.DESDE_FECHA,
       fechaDesbloqueo: new Date("2020-01-01"),
@@ -236,14 +241,27 @@ describe("E3. GET disponibilidad", () => {
     const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN)
     expect(r.disponible).toBe(true)
     expect(r.razon).toBe("DESDE_FECHA")
+    expect(r.motivoBloqueo).toBeNull()
   })
 
-  it("ENCADENADO sin plan completo -> BLOQUEADO_PLAN_INCOMPLETO", async () => {
+  it("DESDE_FECHA con fecha futura -> disponible=false, motivoBloqueo con fecha", async () => {
+    configurarAsignacion(prisma, {
+      desbloqueo: DesbloqueoCurso.DESDE_FECHA,
+      fechaDesbloqueo: new Date("2099-01-15"),
+    })
+    const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN)
+    expect(r.disponible).toBe(false)
+    expect(r.motivoBloqueo).toContain("Disponible desde")
+    expect(r.motivoBloqueo).toContain("2099")
+  })
+
+  it("ENCADENADO sin plan completo -> BLOQUEADO_PLAN_INCOMPLETO + motivo", async () => {
     configurarAsignacion(prisma, { desbloqueo: DesbloqueoCurso.ENCADENADO })
     prisma.planEstudio.findUnique.mockResolvedValue(null)
     const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN)
     expect(r.disponible).toBe(false)
     expect(r.razon).toBe("BLOQUEADO_PLAN_INCOMPLETO")
+    expect(r.motivoBloqueo).toBe("Completa tu plan de estudio antes de empezar el transversal.")
   })
 })
 

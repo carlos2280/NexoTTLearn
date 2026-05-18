@@ -1,7 +1,9 @@
 import {
   IntentoEntrevistaIaAdminResponse,
   IntentoEntrevistaIaParticipanteResponse,
+  ReporteEvaluadorEntrevistaIa,
   TurnoEntrevistaIa,
+  reporteEvaluadorEntrevistaIaSchema,
 } from "@nexott-learn/shared-types"
 import { Prisma } from "@prisma/client"
 import { IntentoEntrevistaSeleccionado, TranscripcionInterna } from "./entrevista-ia.types"
@@ -78,6 +80,21 @@ function notasPorAreaSerializadas(
   }))
 }
 
+/**
+ * Parsea defensivamente el JSONB `reporte_evaluador`. Si el shape no cumple el
+ * contrato (caso: filas sembradas mal o registros previos a la migracion),
+ * devuelve `null` en lugar de propagar el error al frontend.
+ */
+function parsearReporteEvaluador(
+  value: Prisma.JsonValue | null,
+): ReporteEvaluadorEntrevistaIa | null {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return null
+  }
+  const parsed = reporteEvaluadorEntrevistaIaSchema.safeParse(value)
+  return parsed.success ? parsed.data : null
+}
+
 function clonarTurnos(
   turnos: TranscripcionInterna["turnos"],
 ): IntentoEntrevistaIaAdminResponse["transcripcion"] {
@@ -90,6 +107,7 @@ function clonarTurnos(
 
 export function toIntentoAdmin(
   intento: IntentoEntrevistaSeleccionado,
+  contexto: { readonly asignacionId: string },
 ): IntentoEntrevistaIaAdminResponse {
   const interna = parsearTranscripcionInterna(intento.transcripcionOLog)
   const estado = derivarEstado(intento, interna)
@@ -105,6 +123,21 @@ export function toIntentoAdmin(
     notasPorArea: notasPorAreaSerializadas(intento),
     notaAjustadaAdmin: decimalAnumero(intento.notaAjustadaAdmin),
     motivoAjusteOAnulacion: intento.motivoAjusteOAnulacion,
+    reporteEvaluador: parsearReporteEvaluador(intento.reporteEvaluador),
+    colaborador: {
+      id: intento.colaborador.id,
+      nombre: intento.colaborador.nombre,
+      email: intento.colaborador.email,
+    },
+    // EntrevistaIA SIEMPRE pertenece a un curso (FK NOT NULL en BD); el tipo
+    // generado de Prisma lo marca opcional pero por integridad referencial
+    // jamas es null en runtime.
+    curso: {
+      id: intento.entrevistaIA.curso?.id ?? intento.entrevistaIA.cursoId,
+      titulo: intento.entrevistaIA.curso?.titulo ?? "",
+      umbralAprobacion: Number(intento.entrevistaIA.umbralAprobacion.toString()),
+    },
+    asignacionId: contexto.asignacionId,
   }
 }
 

@@ -1,6 +1,6 @@
 import { Field } from "@/shared/components/ui/field"
 import { Input } from "@/shared/components/ui/input"
-import { Select } from "@/shared/components/ui/select"
+import { Select, SelectItem } from "@/shared/components/ui/select"
 import type { ClienteResponse } from "@nexott-learn/shared-types"
 import type { CursoNuevoForm, ErroresCursoNuevo } from "./curso-nuevo-form-validar"
 import { MAX_TITULO_CURSO } from "./curso-nuevo-form-validar"
@@ -39,20 +39,18 @@ export function CursoNuevoCampos({
         {(p) => (
           <Select
             {...p}
-            value={form.clienteId}
-            onChange={(e) => onCambio({ ...form, clienteId: e.target.value })}
+            value={form.clienteId === "" ? undefined : form.clienteId}
+            onValueChange={(v) => onCambio({ ...form, clienteId: v })}
             hasError={Boolean(errores.clienteId)}
             disabled={cargandoClientes}
+            placeholder={cargandoClientes ? "Cargando clientes…" : "Selecciona un cliente"}
           >
-            <option value="">
-              {cargandoClientes ? "Cargando clientes…" : "Selecciona un cliente"}
-            </option>
             {clientes
               .filter((c) => c.activo)
               .map((c) => (
-                <option key={c.id} value={c.id}>
+                <SelectItem key={c.id} value={c.id}>
                   {c.nombre}
-                </option>
+                </SelectItem>
               ))}
           </Select>
         )}

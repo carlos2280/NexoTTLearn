@@ -1,63 +1,87 @@
+import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
 import { useMiFicha } from "@/features/me/hooks/use-mi-ficha"
 import { Banner } from "@/shared/components/ui/banner"
-import { PageHeader } from "@/shared/components/ui/page-header"
-import { useMemo } from "react"
-import { FichaGrupoArea } from "./components/ficha-grupo-area"
-import { FichaResumenAreas } from "./components/ficha-resumen-areas"
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
+import { useState } from "react"
+import { DetalleArea } from "./components/detalle-area"
+import { DrawerHistorico } from "./components/drawer-historico"
 import { FichaSkeleton } from "./components/ficha-skeleton"
-import { agruparPorArea } from "./mi-ficha.types"
+import { HeroViaje } from "./components/hero-viaje"
+import { TuHistorial } from "./components/tu-historial"
+import { TuMapa } from "./components/tu-mapa"
+
+interface HistoricoState {
+  readonly skillId: string
+  readonly skillNombre: string
+}
 
 export function MiFichaPage() {
   const { data, isLoading, error } = useMiFicha()
+  const { data: usuario } = useUsuarioActual()
+  const reducedMotion = useReducedMotion()
+  const [areaExpandidaId, setAreaExpandidaId] = useState<string | null>(null)
+  const [historico, setHistorico] = useState<HistoricoState | null>(null)
 
-  const grupos = useMemo(() => {
-    if (!data) {
-      return []
-    }
-    return agruparPorArea(data.skills, data.porArea)
-  }, [data])
+  const areaExpandida = data?.porArea.find((a) => a.areaId === areaExpandidaId) ?? null
 
-  const totalConNota = useMemo(() => grupos.reduce((acc, g) => acc + g.skillsConNota, 0), [grupos])
-  const totalSkills = useMemo(() => grupos.reduce((acc, g) => acc + g.skillsTotales, 0), [grupos])
+  const handleAreaClick = (areaId: string) => {
+    setAreaExpandidaId((prev) => (prev === areaId ? null : areaId))
+  }
+
+  const handleAbrirHistorico = (skillId: string, skillNombre: string) => {
+    setHistorico({ skillId, skillNombre })
+  }
 
   return (
-    <div className="flex flex-col gap-10">
-      <PageHeader
-        eyebrow="Mi competencia"
-        titulo="Mi ficha"
-        descripcion="Tus skills medidas y su evidencia. Se actualiza a medida que avanzas en cursos, bloques y entrevistas."
-      />
+    <div className="flex flex-col gap-12">
+      {data && usuario ? (
+        <HeroViaje nombre={usuario.nombre} porArea={data.porArea} skills={data.skills} />
+      ) : null}
 
       {isLoading ? <FichaSkeleton /> : null}
 
       {error ? (
         <Banner tone="danger">
-          No pudimos cargar tu ficha. Reintenta en un momento o vuelve más tarde.
+          No pudimos cargar tu ficha. Reintenta en un momento o vuelve mas tarde.
         </Banner>
       ) : null}
 
-      {data && grupos.length === 0 ? (
-        <Banner tone="neutral">
-          Aún no hay skills registradas en tu ficha. Se irán completando a medida que avances.
-        </Banner>
-      ) : null}
+      {data ? <TuMapa porArea={data.porArea} onAreaClick={handleAreaClick} /> : null}
 
-      {data && grupos.length > 0 ? (
-        <>
-          <p className="tabular font-mono text-caption text-text-tertiary">
-            <span className="text-text-primary">{totalConNota}</span> con nota{" "}
-            <span className="text-text-disabled">·</span> {totalSkills} skills en total
-          </p>
+      <AnimatePresence initial={false}>
+        {data && areaExpandida ? (
+          <motion.div
+            key={areaExpandida.areaId}
+            initial={reducedMotion ? { opacity: 1 } : { opacity: 0, y: -8, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: "auto" }}
+            exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -8, height: 0 }}
+            transition={{
+              type: "spring",
+              stiffness: 80,
+              damping: 18,
+              mass: 0.6,
+              opacity: { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
+            }}
+            style={{ overflow: "hidden" }}
+          >
+            <DetalleArea
+              area={areaExpandida}
+              skills={data.skills}
+              onAbrirHistorico={handleAbrirHistorico}
+            />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
-          <FichaResumenAreas grupos={grupos} />
+      {data ? <TuHistorial /> : null}
 
-          <div className="flex flex-col gap-10">
-            {grupos.map((grupo) => (
-              <FichaGrupoArea key={grupo.areaId} grupo={grupo} />
-            ))}
-          </div>
-        </>
-      ) : null}
+      <DrawerHistorico
+        abierto={historico !== null}
+        onCerrar={() => setHistorico(null)}
+        colaboradorId={usuario?.colaboradorId}
+        skillId={historico?.skillId ?? null}
+        skillNombre={historico?.skillNombre ?? null}
+      />
     </div>
   )
 }

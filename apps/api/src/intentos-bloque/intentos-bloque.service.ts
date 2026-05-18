@@ -226,9 +226,30 @@ export class IntentosBloqueService {
 
     // Calculo de la nota — FUERA de la TX (sandbox hace I/O HTTP en el caso
     // CODIGO_PREGUNTAS; jamas hacer I/O externa dentro de Prisma $transaction).
-    const { calculo, respuestasPersistidas } = await this.calcularYEnriquecer({
+    const { calculo, respuestasPersistidas, notaMinima } = await this.calcularYEnriquecer({
       bloque,
       respuestas: input.body.respuestas,
+    })
+
+    // Snapshot del mejor previo (vigente, no invalidado) ANTES del INSERT.
+    // Se reutiliza para dos propositos:
+    //   - decidir `esPrimeraAprobacion` (B-extra.2 punto 3),
+    //   - alimentar `recalcularMejorIntento` sin un round-trip extra a la BD.
+    // La lectura va fuera del TX; la consistencia esta protegida por el
+    // indice unico parcial `uq_intentos_bloque_mejor` (D-S7-C3).
+    const mejorPrevio = await this.prisma.intentoBloque.findFirst({
+      where: {
+        colaboradorId,
+        bloqueId: bloque.id,
+        esMejorIntento: true,
+        estaInvalidado: false,
+      },
+      select: { id: true, nota: true },
+    })
+    const esPrimeraAprobacion = this.calcularEsPrimeraAprobacion({
+      notaMinima,
+      notaActual: calculo.nota,
+      mejorPrevio,
     })
 
     const ejecucion = await this.idempotency.runOnce<IntentoBloqueResponse>({
@@ -251,6 +272,13 @@ export class IntentosBloqueService {
             cursoId: curso.id,
             nota: new Prisma.Decimal(calculo.nota),
             respuestas: respuestasPersistidas as unknown as Prisma.InputJsonValue,
+            // B-extra.2 punto 4: persistimos las falladas solo para QUIZ.
+            // En CODIGO_PREGUNTAS la columna queda null y `toIntentoResponse`
+            // devuelve `[]`.
+            preguntasFalladas:
+              bloque.tipo === TipoBloque.QUIZ
+                ? (calculo.preguntasFalladasIds as unknown as Prisma.InputJsonValue)
+                : Prisma.DbNull,
             versionBloque: bloque.version,
             esMejorIntento: false,
             estaInvalidado: false,
@@ -258,8 +286,7 @@ export class IntentosBloqueService {
           select: SELECT_INTENTO_FIELDS,
         })
         await this.recalcularMejorIntento(tx, {
-          colaboradorId,
-          bloqueId: bloque.id,
+          mejorActual: mejorPrevio,
           nuevoIntentoId: intento.id,
           nuevoIntentoNota: calculo.nota,
         })
@@ -287,7 +314,11 @@ export class IntentosBloqueService {
         })
         // (S11.5 cerrado) NO emite notificacion por intento de bloque
         // entregado — D-S7-D3 confirmo silencio en el catalogo D88.
-        return { status: HTTP_CREATED, body: toIntentoResponse(intentoFinal) }
+        const base = toIntentoResponse(intentoFinal)
+        return {
+          status: HTTP_CREATED,
+          body: esPrimeraAprobacion === undefined ? base : { ...base, esPrimeraAprobacion },
+        }
       },
     })
 
@@ -498,6 +529,13 @@ export class IntentosBloqueService {
   }): Promise<{
     readonly calculo: CalculoQuizResultado
     readonly respuestasPersistidas: Record<string, unknown>
+    /**
+     * B-extra.2 punto 3: nota minima del bloque para calcular
+     * `esPrimeraAprobacion`. Solo definida para QUIZ (el unico tipo que
+     * declara `notaMinima` en su contenido); para CODIGO_PREGUNTAS es null
+     * y el campo no se emite en la respuesta del POST.
+     */
+    readonly notaMinima: number | null
   }> {
     if (input.bloque.tipo === TipoBloque.QUIZ && input.respuestas.tipo === "QUIZ") {
       const contenido = parsearContenidoQuiz(input.bloque.contenido)
@@ -505,6 +543,7 @@ export class IntentosBloqueService {
       return {
         calculo,
         respuestasPersistidas: { ...input.respuestas },
+        notaMinima: contenido.notaMinima,
       }
     }
     if (
@@ -526,6 +565,7 @@ export class IntentosBloqueService {
           puntosObtenidos: resultado.calculo.puntosObtenidos,
           puntosTotales: resultado.calculo.puntosTotales,
         },
+        notaMinima: null,
       }
     }
     // Combinacion imposible tras los pre-checks; el `BadRequestException`
@@ -585,24 +625,38 @@ export class IntentosBloqueService {
     )
   }
 
+  /**
+   * B-extra.2 punto 3: marca `true` cuando el nuevo intento aprueba y el
+   * mejor previo no aprobaba (o no existia). `undefined` para bloques sin
+   * `notaMinima` declarado en el contenido (CODIGO_PREGUNTAS) — el campo
+   * se omite en la respuesta.
+   */
+  private calcularEsPrimeraAprobacion(input: {
+    readonly notaMinima: number | null
+    readonly notaActual: number
+    readonly mejorPrevio: { readonly nota: Prisma.Decimal } | null
+  }): boolean | undefined {
+    if (input.notaMinima === null) {
+      return undefined
+    }
+    const aprobadoAhora = input.notaActual >= input.notaMinima
+    if (!aprobadoAhora) {
+      return false
+    }
+    const aprobadoPrev =
+      input.mejorPrevio !== null && Number(input.mejorPrevio.nota.toString()) >= input.notaMinima
+    return !aprobadoPrev
+  }
+
   private async recalcularMejorIntento(
     tx: PrismaTx,
     input: {
-      readonly colaboradorId: string
-      readonly bloqueId: string
+      readonly mejorActual: { readonly id: string; readonly nota: Prisma.Decimal } | null
       readonly nuevoIntentoId: string
       readonly nuevoIntentoNota: number
     },
   ): Promise<void> {
-    const mejorActual = await tx.intentoBloque.findFirst({
-      where: {
-        colaboradorId: input.colaboradorId,
-        bloqueId: input.bloqueId,
-        esMejorIntento: true,
-        estaInvalidado: false,
-      },
-      select: { id: true, nota: true },
-    })
+    const { mejorActual } = input
     if (!mejorActual) {
       await tx.intentoBloque.update({
         where: { id: input.nuevoIntentoId },

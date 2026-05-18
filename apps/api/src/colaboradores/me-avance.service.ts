@@ -1,14 +1,23 @@
 import { Injectable, NotFoundException } from "@nestjs/common"
 import type {
+  CaminoHaciaApto,
+  CaminoHaciaAptoPorArea,
   ClaseColorSkill,
   EtiquetaCualitativa,
   MeAvanceCursoResponse,
   MeAvancePorSkill,
   MeAvanceSiguienteSeccion,
+  NivelCaminoHaciaAptoArea,
 } from "@nexott-learn/shared-types"
+import { RolAsignacion } from "@prisma/client"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { PlanPersonalService } from "../plan-personal/plan-personal.service"
+import {
+  etiquetaCualitativaPorNota,
+  parseCierreSnapshotMinimo,
+  resolverNotaGlobalFinal,
+} from "./cierre-snapshot.helpers"
 
 /**
  * Fallback de `umbralNoCumple` (cap. 9.1) cuando el curso no lo define
@@ -19,10 +28,6 @@ import { PlanPersonalService } from "../plan-personal/plan-personal.service"
  * global era 50, no el del curso).
  */
 const UMBRAL_NO_CUMPLE_FALLBACK = 10
-
-const UMBRAL_EXCELENCIA_FINAL = 85
-const UMBRAL_SOLIDO_FINAL = 70
-const UMBRAL_DESARROLLO_FINAL = 50
 
 /**
  * `MeAvanceService` — D-S11-C8, cap. 10.7.
@@ -64,6 +69,7 @@ export class MeAvanceService {
       },
       select: {
         id: true,
+        rol: true,
         curso: { select: { id: true, estado: true } },
       },
     })
@@ -75,12 +81,41 @@ export class MeAvanceService {
     }
 
     const estaCerrado = asignacion.curso.estado === "CERRADO"
-    const porcentajeAvance = await this.planPersonalService.obtenerPorcentajeAvance(asignacion.id)
+    const esVoluntario = asignacion.rol === RolAsignacion.VOLUNTARIO
 
-    const seccionesObligatorias = await this.contarSeccionesObligatorias(asignacion.id)
-    const seccionesCompletadas = await this.contarSeccionesCompletadas(asignacion.id)
-    const porSkill = await this.calcularPorSkill(cursoId, colaboradorId)
-    const siguienteSeccion = await this.calcularSiguienteSeccion(asignacion.id)
+    const seccionesAbiertasIds = await this.cargarSeccionesAbiertasIds(asignacion.id)
+    const seccionesCompletadas = seccionesAbiertasIds.length
+
+    // VOLUNTARIO (D-AS-1): no hay PlanEstudio. El denominador es el total de
+    // secciones del curso (catalogo) y el siguiente paso es la primera no
+    // abierta. Esto da feedback de progreso honesto sin generar plan artificial.
+    let seccionesObligatorias: number
+    let porcentajeAvance: number
+    let siguienteSeccion: MeAvanceSiguienteSeccion | null
+    if (esVoluntario) {
+      seccionesObligatorias = await this.contarSeccionesTotalesCurso(cursoId)
+      porcentajeAvance =
+        seccionesObligatorias === 0
+          ? 0
+          : Math.min(100, Math.round((seccionesCompletadas / seccionesObligatorias) * 100))
+      siguienteSeccion = await this.calcularSiguienteSeccionVoluntario(
+        cursoId,
+        seccionesAbiertasIds,
+      )
+    } else {
+      seccionesObligatorias = await this.contarSeccionesObligatorias(asignacion.id)
+      porcentajeAvance = await this.planPersonalService.obtenerPorcentajeAvance(asignacion.id)
+      siguienteSeccion = await this.calcularSiguienteSeccion(asignacion.id)
+    }
+
+    const exigidas = await this.cargarSkillsExigidasConArea(cursoId)
+    const notas = await this.cargarNotasColaborador(
+      colaboradorId,
+      exigidas.map((e) => e.skillId),
+    )
+    const umbralNoCumple = await this.obtenerUmbralNoCumple(cursoId)
+    const porSkill = construirPorSkill(exigidas, notas, umbralNoCumple)
+    const caminoHaciaApto = construirCaminoHaciaApto(exigidas, notas)
 
     const base: MeAvanceCursoResponse = {
       cursoId,
@@ -90,6 +125,8 @@ export class MeAvanceService {
       seccionesObligatorias,
       porSkill,
       siguienteSeccion,
+      caminoHaciaApto,
+      seccionesAbiertasIds,
     }
 
     if (!estaCerrado) {
@@ -99,18 +136,18 @@ export class MeAvanceService {
       where: { cursoId },
       select: { snapshot: true, descartada: true },
     })
-    const final = extraerNotaFinal(
+    const notaFinal = extraerNotaFinal(
       fotografia?.snapshot ?? null,
       fotografia?.descartada ?? true,
       asignacion.id,
     )
-    if (final === null) {
+    if (notaFinal === null) {
       return base
     }
     return {
       ...base,
-      notaGlobalFinal: final.notaGlobalFinal,
-      etiquetaCualitativaFinal: final.etiquetaCualitativaFinal,
+      notaGlobalFinal: notaFinal.notaGlobalFinal,
+      etiquetaCualitativaFinal: notaFinal.etiquetaCualitativaFinal,
     }
   }
 
@@ -127,53 +164,103 @@ export class MeAvanceService {
     })
   }
 
-  private contarSeccionesCompletadas(asignacionId: string): Promise<number> {
-    return this.prisma.aperturaSeccion.count({ where: { asignacionId } })
+  private async cargarSeccionesAbiertasIds(asignacionId: string): Promise<readonly string[]> {
+    const aperturas = await this.prisma.aperturaSeccion.findMany({
+      where: { asignacionId },
+      select: { seccionId: true },
+    })
+    return aperturas.map((a) => a.seccionId)
   }
 
-  private async calcularPorSkill(
+  /**
+   * Total de secciones del curso (todos los modulos habilitados) usado como
+   * denominador del avance del VOLUNTARIO (D-AS-1: voluntarios no tienen
+   * PlanEstudio, el avance se calcula sobre el catalogo completo). La
+   * habilitacion de un modulo en un curso vive en `CursoModuloHabilitado`.
+   */
+  private contarSeccionesTotalesCurso(cursoId: string): Promise<number> {
+    return this.prisma.seccion.count({
+      where: { modulo: { cursosModulosHabilitados: { some: { cursoId } } } },
+    })
+  }
+
+  /**
+   * Para voluntarios: primera seccion del catalogo que el colaborador aun no
+   * ha abierto. Orden: alfabetico por titulo de modulo + `Seccion.orden`
+   * (mismo criterio que `calcularSiguienteSeccion` para asignados, porque
+   * `Modulo` no tiene campo `orden` propio dentro del curso).
+   */
+  private async calcularSiguienteSeccionVoluntario(
     cursoId: string,
-    colaboradorId: string,
-  ): Promise<readonly MeAvancePorSkill[]> {
-    const [curso, exigidas] = await Promise.all([
-      this.prisma.curso.findUnique({
-        where: { id: cursoId },
-        select: { umbralNoCumple: true },
-      }),
-      this.prisma.cursoSkillExigida.findMany({
-        where: { cursoId },
-        select: {
-          skillId: true,
-          notaMinima: true,
-          skill: { select: { id: true, etiquetaVisible: true } },
-        },
-      }),
-    ])
-    if (exigidas.length === 0) {
-      return []
-    }
-    const umbralNoCumple = curso?.umbralNoCumple
-      ? Number(curso.umbralNoCumple.toString())
-      : UMBRAL_NO_CUMPLE_FALLBACK
-    const notas = await this.prisma.notaSkill.findMany({
-      where: {
-        colaboradorId,
-        skillId: { in: exigidas.map((e) => e.skillId) },
+    seccionesAbiertasIds: readonly string[],
+  ): Promise<MeAvanceSiguienteSeccion | null> {
+    const aperturasSet = new Set(seccionesAbiertasIds)
+    const secciones = await this.prisma.seccion.findMany({
+      where: { modulo: { cursosModulosHabilitados: { some: { cursoId } } } },
+      select: {
+        id: true,
+        titulo: true,
+        orden: true,
+        moduloId: true,
+        modulo: { select: { titulo: true } },
       },
+    })
+    const pendiente = [...secciones]
+      .filter((s) => !aperturasSet.has(s.id))
+      .sort((a, b) => {
+        if (a.modulo.titulo !== b.modulo.titulo) {
+          return a.modulo.titulo.localeCompare(b.modulo.titulo)
+        }
+        return a.orden - b.orden
+      })[0]
+    if (!pendiente) {
+      return null
+    }
+    return {
+      seccionId: pendiente.id,
+      moduloId: pendiente.moduloId,
+      titulo: pendiente.titulo,
+    }
+  }
+
+  private cargarSkillsExigidasConArea(cursoId: string): Promise<readonly SkillExigidaConArea[]> {
+    return this.prisma.cursoSkillExigida.findMany({
+      where: { cursoId },
+      select: {
+        skillId: true,
+        notaMinima: true,
+        skill: {
+          select: {
+            id: true,
+            etiquetaVisible: true,
+            area: { select: { id: true, codigo: true, nombre: true } },
+          },
+        },
+      },
+    })
+  }
+
+  private cargarNotasColaborador(
+    colaboradorId: string,
+    skillIds: readonly string[],
+  ): Promise<readonly NotaSkillRaw[]> {
+    if (skillIds.length === 0) {
+      return Promise.resolve([])
+    }
+    return this.prisma.notaSkill.findMany({
+      where: { colaboradorId, skillId: { in: [...skillIds] } },
       select: { skillId: true, notaActual: true },
     })
-    return exigidas.map((exigida) => {
-      const nota = notas.find((n) => n.skillId === exigida.skillId)
-      const notaActual =
-        nota?.notaActual === null || nota?.notaActual === undefined ? null : Number(nota.notaActual)
-      const notaMinima = Number(exigida.notaMinima.toString())
-      return {
-        skillId: exigida.skillId,
-        etiqueta: exigida.skill.etiquetaVisible,
-        notaActual,
-        claseColor: claseColorPorNota(notaActual, notaMinima, umbralNoCumple),
-      }
+  }
+
+  private async obtenerUmbralNoCumple(cursoId: string): Promise<number> {
+    const curso = await this.prisma.curso.findUnique({
+      where: { id: cursoId },
+      select: { umbralNoCumple: true },
     })
+    return curso?.umbralNoCumple
+      ? Number(curso.umbralNoCumple.toString())
+      : UMBRAL_NO_CUMPLE_FALLBACK
   }
 
   private async calcularSiguienteSeccion(
@@ -225,6 +312,125 @@ export class MeAvanceService {
   }
 }
 
+interface SkillExigidaConArea {
+  readonly skillId: string
+  readonly notaMinima: { toString(): string }
+  readonly skill: {
+    readonly id: string
+    readonly etiquetaVisible: string
+    readonly area: { readonly id: string; readonly codigo: string; readonly nombre: string }
+  }
+}
+
+interface NotaSkillRaw {
+  readonly skillId: string
+  readonly notaActual: { toString(): string } | null
+}
+
+function notaActualNumero(nota: NotaSkillRaw | undefined): number | null {
+  if (!nota || nota.notaActual === null || nota.notaActual === undefined) {
+    return null
+  }
+  return Number(nota.notaActual.toString())
+}
+
+function construirPorSkill(
+  exigidas: readonly SkillExigidaConArea[],
+  notas: readonly NotaSkillRaw[],
+  umbralNoCumple: number,
+): readonly MeAvancePorSkill[] {
+  if (exigidas.length === 0) {
+    return []
+  }
+  const notasPorSkill = new Map(notas.map((n) => [n.skillId, n]))
+  return exigidas.map((exigida) => {
+    const notaActual = notaActualNumero(notasPorSkill.get(exigida.skillId))
+    const notaMinima = Number(exigida.notaMinima.toString())
+    return {
+      skillId: exigida.skillId,
+      etiqueta: exigida.skill.etiquetaVisible,
+      notaActual,
+      claseColor: claseColorPorNota(notaActual, notaMinima, umbralNoCumple),
+    }
+  })
+}
+
+/**
+ * Construye el agregado `caminoHaciaApto` por area (B-4, decision 03-R2).
+ *
+ * Una skill se considera DEMOSTRADA cuando `notaActual >= notaMinima` definida
+ * en `CursoSkillExigida` — misma semantica que el chip "verde" de
+ * `MeAvancePorSkill`. Las areas se ordenan alfabeticamente por `areaNombre`
+ * (determinista; el frontend no impone orden).
+ */
+function construirCaminoHaciaApto(
+  exigidas: readonly SkillExigidaConArea[],
+  notas: readonly NotaSkillRaw[],
+): CaminoHaciaApto {
+  // Un curso sin `CursoSkillExigida` (seed incompleto, o catalogo en
+  // construccion) NO esta "listo": el camino simplemente no se puede calcular.
+  // Devolvemos `catalogoIncompleto: true` para que el frontend muestre un
+  // mensaje neutro en vez del falso "Has demostrado todas las capacidades".
+  if (exigidas.length === 0) {
+    return { faltantesParaApto: 0, estaListo: false, porArea: [], catalogoIncompleto: true }
+  }
+  const notasPorSkill = new Map(notas.map((n) => [n.skillId, n]))
+  interface Acumulador {
+    areaId: string
+    areaCodigo: string
+    areaNombre: string
+    exigidas: number
+    demostradas: number
+  }
+  const porArea = new Map<string, Acumulador>()
+  for (const exigida of exigidas) {
+    const area = exigida.skill.area
+    const entry = porArea.get(area.id) ?? {
+      areaId: area.id,
+      areaCodigo: area.codigo,
+      areaNombre: area.nombre,
+      exigidas: 0,
+      demostradas: 0,
+    }
+    entry.exigidas += 1
+    const notaActual = notaActualNumero(notasPorSkill.get(exigida.skillId))
+    const notaMinima = Number(exigida.notaMinima.toString())
+    if (notaActual !== null && notaActual >= notaMinima) {
+      entry.demostradas += 1
+    }
+    porArea.set(area.id, entry)
+  }
+  const items: CaminoHaciaAptoPorArea[] = [...porArea.values()]
+    .sort((a, b) => a.areaNombre.localeCompare(b.areaNombre))
+    .map((acc) => ({
+      areaId: acc.areaId,
+      areaCodigo: acc.areaCodigo,
+      areaNombre: acc.areaNombre,
+      skillsExigidas: acc.exigidas,
+      skillsDemostradas: acc.demostradas,
+      nivelCualitativo: nivelCualitativoArea(acc.demostradas, acc.exigidas),
+    }))
+  const faltantesParaApto = items.reduce(
+    (acc, item) => acc + (item.skillsExigidas - item.skillsDemostradas),
+    0,
+  )
+  return {
+    faltantesParaApto,
+    estaListo: faltantesParaApto === 0,
+    porArea: items,
+  }
+}
+
+function nivelCualitativoArea(demostradas: number, exigidas: number): NivelCaminoHaciaAptoArea {
+  if (demostradas >= exigidas) {
+    return "solido"
+  }
+  if (demostradas === 0) {
+    return "porExplorar"
+  }
+  return "enDesarrollo"
+}
+
 /**
  * Color del chip de skill exigida segun la nota actual vs la exigencia del
  * curso (cap. 9.1):
@@ -255,48 +461,37 @@ function claseColorPorNota(
   return "rojo"
 }
 
-interface SnapshotConAsignaciones {
-  readonly asignaciones: ReadonlyArray<{
-    readonly asignacionId: string
-    readonly notaGlobalFinal?: number
-  }>
-}
-
-function esSnapshotConAsignaciones(value: unknown): value is SnapshotConAsignaciones {
-  if (value === null || typeof value !== "object") {
-    return false
-  }
-  const asigs = (value as Record<string, unknown>).asignaciones
-  return Array.isArray(asigs)
-}
-
+/**
+ * Extrae `notaGlobalFinal` y `etiquetaCualitativaFinal` del snapshot del
+ * cierre. Usa `parseCierreSnapshotMinimo` (Zod) para validar la forma y
+ * delega en `resolverNotaGlobalFinal` (helper compartido) para que la regla
+ * sea identica a la de `/me/cursos/:id/resumen-cierre`: prefiere la nota
+ * persistida, cae a promedio de obligatorias para snapshots legacy
+ * (BUG-QA-2). Devuelve `null` cuando no hay nota inferible, asi el response
+ * omite ambos campos en lugar de mentir con un 0.
+ */
 function extraerNotaFinal(
   snapshot: unknown,
   descartada: boolean,
   asignacionId: string,
 ): { notaGlobalFinal: number; etiquetaCualitativaFinal: EtiquetaCualitativa } | null {
-  if (descartada || !esSnapshotConAsignaciones(snapshot)) {
+  if (descartada) {
     return null
   }
-  const fila = snapshot.asignaciones.find((a) => a.asignacionId === asignacionId)
-  if (!fila || typeof fila.notaGlobalFinal !== "number") {
+  const parsed = parseCierreSnapshotMinimo(snapshot)
+  if (!parsed) {
+    return null
+  }
+  const fila = parsed.asignaciones.find((a) => a.asignacionId === asignacionId)
+  if (!fila) {
+    return null
+  }
+  const nota = resolverNotaGlobalFinal(fila)
+  if (nota === null) {
     return null
   }
   return {
-    notaGlobalFinal: fila.notaGlobalFinal,
-    etiquetaCualitativaFinal: etiquetaCualitativaPorNota(fila.notaGlobalFinal),
+    notaGlobalFinal: nota,
+    etiquetaCualitativaFinal: etiquetaCualitativaPorNota(nota),
   }
-}
-
-function etiquetaCualitativaPorNota(nota: number): EtiquetaCualitativa {
-  if (nota >= UMBRAL_EXCELENCIA_FINAL) {
-    return "excelencia"
-  }
-  if (nota >= UMBRAL_SOLIDO_FINAL) {
-    return "solido"
-  }
-  if (nota >= UMBRAL_DESARROLLO_FINAL) {
-    return "enDesarrollo"
-  }
-  return "noCumple"
 }

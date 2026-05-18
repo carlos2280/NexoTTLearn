@@ -3,14 +3,19 @@ import type {
   ContenidoCodigoTests,
   ModoCursoParticipante,
 } from "@nexott-learn/shared-types"
+import { contenidoQuizSchema } from "@nexott-learn/shared-types"
 import { BloqueCodigoIlustrativo } from "./bloque-codigo-ilustrativo"
 import { BloqueCodigoPreguntas } from "./bloque-codigo-preguntas"
+import { BloqueEvaluableCerrado } from "./bloque-evaluable-cerrado"
 import { BloqueEvaluablePreviewLock } from "./bloque-evaluable-preview-lock"
 import { BloqueParrafo } from "./bloque-parrafo"
 import { BloqueRecurso } from "./bloque-recurso"
 import { BloqueTip } from "./bloque-tip"
 import { BloqueVideo } from "./bloque-video"
+import { EvaluableConColapso } from "./evaluable-con-colapso"
 import { BloqueQuiz } from "./quiz/bloque-quiz"
+
+const NOTA_APROBADO_CODIGO_DEFAULT = 60
 
 interface RenderBloqueProps {
   readonly bloque: BloqueDetalleResponse
@@ -28,6 +33,13 @@ interface RenderBloqueProps {
    * tests del reto en el cliente (Pyodide / Web Worker).
    */
   readonly contenidoTests: ContenidoCodigoTests | null
+  /**
+   * Curso cerrado (`avance.estaCerrado === true`). Los bloques evaluables se
+   * renderizan en modo lectura — sin inputs, sin CTA — mostrando el resultado
+   * del mejor intento. Ortogonal al `modo` (un curso `asignado` se cierra,
+   * no cambia de modo).
+   */
+  readonly soloLectura: boolean
 }
 
 /**
@@ -46,6 +58,7 @@ export function RenderBloque({
   colaboradorId,
   modo,
   contenidoTests,
+  soloLectura,
 }: RenderBloqueProps) {
   switch (bloque.tipo) {
     case "PARRAFO":
@@ -59,30 +72,65 @@ export function RenderBloque({
     case "CODIGO_ILUSTRATIVO":
       return <BloqueCodigoIlustrativo contenido={bloque.contenido} />
     case "QUIZ": {
+      const notaMinima = notaMinimaQuiz(bloque.contenido)
+      if (soloLectura) {
+        return (
+          <BloqueEvaluableCerrado
+            bloqueId={bloque.id}
+            colaboradorId={colaboradorId}
+            titulo="Quiz"
+            notaMinima={notaMinima}
+          />
+        )
+      }
       if (modo === "preview" || !colaboradorId) {
         return <BloqueEvaluablePreviewLock titulo="Quiz" />
       }
       return (
-        <BloqueQuiz
+        <EvaluableConColapso
           bloqueId={bloque.id}
-          cursoId={cursoId}
           colaboradorId={colaboradorId}
-          contenido={bloque.contenido}
-        />
+          notaMinima={notaMinima}
+          tituloColapsado="Quiz"
+        >
+          <BloqueQuiz
+            bloqueId={bloque.id}
+            cursoId={cursoId}
+            colaboradorId={colaboradorId}
+            contenido={bloque.contenido}
+          />
+        </EvaluableConColapso>
       )
     }
     case "CODIGO_PREGUNTAS": {
+      if (soloLectura) {
+        return (
+          <BloqueEvaluableCerrado
+            bloqueId={bloque.id}
+            colaboradorId={colaboradorId}
+            titulo="Ejercicio de código"
+            notaMinima={NOTA_APROBADO_CODIGO_DEFAULT}
+          />
+        )
+      }
       if (modo === "preview" || !colaboradorId) {
         return <BloqueEvaluablePreviewLock titulo="Ejercicio de código" />
       }
       return (
-        <BloqueCodigoPreguntas
+        <EvaluableConColapso
           bloqueId={bloque.id}
-          cursoId={cursoId}
           colaboradorId={colaboradorId}
-          contenido={bloque.contenido}
-          contenidoTests={contenidoTests}
-        />
+          notaMinima={NOTA_APROBADO_CODIGO_DEFAULT}
+          tituloColapsado="Ejercicio de código"
+        >
+          <BloqueCodigoPreguntas
+            bloqueId={bloque.id}
+            cursoId={cursoId}
+            colaboradorId={colaboradorId}
+            contenido={bloque.contenido}
+            contenidoTests={contenidoTests}
+          />
+        </EvaluableConColapso>
       )
     }
     case "CODIGO_TESTS":
@@ -90,4 +138,12 @@ export function RenderBloque({
     default:
       return null
   }
+}
+
+function notaMinimaQuiz(contenido: Record<string, unknown> | null): number {
+  const parsed = contenidoQuizSchema.safeParse(contenido)
+  if (parsed.success) {
+    return parsed.data.notaMinima
+  }
+  return 60
 }

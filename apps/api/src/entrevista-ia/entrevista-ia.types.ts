@@ -23,6 +23,7 @@ export const SELECT_INTENTO_ENTREVISTA_FIELDS = {
   notaAjustadaAdmin: true,
   anulado: true,
   motivoAjusteOAnulacion: true,
+  reporteEvaluador: true,
   notasPorArea: {
     select: { areaId: true, nota: true },
   },
@@ -34,7 +35,13 @@ export const SELECT_INTENTO_ENTREVISTA_FIELDS = {
       rubrica: {
         select: { areaId: true, peso: true },
       },
+      curso: {
+        select: { id: true, titulo: true },
+      },
     },
+  },
+  colaborador: {
+    select: { id: true, nombre: true, email: true },
   },
 } as const satisfies Prisma.IntentoEntrevistaIASelect
 

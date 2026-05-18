@@ -3,12 +3,14 @@ export const RUTAS = {
   logout: "/logout",
   bandeja: "/bandeja",
   cuenta: "/cuenta",
+  notificaciones: "/notificaciones",
   playground: "/playground",
   participante: {
     misCursos: "/mis-cursos",
     miFicha: "/mi-ficha",
     catalogo: "/catalogo",
     cursoDetalle: (cursoId: string) => `/cursos/${cursoId}`,
+    cursoCerrado: (cursoId: string) => `/cursos/${cursoId}/cerrado`,
   },
   admin: {
     inicio: "/admin",
@@ -22,5 +24,6 @@ export const RUTAS = {
     catalogoModuloDetalle: (id: string) => `/admin/catalogo/modulos/${id}`,
     reportes: "/admin/reportes",
     sistema: "/admin/sistema",
+    intentoEntrevistaIa: (intentoId: string) => `/admin/intentos-entrevista-ia/${intentoId}`,
   },
 } as const
