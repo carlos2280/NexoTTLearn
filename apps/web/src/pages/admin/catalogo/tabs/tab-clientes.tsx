@@ -4,7 +4,7 @@ import { DataTable } from "@/shared/components/ui/data-table"
 import { MenuAcciones } from "@/shared/components/ui/menu-acciones"
 import { Pagination } from "@/shared/components/ui/pagination"
 import { SearchField } from "@/shared/components/ui/search-field"
-import { Select } from "@/shared/components/ui/select"
+import { Select, SelectItem } from "@/shared/components/ui/select"
 import { Building2, Plus } from "lucide-react"
 import { useState } from "react"
 import { accionesPorCliente } from "./clientes-acciones-menu"
@@ -53,16 +53,16 @@ export function TabClientes() {
           <Select
             compact={true}
             value={filtroActivo}
-            onChange={(e) => {
-              setFiltroActivo(e.target.value as FiltroActivo)
+            onValueChange={(v) => {
+              setFiltroActivo(v as FiltroActivo)
               setPage(1)
             }}
             aria-label="Filtrar por estado"
             className="min-w-[160px]"
           >
-            <option value="TODOS">Todos los estados</option>
-            <option value="ACTIVOS">Solo activos</option>
-            <option value="INACTIVOS">Solo inactivos</option>
+            <SelectItem value="TODOS">Todos los estados</SelectItem>
+            <SelectItem value="ACTIVOS">Solo activos</SelectItem>
+            <SelectItem value="INACTIVOS">Solo inactivos</SelectItem>
           </Select>
         </div>
         <Button variant="primary" size="md" onClick={() => orq.abrir("crear")}>

@@ -1,8 +1,10 @@
 import { SearchField } from "@/shared/components/ui/search-field"
-import { Select } from "@/shared/components/ui/select"
+import { Select, SelectItem } from "@/shared/components/ui/select"
 import type { AreaResponse, EstadoSkill } from "@nexott-learn/shared-types"
 
 type FiltroEstado = "TODAS" | EstadoSkill
+
+const TODAS_AREAS = "__todas__"
 
 interface SkillsFiltrosProps {
   readonly busqueda: string
@@ -28,28 +30,28 @@ export function SkillsFiltros({
       <SearchField valor={busqueda} onCambio={onBusqueda} placeholder="Buscar skill…" />
       <Select
         compact={true}
-        value={areaFiltroId}
-        onChange={(e) => onArea(e.target.value)}
+        value={areaFiltroId === "" ? TODAS_AREAS : areaFiltroId}
+        onValueChange={(v) => onArea(v === TODAS_AREAS ? "" : v)}
         aria-label="Filtrar por área"
         className="min-w-[160px]"
       >
-        <option value="">Todas las áreas</option>
+        <SelectItem value={TODAS_AREAS}>Todas las áreas</SelectItem>
         {areas.map((a) => (
-          <option key={a.id} value={a.id}>
+          <SelectItem key={a.id} value={a.id}>
             {a.nombre}
-          </option>
+          </SelectItem>
         ))}
       </Select>
       <Select
         compact={true}
         value={estadoFiltro}
-        onChange={(e) => onEstado(e.target.value as FiltroEstado)}
+        onValueChange={(v) => onEstado(v as FiltroEstado)}
         aria-label="Filtrar por estado"
         className="min-w-[140px]"
       >
-        <option value="TODAS">Todos los estados</option>
-        <option value="ACTIVA">Activas</option>
-        <option value="ARCHIVADA">Archivadas</option>
+        <SelectItem value="TODAS">Todos los estados</SelectItem>
+        <SelectItem value="ACTIVA">Activas</SelectItem>
+        <SelectItem value="ARCHIVADA">Archivadas</SelectItem>
       </Select>
     </div>
   )

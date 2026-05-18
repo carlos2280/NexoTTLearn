@@ -17,6 +17,8 @@
     "db:seed:reset": "tsx prisma/seed.ts --reset",
     "db:seed:minimal": "tsx prisma/seed.ts --minimal",
     "db:seed:amsa": "tsx prisma/seed-amsa.local.ts",
+    "db:seed:qa": "tsx prisma/seed-qa.local.ts",
+    "db:seed:frontend": "tsx prisma/seed-frontend.local.ts",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate"
   },

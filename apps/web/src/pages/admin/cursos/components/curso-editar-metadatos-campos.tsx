@@ -1,6 +1,6 @@
 import { Field } from "@/shared/components/ui/field"
 import { Input } from "@/shared/components/ui/input"
-import { Select } from "@/shared/components/ui/select"
+import { Select, SelectItem } from "@/shared/components/ui/select"
 import { Textarea } from "@/shared/components/ui/textarea"
 import type { ClienteResponse } from "@nexott-learn/shared-types"
 import type { FormMetadatos } from "./curso-editar-metadatos-validar"
@@ -40,12 +40,13 @@ export function CursoEditarMetadatosCampos({
           <Select
             {...p}
             value={form.clienteId}
-            onChange={(e) => onCambio({ ...form, clienteId: e.target.value })}
+            onValueChange={(v) => onCambio({ ...form, clienteId: v })}
+            placeholder="Selecciona un cliente"
           >
             {clientes.map((c) => (
-              <option key={c.id} value={c.id}>
+              <SelectItem key={c.id} value={c.id}>
                 {c.nombre}
-              </option>
+              </SelectItem>
             ))}
           </Select>
         )}

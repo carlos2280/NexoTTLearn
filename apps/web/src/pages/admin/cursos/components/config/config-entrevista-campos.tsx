@@ -1,5 +1,5 @@
 import { Field } from "@/shared/components/ui/field"
-import { Select } from "@/shared/components/ui/select"
+import { Select, SelectItem } from "@/shared/components/ui/select"
 import type {
   FilosofiaEntrevista,
   ProfundidadEntrevista,
@@ -27,12 +27,10 @@ export function ConfigEntrevistaCampos({ valores, onCambio }: ConfigEntrevistaCa
             {...p}
             compact={true}
             value={valores.filosofia}
-            onChange={(e) =>
-              onCambio({ ...valores, filosofia: e.target.value as FilosofiaEntrevista })
-            }
+            onValueChange={(v) => onCambio({ ...valores, filosofia: v as FilosofiaEntrevista })}
           >
-            <option value="PREPARACION">Preparación</option>
-            <option value="FILTRO">Filtro</option>
+            <SelectItem value="PREPARACION">Preparación</SelectItem>
+            <SelectItem value="FILTRO">Filtro</SelectItem>
           </Select>
         )}
       </Field>
@@ -42,13 +40,11 @@ export function ConfigEntrevistaCampos({ valores, onCambio }: ConfigEntrevistaCa
             {...p}
             compact={true}
             value={valores.profundidad}
-            onChange={(e) =>
-              onCambio({ ...valores, profundidad: e.target.value as ProfundidadEntrevista })
-            }
+            onValueChange={(v) => onCambio({ ...valores, profundidad: v as ProfundidadEntrevista })}
           >
-            <option value="JUNIOR">Junior</option>
-            <option value="SEMI_SENIOR">Semi-senior</option>
-            <option value="SENIOR">Senior</option>
+            <SelectItem value="JUNIOR">Junior</SelectItem>
+            <SelectItem value="SEMI_SENIOR">Semi-senior</SelectItem>
+            <SelectItem value="SENIOR">Senior</SelectItem>
           </Select>
         )}
       </Field>
@@ -58,16 +54,13 @@ export function ConfigEntrevistaCampos({ valores, onCambio }: ConfigEntrevistaCa
             {...p}
             compact={true}
             value={String(valores.duracionMinutos)}
-            onChange={(e) =>
-              onCambio({
-                ...valores,
-                duracionMinutos: Number(e.target.value) as 15 | 30 | 45,
-              })
+            onValueChange={(v) =>
+              onCambio({ ...valores, duracionMinutos: Number(v) as 15 | 30 | 45 })
             }
           >
-            <option value="15">15</option>
-            <option value="30">30</option>
-            <option value="45">45</option>
+            <SelectItem value="15">15</SelectItem>
+            <SelectItem value="30">30</SelectItem>
+            <SelectItem value="45">45</SelectItem>
           </Select>
         )}
       </Field>
@@ -77,10 +70,10 @@ export function ConfigEntrevistaCampos({ valores, onCambio }: ConfigEntrevistaCa
             {...p}
             compact={true}
             value={valores.tono}
-            onChange={(e) => onCambio({ ...valores, tono: e.target.value as TonoEntrevista })}
+            onValueChange={(v) => onCambio({ ...valores, tono: v as TonoEntrevista })}
           >
-            <option value="CONVERSACIONAL">Conversacional</option>
-            <option value="FORMAL">Formal</option>
+            <SelectItem value="CONVERSACIONAL">Conversacional</SelectItem>
+            <SelectItem value="FORMAL">Formal</SelectItem>
           </Select>
         )}
       </Field>

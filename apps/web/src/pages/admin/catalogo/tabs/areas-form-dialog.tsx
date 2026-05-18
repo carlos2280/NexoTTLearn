@@ -3,7 +3,7 @@ import { Button } from "@/shared/components/ui/button"
 import { Dialog, DialogFooter } from "@/shared/components/ui/dialog"
 import { Field } from "@/shared/components/ui/field"
 import { Input } from "@/shared/components/ui/input"
-import { Select } from "@/shared/components/ui/select"
+import { Select, SelectItem } from "@/shared/components/ui/select"
 import {
   AREA_CODIGOS,
   type AreaCodigo,
@@ -115,11 +115,11 @@ export function AreasFormDialog({
           hint="Familia de color que pintará las cards y skill chips del área."
         >
           {(p) => (
-            <Select {...p} value={codigo} onChange={(e) => setCodigo(e.target.value as AreaCodigo)}>
+            <Select {...p} value={codigo} onValueChange={(v) => setCodigo(v as AreaCodigo)}>
               {AREA_CODIGOS.map((c) => (
-                <option key={c} value={c}>
+                <SelectItem key={c} value={c}>
                   {ETIQUETAS_CODIGO[c]}
-                </option>
+                </SelectItem>
               ))}
             </Select>
           )}

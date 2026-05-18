@@ -2,7 +2,7 @@ import { useListarBloques } from "@/features/catalogo/hooks/use-listar-bloques"
 import { Button } from "@/shared/components/ui/button"
 import { EmptyState } from "@/shared/components/ui/empty-state"
 import { Field } from "@/shared/components/ui/field"
-import { Select } from "@/shared/components/ui/select"
+import { Select, SelectItem } from "@/shared/components/ui/select"
 import type { BloqueDetalleResponse } from "@nexott-learn/shared-types"
 import { FlaskConical, Plus } from "lucide-react"
 import { useMemo, useRef, useState } from "react"
@@ -93,14 +93,14 @@ export function EditorCodigoTests({ bloque }: EditorCodigoTestsProps) {
         {(attrs) => (
           <Select
             id={attrs.id}
-            value={datos.codigoPreguntasId}
-            onChange={(e) => actualizar({ ...datos, codigoPreguntasId: e.target.value })}
+            value={datos.codigoPreguntasId === "" ? undefined : datos.codigoPreguntasId}
+            onValueChange={(v) => actualizar({ ...datos, codigoPreguntasId: v })}
+            placeholder="— Selecciona un reto —"
           >
-            <option value="">— Selecciona un reto —</option>
             {hermanos.map((h) => (
-              <option key={h.id} value={h.id}>
+              <SelectItem key={h.id} value={h.id}>
                 Reto v{h.version} · #{h.orden}
-              </option>
+              </SelectItem>
             ))}
           </Select>
         )}

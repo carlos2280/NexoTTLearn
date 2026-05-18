@@ -3,7 +3,7 @@ import { Button } from "@/shared/components/ui/button"
 import { Dialog, DialogFooter } from "@/shared/components/ui/dialog"
 import { Field } from "@/shared/components/ui/field"
 import { Input } from "@/shared/components/ui/input"
-import { Select } from "@/shared/components/ui/select"
+import { Select, SelectItem } from "@/shared/components/ui/select"
 import { type FormEvent, useEffect, useState } from "react"
 import { type ErroresPersonaForm, validarPersonaForm } from "./persona-crear-form-validar"
 
@@ -99,13 +99,9 @@ export function PersonaCrearDialog({
         </Field>
         <Field label="Rol">
           {(p) => (
-            <Select
-              {...p}
-              value={rol}
-              onChange={(e) => setRol(e.target.value as "ADMIN" | "PARTICIPANTE")}
-            >
-              <option value="PARTICIPANTE">Participante</option>
-              <option value="ADMIN">Administrador</option>
+            <Select {...p} value={rol} onValueChange={(v) => setRol(v as "ADMIN" | "PARTICIPANTE")}>
+              <SelectItem value="PARTICIPANTE">Participante</SelectItem>
+              <SelectItem value="ADMIN">Administrador</SelectItem>
             </Select>
           )}
         </Field>

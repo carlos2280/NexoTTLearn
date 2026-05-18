@@ -1,4 +1,4 @@
-import { Select } from "@/shared/components/ui/select"
+import { Select, SelectItem } from "@/shared/components/ui/select"
 
 export const LENGUAJES_CODIGO = [
   { id: "typescript", etiqueta: "TypeScript" },
@@ -29,11 +29,11 @@ interface SelectLenguajeProps {
 
 export function SelectLenguaje({ value, onChange, id }: SelectLenguajeProps) {
   return (
-    <Select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
+    <Select id={id} value={value} onValueChange={onChange}>
       {LENGUAJES_CODIGO.map((l) => (
-        <option key={l.id} value={l.id}>
+        <SelectItem key={l.id} value={l.id}>
           {l.etiqueta}
-        </option>
+        </SelectItem>
       ))}
     </Select>
   )

@@ -1,10 +1,12 @@
 import { Button } from "@/shared/components/ui/button"
 import { SearchField } from "@/shared/components/ui/search-field"
-import { Select } from "@/shared/components/ui/select"
+import { Select, SelectItem } from "@/shared/components/ui/select"
 import { Tooltip } from "@/shared/components/ui/tooltip"
 import { cn } from "@/shared/lib/cn"
 import type { ClienteResponse } from "@nexott-learn/shared-types"
 import { Archive, Plus } from "lucide-react"
+
+const TODOS_CLIENTES = "__todos__"
 
 interface CursosFiltrosProps {
   readonly busqueda: string
@@ -41,17 +43,17 @@ export function CursosFiltros({
         />
         <Select
           compact={true}
-          value={clienteId}
-          onChange={(e) => onClienteId(e.target.value)}
+          value={clienteId === "" ? TODOS_CLIENTES : clienteId}
+          onValueChange={(v) => onClienteId(v === TODOS_CLIENTES ? "" : v)}
           aria-label="Filtrar por cliente"
           className="min-w-[200px]"
           disabled={cargandoClientes}
         >
-          <option value="">Todos los clientes</option>
+          <SelectItem value={TODOS_CLIENTES}>Todos los clientes</SelectItem>
           {clientes.map((c) => (
-            <option key={c.id} value={c.id}>
+            <SelectItem key={c.id} value={c.id}>
               {c.nombre}
-            </option>
+            </SelectItem>
           ))}
         </Select>
         {mostrarToggleArchivados ? (

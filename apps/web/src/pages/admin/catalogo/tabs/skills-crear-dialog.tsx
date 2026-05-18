@@ -3,7 +3,7 @@ import { Button } from "@/shared/components/ui/button"
 import { Dialog, DialogFooter } from "@/shared/components/ui/dialog"
 import { Field } from "@/shared/components/ui/field"
 import { Input } from "@/shared/components/ui/input"
-import { Select } from "@/shared/components/ui/select"
+import { Select, SelectItem } from "@/shared/components/ui/select"
 import type { AreaResponse } from "@nexott-learn/shared-types"
 import { type FormEvent, useEffect, useState } from "react"
 
@@ -89,17 +89,15 @@ export function SkillsCrearDialog({
           {(p) => (
             <Select
               {...p}
-              value={areaId}
-              onChange={(e) => setAreaId(e.target.value)}
+              value={areaId === "" ? undefined : areaId}
+              onValueChange={setAreaId}
               hasError={Boolean(errorArea)}
+              placeholder="Selecciona un área…"
             >
-              <option value="" disabled={true}>
-                Selecciona un área…
-              </option>
               {areas.map((a) => (
-                <option key={a.id} value={a.id}>
+                <SelectItem key={a.id} value={a.id}>
                   {a.nombre}
-                </option>
+                </SelectItem>
               ))}
             </Select>
           )}

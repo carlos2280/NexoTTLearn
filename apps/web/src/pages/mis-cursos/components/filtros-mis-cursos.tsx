@@ -1,4 +1,4 @@
-import { Select } from "@/shared/components/ui/select"
+import { Select, SelectItem } from "@/shared/components/ui/select"
 import { useId } from "react"
 import type { FiltroEstadoCurso, FiltroRolAsignacion, FiltrosMisCursos } from "../mis-cursos.types"
 
@@ -64,11 +64,11 @@ function FiltroPill({ id, etiqueta, value, opciones, onChange }: FiltroPillProps
       className="inline-flex items-center gap-2 rounded-pill border border-border bg-surface px-3 py-1 transition-colors duration-base ease-default focus-within:border-aurora-violet hover:border-border-strong"
     >
       <span className="nx-eyebrow text-text-tertiary">{etiqueta}</span>
-      <Select id={id} variant="ghost" value={value} onChange={(e) => onChange(e.target.value)}>
+      <Select id={id} variant="ghost" value={value} onValueChange={onChange}>
         {opciones.map((opcion) => (
-          <option key={opcion.value} value={opcion.value}>
+          <SelectItem key={opcion.value} value={opcion.value}>
             {opcion.label}
-          </option>
+          </SelectItem>
         ))}
       </Select>
     </label>

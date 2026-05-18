@@ -4,7 +4,7 @@ import { DataTable } from "@/shared/components/ui/data-table"
 import { MenuAcciones } from "@/shared/components/ui/menu-acciones"
 import { PageHeader, PageHeaderStat } from "@/shared/components/ui/page-header"
 import { Pagination } from "@/shared/components/ui/pagination"
-import { Select } from "@/shared/components/ui/select"
+import { Select, SelectItem } from "@/shared/components/ui/select"
 import type {
   ExportarColaboradoresQuery,
   FormatoExportColaboradores,
@@ -122,14 +122,14 @@ export function PersonasPage() {
             <Select
               compact={true}
               value={String(pageSize)}
-              onChange={(e) => actualizarPageSize(Number(e.target.value))}
+              onValueChange={(v) => actualizarPageSize(Number(v))}
               aria-label="Filas por página"
               className="min-w-[88px]"
             >
               {OPCIONES_PAGE_SIZE.map((opt) => (
-                <option key={opt} value={String(opt)}>
+                <SelectItem key={opt} value={String(opt)}>
                   {opt}
-                </option>
+                </SelectItem>
               ))}
             </Select>
           </div>
