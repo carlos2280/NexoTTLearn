@@ -4,6 +4,7 @@ import { Tabs } from "@/shared/components/ui/tabs"
 import type { EvaluacionesDisponibles } from "@nexott-learn/shared-types"
 import { ClipboardList } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
+import { TablaBloquesEvaluables } from "./tabla-bloques-evaluables"
 import { TablaIntentosEntrevistaIa } from "./tabla-intentos-entrevista-ia"
 import { TablaIntentosTransversal } from "./tabla-intentos-transversal"
 
@@ -16,9 +17,15 @@ interface SubtabDisponible {
 
 function calcularSubtabs(d: EvaluacionesDisponibles): readonly SubtabDisponible[] {
   const lista: SubtabDisponible[] = []
-  if (d.tieneEntrevistaIa) lista.push({ id: "entrevista-ia", etiqueta: "Entrevista IA" })
-  if (d.tieneTransversal) lista.push({ id: "transversal", etiqueta: "Transversal" })
-  if (d.tieneBloquesEvaluables) lista.push({ id: "bloques", etiqueta: "Bloques" })
+  if (d.tieneEntrevistaIa) {
+    lista.push({ id: "entrevista-ia", etiqueta: "Entrevista IA" })
+  }
+  if (d.tieneTransversal) {
+    lista.push({ id: "transversal", etiqueta: "Transversal" })
+  }
+  if (d.tieneBloquesEvaluables) {
+    lista.push({ id: "bloques", etiqueta: "Bloques" })
+  }
   return lista
 }
 
@@ -45,7 +52,8 @@ export function PanelEvaluaciones({ cursoId }: PanelEvaluacionesProps) {
       setSub(null)
       return
     }
-    if (!sub || !subtabs.some((s) => s.id === sub)) {
+    const subActualValido = sub !== null && subtabs.some((s) => s.id === sub)
+    if (!subActualValido) {
       setSub(subtabs[0]?.id ?? null)
     }
   }, [subtabs, sub])
@@ -67,7 +75,9 @@ export function PanelEvaluaciones({ cursoId }: PanelEvaluacionesProps) {
 
   if (subtabs.length === 1) {
     const unica = subtabs[0]
-    if (!unica) return null
+    if (!unica) {
+      return null
+    }
     return (
       <div className="flex flex-col gap-6">
         <span className="nx-eyebrow text-aurora-violet">{unica.etiqueta}</span>
@@ -79,7 +89,9 @@ export function PanelEvaluaciones({ cursoId }: PanelEvaluacionesProps) {
   }
 
   const actual = sub ?? subtabs[0]?.id ?? null
-  if (!actual) return null
+  if (!actual) {
+    return null
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -108,13 +120,5 @@ function ContenidoSubtab({ subtab, cursoId }: ContenidoSubtabProps) {
   if (subtab === "transversal") {
     return <TablaIntentosTransversal cursoId={cursoId} />
   }
-  // Bloques evaluables: tabla pendiente en la Fase 2.
-  return (
-    <EmptyState
-      tono="panel"
-      icono={ClipboardList}
-      titulo="Vista en construcción"
-      descripcion="La tabla de bloques evaluables llega en la próxima iteración."
-    />
-  )
+  return <TablaBloquesEvaluables cursoId={cursoId} />
 }
