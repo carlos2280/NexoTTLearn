@@ -162,6 +162,12 @@ export type {
   CursoConfiguracionResponse,
 } from "./cursos/curso.types"
 export type { EvaluacionesDisponibles } from "./cursos/evaluaciones-disponibles.types"
+export type {
+  BloqueEvaluableAdminItem,
+  BloqueEvaluableStats,
+  BloqueEvaluableColaboradorItem,
+  BloqueEvaluableDetalleResponse,
+} from "./cursos/bloques-evaluables-admin.types"
 export { crearCursoSchema } from "./cursos/crear-curso.schema"
 export type { CrearCursoInput } from "./cursos/crear-curso.schema"
 export { actualizarCursoSchema } from "./cursos/actualizar-curso.schema"

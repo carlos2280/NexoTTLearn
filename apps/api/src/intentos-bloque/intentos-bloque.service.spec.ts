@@ -13,6 +13,7 @@ import {
   Prisma,
   RolAsignacion,
   RolUsuario,
+  TipoBloque,
 } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
@@ -107,7 +108,10 @@ const RESPUESTAS_DOS_DE_TRES_CON_PESOS: Respuestas = {
 }
 
 interface MockPrisma {
-  bloque: { findUnique: ReturnType<typeof vi.fn> }
+  bloque: {
+    findUnique: ReturnType<typeof vi.fn>
+    findMany: ReturnType<typeof vi.fn>
+  }
   curso: { findUnique: ReturnType<typeof vi.fn> }
   seccion: { findUnique: ReturnType<typeof vi.fn> }
   cursoModuloHabilitado: { findUnique: ReturnType<typeof vi.fn> }
@@ -133,7 +137,7 @@ interface MockPrisma {
 
 function buildPrismaMock(): MockPrisma {
   const mock: MockPrisma = {
-    bloque: { findUnique: vi.fn() },
+    bloque: { findUnique: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
     curso: { findUnique: vi.fn() },
     seccion: { findUnique: vi.fn() },
     cursoModuloHabilitado: { findUnique: vi.fn() },
@@ -901,3 +905,228 @@ describe("IntentosBloqueService — visibilidad y scope", () => {
     expect(r).toBeNull()
   })
 })
+
+// ============================================================================
+// FASE 2: bloques evaluables — listado admin + drawer por colaborador
+// ============================================================================
+
+const SECCION_TITULO = "Sección 1"
+const MODULO_TITULO = "Módulo 1"
+const SKILL_ETIQUETA = "JavaScript"
+const OTRO_BLOQUE_ID = "b0000000-0000-0000-0000-000000000002"
+const OTRO_COLABORADOR_ID = "f0000000-0000-0000-0000-000000000002"
+
+function makeBloqueRow(
+  overrides: Partial<{
+    id: string
+    orden: number
+    tipo: TipoBloque
+    version: number
+    notaMinima: number
+    skillId: string | null
+  }> = {},
+) {
+  return {
+    id: overrides.id ?? BLOQUE_ID,
+    orden: overrides.orden ?? 1,
+    tipo: overrides.tipo ?? TipoBloque.QUIZ,
+    version: overrides.version ?? 1,
+    contenido: { ...CONTENIDO_QUIZ_OK, notaMinima: overrides.notaMinima ?? 60 },
+    seccion: {
+      id: SECCION_ID,
+      titulo: SECCION_TITULO,
+      orden: 1,
+      modulo: { id: MODULO_ID, titulo: MODULO_TITULO },
+    },
+    skillQueMide:
+      overrides.skillId === null
+        ? null
+        : { id: overrides.skillId ?? SKILL_ID, etiquetaVisible: SKILL_ETIQUETA },
+  }
+}
+
+function makeIntentoBloqueRow(
+  overrides: Partial<{
+    bloqueId: string
+    colaboradorId: string
+    nota: number
+    esMejorIntento: boolean
+  }> = {},
+) {
+  return {
+    bloqueId: overrides.bloqueId ?? BLOQUE_ID,
+    colaboradorId: overrides.colaboradorId ?? COLABORADOR_ID,
+    nota: new Prisma.Decimal(overrides.nota ?? 80),
+    esMejorIntento: overrides.esMejorIntento ?? false,
+  }
+}
+
+describe("IntentosBloqueService.listarBloquesEvaluablesParaAdmin", () => {
+  it("404 cuando el curso no existe", async () => {
+    prisma.curso.findUnique.mockResolvedValue(null)
+    await expect(service.listarBloquesEvaluablesParaAdmin(CURSO_ID)).rejects.toMatchObject({
+      response: { code: apiErrorCodes.cursoNoEncontrado },
+    })
+  })
+
+  it("devuelve lista vacía cuando el curso no tiene bloques evaluables", async () => {
+    prisma.curso.findUnique.mockResolvedValue({ id: CURSO_ID })
+    prisma.bloque.findMany.mockResolvedValue([])
+    const r = await service.listarBloquesEvaluablesParaAdmin(CURSO_ID)
+    expect(r).toEqual([])
+  })
+
+  it("agrega stats correctas para un bloque con varios intentos", async () => {
+    prisma.curso.findUnique.mockResolvedValue({ id: CURSO_ID })
+    prisma.bloque.findMany.mockResolvedValue([makeBloqueRow({ notaMinima: 70 })])
+    prisma.intentoBloque.findMany.mockResolvedValue([
+      // Colaborador 1: intento viejo + mejor (80 aprobado)
+      makeIntentoBloqueRow({ colaboradorId: COLABORADOR_ID, nota: 60, esMejorIntento: false }),
+      makeIntentoBloqueRow({ colaboradorId: COLABORADOR_ID, nota: 80, esMejorIntento: true }),
+      // Colaborador 2: mejor 50 (no aprobado)
+      makeIntentoBloqueRow({
+        colaboradorId: OTRO_COLABORADOR_ID,
+        nota: 50,
+        esMejorIntento: true,
+      }),
+    ])
+    const r = await service.listarBloquesEvaluablesParaAdmin(CURSO_ID)
+    expect(r).toHaveLength(1)
+    expect(r[0]?.umbralAprobacion).toBe(70)
+    expect(r[0]?.stats).toEqual({
+      colaboradoresConIntento: 2,
+      totalIntentos: 3,
+      aprobados: 1,
+      notaMedia: 65,
+    })
+    expect(r[0]?.skill).toEqual({ id: SKILL_ID, etiqueta: SKILL_ETIQUETA })
+  })
+
+  it("notaMedia=null cuando el bloque no tiene intentos", async () => {
+    prisma.curso.findUnique.mockResolvedValue({ id: CURSO_ID })
+    prisma.bloque.findMany.mockResolvedValue([makeBloqueRow()])
+    prisma.intentoBloque.findMany.mockResolvedValue([])
+    const r = await service.listarBloquesEvaluablesParaAdmin(CURSO_ID)
+    expect(r[0]?.stats).toEqual({
+      colaboradoresConIntento: 0,
+      totalIntentos: 0,
+      aprobados: 0,
+      notaMedia: null,
+    })
+  })
+})
+
+describe("IntentosBloqueService.obtenerDetalleBloqueParaAdmin", () => {
+  it("404 cuando el bloque no existe", async () => {
+    prisma.bloque.findUnique.mockResolvedValue(null)
+    await expect(
+      service.obtenerDetalleBloqueParaAdmin({ cursoId: CURSO_ID, bloqueId: BLOQUE_ID }),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.bloqueNoEncontrado } })
+  })
+
+  it("404 cuando el bloque existe pero no es evaluable", async () => {
+    prisma.bloque.findUnique.mockResolvedValue({
+      id: BLOQUE_ID,
+      tipo: TipoBloque.PARRAFO,
+      version: 1,
+      contenido: {},
+      esEvaluable: false,
+    })
+    await expect(
+      service.obtenerDetalleBloqueParaAdmin({ cursoId: CURSO_ID, bloqueId: BLOQUE_ID }),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.bloqueNoEncontrado } })
+  })
+
+  it("agrupa por colaborador con mejor nota, cantidad y aprobación", async () => {
+    prisma.bloque.findUnique.mockResolvedValue({
+      id: BLOQUE_ID,
+      tipo: TipoBloque.QUIZ,
+      version: 2,
+      contenido: { ...CONTENIDO_QUIZ_OK, notaMinima: 70 },
+      esEvaluable: true,
+    })
+    const fechaNueva = new Date("2026-05-15T10:00:00Z")
+    const fechaVieja = new Date("2026-05-10T10:00:00Z")
+    prisma.intentoBloque.findMany.mockResolvedValue([
+      {
+        colaboradorId: COLABORADOR_ID,
+        nota: new Prisma.Decimal(80),
+        fecha: fechaNueva,
+        esMejorIntento: true,
+        versionBloque: 2,
+        preguntasFalladas: ["p3"],
+        colaborador: { id: COLABORADOR_ID, nombre: "Juan", email: "juan@test.local" },
+      },
+      {
+        colaboradorId: COLABORADOR_ID,
+        nota: new Prisma.Decimal(60),
+        fecha: fechaVieja,
+        esMejorIntento: false,
+        versionBloque: 1, // versión vieja
+        preguntasFalladas: ["p1", "p2"],
+        colaborador: { id: COLABORADOR_ID, nombre: "Juan", email: "juan@test.local" },
+      },
+      {
+        colaboradorId: OTRO_COLABORADOR_ID,
+        nota: new Prisma.Decimal(50),
+        fecha: fechaNueva,
+        esMejorIntento: true,
+        versionBloque: 2,
+        preguntasFalladas: ["p1"],
+        colaborador: { id: OTRO_COLABORADOR_ID, nombre: "Ana", email: "ana@test.local" },
+      },
+    ])
+
+    const r = await service.obtenerDetalleBloqueParaAdmin({
+      cursoId: CURSO_ID,
+      bloqueId: BLOQUE_ID,
+    })
+
+    expect(r.bloque).toEqual({
+      id: BLOQUE_ID,
+      tipo: TipoBloque.QUIZ,
+      umbralAprobacion: 70,
+      versionActual: 2,
+    })
+    expect(r.colaboradores).toHaveLength(2)
+    // Ordenado por mejorNota desc → Juan (80) primero
+    expect(r.colaboradores[0]?.colaborador.nombre).toBe("Juan")
+    expect(r.colaboradores[0]?.mejorNota).toBe(80)
+    expect(r.colaboradores[0]?.aprobado).toBe(true)
+    expect(r.colaboradores[0]?.cantidadIntentos).toBe(2)
+    expect(r.colaboradores[0]?.tieneVersionVieja).toBe(true)
+    expect(r.colaboradores[1]?.aprobado).toBe(false)
+
+    // p1 sale 2 veces (cabeza); p2 y p3 una vez (orden entre empates no garantizado)
+    const masFalladas = r.preguntasMasFalladas ?? []
+    expect(masFalladas).toHaveLength(3)
+    expect(masFalladas[0]).toEqual({ preguntaId: "p1", conteo: 2 })
+    expect(
+      masFalladas
+        .slice(1)
+        .map((m) => m.preguntaId)
+        .sort(),
+    ).toEqual(["p2", "p3"])
+    expect(masFalladas.slice(1).every((m) => m.conteo === 1)).toBe(true)
+  })
+
+  it("preguntasMasFalladas se omite si el bloque NO es QUIZ", async () => {
+    prisma.bloque.findUnique.mockResolvedValue({
+      id: BLOQUE_ID,
+      tipo: TipoBloque.CODIGO_PREGUNTAS,
+      version: 1,
+      contenido: {},
+      esEvaluable: true,
+    })
+    prisma.intentoBloque.findMany.mockResolvedValue([])
+    const r = await service.obtenerDetalleBloqueParaAdmin({
+      cursoId: CURSO_ID,
+      bloqueId: BLOQUE_ID,
+    })
+    expect(r.preguntasMasFalladas).toBeUndefined()
+  })
+})
+
+// Silenciar warning "noUnusedVars" para OTRO_BLOQUE_ID si solo se usara
+// en futuras iteraciones; lo mantenemos para fixtures de drawer multi-bloque.
+void OTRO_BLOQUE_ID
