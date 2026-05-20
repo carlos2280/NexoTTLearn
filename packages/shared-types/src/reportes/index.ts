@@ -78,3 +78,24 @@ export type {
   AreaPorTrabajarCierre,
   ResumenCierreCurso,
 } from "./autoservicio.types"
+
+export { coberturaCursoQuerySchema } from "./cobertura-curso.types"
+export type {
+  CoberturaCursoQuery,
+  CoberturaSkillExigida,
+  CoberturaNotaColaboradorSkill,
+  CoberturaColaboradorItem,
+  CoberturaResumenAgregado,
+  CoberturaCursoResponse,
+} from "./cobertura-curso.types"
+
+export { coberturaAreasQuerySchema } from "./cobertura-areas.types"
+export type {
+  CoberturaAreasQuery,
+  CoberturaAreaConteoNiveles,
+  CoberturaAreaItem,
+  CoberturaAreaKpis,
+  CoberturaTopColaborador,
+  CoberturaListosParaPresentar,
+  CoberturaAreasResponse,
+} from "./cobertura-areas.types"

@@ -475,6 +475,8 @@ export {
   historicoClienteQuerySchema,
   inventarioSkillsQuerySchema,
   reutilizacionCatalogoQuerySchema,
+  coberturaCursoQuerySchema,
+  coberturaAreasQuerySchema,
 } from "./reportes"
 export type {
   TipoAlerta,
@@ -533,6 +535,19 @@ export type {
   SkillCosechadaCierre,
   AreaPorTrabajarCierre,
   ResumenCierreCurso,
+  CoberturaCursoQuery,
+  CoberturaSkillExigida,
+  CoberturaNotaColaboradorSkill,
+  CoberturaColaboradorItem,
+  CoberturaResumenAgregado,
+  CoberturaCursoResponse,
+  CoberturaAreasQuery,
+  CoberturaAreaConteoNiveles,
+  CoberturaAreaItem,
+  CoberturaAreaKpis,
+  CoberturaTopColaborador,
+  CoberturaListosParaPresentar,
+  CoberturaAreasResponse,
 } from "./reportes"
 
 // Entrevista IA P8c — schemas y tipos del flujo de entrevista IA final (D89).

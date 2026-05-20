@@ -1,61 +1,44 @@
-import { ReporteCard } from "./components/reporte-card"
-import { REPORTES, type ReporteSeccion } from "./reportes.types"
+import { useEficaciaPlataforma } from "@/features/reportes/hooks/use-eficacia-plataforma"
+import { GridReportesDetallados } from "./cockpit/components/grid-reportes-detallados"
+import { KpiStrip } from "./cockpit/components/kpi-strip"
+import { SeccionCoberturaAreas } from "./cockpit/components/seccion-cobertura-areas"
+import { SeccionRutaColaborador } from "./cockpit/components/seccion-ruta-colaborador"
 
-const SECCIONES: ReadonlyArray<{
-  readonly id: ReporteSeccion
-  readonly eyebrow: string
-  readonly titulo: string
-  readonly descripcion: string
-}> = [
-  {
-    id: "operativos",
-    eyebrow: "Operativos · Uso diario",
-    titulo: "Estado del trabajo en curso",
-    descripcion:
-      "Lectura inmediata de lo que está pasando ahora. Sin export, pensados para consulta rápida.",
-  },
-  {
-    id: "estrategicos",
-    eyebrow: "Estratégicos · Decisión",
-    titulo: "Inteligencia para decidir",
-    descripcion:
-      "Visión consolidada con histórico. Exportables a CSV, XLSX y PDF. Cada consulta queda auditada.",
-  },
-]
-
+/**
+ * Executive Cockpit de Reportes — vista global del talento NTT.
+ *
+ * Bloques jerárquicos:
+ *   1. KPI strip — eficacia de la plataforma (aptos, presentados, aceptados)
+ *   2. Ruta del colaborador — funnel end-to-end
+ *   3. Cobertura por área — el mapa real del talento agregado (sin curso)
+ *   4. Reportes detallados — drill-down a las 7 sub-páginas
+ *
+ * El cockpit por curso (radar dual + heatmap colaborador × skill) vive en
+ * `/admin/reportes/cobertura-curso` como drill-down accesible desde el grid.
+ */
 export function ReportesPage() {
+  const eficaciaQuery = useEficaciaPlataforma()
+
   return (
-    <div className="mx-auto flex max-w-[1280px] flex-col gap-16">
+    <div className="mx-auto flex max-w-[1280px] flex-col gap-12">
       <header className="flex flex-col gap-2">
-        <span className="nx-eyebrow text-aurora-violet">Reportes · Inteligencia operativa</span>
+        <span className="nx-eyebrow text-aurora-violet">Reportes · Vista ejecutiva</span>
         <h1 className="text-h1 text-text-primary">
-          Reportes<span className="text-aurora-violet">.</span>
+          Cockpit<span className="text-aurora-violet">.</span>
         </h1>
-        <p className="max-w-[640px] text-body text-text-secondary">
-          Ocho lecturas del sistema, en dos planos: lo que necesita atención hoy y lo que orienta la
-          decisión a mediano plazo.
+        <p className="max-w-[640px] text-body-sm text-text-secondary">
+          El estado real del talento NTT: qué pasa hoy en la plataforma, cómo es la ruta end-to-end
+          del colaborador y dónde están las brechas por capacidad.
         </p>
       </header>
 
-      {SECCIONES.map((seccion) => {
-        const reportes = REPORTES.filter((r) => r.seccion === seccion.id)
-        return (
-          <section key={seccion.id} className="flex flex-col gap-6">
-            <div className="flex flex-col gap-1">
-              <span className="nx-eyebrow text-text-tertiary">{seccion.eyebrow}</span>
-              <h2 className="text-h2 text-text-primary">{seccion.titulo}</h2>
-              <p className="max-w-[640px] text-body-sm text-text-secondary">
-                {seccion.descripcion}
-              </p>
-            </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {reportes.map((reporte) => (
-                <ReporteCard key={reporte.slug} reporte={reporte} />
-              ))}
-            </div>
-          </section>
-        )
-      })}
+      <KpiStrip data={eficaciaQuery.data} isLoading={eficaciaQuery.isLoading} />
+
+      <SeccionRutaColaborador data={eficaciaQuery.data} isLoading={eficaciaQuery.isLoading} />
+
+      <SeccionCoberturaAreas />
+
+      <GridReportesDetallados />
     </div>
   )
 }

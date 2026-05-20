@@ -5,6 +5,17 @@ import type {
   BrechasDetectadasResponse,
   CentroRevisionQuery,
   CentroRevisionResponse,
+  CoberturaAreaItem,
+  CoberturaAreaKpis,
+  CoberturaAreasQuery,
+  CoberturaAreasResponse,
+  CoberturaColaboradorItem,
+  CoberturaCursoQuery,
+  CoberturaCursoResponse,
+  CoberturaListosParaPresentar,
+  CoberturaNotaColaboradorSkill,
+  CoberturaSkillExigida,
+  CoberturaTopColaborador,
   DetalleColaboradorQuery,
   DetalleColaboradorResponse,
   EficaciaPlataformaQuery,
@@ -32,6 +43,7 @@ import type {
   UmbralesBrechas,
 } from "@nexott-learn/shared-types"
 import { Prisma, TipoReporteCache } from "@prisma/client"
+import { nivelDesdeNota } from "../colaboradores/nivel-cualitativo.helpers"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { type Paginated, buildPaginatedResponse, resolvePaginacion } from "../common/http/paginated"
 import { PrismaService } from "../common/prisma/prisma.service"
@@ -553,6 +565,383 @@ export class ReportesService {
       skills,
       meta: { frescura: new Date().toISOString() },
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // E3b — GET /reportes/cobertura-curso (matriz colaborador x skill)
+  // -------------------------------------------------------------------------
+  async obtenerCoberturaCurso(query: CoberturaCursoQuery): Promise<CoberturaCursoResponse> {
+    const curso = await this.prisma.curso.findUnique({
+      where: { id: query.cursoId },
+      select: { id: true, titulo: true },
+    })
+    if (!curso) {
+      throw new NotFoundException({
+        code: apiErrorCodes.cursoNoEncontrado,
+        message: "Curso no encontrado.",
+      })
+    }
+
+    const skillsExigidas = await this.prisma.cursoSkillExigida.findMany({
+      where: { cursoId: query.cursoId },
+      select: {
+        skillId: true,
+        notaMinima: true,
+        skill: { select: { id: true, etiquetaVisible: true } },
+      },
+      orderBy: { skill: { etiquetaVisible: "asc" } },
+    })
+
+    const skills: CoberturaSkillExigida[] = skillsExigidas.map((s) => ({
+      skillId: s.skillId,
+      etiqueta: s.skill.etiquetaVisible,
+      notaMinima: Number(s.notaMinima),
+    }))
+
+    const asignaciones = await this.prisma.asignacionCurso.findMany({
+      where: { cursoId: query.cursoId },
+      select: {
+        id: true,
+        colaboradorId: true,
+        estadoAsignado: true,
+        estadoVoluntario: true,
+        colaborador: { select: SELECT_COLABORADOR_EMBED_FIELDS },
+      },
+    })
+
+    const colaboradorIds = asignaciones.map((a) => a.colaboradorId)
+    const skillIds = skills.map((s) => s.skillId)
+
+    const notas =
+      colaboradorIds.length === 0 || skillIds.length === 0
+        ? []
+        : await this.prisma.notaSkill.findMany({
+            where: {
+              colaboradorId: { in: colaboradorIds },
+              skillId: { in: skillIds },
+            },
+            select: { skillId: true, colaboradorId: true, notaActual: true },
+          })
+
+    const porcentajes =
+      asignaciones.length === 0
+        ? []
+        : await Promise.all(
+            asignaciones.map((a) => this.planPersonalService.obtenerPorcentajeAvance(a.id)),
+          )
+    const porcentajePorAsignacion = new Map(asignaciones.map((a, i) => [a.id, porcentajes[i] ?? 0]))
+
+    const conteoNiveles = {
+      excelencia: 0,
+      solido: 0,
+      enDesarrollo: 0,
+      inicial: 0,
+      sinTocar: 0,
+    }
+
+    const sumasPorSkill = new Map<string, { suma: number; n: number }>()
+
+    const colaboradores: CoberturaColaboradorItem[] = asignaciones.map((asig) => {
+      const notasColab: CoberturaNotaColaboradorSkill[] = skills.map((s) => {
+        const fila = notas.find(
+          (n) => n.skillId === s.skillId && n.colaboradorId === asig.colaboradorId,
+        )
+        const valor =
+          fila?.notaActual === null || fila?.notaActual === undefined
+            ? null
+            : Number(fila.notaActual)
+        const acc = sumasPorSkill.get(s.skillId) ?? { suma: 0, n: 0 }
+        if (valor !== null) {
+          acc.suma += valor
+          acc.n += 1
+          sumasPorSkill.set(s.skillId, acc)
+        } else if (!sumasPorSkill.has(s.skillId)) {
+          sumasPorSkill.set(s.skillId, acc)
+        }
+        return {
+          skillId: s.skillId,
+          nota: valor,
+          nivel: nivelDesdeNota(valor),
+        }
+      })
+
+      const conNota = notasColab.filter((n) => n.nota !== null)
+      const promedioNota =
+        conNota.length === 0
+          ? null
+          : conNota.reduce((acc, n) => acc + (n.nota ?? 0), 0) / conNota.length
+
+      let skillsCumplidas = 0
+      let skillsEnBrecha = 0
+      for (const n of notasColab) {
+        if (n.nivel === "excelencia" || n.nivel === "solido") {
+          skillsCumplidas += 1
+        } else {
+          skillsEnBrecha += 1
+        }
+      }
+
+      const nivelAgregado = nivelDesdeNota(promedioNota)
+      conteoNiveles[nivelAgregado] += 1
+
+      return {
+        id: asig.colaborador.id,
+        nombre: asig.colaborador.nombre,
+        email: asig.colaborador.email,
+        porcentajeAvance: porcentajePorAsignacion.get(asig.id) ?? 0,
+        estadoAsignacion: asig.estadoAsignado ?? asig.estadoVoluntario ?? null,
+        promedioNota,
+        skillsCumplidas,
+        skillsEnBrecha,
+        notas: notasColab,
+      }
+    })
+
+    const promedioPorSkill = skills.map((s) => {
+      const acc = sumasPorSkill.get(s.skillId)
+      return {
+        skillId: s.skillId,
+        promedio: acc && acc.n > 0 ? acc.suma / acc.n : null,
+      }
+    })
+
+    return {
+      cursoId: curso.id,
+      cursoTitulo: curso.titulo,
+      skills,
+      colaboradores,
+      resumen: { promedioPorSkill, conteoNiveles },
+      meta: { frescura: new Date().toISOString() },
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // E3c — GET /reportes/cobertura-areas (vista ejecutiva global por area)
+  // -------------------------------------------------------------------------
+  async obtenerCoberturaAreas(query: CoberturaAreasQuery): Promise<CoberturaAreasResponse> {
+    const benchmark = 70
+
+    const colaboradoresActivosWhere: Prisma.ColaboradorWhereInput = {
+      estadoEmpleado: "ACTIVO",
+      ...(query.clienteId
+        ? { asignaciones: { some: { curso: { clienteId: query.clienteId } } } }
+        : {}),
+    }
+
+    const [colaboradoresActivos, areas, todasNotas, asignacionesApto, cursosActivosCount] =
+      await Promise.all([
+        this.prisma.colaborador.findMany({
+          where: colaboradoresActivosWhere,
+          select: { id: true, nombre: true, email: true },
+        }),
+        this.prisma.area.findMany({
+          select: {
+            id: true,
+            nombre: true,
+            skills: {
+              where: { estado: "ACTIVA" },
+              select: { id: true },
+            },
+          },
+          orderBy: { nombre: "asc" },
+        }),
+        this.prisma.notaSkill.findMany({
+          where: {
+            colaborador: colaboradoresActivosWhere,
+            notaActual: { not: null },
+          },
+          select: {
+            colaboradorId: true,
+            skillId: true,
+            notaActual: true,
+            skill: { select: { areaId: true } },
+          },
+        }),
+        this.prisma.asignacionCurso.findMany({
+          where: {
+            estadoAsignado: "APTO",
+            ...(query.clienteId ? { curso: { clienteId: query.clienteId } } : {}),
+          },
+          select: { id: true, cursoId: true, curso: { select: { clienteId: true } } },
+        }),
+        this.prisma.curso.count({
+          where: {
+            estado: "ACTIVO",
+            ...(query.clienteId ? { clienteId: query.clienteId } : {}),
+          },
+        }),
+      ])
+
+    const notasPorColaboradorArea = new Map<string, Map<string, number[]>>()
+    const notasPorArea = new Map<string, number[]>()
+    const colaboradoresPorArea = new Map<string, Set<string>>()
+
+    for (const nota of todasNotas) {
+      const valor = Number(nota.notaActual)
+      const areaId = nota.skill.areaId
+
+      const mapPorColab = notasPorColaboradorArea.get(nota.colaboradorId) ?? new Map()
+      const arrColab = mapPorColab.get(areaId) ?? []
+      arrColab.push(valor)
+      mapPorColab.set(areaId, arrColab)
+      notasPorColaboradorArea.set(nota.colaboradorId, mapPorColab)
+
+      const arrArea = notasPorArea.get(areaId) ?? []
+      arrArea.push(valor)
+      notasPorArea.set(areaId, arrArea)
+
+      const setColabs = colaboradoresPorArea.get(areaId) ?? new Set<string>()
+      setColabs.add(nota.colaboradorId)
+      colaboradoresPorArea.set(areaId, setColabs)
+    }
+
+    const areasItem: CoberturaAreaItem[] = areas.map((area) => {
+      const notas = notasPorArea.get(area.id) ?? []
+      const promedio = notas.length === 0 ? null : notas.reduce((a, b) => a + b, 0) / notas.length
+      const headcount = colaboradoresPorArea.get(area.id)?.size ?? 0
+
+      const conteoNiveles = { excelencia: 0, solido: 0, enDesarrollo: 0, inicial: 0, sinTocar: 0 }
+      for (const colab of colaboradoresActivos) {
+        const notasColabArea = notasPorColaboradorArea.get(colab.id)?.get(area.id) ?? []
+        const promedioColabArea =
+          notasColabArea.length === 0
+            ? null
+            : notasColabArea.reduce((a, b) => a + b, 0) / notasColabArea.length
+        conteoNiveles[nivelDesdeNota(promedioColabArea)] += 1
+      }
+
+      return {
+        areaId: area.id,
+        nombre: area.nombre,
+        totalColaboradores: headcount,
+        promedio,
+        benchmark,
+        brecha: promedio === null ? null : Math.round((promedio - benchmark) * 10) / 10,
+        conteoNiveles,
+        nivelAgregado: nivelDesdeNota(promedio),
+        serieTemporal: [],
+      }
+    })
+
+    const kpis = this.calcularKpisAreas(areasItem, colaboradoresActivos, notasPorColaboradorArea)
+    const { top, necesitanApoyo } = this.calcularTopYApoyo(
+      colaboradoresActivos,
+      notasPorColaboradorArea,
+    )
+
+    const clientesConPipeline = new Set(asignacionesApto.map((a) => a.curso.clienteId)).size
+
+    const listosParaPresentar: CoberturaListosParaPresentar = {
+      colaboradoresAptos: asignacionesApto.length,
+      cursosActivos: cursosActivosCount,
+      clientesConPipeline,
+    }
+
+    return {
+      kpis,
+      areas: areasItem,
+      top,
+      necesitanApoyo,
+      listosParaPresentar,
+      meta: { frescura: new Date().toISOString() },
+    }
+  }
+
+  private calcularKpisAreas(
+    areasItem: readonly CoberturaAreaItem[],
+    colaboradoresActivos: ReadonlyArray<{ id: string }>,
+    notasPorColaboradorArea: Map<string, Map<string, number[]>>,
+  ): CoberturaAreaKpis {
+    const areasSanas = areasItem.filter(
+      (a) => a.promedio !== null && a.promedio >= a.benchmark,
+    ).length
+
+    const areasConBrecha = areasItem
+      .filter((a) => a.brecha !== null && a.brecha < 0)
+      .sort((a, b) => (a.brecha ?? 0) - (b.brecha ?? 0))
+
+    const peor = areasConBrecha[0]
+    const areaPeorBrecha = peor
+      ? { areaId: peor.areaId, nombre: peor.nombre, brecha: peor.brecha as number }
+      : null
+
+    let colaboradoresEnExcelencia = 0
+    for (const colab of colaboradoresActivos) {
+      const mapColab = notasPorColaboradorArea.get(colab.id)
+      if (!mapColab) {
+        continue
+      }
+      let tieneAreaExcelencia = false
+      for (const notas of mapColab.values()) {
+        if (notas.length === 0) {
+          continue
+        }
+        const promedio = notas.reduce((a, b) => a + b, 0) / notas.length
+        if (nivelDesdeNota(promedio) === "excelencia") {
+          tieneAreaExcelencia = true
+          break
+        }
+      }
+      if (tieneAreaExcelencia) {
+        colaboradoresEnExcelencia += 1
+      }
+    }
+
+    return {
+      totalColaboradoresActivos: colaboradoresActivos.length,
+      areasSanas,
+      totalAreas: areasItem.length,
+      areaPeorBrecha,
+      colaboradoresEnExcelencia,
+    }
+  }
+
+  private calcularTopYApoyo(
+    colaboradoresActivos: ReadonlyArray<{ id: string; nombre: string; email: string }>,
+    notasPorColaboradorArea: Map<string, Map<string, number[]>>,
+  ): {
+    top: readonly CoberturaTopColaborador[]
+    necesitanApoyo: readonly CoberturaTopColaborador[]
+  } {
+    const conPromedio = colaboradoresActivos
+      .map<CoberturaTopColaborador | null>((colab) => {
+        const mapColab = notasPorColaboradorArea.get(colab.id)
+        if (!mapColab || mapColab.size === 0) {
+          return null
+        }
+        const promediosArea: number[] = []
+        let areasExcelencia = 0
+        for (const notas of mapColab.values()) {
+          if (notas.length === 0) {
+            continue
+          }
+          const promedio = notas.reduce((a, b) => a + b, 0) / notas.length
+          promediosArea.push(promedio)
+          if (nivelDesdeNota(promedio) === "excelencia") {
+            areasExcelencia += 1
+          }
+        }
+        if (promediosArea.length === 0) {
+          return null
+        }
+        const promedioGlobal = promediosArea.reduce((a, b) => a + b, 0) / promediosArea.length
+        return {
+          id: colab.id,
+          nombre: colab.nombre,
+          email: colab.email,
+          promedioGlobal: Math.round(promedioGlobal * 10) / 10,
+          areasExcelencia,
+        }
+      })
+      .filter((c): c is CoberturaTopColaborador => c !== null)
+
+    const ordenadoDesc = [...conPromedio].sort((a, b) => b.promedioGlobal - a.promedioGlobal)
+    const top = ordenadoDesc.slice(0, 3)
+
+    const ordenadoAsc = [...conPromedio].sort((a, b) => a.promedioGlobal - b.promedioGlobal)
+    const necesitanApoyo = ordenadoAsc.slice(0, 3)
+
+    return { top, necesitanApoyo }
   }
 
   // -------------------------------------------------------------------------
