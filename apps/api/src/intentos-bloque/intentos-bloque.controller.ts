@@ -13,6 +13,8 @@ import {
 } from "@nestjs/common"
 import { Throttle } from "@nestjs/throttler"
 import {
+  BloqueEvaluableAdminItem,
+  BloqueEvaluableDetalleResponse,
   CrearIntentoBloqueInput,
   IntentoBloqueResponse,
   ListarIntentosBloqueQuery,
@@ -120,6 +122,32 @@ export class IntentosBloqueController {
       bloqueId,
       query,
     })
+  }
+
+  /**
+   * Listado admin de bloques evaluables del curso con stats agregadas para
+   * el subtab "Bloques" del PanelEvaluaciones. NO pagina.
+   */
+  @Get("cursos/:cursoId/bloques-evaluables")
+  @Roles(RolUsuario.ADMIN)
+  async listarBloquesEvaluablesParaAdmin(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+  ): Promise<BloqueEvaluableAdminItem[]> {
+    return await this.intentosService.listarBloquesEvaluablesParaAdmin(cursoId)
+  }
+
+  /**
+   * Detalle "por colaborador" de un bloque evaluable dentro de un curso,
+   * para el drawer del PanelEvaluaciones. Incluye preguntasMasFalladas
+   * solo si el bloque es QUIZ.
+   */
+  @Get("cursos/:cursoId/bloques-evaluables/:bloqueId/colaboradores")
+  @Roles(RolUsuario.ADMIN)
+  async obtenerDetalleBloqueParaAdmin(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+    @Param("bloqueId", ParseUUIDPipe) bloqueId: string,
+  ): Promise<BloqueEvaluableDetalleResponse> {
+    return await this.intentosService.obtenerDetalleBloqueParaAdmin({ cursoId, bloqueId })
   }
 
   @Post("intentos-bloque/:intentoId/invalidar")

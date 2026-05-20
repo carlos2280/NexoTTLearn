@@ -27,7 +27,9 @@ import {
   FinalizarTransversalBodyInput,
   FinalizarTransversalResponse,
   IntentoTransversalAdminResponse,
+  IntentoTransversalListadoItem,
   IntentoTransversalParticipanteResponse,
+  ListarIntentosTransversalCursoQuery,
   ListarIntentosTransversalQuery,
   TransversalResponse,
   anularTransversalBodySchema,
@@ -37,6 +39,7 @@ import {
   crearIntentoTransversalSchema,
   editarSkillsTransversalSchema,
   finalizarTransversalBodySchema,
+  listarIntentosTransversalCursoQuerySchema,
   listarIntentosTransversalQuerySchema,
 } from "@nexott-learn/shared-types"
 import { AccionAuditoria, RolUsuario } from "@prisma/client"
@@ -66,6 +69,7 @@ import { TransversalService } from "./transversal.service"
  *                                                                Throttle 10/min/usuario
  * - GET    /intentos-transversal/:intentoId                      ADMIN o propio
  * - GET    /asignaciones/:asignacionId/intentos-transversal      ADMIN o propio (paginado)
+ * - GET    /cursos/:cursoId/intentos-transversal                 ADMIN (listado del curso)
  *
  * El audit `INTENTO_TRANSVERSAL_CREADO` y `TRANSVERSAL_SKILLS_ACTUALIZADAS`
  * se registran aqui fuera del TX (D-AUDIT-1).
@@ -198,6 +202,21 @@ export class TransversalController {
       query,
       usuario: this.requireUsuario(usuario),
     })
+  }
+
+  // E6b. Listado admin por curso (alimenta el tab "Evaluaciones > Transversal"
+  // de la pantalla admin del curso). Solo admin: lista todos los intentos del
+  // proyecto transversal asociado al curso, con paginacion + filtros.
+  @Get("cursos/:cursoId/intentos-transversal")
+  @Roles(RolUsuario.ADMIN)
+  listarIntentosPorCurso(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+    @Query(new ZodValidationPipe(listarIntentosTransversalCursoQuerySchema))
+    query: ListarIntentosTransversalCursoQuery,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<Paginated<IntentoTransversalListadoItem>> {
+    this.requireUsuario(usuario)
+    return this.transversal.listarIntentosPorCurso({ cursoId, query })
   }
 
   // E7

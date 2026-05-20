@@ -34,7 +34,9 @@ export function FilaCaso({ caso, indice }: FilaCasoProps) {
   const delay = reduceMotion ? 0 : 0.05 + indice * 0.05
   const destino = caso.intentoEntrevistaIaId
     ? RUTAS.admin.intentoEntrevistaIa(caso.intentoEntrevistaIaId)
-    : null
+    : caso.intentoTransversalId
+      ? RUTAS.admin.intentoTransversal(caso.intentoTransversalId)
+      : null
   const claseBase =
     "flex w-full items-start gap-4 rounded-xl px-4 py-4 text-left transition-colors duration-fast ease-default hover:bg-subtle focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
 

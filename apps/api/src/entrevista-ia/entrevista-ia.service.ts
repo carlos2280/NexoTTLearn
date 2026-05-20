@@ -15,7 +15,9 @@ import {
   EnviarTurnoResponse,
   FinalizarEntrevistaResponse,
   IntentoEntrevistaIaAdminResponse,
+  IntentoEntrevistaIaListadoItem,
   IntentoEntrevistaIaParticipanteResponse,
+  ListarIntentosEntrevistaIaCursoQuery,
   ListarIntentosEntrevistaIaQuery,
 } from "@nexott-learn/shared-types"
 import { DesbloqueoCurso, Prisma, RolUsuario, TipoEventoNotif } from "@prisma/client"
@@ -606,6 +608,89 @@ export class EntrevistaIaService {
         ? toIntentoAdmin(intento, { asignacionId: input.asignacionId })
         : toIntentoParticipante(intento)
     return buildPaginatedResponse(data.map(mapper), total, page, pageSize)
+  }
+
+  // ===========================================================================
+  // E21. GET /api/v1/cursos/:cursoId/intentos-entrevista-ia
+  // Listado admin paginado de todos los intentos del curso (todos los
+  // colaboradores). Alimenta el tab "Evaluaciones > Entrevista IA" de la
+  // pantalla admin del curso.
+  // ===========================================================================
+
+  async listarIntentosPorCurso(input: {
+    readonly cursoId: string
+    readonly query: ListarIntentosEntrevistaIaCursoQuery
+  }): Promise<Paginated<IntentoEntrevistaIaListadoItem>> {
+    const curso = await this.prisma.curso.findUnique({
+      where: { id: input.cursoId },
+      select: { id: true, entrevistaIaId: true },
+    })
+    if (!curso) {
+      throw new NotFoundException({
+        code: apiErrorCodes.cursoNoEncontrado,
+        message: `Curso ${input.cursoId} no encontrado.`,
+      })
+    }
+    if (curso.entrevistaIaId === null) {
+      throw new NotFoundException({
+        code: apiErrorCodes.entrevistaIaNoEncontrada,
+        message: "El curso no tiene entrevista IA configurada.",
+      })
+    }
+
+    const { skip, take, page, pageSize } = resolvePaginacion(input.query)
+    const busqueda = input.query.busqueda?.trim()
+    const where: Prisma.IntentoEntrevistaIAWhereInput = {
+      entrevistaIaId: curso.entrevistaIaId,
+      ...(input.query.estado ? { estado: input.query.estado } : {}),
+      ...(busqueda && busqueda.length > 0
+        ? {
+            colaborador: {
+              // biome-ignore lint/style/useNamingConvention: `OR` es operador de Prisma, no propiedad del dominio.
+              OR: [
+                { nombre: { contains: busqueda, mode: "insensitive" } },
+                { email: { contains: busqueda, mode: "insensitive" } },
+              ],
+            },
+          }
+        : {}),
+    }
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.intentoEntrevistaIA.findMany({
+        where,
+        select: {
+          id: true,
+          fecha: true,
+          estado: true,
+          notaGlobal: true,
+          notaAjustadaAdmin: true,
+          aprobado: true,
+          anulado: true,
+          colaborador: {
+            select: { id: true, nombre: true, email: true },
+          },
+        },
+        orderBy: { fecha: "desc" },
+        skip,
+        take,
+      }),
+      this.prisma.intentoEntrevistaIA.count({ where }),
+    ])
+
+    const items: IntentoEntrevistaIaListadoItem[] = data.map((intento) => ({
+      intentoId: intento.id,
+      fecha: intento.fecha.toISOString(),
+      estado: intento.estado,
+      notaGlobal: intento.notaGlobal === null ? null : Number(intento.notaGlobal.toString()),
+      notaAjustadaAdmin:
+        intento.notaAjustadaAdmin === null ? null : Number(intento.notaAjustadaAdmin.toString()),
+      aprobado: intento.aprobado,
+      anulado: intento.anulado,
+      colaborador: intento.colaborador,
+    }))
+
+    return buildPaginatedResponse(items, total, page, pageSize)
   }
 
   // ===========================================================================

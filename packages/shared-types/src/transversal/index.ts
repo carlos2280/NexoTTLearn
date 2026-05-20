@@ -54,3 +54,11 @@ export type {
   FinalizarTransversalResponse,
   AnularTransversalResponse,
 } from "./finalizar-anular.schema"
+export {
+  listarIntentosTransversalCursoQuerySchema,
+  intentoTransversalListadoItemSchema,
+} from "./listado-curso.schema"
+export type {
+  ListarIntentosTransversalCursoQuery,
+  IntentoTransversalListadoItem,
+} from "./listado-curso.schema"

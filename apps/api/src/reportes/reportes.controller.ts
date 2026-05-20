@@ -13,6 +13,10 @@ import {
   type BrechasDetectadasResponse,
   type CentroRevisionQuery,
   type CentroRevisionResponse,
+  type CoberturaAreasQuery,
+  type CoberturaAreasResponse,
+  type CoberturaCursoQuery,
+  type CoberturaCursoResponse,
   type DetalleColaboradorQuery,
   type DetalleColaboradorResponse,
   type EficaciaPlataformaQuery,
@@ -28,6 +32,8 @@ import {
   avanceCursoQuerySchema,
   brechasDetectadasQuerySchema,
   centroRevisionQuerySchema,
+  coberturaAreasQuerySchema,
+  coberturaCursoQuerySchema,
   detalleColaboradorQuerySchema,
   eficaciaPlataformaQuerySchema,
   historicoClienteQuerySchema,
@@ -98,6 +104,22 @@ export class ReportesController {
   ): Promise<BrechasDetectadasResponse> {
     this.exigirFormatoJson(query.format)
     return this.reportes.obtenerBrechasDetectadas(query)
+  }
+
+  @Get("cobertura-curso")
+  obtenerCoberturaCurso(
+    @Query(new ZodValidationPipe(coberturaCursoQuerySchema))
+    query: CoberturaCursoQuery,
+  ): Promise<CoberturaCursoResponse> {
+    return this.reportes.obtenerCoberturaCurso(query)
+  }
+
+  @Get("cobertura-areas")
+  obtenerCoberturaAreas(
+    @Query(new ZodValidationPipe(coberturaAreasQuerySchema))
+    query: CoberturaAreasQuery,
+  ): Promise<CoberturaAreasResponse> {
+    return this.reportes.obtenerCoberturaAreas(query)
   }
 
   @Get("centro-revision")

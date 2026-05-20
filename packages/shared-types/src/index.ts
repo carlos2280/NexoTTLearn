@@ -161,6 +161,13 @@ export type {
   DuplicarCursoResponse,
   CursoConfiguracionResponse,
 } from "./cursos/curso.types"
+export type { EvaluacionesDisponibles } from "./cursos/evaluaciones-disponibles.types"
+export type {
+  BloqueEvaluableAdminItem,
+  BloqueEvaluableStats,
+  BloqueEvaluableColaboradorItem,
+  BloqueEvaluableDetalleResponse,
+} from "./cursos/bloques-evaluables-admin.types"
 export { crearCursoSchema } from "./cursos/crear-curso.schema"
 export type { CrearCursoInput } from "./cursos/crear-curso.schema"
 export { actualizarCursoSchema } from "./cursos/actualizar-curso.schema"
@@ -407,6 +414,8 @@ export {
   anularTransversalBodySchema,
   finalizarTransversalResponseSchema,
   anularTransversalResponseSchema,
+  listarIntentosTransversalCursoQuerySchema,
+  intentoTransversalListadoItemSchema,
 } from "./transversal"
 export type {
   EstadoIntentoTransversal,
@@ -429,6 +438,8 @@ export type {
   AnularTransversalBodyInput,
   FinalizarTransversalResponse,
   AnularTransversalResponse,
+  ListarIntentosTransversalCursoQuery,
+  IntentoTransversalListadoItem,
 } from "./transversal"
 
 // Notificaciones P10b — inbox + preferencias (D-S10-C3..C7).
@@ -464,6 +475,8 @@ export {
   historicoClienteQuerySchema,
   inventarioSkillsQuerySchema,
   reutilizacionCatalogoQuerySchema,
+  coberturaCursoQuerySchema,
+  coberturaAreasQuerySchema,
 } from "./reportes"
 export type {
   TipoAlerta,
@@ -522,6 +535,19 @@ export type {
   SkillCosechadaCierre,
   AreaPorTrabajarCierre,
   ResumenCierreCurso,
+  CoberturaCursoQuery,
+  CoberturaSkillExigida,
+  CoberturaNotaColaboradorSkill,
+  CoberturaColaboradorItem,
+  CoberturaResumenAgregado,
+  CoberturaCursoResponse,
+  CoberturaAreasQuery,
+  CoberturaAreaConteoNiveles,
+  CoberturaAreaItem,
+  CoberturaAreaKpis,
+  CoberturaTopColaborador,
+  CoberturaListosParaPresentar,
+  CoberturaAreasResponse,
 } from "./reportes"
 
 // Entrevista IA P8c — schemas y tipos del flujo de entrevista IA final (D89).
@@ -547,6 +573,8 @@ export {
   finalizarEntrevistaResponseSchema,
   ajustarEntrevistaResponseSchema,
   anularEntrevistaResponseSchema,
+  listarIntentosEntrevistaIaCursoQuerySchema,
+  intentoEntrevistaIaListadoItemSchema,
 } from "./entrevista-ia"
 export type {
   EnviarTurnoInput,
@@ -571,6 +599,8 @@ export type {
   AjustarEntrevistaResponse,
   AnularEntrevistaResponse,
   TurnoEntrevistaIa,
+  ListarIntentosEntrevistaIaCursoQuery,
+  IntentoEntrevistaIaListadoItem,
 } from "./entrevista-ia"
 
 // Colaboradores — endpoints autoservicio /me/* (FIX-pre-S12).

@@ -5,6 +5,9 @@ import {
   NotFoundException,
 } from "@nestjs/common"
 import {
+  type BloqueEvaluableAdminItem,
+  type BloqueEvaluableColaboradorItem,
+  type BloqueEvaluableDetalleResponse,
   type CrearIntentoBloqueInput,
   type IntentoBloqueResponse,
   type ListarIntentosBloqueQuery,
@@ -20,6 +23,7 @@ import {
   RolUsuario,
   TipoBloque,
 } from "@prisma/client"
+import { umbralAprobacionBloque } from "../catalogo/bloques/umbral-aprobacion"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { Paginated, buildPaginatedResponse, resolvePaginacion } from "../common/http/paginated"
 import { IdempotencyService } from "../common/idempotency/idempotency.service"
@@ -411,6 +415,202 @@ export class IntentosBloqueService {
   }
 
   // =========================================================================
+  // GET /cursos/:cursoId/bloques-evaluables (admin)
+  // =========================================================================
+
+  /**
+   * Listado admin de bloques evaluables del curso con stats agregadas. NO
+   * pagina (un curso suele tener < 30 bloques). Solo bloques en módulos
+   * habilitados del curso. Stats excluyen intentos invalidados.
+   *
+   * Estrategia: 2 queries.
+   *  1) Bloques + relaciones (sección/módulo/skill) + contenido para umbral.
+   *  2) Todos los IntentoBloque del curso (no anulados) con los campos
+   *     mínimos para agregar en memoria. Cardinalidad acotada por colaboradores
+   *     × bloques × intentos.
+   */
+  async listarBloquesEvaluablesParaAdmin(cursoId: string): Promise<BloqueEvaluableAdminItem[]> {
+    const cursoExiste = await this.prisma.curso.findUnique({
+      where: { id: cursoId },
+      select: { id: true },
+    })
+    if (!cursoExiste) {
+      throw new NotFoundException({
+        code: apiErrorCodes.cursoNoEncontrado,
+        message: "Curso no encontrado.",
+      })
+    }
+    const bloques = await this.prisma.bloque.findMany({
+      where: {
+        esEvaluable: true,
+        seccion: {
+          modulo: {
+            cursosModulosHabilitados: { some: { cursoId } },
+          },
+        },
+      },
+      select: {
+        id: true,
+        orden: true,
+        tipo: true,
+        version: true,
+        contenido: true,
+        seccion: {
+          select: {
+            id: true,
+            titulo: true,
+            orden: true,
+            modulo: { select: { id: true, titulo: true } },
+          },
+        },
+        skillQueMide: { select: { id: true, etiquetaVisible: true } },
+      },
+      orderBy: [
+        { seccion: { modulo: { titulo: "asc" } } },
+        { seccion: { orden: "asc" } },
+        { orden: "asc" },
+      ],
+    })
+    if (bloques.length === 0) return []
+
+    const bloqueIds = bloques.map((b) => b.id)
+    const intentos = await this.prisma.intentoBloque.findMany({
+      where: { cursoId, estaInvalidado: false, bloqueId: { in: bloqueIds } },
+      select: {
+        bloqueId: true,
+        colaboradorId: true,
+        nota: true,
+        esMejorIntento: true,
+      },
+    })
+
+    const intentosPorBloque = new Map<string, typeof intentos>()
+    for (const it of intentos) {
+      const arr = intentosPorBloque.get(it.bloqueId) ?? []
+      arr.push(it)
+      intentosPorBloque.set(it.bloqueId, arr)
+    }
+
+    return bloques.map((b): BloqueEvaluableAdminItem => {
+      const umbralAprobacion = umbralAprobacionBloque(b.tipo, b.contenido)
+      const propios = intentosPorBloque.get(b.id) ?? []
+      const colaboradoresUnicos = new Set(propios.map((p) => p.colaboradorId))
+      const mejores = propios.filter((p) => p.esMejorIntento)
+      const notasMejores = mejores.map((m) => Number(m.nota))
+      const aprobados = notasMejores.filter((n) => n >= umbralAprobacion).length
+      const notaMedia =
+        notasMejores.length === 0
+          ? null
+          : Math.round((notasMejores.reduce((s, n) => s + n, 0) / notasMejores.length) * 100) / 100
+      return {
+        bloqueId: b.id,
+        orden: b.orden,
+        tipo: b.tipo,
+        version: b.version,
+        umbralAprobacion,
+        modulo: { id: b.seccion.modulo.id, titulo: b.seccion.modulo.titulo },
+        seccion: { id: b.seccion.id, titulo: b.seccion.titulo, orden: b.seccion.orden },
+        skill: b.skillQueMide
+          ? { id: b.skillQueMide.id, etiqueta: b.skillQueMide.etiquetaVisible }
+          : null,
+        stats: {
+          colaboradoresConIntento: colaboradoresUnicos.size,
+          totalIntentos: propios.length,
+          aprobados,
+          notaMedia,
+        },
+      }
+    })
+  }
+
+  // =========================================================================
+  // GET /cursos/:cursoId/bloques-evaluables/:bloqueId/colaboradores (admin)
+  // =========================================================================
+
+  /**
+   * Detalle del drawer "ver por colaborador". Una fila por colaborador con
+   * al menos un intento (no anulado) en el bloque, dentro del curso.
+   * Para QUIZ, agrega también las preguntas más falladas.
+   */
+  async obtenerDetalleBloqueParaAdmin(input: {
+    readonly cursoId: string
+    readonly bloqueId: string
+  }): Promise<BloqueEvaluableDetalleResponse> {
+    const bloque = await this.prisma.bloque.findUnique({
+      where: { id: input.bloqueId },
+      select: { id: true, tipo: true, version: true, contenido: true, esEvaluable: true },
+    })
+    if (!bloque || !bloque.esEvaluable) {
+      throw new NotFoundException({
+        code: apiErrorCodes.bloqueNoEncontrado,
+        message: "Bloque evaluable no encontrado.",
+      })
+    }
+    const umbralAprobacion = umbralAprobacionBloque(bloque.tipo, bloque.contenido)
+
+    const intentos = await this.prisma.intentoBloque.findMany({
+      where: {
+        cursoId: input.cursoId,
+        bloqueId: input.bloqueId,
+        estaInvalidado: false,
+      },
+      select: {
+        colaboradorId: true,
+        nota: true,
+        fecha: true,
+        esMejorIntento: true,
+        versionBloque: true,
+        preguntasFalladas: true,
+        colaborador: { select: { id: true, nombre: true, email: true } },
+      },
+      orderBy: { fecha: "desc" },
+    })
+
+    const porColaborador = new Map<string, typeof intentos>()
+    for (const it of intentos) {
+      const arr = porColaborador.get(it.colaboradorId) ?? []
+      arr.push(it)
+      porColaborador.set(it.colaboradorId, arr)
+    }
+
+    const colaboradores: BloqueEvaluableColaboradorItem[] = []
+    for (const [, lista] of porColaborador) {
+      const mejor = lista.find((l) => l.esMejorIntento) ?? lista[0]
+      if (!mejor) continue
+      const mejorNota = Number(mejor.nota)
+      const ultimo = lista[0]
+      if (!ultimo) continue
+      colaboradores.push({
+        colaborador: {
+          id: mejor.colaborador.id,
+          nombre: mejor.colaborador.nombre,
+          email: mejor.colaborador.email,
+        },
+        mejorNota,
+        cantidadIntentos: lista.length,
+        ultimoIntentoFecha: ultimo.fecha.toISOString(),
+        aprobado: mejorNota >= umbralAprobacion,
+        tieneVersionVieja: lista.some((l) => l.versionBloque < bloque.version),
+      })
+    }
+    colaboradores.sort((a, b) => b.mejorNota - a.mejorNota)
+
+    const preguntasMasFalladas =
+      bloque.tipo === TipoBloque.QUIZ ? agregarPreguntasFalladas(intentos) : undefined
+
+    return {
+      bloque: {
+        id: bloque.id,
+        tipo: bloque.tipo,
+        umbralAprobacion,
+        versionActual: bloque.version,
+      },
+      colaboradores,
+      ...(preguntasMasFalladas ? { preguntasMasFalladas } : {}),
+    }
+  }
+
+  // =========================================================================
   // POST /intentos-bloque/:id/invalidar (admin)
   // =========================================================================
 
@@ -729,4 +929,28 @@ export class IntentosBloqueService {
       })
     }
   }
+}
+
+/**
+ * Agrega `preguntasFalladas` de todos los intentos QUIZ pasados y devuelve la
+ * lista ordenada desc por conteo. Tolera shapes inesperados: ignora valores
+ * que no son string. Devuelve `undefined` si tras el filtro no queda nada
+ * útil para no añadir ruido a la respuesta.
+ */
+function agregarPreguntasFalladas(
+  intentos: readonly { readonly preguntasFalladas: Prisma.JsonValue | null }[],
+): readonly { readonly preguntaId: string; readonly conteo: number }[] | undefined {
+  const conteo = new Map<string, number>()
+  for (const it of intentos) {
+    const raw = it.preguntasFalladas
+    if (!Array.isArray(raw)) continue
+    for (const v of raw) {
+      if (typeof v !== "string") continue
+      conteo.set(v, (conteo.get(v) ?? 0) + 1)
+    }
+  }
+  if (conteo.size === 0) return undefined
+  return [...conteo.entries()]
+    .map(([preguntaId, c]) => ({ preguntaId, conteo: c }))
+    .sort((a, b) => b.conteo - a.conteo)
 }

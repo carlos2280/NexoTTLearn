@@ -10,15 +10,18 @@ import { ALERTA_SIN_ACTIVIDAD_DIAS } from "./reportes.types"
 const MS_DIA = 86_400_000
 
 interface PrismaMock {
+  area: { findMany: ReturnType<typeof vi.fn> }
   asignacionCurso: {
     findMany: ReturnType<typeof vi.fn>
     count: ReturnType<typeof vi.fn>
     findUnique: ReturnType<typeof vi.fn>
   }
   cliente: { findUnique: ReturnType<typeof vi.fn> }
+  colaborador: { findMany: ReturnType<typeof vi.fn> }
   curso: {
     findUnique: ReturnType<typeof vi.fn>
     findMany: ReturnType<typeof vi.fn>
+    count: ReturnType<typeof vi.fn>
   }
   cursoFotografiaCierre: { findUnique: ReturnType<typeof vi.fn> }
   cursoSkillExigida: { findMany: ReturnType<typeof vi.fn> }
@@ -80,13 +83,15 @@ function buildService(
 
 function buildPrismaMock(): PrismaMock {
   const prisma: PrismaMock = {
+    area: { findMany: vi.fn() },
     asignacionCurso: {
       findMany: vi.fn(),
       count: vi.fn(),
       findUnique: vi.fn(),
     },
     cliente: { findUnique: vi.fn() },
-    curso: { findUnique: vi.fn(), findMany: vi.fn() },
+    colaborador: { findMany: vi.fn() },
+    curso: { findUnique: vi.fn(), findMany: vi.fn(), count: vi.fn() },
     cursoFotografiaCierre: { findUnique: vi.fn() },
     cursoSkillExigida: { findMany: vi.fn() },
     notaSkill: { findMany: vi.fn() },
@@ -959,5 +964,210 @@ describe("ReportesService — reutilizacion-catalogo (P11c)", () => {
     expect(result.modulos[0]?.vecesUsado).toBe(2)
     expect(result.skills[0]?.skillId).toBe("sk1")
     expect(result.skills[0]?.vecesExigida).toBe(2)
+  })
+})
+
+describe("ReportesService.obtenerCoberturaCurso", () => {
+  let prisma: PrismaMock
+  let planService: PlanServiceMock
+  let service: ReportesService
+
+  beforeEach(() => {
+    prisma = buildPrismaMock()
+    planService = buildPlanServiceMock()
+    service = buildService(prisma, planService)
+  })
+
+  it("arma matriz colaborador x skill con niveles cualitativos y resumen agregado", async () => {
+    prisma.curso.findUnique.mockResolvedValueOnce({ id: CURSO_ID, titulo: "Curso QA" })
+    prisma.cursoSkillExigida.findMany.mockResolvedValueOnce([
+      { skillId: SKILL_ID, notaMinima: dec(70), skill: { id: SKILL_ID, etiquetaVisible: "Git" } },
+    ])
+    prisma.asignacionCurso.findMany.mockResolvedValueOnce([
+      {
+        id: ASIG_ID,
+        colaboradorId: COLAB_ID,
+        estadoAsignado: "EN_PROGRESO",
+        estadoVoluntario: null,
+        colaborador: { id: COLAB_ID, nombre: "Ana", email: "ana@nttdata.com" },
+      },
+      {
+        id: ASIG_ID_2,
+        colaboradorId: COLAB_ID_2,
+        estadoAsignado: "ASIGNADO",
+        estadoVoluntario: null,
+        colaborador: { id: COLAB_ID_2, nombre: "Beto", email: "beto@nttdata.com" },
+      },
+      {
+        id: ASIG_ID_3,
+        colaboradorId: COLAB_ID_3,
+        estadoAsignado: "EN_PROGRESO",
+        estadoVoluntario: null,
+        colaborador: { id: COLAB_ID_3, nombre: "Carla", email: "carla@nttdata.com" },
+      },
+    ])
+    prisma.notaSkill.findMany.mockResolvedValueOnce([
+      { skillId: SKILL_ID, colaboradorId: COLAB_ID, notaActual: dec(90) }, // excelencia
+      { skillId: SKILL_ID, colaboradorId: COLAB_ID_2, notaActual: dec(60) }, // enDesarrollo
+      // Carla sin nota -> sinTocar
+    ])
+    planService.obtenerPorcentajeAvance.mockResolvedValueOnce(80)
+    planService.obtenerPorcentajeAvance.mockResolvedValueOnce(40)
+    planService.obtenerPorcentajeAvance.mockResolvedValueOnce(0)
+
+    const result = await service.obtenerCoberturaCurso({ cursoId: CURSO_ID })
+
+    expect(result.cursoTitulo).toBe("Curso QA")
+    expect(result.skills).toHaveLength(1)
+    expect(result.colaboradores).toHaveLength(3)
+    expect(result.resumen.conteoNiveles).toMatchObject({
+      excelencia: 1,
+      enDesarrollo: 1,
+      sinTocar: 1,
+    })
+    expect(result.resumen.promedioPorSkill[0]?.promedio).toBe(75)
+
+    const ana = result.colaboradores.find((c) => c.nombre === "Ana")
+    expect(ana?.porcentajeAvance).toBe(80)
+    expect(ana?.skillsCumplidas).toBe(1)
+    expect(ana?.notas[0]?.nivel).toBe("excelencia")
+
+    const carla = result.colaboradores.find((c) => c.nombre === "Carla")
+    expect(carla?.promedioNota).toBeNull()
+    expect(carla?.notas[0]?.nivel).toBe("sinTocar")
+  })
+
+  it("404 cuando el curso no existe", async () => {
+    prisma.curso.findUnique.mockResolvedValueOnce(null)
+    await expect(service.obtenerCoberturaCurso({ cursoId: CURSO_ID })).rejects.toThrow(
+      NotFoundException,
+    )
+  })
+
+  it("devuelve estructura vacia coherente cuando no hay skills ni colaboradores", async () => {
+    prisma.curso.findUnique.mockResolvedValueOnce({ id: CURSO_ID, titulo: "Curso vacio" })
+    prisma.cursoSkillExigida.findMany.mockResolvedValueOnce([])
+    prisma.asignacionCurso.findMany.mockResolvedValueOnce([])
+
+    const result = await service.obtenerCoberturaCurso({ cursoId: CURSO_ID })
+
+    expect(result.skills).toHaveLength(0)
+    expect(result.colaboradores).toHaveLength(0)
+    expect(result.resumen.promedioPorSkill).toHaveLength(0)
+    expect(result.resumen.conteoNiveles).toEqual({
+      excelencia: 0,
+      solido: 0,
+      enDesarrollo: 0,
+      inicial: 0,
+      sinTocar: 0,
+    })
+  })
+})
+
+const AREA_FRONT = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+const AREA_TEST = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+const SKILL_FRONT_1 = "11111111-aaaa-aaaa-aaaa-aaaaaaaaaaa1"
+const SKILL_TEST_1 = "22222222-bbbb-bbbb-bbbb-bbbbbbbbbbb1"
+
+describe("ReportesService.obtenerCoberturaAreas", () => {
+  let prisma: PrismaMock
+  let planService: PlanServiceMock
+  let service: ReportesService
+
+  beforeEach(() => {
+    prisma = buildPrismaMock()
+    planService = buildPlanServiceMock()
+    service = buildService(prisma, planService)
+  })
+
+  it("agrega notas por area y calcula KPIs ejecutivos", async () => {
+    prisma.colaborador.findMany.mockResolvedValueOnce([
+      { id: COLAB_ID, nombre: "Ana", email: "ana@nttdata.com" },
+      { id: COLAB_ID_2, nombre: "Beto", email: "beto@nttdata.com" },
+      { id: COLAB_ID_3, nombre: "Carla", email: "carla@nttdata.com" },
+    ])
+    prisma.area.findMany.mockResolvedValueOnce([
+      {
+        id: AREA_FRONT,
+        nombre: "Frontend",
+        skills: [{ id: SKILL_FRONT_1 }],
+      },
+      {
+        id: AREA_TEST,
+        nombre: "Testing",
+        skills: [{ id: SKILL_TEST_1 }],
+      },
+    ])
+    prisma.notaSkill.findMany.mockResolvedValueOnce([
+      // Ana: Frontend 90 (excelencia), Testing 60 (enDesarrollo)
+      {
+        colaboradorId: COLAB_ID,
+        skillId: SKILL_FRONT_1,
+        notaActual: dec(90),
+        skill: { areaId: AREA_FRONT },
+      },
+      {
+        colaboradorId: COLAB_ID,
+        skillId: SKILL_TEST_1,
+        notaActual: dec(60),
+        skill: { areaId: AREA_TEST },
+      },
+      // Beto: Frontend 70 (solido), nada en Testing -> promedio global 70
+      {
+        colaboradorId: COLAB_ID_2,
+        skillId: SKILL_FRONT_1,
+        notaActual: dec(70),
+        skill: { areaId: AREA_FRONT },
+      },
+      // Carla sin notas (sinTocar)
+    ])
+    prisma.asignacionCurso.findMany.mockResolvedValueOnce([
+      { id: ASIG_ID, cursoId: CURSO_ID, curso: { clienteId: "c1" } },
+    ])
+    prisma.curso.count.mockResolvedValueOnce(2)
+
+    const result = await service.obtenerCoberturaAreas({})
+
+    expect(result.kpis.totalColaboradoresActivos).toBe(3)
+    expect(result.kpis.totalAreas).toBe(2)
+    expect(result.kpis.colaboradoresEnExcelencia).toBe(1) // solo Ana
+    expect(result.kpis.areasSanas).toBe(1) // Frontend (promedio 82.5 >= 70); Testing (60) no
+
+    const front = result.areas.find((a) => a.nombre === "Frontend")
+    expect(front?.promedio).toBe(80) // (90 + 70) / 2
+    expect(front?.brecha).toBe(10)
+    expect(front?.conteoNiveles.excelencia).toBe(1)
+    expect(front?.conteoNiveles.solido).toBe(1)
+    expect(front?.conteoNiveles.sinTocar).toBe(1)
+
+    const test = result.areas.find((a) => a.nombre === "Testing")
+    expect(test?.promedio).toBe(60)
+    expect(test?.brecha).toBe(-10)
+    expect(test?.conteoNiveles.enDesarrollo).toBe(1)
+    expect(test?.conteoNiveles.sinTocar).toBe(2)
+
+    expect(result.kpis.areaPeorBrecha).toMatchObject({ nombre: "Testing", brecha: -10 })
+
+    expect(result.top[0]?.nombre).toBe("Ana")
+    expect(result.necesitanApoyo[0]?.nombre).toBe("Beto")
+    expect(result.listosParaPresentar.colaboradoresAptos).toBe(1)
+    expect(result.listosParaPresentar.cursosActivos).toBe(2)
+    expect(result.listosParaPresentar.clientesConPipeline).toBe(1)
+  })
+
+  it("responde estructura vacia coherente sin colaboradores activos", async () => {
+    prisma.colaborador.findMany.mockResolvedValueOnce([])
+    prisma.area.findMany.mockResolvedValueOnce([])
+    prisma.notaSkill.findMany.mockResolvedValueOnce([])
+    prisma.asignacionCurso.findMany.mockResolvedValueOnce([])
+    prisma.curso.count.mockResolvedValueOnce(0)
+
+    const result = await service.obtenerCoberturaAreas({})
+
+    expect(result.kpis.totalColaboradoresActivos).toBe(0)
+    expect(result.areas).toHaveLength(0)
+    expect(result.top).toHaveLength(0)
+    expect(result.necesitanApoyo).toHaveLength(0)
+    expect(result.kpis.areaPeorBrecha).toBeNull()
   })
 })

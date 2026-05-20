@@ -90,6 +90,7 @@ interface MockPrisma {
     update: ReturnType<typeof vi.fn>
   }
   intentoEntrevistaIA: { count: ReturnType<typeof vi.fn> }
+  bloque: { findFirst: ReturnType<typeof vi.fn> }
   logCambioCurso: {
     create: ReturnType<typeof vi.fn>
     deleteMany: ReturnType<typeof vi.fn>
@@ -136,6 +137,7 @@ function buildPrismaMock(): MockPrisma {
       update: vi.fn(),
     },
     intentoEntrevistaIA: { count: vi.fn() },
+    bloque: { findFirst: vi.fn() },
     logCambioCurso: {
       create: vi.fn(),
       deleteMany: vi.fn(),
@@ -346,6 +348,58 @@ describe("CursosService.obtenerDetalle", () => {
     prisma.curso.findUnique.mockResolvedValue(buildCursoDetalleRow({ estado: EstadoCurso.ACTIVO }))
     const detalle = await service.obtenerDetalle(CURSO_ID, PARTICIPANTE_SESION)
     expect(detalle.id).toBe(CURSO_ID)
+  })
+})
+
+describe("CursosService.obtenerEvaluacionesDisponibles", () => {
+  it("404 cuando el curso no existe", async () => {
+    prisma.curso.findUnique.mockResolvedValue(null)
+    await expect(service.obtenerEvaluacionesDisponibles(CURSO_ID)).rejects.toBeInstanceOf(
+      NotFoundException,
+    )
+  })
+
+  it("devuelve los tres flags en false cuando el curso no tiene nada configurado", async () => {
+    prisma.curso.findUnique.mockResolvedValue({ entrevistaIaId: null, transversalId: null })
+    prisma.bloque.findFirst.mockResolvedValue(null)
+    const res = await service.obtenerEvaluacionesDisponibles(CURSO_ID)
+    expect(res).toEqual({
+      tieneEntrevistaIa: false,
+      tieneTransversal: false,
+      tieneBloquesEvaluables: false,
+    })
+  })
+
+  it("refleja IA y Transversal cuando los IDs están seteados", async () => {
+    prisma.curso.findUnique.mockResolvedValue({
+      entrevistaIaId: "ia-id",
+      transversalId: "tx-id",
+    })
+    prisma.bloque.findFirst.mockResolvedValue(null)
+    const res = await service.obtenerEvaluacionesDisponibles(CURSO_ID)
+    expect(res).toEqual({
+      tieneEntrevistaIa: true,
+      tieneTransversal: true,
+      tieneBloquesEvaluables: false,
+    })
+  })
+
+  it("marca tieneBloquesEvaluables=true cuando hay ≥1 bloque evaluable en módulos habilitados", async () => {
+    prisma.curso.findUnique.mockResolvedValue({ entrevistaIaId: null, transversalId: null })
+    prisma.bloque.findFirst.mockResolvedValue({ id: "bloque-id" })
+    const res = await service.obtenerEvaluacionesDisponibles(CURSO_ID)
+    expect(res.tieneBloquesEvaluables).toBe(true)
+    expect(prisma.bloque.findFirst).toHaveBeenCalledWith({
+      where: {
+        esEvaluable: true,
+        seccion: {
+          modulo: {
+            cursosModulosHabilitados: { some: { cursoId: CURSO_ID } },
+          },
+        },
+      },
+      select: { id: true },
+    })
   })
 })
 

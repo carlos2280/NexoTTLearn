@@ -333,7 +333,7 @@ describe("E5. GET intento por id", () => {
     )
   })
 
-  it("ADMIN ve detalle completo (notas + anulado + motivoAnulacion)", async () => {
+  it("ADMIN ve detalle completo (notas + anulado + motivoAnulacion + contexto)", async () => {
     prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
       id: INTENTO_ID,
       transversalId: TRANSVERSAL_ID,
@@ -350,11 +350,29 @@ describe("E5. GET intento por id", () => {
       notaCapaComprension: new Prisma.Decimal(72),
       notaGlobal: null,
       aprobado: null,
+      colaborador: { id: COLABORADOR_ID, nombre: "Colab", email: "c@nttdata.test" },
+      transversal: {
+        id: TRANSVERSAL_ID,
+        descripcion: "Mini-proyecto",
+        umbralAprobacion: new Prisma.Decimal(70),
+        curso: { id: CURSO_ID, titulo: "Curso mock" },
+      },
     })
     const r = (await service.obtenerIntento(INTENTO_ID, ADMIN)) as Record<string, unknown>
     expect(r.notaCapaTests).toBe(70)
     expect(r.notaCapaCualitativa).toBe(80)
     expect(r.anulado).toBe(false)
+    expect(r.colaborador).toEqual({
+      id: COLABORADOR_ID,
+      nombre: "Colab",
+      email: "c@nttdata.test",
+    })
+    expect(r.curso).toEqual({ id: CURSO_ID, titulo: "Curso mock" })
+    expect(r.transversal).toEqual({
+      id: TRANSVERSAL_ID,
+      descripcion: "Mini-proyecto",
+      umbralAprobacion: 70,
+    })
   })
 
   it("PARTICIPANTE ajeno -> 404 (D-AS-9 patron uniforme)", async () => {
@@ -572,6 +590,13 @@ describe("E7. POST /intentos-transversal/:id/capas/tests (P8b)", () => {
       notaCapaComprension: new Prisma.Decimal(70),
       notaGlobal: null,
       aprobado: false,
+      colaborador: { id: COLABORADOR_ID, nombre: "Colab", email: "c@nttdata.test" },
+      transversal: {
+        id: TRANSVERSAL_ID,
+        descripcion: "Mini-proyecto",
+        umbralAprobacion: new Prisma.Decimal(70),
+        curso: { id: CURSO_ID, titulo: "Curso mock" },
+      },
     })
     const r = await service.cargarCapaTests({
       intentoId: INTENTO_ID,
@@ -872,5 +897,77 @@ describe("TransversalService P11.5a — TRANSVERSAL_DISPONIBLE en crearIntento",
         usuario: ADMIN,
       }),
     ).resolves.toMatchObject({ intentoId: INTENTO_ID })
+  })
+})
+
+describe("E6b. GET /cursos/:cursoId/intentos-transversal (listado por curso, admin)", () => {
+  it("404 si el curso no existe", async () => {
+    prisma.curso.findUnique.mockResolvedValueOnce(null)
+    await expect(
+      service.listarIntentosPorCurso({
+        cursoId: CURSO_ID,
+        query: { page: 1, pageSize: 20 },
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException)
+  })
+
+  it("404 si el curso no tiene transversal configurado", async () => {
+    prisma.curso.findUnique.mockResolvedValueOnce({ id: CURSO_ID, transversalId: null })
+    await expect(
+      service.listarIntentosPorCurso({
+        cursoId: CURSO_ID,
+        query: { page: 1, pageSize: 20 },
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException)
+  })
+
+  it("happy: devuelve item ligero con capasCargadas calculado y meta paginada", async () => {
+    prisma.curso.findUnique.mockResolvedValueOnce({ id: CURSO_ID, transversalId: TRANSVERSAL_ID })
+    prisma.$transaction.mockResolvedValueOnce([
+      [
+        {
+          id: INTENTO_ID,
+          fecha: new Date("2026-05-18T12:00:00Z"),
+          estado: "EN_EVALUACION" as const,
+          notaGlobal: null,
+          aprobado: null,
+          anulado: false,
+          notaCapaTests: new Prisma.Decimal(82),
+          notaCapaCualitativa: new Prisma.Decimal(75),
+          notaCapaComprension: null,
+          colaborador: { id: COLABORADOR_ID, nombre: "Lucia", email: "l@nttdata.test" },
+        },
+      ],
+      1,
+    ])
+    const r = await service.listarIntentosPorCurso({
+      cursoId: CURSO_ID,
+      query: { page: 1, pageSize: 20 },
+    })
+    expect(r.meta).toEqual({ page: 1, pageSize: 20, total: 1, totalPages: 1 })
+    expect(r.data[0]).toEqual({
+      intentoId: INTENTO_ID,
+      fecha: "2026-05-18T12:00:00.000Z",
+      estado: "EN_EVALUACION",
+      notaGlobal: null,
+      aprobado: null,
+      anulado: false,
+      capasCargadas: 2,
+      colaborador: { id: COLABORADOR_ID, nombre: "Lucia", email: "l@nttdata.test" },
+    })
+  })
+
+  it("propaga filtro de busqueda al WHERE (colaborador.nombre OR email, case-insensitive)", async () => {
+    prisma.curso.findUnique.mockResolvedValueOnce({ id: CURSO_ID, transversalId: TRANSVERSAL_ID })
+    prisma.$transaction.mockResolvedValueOnce([[], 0])
+    await service.listarIntentosPorCurso({
+      cursoId: CURSO_ID,
+      query: { page: 1, pageSize: 20, busqueda: "luc" },
+    })
+    const findManyArgs = prisma.intentoTransversal.findMany.mock.calls[0]?.[0]
+    expect(findManyArgs?.where?.colaborador?.OR).toEqual([
+      { nombre: { contains: "luc", mode: "insensitive" } },
+      { email: { contains: "luc", mode: "insensitive" } },
+    ])
   })
 })

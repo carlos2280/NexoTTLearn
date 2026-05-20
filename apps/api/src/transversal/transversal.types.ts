@@ -33,6 +33,21 @@ export const SELECT_INTENTO_TRANSVERSAL_FIELDS = {
   notaCapaComprension: true,
   notaGlobal: true,
   aprobado: true,
+  // Joins para el shape ADMIN del response (D-S8 / pantalla admin del intento).
+  // El mapper `toIntentoParticipante` los ignora — visibilidad campo-a-campo.
+  colaborador: {
+    select: { id: true, nombre: true, email: true },
+  },
+  transversal: {
+    select: {
+      id: true,
+      descripcion: true,
+      umbralAprobacion: true,
+      curso: {
+        select: { id: true, titulo: true },
+      },
+    },
+  },
 } as const satisfies Prisma.IntentoTransversalSelect
 
 export type IntentoTransversalSeleccionado = Prisma.IntentoTransversalGetPayload<{

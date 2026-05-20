@@ -7,10 +7,12 @@ import { CursoDetallePage } from "@/pages/admin/cursos/curso-detalle.page"
 import { CursosPage } from "@/pages/admin/cursos/cursos.page"
 import { InicioPage } from "@/pages/admin/inicio/inicio.page"
 import { IntentoEntrevistaIaDetallePage } from "@/pages/admin/intentos-entrevista-ia/intento-ia-detalle.page"
+import { IntentoTransversalDetallePage } from "@/pages/admin/intentos-transversal/intento-transversal-detalle.page"
 import { PersonasPage } from "@/pages/admin/personas/personas.page"
 import { ProximamentePage } from "@/pages/admin/proximamente/proximamente.page"
 import { AvanceCursoPage } from "@/pages/admin/reportes/avance-curso/avance-curso.page"
 import { BrechasDetectadasPage } from "@/pages/admin/reportes/brechas-detectadas/brechas-detectadas.page"
+import { CoberturaCursoPage } from "@/pages/admin/reportes/cobertura-curso/cobertura-curso.page"
 import { DetalleColaboradorPage } from "@/pages/admin/reportes/detalle-colaborador/detalle-colaborador.page"
 import { EficaciaPlataformaPage } from "@/pages/admin/reportes/eficacia-plataforma/eficacia-plataforma.page"
 import { HistoricoClientePage } from "@/pages/admin/reportes/historico-cliente/historico-cliente.page"
@@ -127,8 +129,10 @@ export function AppRoutes() {
           path="intentos-entrevista-ia/:intentoId"
           element={<IntentoEntrevistaIaDetallePage />}
         />
+        <Route path="intentos-transversal/:intentoId" element={<IntentoTransversalDetallePage />} />
         <Route path="personas" element={<PersonasPage />} />
         <Route path="reportes" element={<ReportesPage />} />
+        <Route path="reportes/cobertura-curso" element={<CoberturaCursoPage />} />
         <Route path="reportes/eficacia-plataforma" element={<EficaciaPlataformaPage />} />
         <Route path="reportes/inventario-skills" element={<InventarioSkillsPage />} />
         <Route path="reportes/avance-curso" element={<AvanceCursoPage />} />

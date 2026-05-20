@@ -26,11 +26,15 @@ export interface CasoRevision {
   readonly slaRestante: string
   readonly responsable: string
   /**
-   * Si el caso corresponde a un intento de entrevista IA, su id; permite
-   * que la fila navegue al detalle admin sin parsear `id`. `undefined` en
-   * otros tipos de caso (transversal) hasta que tengan su pantalla.
+   * Si el caso corresponde a un intento de entrevista IA, su id. Permite que
+   * la fila navegue al detalle admin sin parsear `id`.
    */
   readonly intentoEntrevistaIaId?: string
+  /**
+   * Si el caso corresponde a un intento de proyecto transversal, su id.
+   * Mutuamente excluyente con `intentoEntrevistaIaId` en la practica.
+   */
+  readonly intentoTransversalId?: string
 }
 
 export type TipoEvento = "publicacion" | "matricula" | "evaluacion" | "sistema" | "alerta"

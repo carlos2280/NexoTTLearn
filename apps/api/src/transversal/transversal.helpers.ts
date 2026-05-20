@@ -1,4 +1,4 @@
-import { BadRequestException } from "@nestjs/common"
+import { BadRequestException, InternalServerErrorException } from "@nestjs/common"
 import {
   IntentoTransversalAdminResponse,
   IntentoTransversalParticipanteResponse,
@@ -68,6 +68,15 @@ function decimalAnumero(value: Prisma.Decimal | null): number | null {
 export function toIntentoAdmin(
   intento: IntentoTransversalSeleccionado,
 ): IntentoTransversalAdminResponse {
+  // Invariante de dominio: todo ProyectoTransversal pertenece a un Curso
+  // (Curso.transversalId @unique). La relacion inversa es nullable en Prisma
+  // por el orden de cascada al borrar — en runtime no puede faltar.
+  if (intento.transversal.curso === null) {
+    throw new InternalServerErrorException({
+      code: apiErrorCodes.errorInterno,
+      message: `Intento ${intento.id} apunta a un transversal sin curso asociado.`,
+    })
+  }
   return {
     intentoId: intento.id,
     estado: intento.estado,
@@ -81,6 +90,13 @@ export function toIntentoAdmin(
     aprobado: intento.aprobado,
     anulado: intento.anulado,
     motivoAnulacion: intento.motivoAnulacion,
+    colaborador: intento.colaborador,
+    curso: intento.transversal.curso,
+    transversal: {
+      id: intento.transversal.id,
+      descripcion: intento.transversal.descripcion,
+      umbralAprobacion: Number(intento.transversal.umbralAprobacion.toString()),
+    },
   }
 }
 

@@ -24,6 +24,7 @@ import {
   CursoResumen,
   DuplicarCursoInput,
   DuplicarCursoResponse,
+  EvaluacionesDisponibles,
   ListarCursosQuery,
   ListarLogCambiosQuery,
   LogCambioCurso as LogCambioCursoDto,
@@ -645,6 +646,45 @@ export class CursosService {
       }
     }
     return toCursoDetalle(row)
+  }
+
+  /**
+   * Devuelve qué modalidades de evaluación están configuradas en el curso.
+   * Lo consume el PanelEvaluaciones del admin para renderizar solo los
+   * subtabs aplicables (Entrevista IA / Transversal / Bloques evaluables).
+   *
+   * `tieneBloquesEvaluables` requiere que el curso tenga al menos un módulo
+   * habilitado y que ese módulo contenga al menos una sección con un bloque
+   * con `esEvaluable=true`. Si el admin aún no habilitó módulos, no hay
+   * bloques aunque el catálogo tenga muchos.
+   */
+  async obtenerEvaluacionesDisponibles(cursoId: string): Promise<EvaluacionesDisponibles> {
+    const curso = await this.prisma.curso.findUnique({
+      where: { id: cursoId },
+      select: { entrevistaIaId: true, transversalId: true },
+    })
+    if (!curso) {
+      throw new NotFoundException({
+        code: apiErrorCodes.cursoNoEncontrado,
+        message: "Curso no encontrado.",
+      })
+    }
+    const bloqueEvaluable = await this.prisma.bloque.findFirst({
+      where: {
+        esEvaluable: true,
+        seccion: {
+          modulo: {
+            cursosModulosHabilitados: { some: { cursoId } },
+          },
+        },
+      },
+      select: { id: true },
+    })
+    return {
+      tieneEntrevistaIa: curso.entrevistaIaId !== null,
+      tieneTransversal: curso.transversalId !== null,
+      tieneBloquesEvaluables: bloqueEvaluable !== null,
+    }
   }
 
   private async cursoEsVisibleParaParticipante(
