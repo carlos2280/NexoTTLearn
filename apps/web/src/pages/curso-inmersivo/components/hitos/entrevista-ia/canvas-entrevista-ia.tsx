@@ -1,3 +1,4 @@
+import { useContinuarIntentoEntrevistaIa } from "@/features/entrevista-ia/hooks/use-continuar-intento-entrevista-ia"
 import { useCrearIntentoEntrevistaIa } from "@/features/entrevista-ia/hooks/use-crear-intento-entrevista-ia"
 import { useDisponibilidadEntrevistaIa } from "@/features/entrevista-ia/hooks/use-disponibilidad-entrevista-ia"
 import { useEntrevistaIaCurso } from "@/features/entrevista-ia/hooks/use-entrevista-ia-curso"
@@ -37,6 +38,7 @@ export function CanvasEntrevistaIa({
   const crear = useCrearIntentoEntrevistaIa()
   const [intentoActivo, setIntentoActivo] =
     useState<IntentoEntrevistaIaParticipanteResponse | null>(null)
+  const continuarIntento = useContinuarIntentoEntrevistaIa(setIntentoActivo)
 
   const chatActivo = intentoActivo !== null
   const reducedMotion = useReducedMotion()
@@ -65,10 +67,15 @@ export function CanvasEntrevistaIa({
   }
 
   if (!disponibilidad.data.disponible) {
+    const enCursoId = disponibilidad.data.intentoEnCursoId
+    const continuar = enCursoId ? () => continuarIntento(enCursoId) : undefined
     return (
       <main className="flex flex-1 flex-col overflow-y-auto bg-canvas px-8 py-10">
         <div className="mx-auto flex w-full max-w-2xl flex-col">
-          <VistaBloqueadaEntrevistaIa disponibilidad={disponibilidad.data} />
+          <VistaBloqueadaEntrevistaIa
+            disponibilidad={disponibilidad.data}
+            onContinuarIntento={continuar}
+          />
         </div>
       </main>
     )
