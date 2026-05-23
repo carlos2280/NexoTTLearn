@@ -8,7 +8,6 @@ interface CanvasHitoProps {
   readonly cursoId: string
   readonly asignacionId: string | null
   readonly tieneEntrevistaIa: boolean
-  readonly onAbrirHito: (hito: HitoTipo) => void
   /**
    * Propagado por el chat de entrevista IA cuando arranca/termina. Permite
    * que el page atenue sidebar y topbar mientras dura la conversacion.
@@ -18,18 +17,15 @@ interface CanvasHitoProps {
 
 /**
  * Dispatcher del canvas central cuando el participante elige un hito de cierre
- * desde el sidebar. Hoy solo `transversal` tiene canvas real (spec 05 F1+F2);
- * `entrevistaIa` muestra un placeholder hasta que se implemente (spec 06).
- *
- * `onAbrirHito` permite navegar entre hitos sin cambiar de ruta — lo usa la
- * vista "aprobado" del transversal para invitar a la entrevista IA.
+ * desde el sidebar. Cada hito tiene su propio canvas autocontenido y solo
+ * muestra informacion de su propio tema; la navegacion entre hitos se hace
+ * por el sidebar o el panel "Hacia el cierre".
  */
 export function CanvasHito({
   hito,
   cursoId,
   asignacionId,
   tieneEntrevistaIa,
-  onAbrirHito,
   onChatEntrevistaIaActivo,
 }: CanvasHitoProps) {
   if (hito === "transversal") {
@@ -38,7 +34,6 @@ export function CanvasHito({
         cursoId={cursoId}
         asignacionId={asignacionId}
         tieneEntrevistaIa={tieneEntrevistaIa}
-        onIrAEntrevistaIa={() => onAbrirHito("entrevistaIa")}
       />
     )
   }

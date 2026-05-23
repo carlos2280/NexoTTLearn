@@ -57,8 +57,9 @@ export function FilaSeccion({
         />
         <span className="min-w-0 flex-1">
           <span
+            title={titulo}
             className={cn(
-              "block truncate text-body-sm",
+              "block text-body-sm leading-tight line-clamp-2",
               activa ? "font-semibold text-text-primary" : "",
               completada && !activa ? "text-text-tertiary" : "",
             )}
