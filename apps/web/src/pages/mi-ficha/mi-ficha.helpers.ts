@@ -1,4 +1,5 @@
 import type {
+  EventoHistorialFicha,
   FichaPorAreaItem,
   FichaSkillItem,
   NivelCualitativoArea,
@@ -126,6 +127,89 @@ const ETIQUETA_NIVEL_AREA: Record<NivelCualitativoArea, string> = {
 
 export function etiquetaNivelArea(nivel: NivelCualitativoArea): string {
   return ETIQUETA_NIVEL_AREA[nivel]
+}
+
+/**
+ * Distingue hitos mayores (cumbres del viaje — completaste un curso, aprobaste
+ * un transversal, una entrevista IA, llegaste a Excelencia) de eventos menores
+ * (skills demostradas por bloque, cursos iniciados). El timeline trata cada
+ * tipo con peso visual distinto para que se lea el arco antes que el ruido.
+ */
+export function esHitoMayor(evento: EventoHistorialFicha): boolean {
+  if (evento.tipo === "CURSO_COMPLETADO") {
+    return true
+  }
+  if (evento.tipo === "SKILL_DEMOSTRADA") {
+    if (evento.origen === "TRANSVERSAL" || evento.origen === "ENTREVISTA_IA") {
+      return true
+    }
+    if (evento.nivelCualitativo === "excelencia") {
+      return true
+    }
+  }
+  return false
+}
+
+export interface GrupoMesHistorial {
+  readonly clave: string
+  readonly label: string
+  readonly eventos: readonly EventoHistorialFicha[]
+}
+
+const FMT_MES = new Intl.DateTimeFormat("es", { month: "long" })
+
+/**
+ * Agrupa eventos por mes calendario (YYYY-MM). Devuelve los grupos en orden
+ * cronologico descendente (mes mas reciente arriba). El label es "Este mes"
+ * para el mes actual, "Mayo" para meses del anio actual y "Mayo 2025" para
+ * meses de anios anteriores — patron familiar de bitacora.
+ *
+ * Asume que `eventos` ya viene ordenado desc por fecha (contrato del backend).
+ */
+export function agruparEventosPorMes(
+  eventos: readonly EventoHistorialFicha[],
+): GrupoMesHistorial[] {
+  const ahora = new Date()
+  const anioActual = ahora.getFullYear()
+  const claveActual = claveMes(ahora)
+  const grupos = new Map<string, EventoHistorialFicha[]>()
+  const orden: string[] = []
+
+  for (const evento of eventos) {
+    const fecha = new Date(evento.fecha)
+    if (Number.isNaN(fecha.getTime())) {
+      continue
+    }
+    const clave = claveMes(fecha)
+    const existente = grupos.get(clave)
+    if (existente) {
+      existente.push(evento)
+    } else {
+      grupos.set(clave, [evento])
+      orden.push(clave)
+    }
+  }
+
+  return orden.map((clave) => {
+    const [anioStr, mesStr] = clave.split("-")
+    const anio = Number(anioStr)
+    const mes = Number(mesStr) - 1
+    const nombreMes = capitalizar(FMT_MES.format(new Date(anio, mes, 1)))
+    const label =
+      clave === claveActual ? "Este mes" : anio === anioActual ? nombreMes : `${nombreMes} ${anio}`
+    return { clave, label, eventos: grupos.get(clave) ?? [] }
+  })
+}
+
+function claveMes(fecha: Date): string {
+  return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`
+}
+
+function capitalizar(texto: string): string {
+  if (texto.length === 0) {
+    return texto
+  }
+  return texto.charAt(0).toUpperCase() + texto.slice(1)
 }
 
 // Origen narrativo de una skill — "Demostrada en el curso X" en vez de un tag

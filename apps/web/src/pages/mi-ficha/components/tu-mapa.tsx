@@ -3,7 +3,6 @@ import type { FichaPorAreaItem, NivelCualitativoArea } from "@nexott-learn/share
 
 interface TuMapaProps {
   readonly porArea: readonly FichaPorAreaItem[]
-  readonly onAreaClick?: (areaId: string) => void
 }
 
 const ORDEN_AREAS = [
@@ -36,7 +35,14 @@ const DOTS_LLENOS: Record<NivelCualitativoArea, number> = {
 
 const TOTAL_DOTS = 5
 
-export function TuMapa({ porArea, onAreaClick }: TuMapaProps) {
+/**
+ * "Donde estas hoy" — snapshot del estado actual del colaborador por area.
+ * Lista editorial densa (sin cards) que enfatiza tipografia y datos antes
+ * que contenedores: una fila por area activa con dot del color, nombre, 5
+ * dots de progreso, etiqueta de nivel y conteo de habilidades. Las areas
+ * sin tocar se resumen en una sola linea al pie.
+ */
+export function TuMapa({ porArea }: TuMapaProps) {
   const ordenado = [...porArea].sort((a, b) => {
     const ia = ORDEN_AREAS.indexOf(slugArea(a.nombre))
     const ib = ORDEN_AREAS.indexOf(slugArea(b.nombre))
@@ -45,65 +51,61 @@ export function TuMapa({ porArea, onAreaClick }: TuMapaProps) {
     }
     return a.nombre.localeCompare(b.nombre, "es")
   })
+  const activas = ordenado.filter((a) => a.nivelCualitativo !== "sinTocar")
+  const porExplorar = ordenado.filter((a) => a.nivelCualitativo === "sinTocar")
 
   return (
     <section className="flex flex-col gap-5" aria-labelledby="tu-mapa-titulo">
       <header className="flex flex-col gap-1.5">
         <span className="nx-eyebrow text-text-tertiary">Tu mapa</span>
         <h2 id="tu-mapa-titulo" className="text-h2 text-text-primary">
-          Las 8 areas
+          Donde estas hoy
         </h2>
       </header>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        {ordenado.map((area) => (
-          <AreaCard key={area.areaId} area={area} onClick={onAreaClick} />
-        ))}
-      </div>
+      {activas.length > 0 ? (
+        <ul className="flex flex-col">
+          {activas.map((area) => (
+            <FilaArea key={area.areaId} area={area} />
+          ))}
+        </ul>
+      ) : (
+        <p className="text-body-sm text-text-secondary">
+          Aun no tienes habilidades demostradas. Tu camino comienza con el primer curso.
+        </p>
+      )}
+
+      {porExplorar.length > 0 ? (
+        <p className="text-body-sm text-text-tertiary">
+          Otras areas aun esperan:{" "}
+          <span className="text-text-secondary">{porExplorar.map((a) => a.nombre).join(", ")}</span>
+          .
+        </p>
+      ) : null}
     </section>
   )
 }
 
-interface AreaCardProps {
+interface FilaAreaProps {
   readonly area: FichaPorAreaItem
-  readonly onClick?: (areaId: string) => void
 }
 
-function AreaCard({ area, onClick }: AreaCardProps) {
+function FilaArea({ area }: FilaAreaProps) {
   const slug = slugArea(area.nombre)
   const nivel = area.nivelCualitativo
-  const sinTocar = nivel === "sinTocar"
   const llenos = DOTS_LLENOS[nivel]
   const colorArea = `var(--color-area-${slug})`
-  const glow = `var(--shadow-glow-area-${slug})`
-
-  const subtexto = sinTocar
-    ? "Esta capacidad espera"
-    : `${area.skillsConNota} ${area.skillsConNota === 1 ? "hab." : "hab."}`
+  const conteo = `${area.skillsConNota} ${area.skillsConNota === 1 ? "hab." : "hab."}`
 
   return (
-    <button
-      type="button"
-      onClick={() => onClick?.(area.areaId)}
-      className={`hover:-translate-y-0.5 group relative flex flex-col items-start gap-3 overflow-hidden rounded-2xl border border-border bg-surface p-5 text-left transition-all duration-base ease-out ${
-        sinTocar ? "opacity-70 hover:opacity-90" : ""
-      }`}
-      style={{ boxShadow: "var(--shadow-card-resting)" }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow = glow
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = "var(--shadow-card-resting)"
-      }}
-    >
+    <li className="grid grid-cols-[12px_1fr_96px_56px] items-center gap-4 border-border border-b py-3 last:border-b-0 sm:grid-cols-[12px_1fr_72px_96px_56px] sm:gap-6">
       <span
         aria-hidden="true"
-        className="absolute top-0 right-0 left-0 h-[2px]"
+        className="block h-2 w-2 shrink-0 rounded-full"
         style={{ background: colorArea }}
       />
-      <span className="nx-eyebrow text-text-tertiary">{area.nombre}</span>
-
-      <span aria-hidden="true" className="flex items-center gap-1.5">
+      <span className="truncate text-body text-text-primary">{area.nombre}</span>
+      <span aria-hidden="true" className="hidden items-center gap-1.5 sm:flex">
         {Array.from({ length: TOTAL_DOTS }).map((_, i) => {
           const lleno = i < llenos
           return (
@@ -119,14 +121,8 @@ function AreaCard({ area, onClick }: AreaCardProps) {
           )
         })}
       </span>
-
-      <span
-        className={`font-medium text-body-sm ${sinTocar ? "text-text-tertiary" : "text-text-primary"}`}
-      >
-        {ETIQUETA_NIVEL[nivel]}
-      </span>
-
-      <span className="mt-auto text-caption text-text-tertiary">{subtexto}</span>
-    </button>
+      <span className="text-body-sm text-text-secondary">{ETIQUETA_NIVEL[nivel]}</span>
+      <span className="tabular text-caption text-text-tertiary text-right">{conteo}</span>
+    </li>
   )
 }

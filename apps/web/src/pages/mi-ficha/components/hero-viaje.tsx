@@ -1,9 +1,5 @@
-import { descargarMiFicha, dispararDescargaFicha } from "@/features/me/api/exportar-ficha.api"
-import { Button } from "@/shared/components/ui/button"
 import { FirmaNombre } from "@/shared/components/ui/firma-nombre"
 import type { FichaPorAreaItem, FichaSkillItem } from "@nexott-learn/shared-types"
-import { useState } from "react"
-import { toast } from "sonner"
 import {
   areasConActividad,
   cuentaAreasSolidasOExcelentes,
@@ -20,25 +16,19 @@ interface HeroViajeProps {
   readonly skills: readonly FichaSkillItem[]
 }
 
+/**
+ * Hero de /mi-ficha — quien eres ahora. Firma aurora con el nombre, frase
+ * narrativa derivada del nivel del camino, contador de areas activas y la
+ * ultima habilidad demostrada. La descarga del reporte vive ahora en el
+ * bloque `LlevateTuFicha` al final de la pagina — el hero es lectura, no
+ * accion.
+ */
 export function HeroViaje({ nombre, porArea, skills }: HeroViajeProps) {
-  const [descargando, setDescargando] = useState(false)
   const areas = areasConActividad(porArea)
   const solidas = cuentaAreasSolidasOExcelentes(porArea)
   const solida = hayAreaSolida(porArea)
   const fortaleza = fortalezaActual(porArea)
   const ultima = ultimaSkill(skills)
-
-  async function descargarCsv(): Promise<void> {
-    setDescargando(true)
-    try {
-      const payload = await descargarMiFicha("csv")
-      dispararDescargaFicha(payload)
-    } catch (_err) {
-      toast.error("No se pudo exportar la ficha. Reintenta en un momento.")
-    } finally {
-      setDescargando(false)
-    }
-  }
 
   const sufijo = sufijoNarrativo({
     areasConActividad: areas,
@@ -77,28 +67,13 @@ export function HeroViaje({ nombre, porArea, skills }: HeroViajeProps) {
         className="block h-px w-full max-w-[480px] rounded-full bg-[image:var(--gradient-aurora)] opacity-80"
       />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {ultima ? (
-          <p className="text-body-sm text-text-tertiary">
-            Ultima habilidad: <span className="text-text-secondary">{ultima.nombre}</span>{" "}
-            <span className="text-text-disabled">·</span>{" "}
-            <span>{relativizarFecha(ultima.fecha)}</span>
-          </p>
-        ) : (
-          <span aria-hidden="true" />
-        )}
-        <Button
-          variant="ghost"
-          size="sm"
-          isLoading={descargando}
-          disabled={descargando}
-          onClick={() => {
-            descargarCsv().catch(() => undefined)
-          }}
-        >
-          Exportar →
-        </Button>
-      </div>
+      {ultima ? (
+        <p className="text-body-sm text-text-tertiary">
+          Ultima habilidad: <span className="text-text-secondary">{ultima.nombre}</span>{" "}
+          <span className="text-text-disabled">·</span>{" "}
+          <span>{relativizarFecha(ultima.fecha)}</span>
+        </p>
+      ) : null}
     </header>
   )
 }
