@@ -641,12 +641,15 @@ model CursoSkillExigida {
 model CursoModuloHabilitado {
   cursoId  String @map("curso_id") @db.Uuid
   moduloId String @map("modulo_id") @db.Uuid
+  orden    Int    @default(0)
 
   curso  Curso  @relation(fields: [cursoId], references: [id], onDelete: Cascade)
   modulo Modulo @relation(fields: [moduloId], references: [id], onDelete: Restrict)
 
   @@id([cursoId, moduloId])
+  @@unique([cursoId, orden], map: "uq_cmh_curso_orden")
   @@index([moduloId], map: "idx_cmh_modulo")
+  @@index([cursoId, orden], map: "idx_cmh_curso_orden")
   @@map("cursos_modulos_habilitados")
 }
 

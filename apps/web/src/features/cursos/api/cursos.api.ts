@@ -19,6 +19,7 @@ import type {
   ListarLogCambiosQuery,
   LogCambioCurso,
   Paginated,
+  ReordenarModulosHabilitadosCursoInput,
 } from "@nexott-learn/shared-types"
 
 function buildQueryString(query: ListarCursosQuery): string {
@@ -162,6 +163,18 @@ export function actualizarModulosHabilitadosCurso(
 ): Promise<CursoConfiguracionResponse> {
   return httpClient.patch<CursoConfiguracionResponse>(
     `/cursos/${cursoId}/modulos-habilitados`,
+    input,
+    { motivo },
+  )
+}
+
+export function reordenarModulosHabilitadosCurso(
+  cursoId: string,
+  input: ReordenarModulosHabilitadosCursoInput,
+  motivo: string | undefined,
+): Promise<CursoConfiguracionResponse> {
+  return httpClient.patch<CursoConfiguracionResponse>(
+    `/cursos/${cursoId}/modulos-habilitados/orden`,
     input,
     { motivo },
   )

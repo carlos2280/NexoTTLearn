@@ -11,6 +11,8 @@ interface PrismaMock {
   curso: { findUnique: ReturnType<typeof vi.fn> }
   cursoFotografiaCierre: { findUnique: ReturnType<typeof vi.fn> }
   cursoSkillExigida: { findMany: ReturnType<typeof vi.fn> }
+  cursoModuloHabilitado: { findMany: ReturnType<typeof vi.fn> }
+  intentoBloque: { findMany: ReturnType<typeof vi.fn> }
   notaSkill: { findMany: ReturnType<typeof vi.fn> }
   planEstudio: { findUnique: ReturnType<typeof vi.fn> }
   itemPlan: {
@@ -34,6 +36,8 @@ function buildPrismaMock(): PrismaMock {
     curso: { findUnique: vi.fn().mockResolvedValue({ umbralNoCumple: 10 }) },
     cursoFotografiaCierre: { findUnique: vi.fn() },
     cursoSkillExigida: { findMany: vi.fn().mockResolvedValue([]) },
+    cursoModuloHabilitado: { findMany: vi.fn().mockResolvedValue([]) },
+    intentoBloque: { findMany: vi.fn().mockResolvedValue([]) },
     notaSkill: { findMany: vi.fn().mockResolvedValue([]) },
     planEstudio: { findUnique: vi.fn().mockResolvedValue(null) },
     itemPlan: { count: vi.fn().mockResolvedValue(0), findMany: vi.fn().mockResolvedValue([]) },

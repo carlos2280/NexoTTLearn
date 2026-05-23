@@ -146,11 +146,69 @@ export interface OpcionQuiz {
   readonly texto: string
   readonly esCorrecta: boolean
 }
-export interface PreguntaQuiz {
+
+interface PreguntaBase {
   readonly id: string
   readonly enunciado: string
-  readonly explicacion: string
+  readonly explicacion?: string
+}
+export interface PreguntaOpcionUnica extends PreguntaBase {
+  readonly tipo?: "OPCION_UNICA"
   readonly opciones: readonly OpcionQuiz[]
+}
+export interface PreguntaOpcionMultiple extends PreguntaBase {
+  readonly tipo: "OPCION_MULTIPLE"
+  readonly opciones: readonly OpcionQuiz[]
+  readonly puntuacionParcial?: boolean
+}
+export interface PreguntaVerdaderoFalso extends PreguntaBase {
+  readonly tipo: "VERDADERO_FALSO"
+  readonly correcta: boolean
+}
+export interface NormalizacionRespuestaCorta {
+  readonly trim: boolean
+  readonly ignorarMayusculas: boolean
+  readonly ignorarAcentos: boolean
+  readonly ignorarEspaciosDobles: boolean
+}
+export interface PreguntaRespuestaCorta extends PreguntaBase {
+  readonly tipo: "RESPUESTA_CORTA"
+  readonly respuestasAceptadas: readonly string[]
+  readonly normalizacion?: NormalizacionRespuestaCorta
+}
+export type PreguntaQuiz =
+  | PreguntaOpcionUnica
+  | PreguntaOpcionMultiple
+  | PreguntaVerdaderoFalso
+  | PreguntaRespuestaCorta
+
+function normalizarPregunta(p: PreguntaQuiz): Record<string, unknown> {
+  const tipo = p.tipo ?? "OPCION_UNICA"
+  const base: Record<string, unknown> = {
+    id: p.id,
+    enunciado: p.enunciado,
+    pesoPunto: 1,
+    tipo,
+  }
+  if (p.explicacion !== undefined) base.explicacion = p.explicacion
+  if (tipo === "OPCION_UNICA") {
+    base.opciones = (p as PreguntaOpcionUnica).opciones
+    return base
+  }
+  if (tipo === "OPCION_MULTIPLE") {
+    const multi = p as PreguntaOpcionMultiple
+    base.opciones = multi.opciones
+    base.puntuacionParcial = multi.puntuacionParcial ?? false
+    return base
+  }
+  if (tipo === "VERDADERO_FALSO") {
+    base.correcta = (p as PreguntaVerdaderoFalso).correcta
+    return base
+  }
+  const corta = p as PreguntaRespuestaCorta
+  base.respuestasAceptadas = corta.respuestasAceptadas
+  if (corta.normalizacion) base.normalizacion = corta.normalizacion
+  return base
 }
 
 export function buildQuiz(preguntas: readonly PreguntaQuiz[], ctx: string): Prisma.InputJsonValue {
@@ -161,11 +219,7 @@ export function buildQuiz(preguntas: readonly PreguntaQuiz[], ctx: string): Pris
       solucionVisible: "tras_intento",
       ordenAleatorio: false,
       notaMinima: 70,
-      preguntas: preguntas.map((p) => ({
-        ...p,
-        tipo: "OPCION_UNICA",
-        pesoPunto: 1,
-      })),
+      preguntas: preguntas.map(normalizarPregunta),
     },
     ctx,
   )

@@ -4,7 +4,7 @@ import type {
   DisponibilidadTransversalResponse,
   MeAvanceCursoResponse,
 } from "@nexott-learn/shared-types"
-import { ArrowRight } from "lucide-react"
+import { ArrowRight, Sparkles } from "lucide-react"
 import { SeccionCaminoHaciaApto } from "./seccion-camino-hacia-apto"
 import { SeccionHaciaElCierre } from "./seccion-hacia-el-cierre"
 
@@ -44,6 +44,12 @@ export function PanelContexto({
 }: PanelContextoProps) {
   const sugerencia = avance.siguienteSeccion
   const mostrarSugerencia = sugerencia !== null && sugerencia.seccionId !== seccionActivaId
+  // Plan obligatorio terminado: ya no hay siguiente seccion. El backend
+  // devuelve `siguienteSeccion: null` y `seccionesCompletadas === seccionesObligatorias`.
+  const planCompletado =
+    sugerencia === null &&
+    avance.seccionesObligatorias > 0 &&
+    avance.seccionesCompletadas >= avance.seccionesObligatorias
 
   return (
     <aside
@@ -59,6 +65,8 @@ export function PanelContexto({
           titulo={sugerencia.titulo}
           onClick={() => onIrASiguiente(sugerencia.seccionId)}
         />
+      ) : planCompletado ? (
+        <SeccionPlanCompletado />
       ) : null}
       <SeccionCaminoHaciaApto camino={avance.caminoHaciaApto} />
       <SeccionHaciaElCierre
@@ -67,6 +75,23 @@ export function PanelContexto({
         onAbrirHito={onAbrirHito}
       />
     </aside>
+  )
+}
+
+function SeccionPlanCompletado() {
+  return (
+    <section className="flex flex-col gap-2 rounded-2xl border border-success/30 bg-success-soft p-4">
+      <div className="flex items-center gap-2">
+        <Sparkles className="h-4 w-4 text-success" aria-hidden={true} />
+        <h3 className="nx-eyebrow text-success-on-soft">Plan al día</h3>
+      </div>
+      <p className="text-body-sm text-text-primary">
+        Completaste todas las secciones obligatorias. Lo que aprendiste aquí ya es tuyo.
+      </p>
+      <p className="text-caption text-text-secondary">
+        Sigue puliendo lo que quieras o avanza al cierre cuando estés listo.
+      </p>
+    </section>
   )
 }
 

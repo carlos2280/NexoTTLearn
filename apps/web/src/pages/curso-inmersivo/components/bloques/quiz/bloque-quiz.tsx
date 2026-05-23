@@ -118,7 +118,7 @@ function QuizActivo({ bloqueId, cursoId, colaboradorId, contenido }: QuizActivoP
             pregunta={pregunta}
             respuestas={respuestas}
             bloqueado={crear.isPending}
-            mostrarSolucion={mostrarSolucion}
+            verSolucion={mostrarSolucion}
             preguntasFalladas={preguntasFalladasSet}
           />
         ))}
@@ -127,6 +127,7 @@ function QuizActivo({ bloqueId, cursoId, colaboradorId, contenido }: QuizActivoP
         <ResultadoIntentoQuiz
           intento={ultimoIntento}
           notaMinima={contenido.notaMinima}
+          totalPreguntas={total}
           mejorPrevio={mejorPrevioAlEnviar}
         />
       ) : null}

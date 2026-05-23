@@ -79,6 +79,7 @@ export const apiErrorCodes = {
   // D-CUR-11: codigo unificado para suma=100 con `details.contexto` que distingue dominio.
   validacionPesoNoSuma100: "VALIDACION_PESO_NO_SUMA_100",
   validacionSkillSinCobertura: "VALIDACION_SKILL_SIN_COBERTURA",
+  validacionModulosReordenSetDistinto: "VALIDACION_MODULOS_REORDEN_SET_DISTINTO",
   validacionUmbralesLogroMonotonia: "VALIDACION_UMBRALES_LOGRO_MONOTONIA",
   validacionDuracionEntrevistaInvalida: "VALIDACION_DURACION_ENTREVISTA_INVALIDA",
   conflictModuloArchivadoNoHabilitable: "CONFLICT_MODULO_ARCHIVADO_NO_HABILITABLE",

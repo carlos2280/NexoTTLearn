@@ -203,6 +203,61 @@ git push --force-with-lease    # seguro: aborta si alguien mas pusheo
                     { id: "d", texto: "git push --force para reemplazar todo", esCorrecta: false },
                   ],
                 },
+                {
+                  id: "q4",
+                  tipo: "OPCION_MULTIPLE",
+                  enunciado:
+                    "<p>¿Cuales de los siguientes son <strong>habitos sanos</strong> al trabajar con Git en equipo? (marca todas las que apliquen)</p>",
+                  explicacion:
+                    "Rebase contra main antes del PR mantiene la historia limpia; commits pequenios facilitan el review; borrar la rama remota tras el merge evita ruido en el repo. Hacer --force sobre main es destructivo: sobrescribe trabajo de otros.",
+                  puntuacionParcial: true,
+                  opciones: [
+                    {
+                      id: "a",
+                      texto: "Rebase de tu feature contra main antes de abrir PR",
+                      esCorrecta: true,
+                    },
+                    {
+                      id: "b",
+                      texto: "git push --force directo a main para corregir un commit malo",
+                      esCorrecta: false,
+                    },
+                    {
+                      id: "c",
+                      texto: "Commits pequeños con mensaje claro que comunica el por que",
+                      esCorrecta: true,
+                    },
+                    {
+                      id: "d",
+                      texto: "Borrar la rama remota despues del merge a main",
+                      esCorrecta: true,
+                    },
+                  ],
+                },
+                {
+                  id: "q5",
+                  tipo: "VERDADERO_FALSO",
+                  enunciado:
+                    "<p><code>git stash</code> funciona como una pila: <code>git stash pop</code> aplica primero el ultimo cambio guardado (<code>stash@{0}</code>).</p>",
+                  explicacion:
+                    "Cierto. stash es LIFO: el ultimo en entrar es el primero en salir. Si guardaste 3 stash y haces pop, te aplica stash@{0}, que es el mas reciente.",
+                  correcta: true,
+                },
+                {
+                  id: "q6",
+                  tipo: "RESPUESTA_CORTA",
+                  enunciado:
+                    "<p>¿Que comando de Git te permite encontrar, por <strong>busqueda binaria</strong>, el commit exacto que introdujo un bug? (escribe solo el comando base, sin flags)</p>",
+                  explicacion:
+                    "git bisect te marca un commit bueno y uno malo, y va saltando por la mitad de la historia preguntando si el bug esta. En log(n) commits localizas al culpable.",
+                  respuestasAceptadas: ["git bisect", "bisect", "git bisect start"],
+                  normalizacion: {
+                    trim: true,
+                    ignorarMayusculas: true,
+                    ignorarAcentos: true,
+                    ignorarEspaciosDobles: true,
+                  },
+                },
               ],
               "m0-s1-quiz",
             ),

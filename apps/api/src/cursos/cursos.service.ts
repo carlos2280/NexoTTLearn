@@ -29,6 +29,7 @@ import {
   ListarLogCambiosQuery,
   LogCambioCurso as LogCambioCursoDto,
   Paginated,
+  ReordenarModulosHabilitadosCursoInput,
   SkillSinCobertura,
   UmbralesLogroValores,
 } from "@nexott-learn/shared-types"
@@ -107,7 +108,8 @@ const SELECT_CURSO_DETALLE_FIELDS = {
     select: { skillId: true, notaMinima: true },
   },
   modulosHabilitados: {
-    select: { moduloId: true },
+    select: { moduloId: true, orden: true },
+    orderBy: { orden: "asc" },
   },
 } as const satisfies Prisma.CursoSelect
 
@@ -393,9 +395,10 @@ async function copiarSubRecursosCurso(
   }
   if (fuente.modulosCopiables.length > 0) {
     await tx.cursoModuloHabilitado.createMany({
-      data: fuente.modulosCopiables.map((m) => ({
+      data: fuente.modulosCopiables.map((m, indice) => ({
         cursoId: cursoDestinoId,
         moduloId: m.moduloId,
+        orden: indice,
       })),
     })
   }
@@ -1690,8 +1693,20 @@ export class CursosService {
         })
       }
       if (diff.aAgregar.length > 0) {
+        // Los nuevos modulos se anaden al final del orden actual del curso.
+        // Si despues se quiere reordenar, el admin lo hara via endpoint
+        // dedicado (no existente aun — ver doc).
+        const maxOrden = await tx.cursoModuloHabilitado.aggregate({
+          where: { cursoId },
+          _max: { orden: true },
+        })
+        const base = (maxOrden._max.orden ?? -1) + 1
         await tx.cursoModuloHabilitado.createMany({
-          data: diff.aAgregar.map((moduloId) => ({ cursoId, moduloId })),
+          data: diff.aAgregar.map((moduloId, indice) => ({
+            cursoId,
+            moduloId,
+            orden: base + indice,
+          })),
         })
       }
       // Misma referencia para el log y para el response (H-9): evita drift
@@ -1727,6 +1742,80 @@ export class CursosService {
       umbralesLogro: parseUmbralesLogro(resultado.detalle.umbralesLogro),
       previewImpacto: resultado.previewImpacto,
       skillsSinCobertura: resultado.skillsSinCobertura,
+    }
+  }
+
+  /**
+   * Endpoint 3-bis — PATCH /api/v1/cursos/:id/modulos-habilitados/orden.
+   * Reordena los modulos habilitados del curso. El nuevo orden es el orden del
+   * array `moduloIds` (indice 0 = primero). Valida que el set coincide con el
+   * actual del curso: para AGREGAR o QUITAR modulos se usa el endpoint
+   * `actualizarModulosHabilitados`.
+   *
+   * Implementacion: dentro de una transaccion, asigna `orden = i` a cada
+   * vinculo. El unique `(curso_id, orden)` es DEFERRABLE INITIALLY DEFERRED
+   * (migracion `add_orden_cmh`), asi que las actualizaciones intermedias
+   * pueden colisionar sin abortar — la unicidad se verifica al COMMIT.
+   */
+  async reordenarModulosHabilitados(
+    cursoId: string,
+    input: ReordenarModulosHabilitadosCursoInput,
+    motivo: string | undefined,
+    autorUsuarioId: string,
+  ): Promise<CursoConfiguracionResponse> {
+    const resultado = await this.prisma.$transaction(async (tx) => {
+      const actual = await this.leerCursoParaConfigurar(tx, cursoId, motivo)
+      const idsActuales = new Set(actual.modulosHabilitados.map((m) => m.moduloId))
+      const idsInput = new Set(input.moduloIds)
+      if (idsActuales.size !== idsInput.size || ![...idsActuales].every((id) => idsInput.has(id))) {
+        throw new UnprocessableEntityException({
+          code: apiErrorCodes.validacionModulosReordenSetDistinto,
+          message:
+            "El conjunto de moduloIds no coincide con el actual del curso. Para agregar o quitar modulos usa el endpoint actualizar.",
+        })
+      }
+      const ordenPrevio = [...actual.modulosHabilitados]
+        .sort((a, b) => a.orden - b.orden)
+        .map((m) => m.moduloId)
+      // Sin cambios: el array de entrada ya coincide con el orden actual.
+      const huboCambio = ordenPrevio.some((id, i) => id !== input.moduloIds[i])
+      if (!huboCambio) {
+        const detalle = await this.releerCursoDetalle(tx, cursoId)
+        return { detalle, previewImpacto: null }
+      }
+      // Actualizar `orden` de cada vinculo. El unique deferrable permite que
+      // las filas pasen por estados intermedios duplicados durante la TX.
+      for (const [indice, moduloId] of input.moduloIds.entries()) {
+        await tx.cursoModuloHabilitado.update({
+          where: {
+            // biome-ignore lint/style/useNamingConvention: clave compuesta generada por Prisma.
+            cursoId_moduloId: { cursoId, moduloId },
+          },
+          data: { orden: indice },
+        })
+      }
+      const previewImpacto = {
+        tipo: "REORDEN" as const,
+        ordenPrevio,
+        ordenNuevo: [...input.moduloIds],
+      } satisfies Prisma.InputJsonValue
+      await tx.logCambioCurso.create({
+        data: {
+          cursoId,
+          autorUsuarioId,
+          accion: AccionLogCurso.CAMBIO_MODULOS,
+          motivo: this.resolverMotivoLog(motivo, "Reorden de modulos habilitados"),
+          previewImpacto,
+        },
+      })
+      const detalle = await this.releerCursoDetalle(tx, cursoId)
+      return { detalle, previewImpacto }
+    })
+    const base = toCursoDetalle(resultado.detalle)
+    return {
+      ...base,
+      umbralesLogro: parseUmbralesLogro(resultado.detalle.umbralesLogro),
+      previewImpacto: resultado.previewImpacto ?? undefined,
     }
   }
 

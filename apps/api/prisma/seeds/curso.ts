@@ -259,11 +259,11 @@ export async function seedCurso(
     })
   }
 
-  // Modulos habilitados (orden = el del seed)
+  // Modulos habilitados (orden = el del seed, persistido explicitamente)
   await prisma.cursoModuloHabilitado.deleteMany({ where: { cursoId: cId } })
-  for (const m of modulos) {
+  for (const [indice, m] of modulos.entries()) {
     await prisma.cursoModuloHabilitado.create({
-      data: { cursoId: cId, moduloId: m.moduloId },
+      data: { cursoId: cId, moduloId: m.moduloId, orden: indice },
     })
   }
 

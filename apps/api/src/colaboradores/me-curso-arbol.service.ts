@@ -80,6 +80,7 @@ export class MeCursoArbolService {
         },
         modulosHabilitados: {
           select: {
+            orden: true,
             modulo: {
               select: {
                 id: true,
@@ -96,6 +97,7 @@ export class MeCursoArbolService {
               },
             },
           },
+          orderBy: { orden: "asc" },
         },
       },
     })
@@ -150,6 +152,7 @@ export class MeCursoArbolService {
 
   private proyectarModulos(
     rows: ReadonlyArray<{
+      readonly orden: number
       readonly modulo: {
         readonly id: string
         readonly titulo: string
@@ -162,9 +165,12 @@ export class MeCursoArbolService {
       }
     }>,
   ): readonly CursoArbolModulo[] {
+    // El orden viene ya aplicado en la query (`orderBy: { orden: "asc" }`)
+    // pero replicamos el sort en memoria para que el método sea independiente
+    // del orden de llegada (test-friendly).
     return [...rows]
-      .sort((a, b) => a.modulo.titulo.localeCompare(b.modulo.titulo))
-      .map((row, indice) => {
+      .sort((a, b) => a.orden - b.orden)
+      .map((row) => {
         const secciones: readonly CursoArbolSeccion[] = row.modulo.secciones.map((s) => ({
           seccionId: s.id,
           titulo: s.titulo,
@@ -174,7 +180,7 @@ export class MeCursoArbolService {
         return {
           moduloId: row.modulo.id,
           titulo: row.modulo.titulo,
-          orden: indice,
+          orden: row.orden,
           secciones,
         }
       })

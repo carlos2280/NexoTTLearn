@@ -198,6 +198,8 @@ export type {
   ActualizarModulosHabilitadosCursoInput,
   SkillSinCobertura,
 } from "./cursos/actualizar-modulos-habilitados-curso.schema"
+export { reordenarModulosHabilitadosCursoSchema } from "./cursos/reordenar-modulos-habilitados-curso.schema"
+export type { ReordenarModulosHabilitadosCursoInput } from "./cursos/reordenar-modulos-habilitados-curso.schema"
 export { actualizarPesosCursoSchema } from "./cursos/actualizar-pesos-curso.schema"
 export type { ActualizarPesosCursoInput } from "./cursos/actualizar-pesos-curso.schema"
 export { actualizarUmbralesLogroCursoSchema } from "./cursos/actualizar-umbrales-logro-curso.schema"
