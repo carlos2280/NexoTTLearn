@@ -48,6 +48,7 @@ export function BloqueHitosSidebar({
           <ItemHito
             etiqueta="Proyecto transversal"
             disponible={transversal.disponible}
+            enCurso={false}
             activo={hitoActivo === "transversal"}
             onClick={() => onAbrirHito("transversal")}
             soloLectura={soloLectura}
@@ -57,6 +58,7 @@ export function BloqueHitosSidebar({
           <ItemHito
             etiqueta="Entrevista IA"
             disponible={entrevistaIa.disponible}
+            enCurso={entrevistaIa.razon === "INTENTO_EN_CURSO"}
             activo={hitoActivo === "entrevistaIa"}
             onClick={() => onAbrirHito("entrevistaIa")}
             soloLectura={soloLectura}
@@ -70,13 +72,29 @@ export function BloqueHitosSidebar({
 interface ItemHitoProps {
   readonly etiqueta: string
   readonly disponible: boolean
+  readonly enCurso: boolean
   readonly activo: boolean
   readonly onClick: () => void
   readonly soloLectura: boolean
 }
 
-function ItemHito({ etiqueta, disponible, activo, onClick, soloLectura }: ItemHitoProps) {
-  const interactivo = !soloLectura && disponible
+function microcopyHito(soloLectura: boolean, disponible: boolean, enCurso: boolean): string {
+  if (soloLectura) {
+    return "Completado"
+  }
+  if (disponible) {
+    return "Disponible"
+  }
+  if (enCurso) {
+    return "En curso"
+  }
+  return "Pendiente"
+}
+
+function ItemHito({ etiqueta, disponible, enCurso, activo, onClick, soloLectura }: ItemHitoProps) {
+  const accesible = disponible || enCurso
+  const interactivo = !soloLectura && accesible
+  const microcopy = microcopyHito(soloLectura, disponible, enCurso)
   return (
     <li>
       <button
@@ -93,7 +111,7 @@ function ItemHito({ etiqueta, disponible, activo, onClick, soloLectura }: ItemHi
           interactivo ? "" : "cursor-default text-text-tertiary",
         )}
       >
-        <IconoHito disponible={disponible} activo={activo} soloLectura={soloLectura} />
+        <IconoHito accesible={accesible} activo={activo} soloLectura={soloLectura} />
         <span className="min-w-0 flex-1">
           <span
             className={cn(
@@ -105,7 +123,7 @@ function ItemHito({ etiqueta, disponible, activo, onClick, soloLectura }: ItemHi
             {etiqueta}
           </span>
           <span className="block font-mono text-[10px] text-text-tertiary uppercase tracking-wider">
-            {soloLectura ? "Completado" : disponible ? "Disponible" : "Pendiente"}
+            {microcopy}
           </span>
         </span>
       </button>
@@ -114,16 +132,16 @@ function ItemHito({ etiqueta, disponible, activo, onClick, soloLectura }: ItemHi
 }
 
 interface IconoHitoProps {
-  readonly disponible: boolean
+  readonly accesible: boolean
   readonly activo: boolean
   readonly soloLectura: boolean
 }
 
-function IconoHito({ disponible, activo, soloLectura }: IconoHitoProps) {
+function IconoHito({ accesible, activo, soloLectura }: IconoHitoProps) {
   if (soloLectura) {
     return <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden={true} />
   }
-  if (disponible) {
+  if (accesible) {
     return (
       <span
         aria-hidden={true}

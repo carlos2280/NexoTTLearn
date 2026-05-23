@@ -203,7 +203,6 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
             cursoId={arbol.curso.id}
             asignacionId={asignacionId}
             tieneEntrevistaIa={entrevistaIa !== undefined}
-            onAbrirHito={onAbrirHito}
             onChatEntrevistaIaActivo={onChatEntrevistaIaActivo}
           />
         )}

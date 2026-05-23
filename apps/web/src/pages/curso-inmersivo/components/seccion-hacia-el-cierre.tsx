@@ -35,6 +35,7 @@ export function SeccionHaciaElCierre({
           <ItemHito
             etiqueta="Proyecto transversal"
             disponible={transversal.disponible}
+            enCurso={false}
             motivoBloqueo={transversal.motivoBloqueo ?? null}
             onClick={() => onAbrirHito("transversal")}
             esUltimo={!entrevistaIa}
@@ -44,6 +45,7 @@ export function SeccionHaciaElCierre({
           <ItemHito
             etiqueta="Entrevista IA"
             disponible={entrevistaIa.disponible}
+            enCurso={entrevistaIa.razon === "INTENTO_EN_CURSO"}
             motivoBloqueo={entrevistaIa.motivoBloqueo ?? null}
             onClick={() => onAbrirHito("entrevistaIa")}
             esUltimo={true}
@@ -57,18 +59,29 @@ export function SeccionHaciaElCierre({
 interface ItemHitoProps {
   readonly etiqueta: string
   readonly disponible: boolean
+  readonly enCurso: boolean
   readonly motivoBloqueo: string | null
   readonly onClick: () => void
   readonly esUltimo: boolean
 }
 
-function ItemHito({ etiqueta, disponible, motivoBloqueo, onClick, esUltimo }: ItemHitoProps) {
-  const microcopy = disponible ? "Disponible ahora" : (motivoBloqueo ?? "Bloqueado")
+function ItemHito({
+  etiqueta,
+  disponible,
+  enCurso,
+  motivoBloqueo,
+  onClick,
+  esUltimo,
+}: ItemHitoProps) {
+  const accesible = disponible || enCurso
+  const microcopy = disponible
+    ? "Disponible ahora"
+    : enCurso
+      ? "Tienes un intento en curso"
+      : (motivoBloqueo ?? "Bloqueado")
   const contenido = (
     <div className="flex flex-col gap-0.5">
-      <span
-        className={cn("text-body-sm", disponible ? "text-text-primary" : "text-text-secondary")}
-      >
+      <span className={cn("text-body-sm", accesible ? "text-text-primary" : "text-text-secondary")}>
         {etiqueta}
       </span>
       <span className="text-caption text-text-tertiary">{microcopy}</span>
@@ -78,11 +91,11 @@ function ItemHito({ etiqueta, disponible, motivoBloqueo, onClick, esUltimo }: It
   return (
     <li className="relative grid grid-cols-[auto_minmax(0,1fr)] gap-3">
       <div className="flex flex-col items-center">
-        <Punto disponible={disponible} />
+        <Punto accesible={accesible} />
         {esUltimo ? null : <span aria-hidden={true} className="my-1 w-px flex-1 bg-border" />}
       </div>
       <div className={cn("pb-4", esUltimo ? "pb-0" : "")}>
-        {disponible ? (
+        {accesible ? (
           <button
             type="button"
             onClick={onClick}
@@ -98,8 +111,8 @@ function ItemHito({ etiqueta, disponible, motivoBloqueo, onClick, esUltimo }: It
   )
 }
 
-function Punto({ disponible }: { readonly disponible: boolean }) {
-  if (disponible) {
+function Punto({ accesible }: { readonly accesible: boolean }) {
+  if (accesible) {
     return (
       <span
         aria-hidden={true}

@@ -40,8 +40,9 @@ import { MeAvanceService } from "./me-avance.service"
 import { MeBandejaService } from "./me-bandeja.service"
 import { MeCursoArbolService } from "./me-curso-arbol.service"
 import { MeCursosService } from "./me-cursos.service"
-import { fichaACsv, fichaAPdf, slugNombreColaborador } from "./me-ficha-export.helpers"
+import { fichaACsv, slugNombreColaborador } from "./me-ficha-export.helpers"
 import { MeFichaHistorialService } from "./me-ficha-historial.service"
+import { fichaAPdfReporte, filtrarHitosMayores } from "./me-ficha-pdf.helpers"
 import { MeFichaResumenService } from "./me-ficha-resumen.service"
 import { MeResumenCierreService } from "./me-resumen-cierre.service"
 
@@ -149,7 +150,15 @@ export class MeController {
       response.setHeader("Content-Disposition", `attachment; filename="${baseFilename}.csv"`)
       response.end(Buffer.from(csv, "utf-8"))
     } else {
-      const pdf = await fichaAPdf(ficha)
+      // Para el reporte PDF cargamos tambien el historial cronologico (hasta 50
+      // eventos recientes) y filtramos a hitos mayores antes de renderizar.
+      // El helper se encarga de cortar al maximo de hitos visibles en 1 pagina.
+      const eventos = await this.meFichaHistorialService.obtenerHistorialDeUsuario(
+        sesion.usuarioId,
+        50,
+      )
+      const hitos = filtrarHitosMayores(eventos)
+      const pdf = await fichaAPdfReporte({ ficha, identidad, hitos })
       response.setHeader("Content-Type", "application/pdf")
       response.setHeader("Content-Disposition", `attachment; filename="${baseFilename}.pdf"`)
       response.end(pdf)

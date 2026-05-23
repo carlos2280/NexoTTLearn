@@ -1,7 +1,8 @@
+import { cn } from "@/shared/lib/cn"
 import { slugArea } from "@/shared/lib/slug-area"
 import type { EventoHistorialFicha } from "@nexott-learn/shared-types"
 import { motion, useReducedMotion } from "framer-motion"
-import { etiquetaNivelSkill, relativizarFecha } from "../mi-ficha.helpers"
+import { esHitoMayor, etiquetaNivelSkill, relativizarFecha } from "../mi-ficha.helpers"
 
 interface EventoItemProps {
   readonly evento: EventoHistorialFicha
@@ -9,18 +10,20 @@ interface EventoItemProps {
 }
 
 /**
- * Item del timeline de /mi-ficha. Cuando el evento es `SKILL_DEMOSTRADA`
- * con origen `ENTREVISTA_IA` y `referenciaIntentoIaId`, muestra debajo un
- * link sutil "Releer la entrevista" — abre el drawer compartido con la
- * transcripcion (decision B post-06 F3).
+ * Item del timeline de /mi-ficha. Distingue **hitos mayores** (curso
+ * completado, skill via transversal o entrevista IA, salto a Excelencia)
+ * de **eventos menores** con tratamiento visual distinto: punto aurora con
+ * halo para hitos, punto de color de area para el resto. Asi el lector
+ * escanea el arco del viaje sin ahogarse en el detalle.
+ *
+ * Cuando el evento es `SKILL_DEMOSTRADA` con origen `ENTREVISTA_IA` y
+ * `referenciaIntentoIaId`, muestra debajo un link sutil "Releer la
+ * entrevista" — abre el drawer compartido con la transcripcion.
  */
 export function EventoItem({ evento, onReleerEntrevista }: EventoItemProps) {
   const reducedMotion = useReducedMotion()
   const fechaRel = relativizarFecha(evento.fecha)
-  const colorDot =
-    evento.tipo === "SKILL_DEMOSTRADA"
-      ? `var(--color-area-${slugArea(evento.areaNombre)})`
-      : "var(--color-text-tertiary)"
+  const esHito = esHitoMayor(evento)
   const intentoIaId =
     evento.tipo === "SKILL_DEMOSTRADA" &&
     evento.origen === "ENTREVISTA_IA" &&
@@ -33,16 +36,17 @@ export function EventoItem({ evento, onReleerEntrevista }: EventoItemProps) {
       initial={reducedMotion ? { opacity: 1 } : { opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 100, damping: 18, mass: 0.6 }}
-      className="grid grid-cols-[100px_auto_1fr] items-start gap-3 border-border border-b py-4 last:border-b-0"
+      className={cn(
+        "grid grid-cols-[100px_auto_1fr] items-start gap-3 border-border border-b last:border-b-0",
+        esHito ? "py-5" : "py-3",
+      )}
     >
-      <span className="text-caption text-text-tertiary">{fechaRel}</span>
-      <span
-        aria-hidden="true"
-        className="mt-1.5 block h-2 w-2 shrink-0 rounded-full"
-        style={{ background: colorDot }}
-      />
+      <span className={cn("text-caption", esHito ? "text-text-secondary" : "text-text-tertiary")}>
+        {fechaRel}
+      </span>
+      <PuntoTimeline evento={evento} esHito={esHito} />
       <div className="flex min-w-0 flex-col gap-0.5">
-        <DescripcionEvento evento={evento} />
+        <DescripcionEvento evento={evento} esHito={esHito} />
         <SubLineaEvento evento={evento} />
         {intentoIaId !== null ? (
           <button
@@ -58,24 +62,57 @@ export function EventoItem({ evento, onReleerEntrevista }: EventoItemProps) {
   )
 }
 
-function DescripcionEvento({ evento }: { readonly evento: EventoHistorialFicha }) {
+interface PuntoTimelineProps {
+  readonly evento: EventoHistorialFicha
+  readonly esHito: boolean
+}
+
+function PuntoTimeline({ evento, esHito }: PuntoTimelineProps) {
+  if (esHito) {
+    return (
+      <span
+        aria-hidden="true"
+        className="mt-2 block h-2.5 w-2.5 shrink-0 rounded-full bg-aurora-violet ring-2 ring-[rgb(var(--color-aurora-violet-rgb)/0.18)]"
+      />
+    )
+  }
+  const colorDot =
+    evento.tipo === "SKILL_DEMOSTRADA"
+      ? `var(--color-area-${slugArea(evento.areaNombre)})`
+      : "var(--color-text-tertiary)"
+  return (
+    <span
+      aria-hidden="true"
+      className="mt-2 block h-1.5 w-1.5 shrink-0 rounded-full"
+      style={{ background: colorDot }}
+    />
+  )
+}
+
+interface DescripcionEventoProps {
+  readonly evento: EventoHistorialFicha
+  readonly esHito: boolean
+}
+
+function DescripcionEvento({ evento, esHito }: DescripcionEventoProps) {
+  const claseTexto = esHito ? "text-body text-text-secondary" : "text-body-sm text-text-secondary"
   switch (evento.tipo) {
     case "SKILL_DEMOSTRADA":
       return (
-        <p className="text-body-sm text-text-secondary">
+        <p className={claseTexto}>
           Demostraste <span className="font-medium text-text-primary">{evento.skillNombre}</span>
         </p>
       )
     case "CURSO_INICIADO":
       return (
-        <p className="text-body-sm text-text-secondary">
+        <p className={claseTexto}>
           Iniciaste el curso{" "}
           <span className="font-medium text-text-primary">{evento.cursoTitulo}</span>
         </p>
       )
     case "CURSO_COMPLETADO":
       return (
-        <p className="text-body-sm text-text-secondary">
+        <p className={claseTexto}>
           Completaste el curso{" "}
           <span className="font-medium text-text-primary">{evento.cursoTitulo}</span>
         </p>

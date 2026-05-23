@@ -15,7 +15,6 @@ interface CanvasTransversalProps {
   readonly cursoId: string
   readonly asignacionId: string | null
   readonly tieneEntrevistaIa: boolean
-  readonly onIrAEntrevistaIa: () => void
 }
 
 /**
@@ -35,7 +34,6 @@ export function CanvasTransversal({
   cursoId,
   asignacionId,
   tieneEntrevistaIa,
-  onIrAEntrevistaIa,
 }: CanvasTransversalProps) {
   const [forzarBrief, setForzarBrief] = useState(false)
   const [intentoIdRecienCreado, setIntentoIdRecienCreado] = useState<string | null>(null)
@@ -90,7 +88,6 @@ export function CanvasTransversal({
           forzarBrief={forzarBrief}
           tieneEntrevistaIa={tieneEntrevistaIa}
           onIntentoCreado={onIntentoCreado}
-          onIrAEntrevistaIa={onIrAEntrevistaIa}
           onIntentarDeNuevo={() => setForzarBrief(true)}
         />
       </div>
@@ -106,7 +103,6 @@ interface ContenidoTransversalProps {
   readonly forzarBrief: boolean
   readonly tieneEntrevistaIa: boolean
   readonly onIntentoCreado: (intentoId: string) => void
-  readonly onIrAEntrevistaIa: () => void
   readonly onIntentarDeNuevo: () => void
 }
 
@@ -119,7 +115,6 @@ function ContenidoTransversal(props: ContenidoTransversalProps) {
     forzarBrief,
     tieneEntrevistaIa,
     onIntentoCreado,
-    onIrAEntrevistaIa,
     onIntentarDeNuevo,
   } = props
 
@@ -145,7 +140,7 @@ function ContenidoTransversal(props: ContenidoTransversalProps) {
         intento={intentoActivo}
         intentos={intentos}
         tieneEntrevistaIa={tieneEntrevistaIa}
-        onIrAEntrevistaIa={onIrAEntrevistaIa}
+        skillsDemostradas={transversal.skillsQueMide}
       />
     )
   }
