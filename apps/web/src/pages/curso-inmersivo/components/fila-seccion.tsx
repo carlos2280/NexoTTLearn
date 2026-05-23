@@ -59,7 +59,7 @@ export function FilaSeccion({
           <span
             title={titulo}
             className={cn(
-              "block text-body-sm leading-tight line-clamp-2",
+              "line-clamp-2 block text-body-sm leading-tight",
               activa ? "font-semibold text-text-primary" : "",
               completada && !activa ? "text-text-tertiary" : "",
             )}

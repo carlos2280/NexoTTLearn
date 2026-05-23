@@ -78,16 +78,23 @@ interface ItemHitoProps {
   readonly soloLectura: boolean
 }
 
+function microcopyHito(soloLectura: boolean, disponible: boolean, enCurso: boolean): string {
+  if (soloLectura) {
+    return "Completado"
+  }
+  if (disponible) {
+    return "Disponible"
+  }
+  if (enCurso) {
+    return "En curso"
+  }
+  return "Pendiente"
+}
+
 function ItemHito({ etiqueta, disponible, enCurso, activo, onClick, soloLectura }: ItemHitoProps) {
   const accesible = disponible || enCurso
   const interactivo = !soloLectura && accesible
-  const microcopy = soloLectura
-    ? "Completado"
-    : disponible
-      ? "Disponible"
-      : enCurso
-        ? "En curso"
-        : "Pendiente"
+  const microcopy = microcopyHito(soloLectura, disponible, enCurso)
   return (
     <li>
       <button

@@ -66,7 +66,7 @@ export function CanvasEntrevistaIa({
     return <SinAsignacion />
   }
 
-  if (!disponibilidad.data.disponible && !intentoActivo) {
+  if (!(disponibilidad.data.disponible || intentoActivo)) {
     const enCursoId = disponibilidad.data.intentoEnCursoId
     const continuar = enCursoId ? () => continuarIntento(enCursoId) : undefined
     return (

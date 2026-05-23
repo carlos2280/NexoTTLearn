@@ -122,7 +122,7 @@ function FilaArea({ area }: FilaAreaProps) {
         })}
       </span>
       <span className="text-body-sm text-text-secondary">{ETIQUETA_NIVEL[nivel]}</span>
-      <span className="tabular text-caption text-text-tertiary text-right">{conteo}</span>
+      <span className="tabular text-right text-caption text-text-tertiary">{conteo}</span>
     </li>
   )
 }

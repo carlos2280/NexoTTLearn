@@ -35,7 +35,7 @@ export function TuHistorial() {
   return (
     <section
       ref={sectionRef}
-      className="flex flex-col gap-5 scroll-mt-6"
+      className="flex scroll-mt-6 flex-col gap-5"
       aria-labelledby="tu-historial-titulo"
     >
       <header className="flex flex-col gap-1.5">
