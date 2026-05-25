@@ -7,8 +7,8 @@ import { type ConfigQuiz, QuizConfig } from "./quiz/quiz-config"
 import { type BorradorQuiz, leerInicial } from "./quiz/quiz-lectura"
 import { QuizPregunta } from "./quiz/quiz-pregunta"
 import {
-  TIPOS_PREGUNTA_META,
   type PreguntaQuiz,
+  TIPOS_PREGUNTA_META,
   type TipoPreguntaQuiz,
   preguntaVacia,
 } from "./quiz/quiz-tipos"
@@ -63,7 +63,7 @@ export function EditorQuiz({ bloque }: EditorQuizProps) {
     setExpandidaId(nueva.id)
   }
 
-  const accionesAnadir: ReadonlyArray<AccionMenu> = TIPOS_PREGUNTA_META.map((m) => ({
+  const accionesAnadir: readonly AccionMenu[] = TIPOS_PREGUNTA_META.map((m) => ({
     id: m.tipo,
     etiqueta: m.etiqueta,
     icono: m.icono,
@@ -90,7 +90,7 @@ export function EditorQuiz({ bloque }: EditorQuizProps) {
             trigger={
               <button
                 type="button"
-                className="inline-flex items-center gap-1.5 rounded-pill border border-border-strong bg-surface px-3 py-1.5 text-body-sm font-medium text-text-primary shadow-xs transition-[background-color,border-color,box-shadow] duration-fast ease-default hover:bg-subtle/60 focus-visible:border-aurora-violet focus-visible:shadow-ring-aurora-soft focus-visible:outline-none"
+                className="inline-flex items-center gap-1.5 rounded-pill border border-border-strong bg-surface px-3 py-1.5 font-medium text-body-sm text-text-primary shadow-xs transition-[background-color,border-color,box-shadow] duration-fast ease-default hover:bg-subtle/60 focus-visible:border-aurora-violet focus-visible:shadow-ring-aurora-soft focus-visible:outline-none"
               >
                 <Plus className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
                 Añadir pregunta

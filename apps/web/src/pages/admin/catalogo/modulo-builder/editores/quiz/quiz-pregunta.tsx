@@ -2,6 +2,7 @@ import { Button } from "@/shared/components/ui/button"
 import { Textarea } from "@/shared/components/ui/textarea"
 import { cn } from "@/shared/lib/cn"
 import { Check, ChevronDown, ChevronRight, Trash2 } from "lucide-react"
+import type { MouseEvent } from "react"
 import { CuerpoOpcionMultiple } from "./cuerpos/cuerpo-opcion-multiple"
 import { CuerpoOpcionUnica } from "./cuerpos/cuerpo-opcion-unica"
 import { CuerpoRespuestaCorta } from "./cuerpos/cuerpo-respuesta-corta"
@@ -24,6 +25,7 @@ interface QuizPreguntaProps {
   readonly onEliminar: () => void
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: orquesta cabecera + cuerpo por tipo; partir el switch reduce legibilidad sin ganar mantenimiento.
 export function QuizPregunta({
   pregunta,
   numero,
@@ -36,7 +38,7 @@ export function QuizPregunta({
   const meta = metaDeTipo(pregunta.tipo)
   const IconoCabecera = meta.icono
 
-  function alEliminarDesdeCabecera(event: React.MouseEvent<HTMLButtonElement>) {
+  function alEliminarDesdeCabecera(event: MouseEvent<HTMLButtonElement>) {
     event.stopPropagation()
     onEliminar()
   }

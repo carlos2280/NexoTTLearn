@@ -53,7 +53,7 @@ function ChipAprobado({ nota, fecha }: ChipAprobadoProps) {
       <span className="flex flex-wrap items-center gap-x-2 text-caption text-success-on-soft">
         <span>Ya lo realizaste</span>
         <span aria-hidden={true}>·</span>
-        <span className="tabular font-mono font-medium">{Math.round(nota)}%</span>
+        <span className="tabular font-medium font-mono">{Math.round(nota)}%</span>
         <span aria-hidden={true}>·</span>
         <span>{tiempoRelativo(fecha)}</span>
       </span>

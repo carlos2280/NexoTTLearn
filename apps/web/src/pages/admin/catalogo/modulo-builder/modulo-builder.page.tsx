@@ -51,7 +51,9 @@ function ContenidoBuilder() {
     }
     const seccionId = acciones.dialog.seccionId
     const item = datos.arbol.find((i) => i.seccion.id === seccionId)
-    if (!item) return []
+    if (!item) {
+      return []
+    }
     return item.bloques.filter((b) => b.tipo === "CODIGO_PREGUNTAS").map((b) => b.id)
   }, [acciones.dialog, datos.arbol])
 

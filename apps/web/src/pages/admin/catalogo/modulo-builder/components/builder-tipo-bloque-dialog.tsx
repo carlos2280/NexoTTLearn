@@ -2,8 +2,8 @@ import { Dialog } from "@/shared/components/ui/dialog"
 import { cn } from "@/shared/lib/cn"
 import type { TipoBloque } from "@nexott-learn/shared-types"
 import { useEffect, useRef } from "react"
-import type { ContextoContenidoDefecto } from "../editores/shared/contenido-por-defecto"
 import { tipoBloqueMeta } from "../bloque-tipo-meta"
+import type { ContextoContenidoDefecto } from "../editores/shared/contenido-por-defecto"
 
 interface BuilderTipoBloqueDialogProps {
   readonly abierto: boolean
@@ -71,7 +71,9 @@ export function BuilderTipoBloqueDialog({
   function manejarClick(tipo: TipoBloque) {
     if (tipo === "CODIGO_TESTS") {
       const hermano = hermanosCodigoPreguntasIds[0]
-      if (!hermano) return
+      if (!hermano) {
+        return
+      }
       onElegir(tipo, { codigoPreguntasHermanoId: hermano })
       return
     }
@@ -79,8 +81,12 @@ export function BuilderTipoBloqueDialog({
   }
 
   function estaDeshabilitado(tipo: TipoBloque): boolean {
-    if (enviando) return true
-    if (tipo === "CODIGO_TESTS") return hermanosCodigoPreguntasIds.length === 0
+    if (enviando) {
+      return true
+    }
+    if (tipo === "CODIGO_TESTS") {
+      return hermanosCodigoPreguntasIds.length === 0
+    }
     return false
   }
 
@@ -120,7 +126,7 @@ export function BuilderTipoBloqueDialog({
                         "shadow-xs transition-[border-color,box-shadow,transform] duration-base ease-default",
                         "hover:-translate-y-px hover:border-border-emphasis hover:shadow-sm",
                         "focus-visible:border-aurora-violet focus-visible:shadow-ring-aurora-soft focus-visible:outline-none",
-                        "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-xs disabled:hover:border-border",
+                        "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:border-border disabled:hover:shadow-xs",
                       )}
                     >
                       <span

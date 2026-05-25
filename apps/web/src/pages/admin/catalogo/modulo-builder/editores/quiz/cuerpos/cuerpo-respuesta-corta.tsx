@@ -1,6 +1,7 @@
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
 import { Plus, Trash2 } from "lucide-react"
+import type { KeyboardEvent } from "react"
 import type { NormalizacionRespuestaCorta, PreguntaRespuestaCorta } from "../quiz-tipos"
 
 interface CuerpoRespuestaCortaProps {
@@ -15,10 +16,12 @@ interface ToggleNormalizacion {
   readonly etiqueta: string
 }
 
-const TOGGLES: ReadonlyArray<ToggleNormalizacion> = [
+const TOGGLES: readonly ToggleNormalizacion[] = [
   { clave: "trim", etiqueta: "Ignorar espacios al inicio y al final" },
+  // biome-ignore lint/nursery/noSecrets: clave de normalización, no es un secreto.
   { clave: "ignorarMayusculas", etiqueta: "Ignorar mayúsculas y minúsculas" },
   { clave: "ignorarAcentos", etiqueta: "Ignorar acentos y diacríticos" },
+  // biome-ignore lint/nursery/noSecrets: clave de normalización, no es un secreto.
   { clave: "ignorarEspaciosDobles", etiqueta: "Colapsar espacios dobles" },
 ]
 
@@ -43,14 +46,16 @@ export function CuerpoRespuestaCorta({ pregunta, onCambiar }: CuerpoRespuestaCor
   }
 
   function anadirRespuesta() {
-    if (haxMaximas) return
+    if (haxMaximas) {
+      return
+    }
     onCambiar({
       ...pregunta,
       respuestasAceptadas: [...pregunta.respuestasAceptadas, ""],
     })
   }
 
-  function alPulsarEnter(event: React.KeyboardEvent<HTMLInputElement>) {
+  function alPulsarEnter(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
       anadirRespuesta()

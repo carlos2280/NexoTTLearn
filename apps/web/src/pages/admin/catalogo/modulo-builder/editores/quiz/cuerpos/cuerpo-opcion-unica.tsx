@@ -2,6 +2,7 @@ import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
 import { cn } from "@/shared/lib/cn"
 import { Check, Plus, Trash2 } from "lucide-react"
+import type { KeyboardEvent } from "react"
 import { type PreguntaOpcion, type PreguntaOpcionUnica, nuevoId } from "../quiz-tipos"
 
 interface CuerpoOpcionUnicaProps {
@@ -39,14 +40,16 @@ export function CuerpoOpcionUnica({ pregunta, onCambiar }: CuerpoOpcionUnicaProp
   }
 
   function anadirOpcion() {
-    if (haxMaximas) return
+    if (haxMaximas) {
+      return
+    }
     onCambiar({
       ...pregunta,
       opciones: [...pregunta.opciones, { id: nuevoId(), texto: "", esCorrecta: false }],
     })
   }
 
-  function alPulsarEnterEnOpcion(event: React.KeyboardEvent<HTMLInputElement>) {
+  function alPulsarEnterEnOpcion(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
       anadirOpcion()

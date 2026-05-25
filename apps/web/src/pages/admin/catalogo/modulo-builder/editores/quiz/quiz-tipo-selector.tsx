@@ -18,6 +18,7 @@ export function QuizTipoSelector({ valor, onCambiar }: QuizTipoSelectorProps) {
             <button
               key={m.tipo}
               type="button"
+              // biome-ignore lint/a11y/useSemanticElements: el grupo se comporta como segmented control radio sobre <button>; usar <input type=radio> añade label/disposición no deseada.
               role="radio"
               aria-checked={activo}
               onClick={() => onCambiar(m.tipo)}

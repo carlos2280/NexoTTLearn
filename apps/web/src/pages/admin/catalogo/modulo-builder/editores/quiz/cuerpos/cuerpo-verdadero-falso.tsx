@@ -12,7 +12,7 @@ interface OpcionBoton {
   readonly etiqueta: string
 }
 
-const OPCIONES: ReadonlyArray<OpcionBoton> = [
+const OPCIONES: readonly OpcionBoton[] = [
   { valor: true, etiqueta: "Verdadero" },
   { valor: false, etiqueta: "Falso" },
 ]
@@ -28,7 +28,7 @@ export function CuerpoVerdaderoFalso({ pregunta, onCambiar }: CuerpoVerdaderoFal
             <label
               key={opt.etiqueta}
               className={cn(
-                "flex h-12 cursor-pointer items-center justify-center gap-2 rounded-lg border text-body font-medium",
+                "flex h-12 cursor-pointer items-center justify-center gap-2 rounded-lg border font-medium text-body",
                 "transition-[background-color,border-color,color,box-shadow] duration-fast ease-default",
                 activo
                   ? "border-success bg-success-soft text-success-on-soft shadow-xs"

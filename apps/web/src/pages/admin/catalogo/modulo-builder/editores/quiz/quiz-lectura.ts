@@ -42,7 +42,9 @@ export function leerInicial(contenido: Record<string, unknown> | null): Borrador
 
 function adaptarPregunta(p: Record<string, unknown>): PreguntaQuiz | null {
   const id = typeof p.id === "string" ? p.id : null
-  if (id === null) return null
+  if (id === null) {
+    return null
+  }
   const base = {
     id,
     enunciado: typeof p.enunciado === "string" ? p.enunciado : "",

@@ -40,7 +40,7 @@ export function DialogoAsignarColaboradores({
             className="max-w-md flex-1"
           />
           <div className="ms-auto flex items-center gap-3">
-            <span className="font-mono text-caption text-text-tertiary tabular">
+            <span className="tabular font-mono text-caption text-text-tertiary">
               <span className="text-text-primary">{h.seleccionados.size}</span> seleccionado
               {h.seleccionados.size === 1 ? "" : "s"}
             </span>

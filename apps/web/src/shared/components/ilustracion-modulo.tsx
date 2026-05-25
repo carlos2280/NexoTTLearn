@@ -1,4 +1,5 @@
 import { cn } from "@/shared/lib/cn"
+import type { ReactElement } from "react"
 
 /**
  * Ilustraciones hero por módulo — SVG mono-trazo en aurora-violet.
@@ -39,6 +40,7 @@ export function IlustracionModulo({ tituloModulo, className }: IlustracionModulo
   )
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: matcher por keywords; cada rama es una palabra, partirlo en helpers sólo dispersa el mapping.
 function detectarTema(titulo: string): TemaModulo | null {
   const t = titulo.toLowerCase()
   if (t.includes("bienvenida") || t.includes("pánico") || t.includes("panico")) {
@@ -95,6 +97,7 @@ const COMUN_PROPS = {
 
 function SvgBienvenida(props: SvgProps) {
   return (
+    // biome-ignore lint/a11y/noSvgWithoutTitle: ilustración decorativa; el wrapper pasa aria-hidden.
     <svg {...COMUN_PROPS} {...props}>
       <circle cx="48" cy="48" r="34" opacity="0.35" />
       <circle cx="48" cy="48" r="22" />
@@ -106,6 +109,7 @@ function SvgBienvenida(props: SvgProps) {
 
 function SvgGit(props: SvgProps) {
   return (
+    // biome-ignore lint/a11y/noSvgWithoutTitle: ilustración decorativa; el wrapper pasa aria-hidden.
     <svg {...COMUN_PROPS} {...props}>
       <line x1="30" y1="18" x2="30" y2="78" />
       <circle cx="30" cy="22" r="4.5" />
@@ -119,6 +123,7 @@ function SvgGit(props: SvgProps) {
 
 function SvgWeb(props: SvgProps) {
   return (
+    // biome-ignore lint/a11y/noSvgWithoutTitle: ilustración decorativa; el wrapper pasa aria-hidden.
     <svg {...COMUN_PROPS} {...props}>
       <rect x="14" y="20" width="68" height="56" rx="4" />
       <line x1="14" y1="32" x2="82" y2="32" />
@@ -134,6 +139,7 @@ function SvgWeb(props: SvgProps) {
 
 function SvgJavascript(props: SvgProps) {
   return (
+    // biome-ignore lint/a11y/noSvgWithoutTitle: ilustración decorativa; el wrapper pasa aria-hidden.
     <svg {...COMUN_PROPS} {...props}>
       <path d="M 32 20 Q 22 20 22 30 L 22 42 Q 22 48 16 48 Q 22 48 22 54 L 22 66 Q 22 76 32 76" />
       <path d="M 64 20 Q 74 20 74 30 L 74 42 Q 74 48 80 48 Q 74 48 74 54 L 74 66 Q 74 76 64 76" />
@@ -146,6 +152,7 @@ function SvgJavascript(props: SvgProps) {
 
 function SvgTypescript(props: SvgProps) {
   return (
+    // biome-ignore lint/a11y/noSvgWithoutTitle: ilustración decorativa; el wrapper pasa aria-hidden.
     <svg {...COMUN_PROPS} {...props}>
       <path d="M 48 14 L 76 24 L 76 50 Q 76 68 48 82 Q 20 68 20 50 L 20 24 Z" />
       <path d="M 34 48 L 44 58 L 62 38" />
@@ -155,6 +162,7 @@ function SvgTypescript(props: SvgProps) {
 
 function SvgReactBase(props: SvgProps) {
   return (
+    // biome-ignore lint/a11y/noSvgWithoutTitle: ilustración decorativa; el wrapper pasa aria-hidden.
     <svg {...COMUN_PROPS} {...props}>
       <ellipse cx="48" cy="48" rx="32" ry="12" />
       <ellipse cx="48" cy="48" rx="32" ry="12" transform="rotate(60 48 48)" />
@@ -166,6 +174,7 @@ function SvgReactBase(props: SvgProps) {
 
 function SvgReactDatos(props: SvgProps) {
   return (
+    // biome-ignore lint/a11y/noSvgWithoutTitle: ilustración decorativa; el wrapper pasa aria-hidden.
     <svg {...COMUN_PROPS} {...props}>
       <rect x="14" y="28" width="22" height="40" rx="2" />
       <line x1="20" y1="38" x2="30" y2="38" />
@@ -182,6 +191,7 @@ function SvgReactDatos(props: SvgProps) {
 
 function SvgIa(props: SvgProps) {
   return (
+    // biome-ignore lint/a11y/noSvgWithoutTitle: ilustración decorativa; el wrapper pasa aria-hidden.
     <svg {...COMUN_PROPS} {...props}>
       <path d="M 48 16 L 53 38 L 76 43 L 56 50 L 60 72 L 48 58 L 36 72 L 40 50 L 20 43 L 43 38 Z" />
       <circle cx="76" cy="20" r="2" fill="currentColor" stroke="none" />
@@ -193,6 +203,7 @@ function SvgIa(props: SvgProps) {
 
 function SvgCierre(props: SvgProps) {
   return (
+    // biome-ignore lint/a11y/noSvgWithoutTitle: ilustración decorativa; el wrapper pasa aria-hidden.
     <svg {...COMUN_PROPS} {...props}>
       <path d="M 24 30 L 48 18 L 72 30 L 72 58 L 48 70 L 24 58 Z" />
       <path d="M 24 30 L 48 42 L 72 30" />
@@ -202,7 +213,7 @@ function SvgCierre(props: SvgProps) {
   )
 }
 
-const SVG_POR_TEMA: Record<TemaModulo, (props: SvgProps) => JSX.Element> = {
+const SVG_POR_TEMA: Record<TemaModulo, (props: SvgProps) => ReactElement> = {
   bienvenida: SvgBienvenida,
   git: SvgGit,
   web: SvgWeb,

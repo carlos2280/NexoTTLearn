@@ -61,7 +61,7 @@ export interface TipoPreguntaMeta {
   readonly icono: LucideIcon
 }
 
-export const TIPOS_PREGUNTA_META: ReadonlyArray<TipoPreguntaMeta> = [
+export const TIPOS_PREGUNTA_META: readonly TipoPreguntaMeta[] = [
   {
     tipo: "OPCION_UNICA",
     etiqueta: "Opción única",
@@ -113,6 +113,7 @@ export function preguntaEstaCompleta(pregunta: PreguntaQuiz): boolean {
   if (pregunta.enunciado.trim().length === 0) {
     return false
   }
+  // biome-ignore lint/style/useDefaultSwitchClause: switch exhaustivo sobre TipoPreguntaQuiz; el chequeo lo hace TypeScript.
   switch (pregunta.tipo) {
     case "OPCION_UNICA": {
       const correctas = pregunta.opciones.filter((o) => o.esCorrecta).length
@@ -134,7 +135,7 @@ export function preguntaEstaCompleta(pregunta: PreguntaQuiz): boolean {
       return typeof pregunta.correcta === "boolean"
     case "RESPUESTA_CORTA":
       return (
-        pregunta.respuestasAceptadas.length >= 1 &&
+        pregunta.respuestasAceptadas.length > 0 &&
         pregunta.respuestasAceptadas.every((r) => r.trim().length > 0)
       )
   }
@@ -159,6 +160,7 @@ export function preguntaVacia(tipo: TipoPreguntaQuiz): PreguntaQuiz {
     pesoPunto: 1,
     explicacion: "",
   }
+  // biome-ignore lint/style/useDefaultSwitchClause: switch exhaustivo sobre TipoPreguntaQuiz; el chequeo lo hace TypeScript.
   switch (tipo) {
     case "OPCION_UNICA":
       return {
@@ -215,6 +217,7 @@ export function convertirTipo(pregunta: PreguntaQuiz, nuevoTipo: TipoPreguntaQui
     pregunta.tipo === "OPCION_UNICA" || pregunta.tipo === "OPCION_MULTIPLE"
       ? pregunta.opciones
       : null
+  // biome-ignore lint/style/useDefaultSwitchClause: switch exhaustivo sobre TipoPreguntaQuiz; el chequeo lo hace TypeScript.
   switch (nuevoTipo) {
     case "OPCION_UNICA": {
       const opciones = opcionesPrevias ?? [
