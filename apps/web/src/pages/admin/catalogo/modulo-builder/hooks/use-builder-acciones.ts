@@ -12,7 +12,10 @@ import {
 import type { BloqueResponse, SeccionResponse, TipoBloque } from "@nexott-learn/shared-types"
 import { useState } from "react"
 import { toast } from "sonner"
-import { contenidoPorDefecto } from "../editores/shared/contenido-por-defecto"
+import {
+  type ContextoContenidoDefecto,
+  contenidoPorDefecto,
+} from "../editores/shared/contenido-por-defecto"
 import type { BuilderSeleccion } from "./use-builder-seleccion"
 
 type Dialog =
@@ -83,11 +86,11 @@ export function useBuilderAcciones({ moduloId, seleccion }: UseBuilderAccionesAr
     cerrar()
   }
 
-  async function ejecutarCrearBloque(tipo: TipoBloque) {
+  async function ejecutarCrearBloque(tipo: TipoBloque, contexto?: ContextoContenidoDefecto) {
     if (dialog.modo !== "tipos-bloque") {
       return
     }
-    await crearBloqueDirecto(dialog.seccionId, tipo)
+    await crearBloqueDirecto(dialog.seccionId, tipo, contexto)
     cerrar()
   }
 
@@ -95,14 +98,18 @@ export function useBuilderAcciones({ moduloId, seleccion }: UseBuilderAccionesAr
    * Crear bloque sin pasar por el dialog (slash command). Util desde dentro
    * del editor de un bloque para insertar un hermano de tipo X.
    */
-  async function crearBloqueDirecto(seccionId: string, tipo: TipoBloque) {
+  async function crearBloqueDirecto(
+    seccionId: string,
+    tipo: TipoBloque,
+    contexto?: ContextoContenidoDefecto,
+  ) {
     const nuevo = await crearBloque.mutateAsync({
       seccionId,
       input: {
         tipo,
         esEvaluable: false,
         skillQueMideId: null,
-        contenido: contenidoPorDefecto(tipo),
+        contenido: contenidoPorDefecto(tipo, contexto),
       },
     })
     seleccion.seleccionarBloque(nuevo.id)

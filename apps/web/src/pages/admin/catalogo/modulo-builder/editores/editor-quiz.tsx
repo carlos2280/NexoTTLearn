@@ -1,50 +1,22 @@
-import { Button } from "@/shared/components/ui/button"
 import { EmptyState } from "@/shared/components/ui/empty-state"
+import { type AccionMenu, MenuAcciones } from "@/shared/components/ui/menu-acciones"
 import type { BloqueDetalleResponse } from "@nexott-learn/shared-types"
-import { HelpCircle, Plus } from "lucide-react"
+import { ChevronDown, HelpCircle, Plus } from "lucide-react"
 import { useMemo, useRef, useState } from "react"
-import { type ConfigQuiz, QuizConfig, type SolucionVisible } from "./quiz/quiz-config"
-import { type PreguntaQuiz, QuizPregunta, preguntaVacia } from "./quiz/quiz-pregunta"
+import { type ConfigQuiz, QuizConfig } from "./quiz/quiz-config"
+import { type BorradorQuiz, leerInicial } from "./quiz/quiz-lectura"
+import { QuizPregunta } from "./quiz/quiz-pregunta"
+import {
+  TIPOS_PREGUNTA_META,
+  type PreguntaQuiz,
+  type TipoPreguntaQuiz,
+  preguntaVacia,
+} from "./quiz/quiz-tipos"
 import { EditorBloqueShell } from "./shared/editor-bloque-shell"
 import { useAutoGuardarBloque } from "./shared/use-auto-guardar-bloque"
 
 interface EditorQuizProps {
   readonly bloque: BloqueDetalleResponse
-}
-
-interface BorradorQuiz {
-  readonly config: ConfigQuiz
-  readonly preguntas: readonly PreguntaQuiz[]
-}
-
-function leerInicial(contenido: Record<string, unknown> | null): BorradorQuiz {
-  const intentosMax =
-    contenido?.intentosMax === null
-      ? null
-      : typeof contenido?.intentosMax === "number"
-        ? contenido.intentosMax
-        : null
-  const solucion: SolucionVisible =
-    contenido?.solucionVisible === "tras_intento" ||
-    contenido?.solucionVisible === "al_aprobar" ||
-    contenido?.solucionVisible === "al_cerrar"
-      ? (contenido.solucionVisible as SolucionVisible)
-      : "al_aprobar"
-  const ordenAleatorio =
-    typeof contenido?.ordenAleatorio === "boolean" ? contenido.ordenAleatorio : false
-  const notaMinima = typeof contenido?.notaMinima === "number" ? contenido.notaMinima : 60
-  const preguntas = Array.isArray(contenido?.preguntas)
-    ? (contenido.preguntas as PreguntaQuiz[])
-    : []
-  return {
-    config: {
-      intentosMax,
-      solucionVisible: solucion,
-      ordenAleatorio,
-      notaMinima,
-    },
-    preguntas,
-  }
 }
 
 export function EditorQuiz({ bloque }: EditorQuizProps) {
@@ -79,26 +51,30 @@ export function EditorQuiz({ bloque }: EditorQuizProps) {
   }
 
   function eliminarPregunta(id: string) {
-    actualizar({
-      ...datos,
-      preguntas: datos.preguntas.filter((p) => p.id !== id),
-    })
+    actualizar({ ...datos, preguntas: datos.preguntas.filter((p) => p.id !== id) })
     if (expandidaId === id) {
       setExpandidaId(null)
     }
   }
 
-  function anadirPregunta() {
-    const nueva = preguntaVacia()
+  function anadirPregunta(tipo: TipoPreguntaQuiz) {
+    const nueva = preguntaVacia(tipo)
     actualizar({ ...datos, preguntas: [...datos.preguntas, nueva] })
     setExpandidaId(nueva.id)
   }
+
+  const accionesAnadir: ReadonlyArray<AccionMenu> = TIPOS_PREGUNTA_META.map((m) => ({
+    id: m.tipo,
+    etiqueta: m.etiqueta,
+    icono: m.icono,
+    onClick: () => anadirPregunta(m.tipo),
+  }))
 
   return (
     <EditorBloqueShell
       bloque={bloque}
       titulo="Quiz de selección"
-      descripcion="Preguntas con una opción correcta. Auto-corregido. La nota es el porcentaje de preguntas correctas sobre el total."
+      descripcion="Preguntas auto-corregidas. La nota es el porcentaje de aciertos (pondera por «peso» de cada pregunta)."
       estadoGuardado={auto.estado}
     >
       <QuizConfig config={datos.config} onCambiar={actualizarConfig} />
@@ -108,17 +84,31 @@ export function EditorQuiz({ bloque }: EditorQuizProps) {
           <span className="nx-eyebrow text-text-tertiary">
             Preguntas · {datos.preguntas.length}
           </span>
-          <Button variant="secondary" size="sm" onClick={anadirPregunta}>
-            <Plus className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
-            Añadir pregunta
-          </Button>
+          <MenuAcciones
+            etiquetaAria="Elegir tipo de pregunta a añadir"
+            grupos={[accionesAnadir]}
+            trigger={
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-pill border border-border-strong bg-surface px-3 py-1.5 text-body-sm font-medium text-text-primary shadow-xs transition-[background-color,border-color,box-shadow] duration-fast ease-default hover:bg-subtle/60 focus-visible:border-aurora-violet focus-visible:shadow-ring-aurora-soft focus-visible:outline-none"
+              >
+                <Plus className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
+                Añadir pregunta
+                <ChevronDown
+                  className="h-3.5 w-3.5 text-text-tertiary"
+                  strokeWidth={1.5}
+                  aria-hidden={true}
+                />
+              </button>
+            }
+          />
         </div>
 
         {datos.preguntas.length === 0 ? (
           <EmptyState
             icono={HelpCircle}
             titulo="Aún no hay preguntas"
-            descripcion="Añade la primera pregunta. Cada una con al menos 2 opciones y una correcta."
+            descripcion="Añade la primera pregunta y elige su tipo. Puedes mezclar varios tipos en el mismo quiz."
           />
         ) : (
           <ol className="flex flex-col gap-2">

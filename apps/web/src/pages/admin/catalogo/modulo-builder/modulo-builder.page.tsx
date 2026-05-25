@@ -45,6 +45,16 @@ function ContenidoBuilder() {
     return datos.arbol.find((item) => item.seccion.id === seleccion.seccionId)?.seccion
   }, [seleccion, datos.arbol])
 
+  const hermanosCodigoPreguntasIds = useMemo<readonly string[]>(() => {
+    if (acciones.dialog.modo !== "tipos-bloque") {
+      return []
+    }
+    const seccionId = acciones.dialog.seccionId
+    const item = datos.arbol.find((i) => i.seccion.id === seccionId)
+    if (!item) return []
+    return item.bloques.filter((b) => b.tipo === "CODIGO_PREGUNTAS").map((b) => b.id)
+  }, [acciones.dialog, datos.arbol])
+
   const bloqueIdSeleccionado = seleccion.tipo === "bloque" ? seleccion.bloqueId : undefined
   const bloqueQuery = useObtenerBloque(bloqueIdSeleccionado)
 
@@ -141,6 +151,7 @@ function ContenidoBuilder() {
         abierto={dialog.modo === "tipos-bloque"}
         onCambiarAbierto={(a) => (a ? null : acciones.cerrar())}
         enviando={acciones.estado.crearBloque}
+        hermanosCodigoPreguntasIds={hermanosCodigoPreguntasIds}
         onElegir={acciones.acciones.crearBloque}
       />
       <ConfirmMotivoDialog

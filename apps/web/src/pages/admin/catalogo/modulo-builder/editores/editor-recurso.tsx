@@ -1,11 +1,13 @@
 import { Field } from "@/shared/components/ui/field"
 import { Input } from "@/shared/components/ui/input"
-import { Textarea } from "@/shared/components/ui/textarea"
+import { Switch } from "@/shared/components/ui/switch"
 import { cn } from "@/shared/lib/cn"
 import { type BloqueDetalleResponse, contenidoRecursoSchema } from "@nexott-learn/shared-types"
 import { ExternalLink, Paperclip } from "lucide-react"
 import { useRef, useState } from "react"
 import { EditorBloqueShell } from "./shared/editor-bloque-shell"
+import { TiptapEditor } from "./shared/tiptap-editor"
+import { extensionesMinimas } from "./shared/tiptap-extensiones"
 import { useAutoGuardarBloque } from "./shared/use-auto-guardar-bloque"
 
 interface EditorRecursoProps {
@@ -131,28 +133,29 @@ export function EditorRecurso({ bloque }: EditorRecursoProps) {
         )}
       </Field>
 
-      <Field label="Descripción" hint="Opcional. Aparece debajo del título.">
-        {(attrs) => (
-          <Textarea
-            {...attrs}
-            rows={3}
-            value={datos.descripcion}
-            onChange={(e) => actualizar({ descripcion: e.target.value })}
-            placeholder="Ej. Capítulo oficial sobre genéricos del Handbook…"
+      <Field
+        label="Descripción"
+        hint="Opcional. Acepta negrita, cursiva, listas, código inline y enlaces."
+      >
+        {(_attrs) => (
+          <TiptapEditor
+            key={bloque.id}
+            htmlInicial={datos.descripcion}
+            extensiones={extensionesMinimas("Ej. Capítulo oficial sobre genéricos del Handbook…")}
+            variante="minima"
+            altoMin="100px"
+            onCambio={(html) => actualizar({ descripcion: html })}
           />
         )}
       </Field>
 
       {datos.subtipo === "enlace" ? (
-        <label className="inline-flex items-center gap-2 text-body-sm text-text-secondary">
-          <input
-            type="checkbox"
-            checked={datos.abrirNuevaPestana}
-            onChange={(e) => actualizar({ abrirNuevaPestana: e.target.checked })}
-            className="h-4 w-4 rounded border-border-strong text-accent focus:ring-accent"
-          />
-          Abrir en nueva pestaña
-        </label>
+        <Switch
+          checked={datos.abrirNuevaPestana}
+          onCambio={(v) => actualizar({ abrirNuevaPestana: v })}
+          label="Abrir en nueva pestaña"
+          descripcion="Se abre en una pestaña aparte para no interrumpir el curso."
+        />
       ) : null}
     </EditorBloqueShell>
   )

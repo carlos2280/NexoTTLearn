@@ -51,3 +51,19 @@ export function sanitizarHtml(html: string): string {
     ADD_ATTR: ["target"],
   })
 }
+
+/**
+ * Extrae sólo el texto plano de un HTML (sin tags), colapsando whitespace.
+ * Útil para cabeceras compactas o terminales tipo IDE donde la descripción
+ * se guarda como HTML (TipTap) pero el render no admite formato.
+ */
+export function extraerTextoPlano(html: string): string {
+  return DOMPurify.sanitize(html, {
+    // biome-ignore lint/style/useNamingConvention: API de DOMPurify.
+    ALLOWED_TAGS: [],
+    // biome-ignore lint/style/useNamingConvention: API de DOMPurify.
+    ALLOWED_ATTR: [],
+  })
+    .replace(/\s+/g, " ")
+    .trim()
+}
