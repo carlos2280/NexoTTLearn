@@ -31,7 +31,15 @@ import {
   seedSkillsFrontend,
 } from "./seeds/catalogo"
 import { seedCurso, seedModulos } from "./seeds/curso"
+import {
+  CURSO_SOPORTE_REACT_TITULO,
+  SKILLS_SOPORTE_REACT,
+  seedCursoSoporteReact,
+  seedModulosSoporteReact,
+  seedSkillsSoporteReact,
+} from "./seeds/curso-soporte-react"
 import { MODULOS_FRONTEND } from "./seeds/modulos"
+import { MODULOS_SOPORTE_REACT } from "./seeds/modulos/soporte-react"
 import { seedAsignacionesFrontend, seedNotasSkill } from "./seeds/progreso"
 
 async function main(): Promise<void> {
@@ -51,6 +59,17 @@ async function main(): Promise<void> {
     await seedAsignacionesFrontend(prisma, cursoIdResolved, modulos)
     await seedNotasSkill(prisma, cursoIdResolved, skillIdByEtiqueta)
 
+    // ---- Curso #2: "De Soporte a Frontend Dev" ----
+    // Skills + modulos + curso. Reusa el cliente y las areas globales.
+    const skillIdSoporte = await seedSkillsSoporteReact(prisma, areaIdByNombre)
+    const modulosSoporte = await seedModulosSoporteReact(prisma, skillIdSoporte)
+    const cursoSoporteId = await seedCursoSoporteReact(
+      prisma,
+      clienteIdResolved,
+      modulosSoporte,
+      skillIdSoporte,
+    )
+
     log("")
     log("===== RESUMEN seed =====")
     log(`Admins:          ${ADMINS.length}`)
@@ -64,6 +83,12 @@ async function main(): Promise<void> {
     log("")
     log("Curso destacado: 'Frontend para devs backend' (10 modulos placeholder).")
     log("Entrevista IA y Transversal habilitados.")
+    log("")
+    log(`Curso #2: '${CURSO_SOPORTE_REACT_TITULO}' (cursoId=${cursoSoporteId})`)
+    log(`  Modulos:  ${MODULOS_SOPORTE_REACT.length}`)
+    log(`  Secciones: ${MODULOS_SOPORTE_REACT.reduce((acc, m) => acc + m.secciones.length, 0)}`)
+    log(`  Skills:   ${SKILLS_SOPORTE_REACT.length}`)
+    log("  Estado: M00 con bloques reales; M01-M08 con placeholder (en preparacion).")
     log("")
     log("Admins (password Cambiar2026!):")
     for (const a of ADMINS) {
