@@ -1,0 +1,30 @@
+export const RUTAS = {
+  login: "/login",
+  logout: "/logout",
+  bandeja: "/bandeja",
+  cuenta: "/cuenta",
+  notificaciones: "/notificaciones",
+  playground: "/playground",
+  participante: {
+    misCursos: "/mis-cursos",
+    miFicha: "/mi-ficha",
+    catalogo: "/catalogo",
+    cursoDetalle: (cursoId: string) => `/cursos/${cursoId}`,
+    cursoCerrado: (cursoId: string) => `/cursos/${cursoId}/cerrado`,
+  },
+  admin: {
+    inicio: "/admin",
+    cursos: "/admin/cursos",
+    cursoDetalle: (id: string) => `/admin/cursos/${id}`,
+    cursoAsignaciones: (id: string) => `/admin/cursos/${id}/asignaciones`,
+    personas: "/admin/personas",
+    clientes: "/admin/clientes",
+    catalogo: "/admin/catalogo",
+    // El detalle de módulo abre directamente el builder inmersivo.
+    catalogoModuloDetalle: (id: string) => `/admin/catalogo/modulos/${id}`,
+    reportes: "/admin/reportes",
+    sistema: "/admin/sistema",
+    intentoEntrevistaIa: (intentoId: string) => `/admin/intentos-entrevista-ia/${intentoId}`,
+    intentoTransversal: (intentoId: string) => `/admin/intentos-transversal/${intentoId}`,
+  },
+} as const

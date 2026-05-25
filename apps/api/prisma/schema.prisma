@@ -1,49 +1,1359 @@
-// NexoTT Learn - Schema Prisma
-// Inicialmente solo Auth. Crece por dominio conforme avancen los sprints.
+// =============================================================================
+// NexoTT Learn — Prisma schema (PostgreSQL 16)
+// -----------------------------------------------------------------------------
+// Fuente de verdad: docs/NexoTTLearn/04_datos/modelo_fisico.md
+// Convenciones:
+//   - Modelos PascalCase (espanol). Campos camelCase. Mapeo a snake_case con
+//     @map / @@map (D: Arquitectura "Tablas BD en snake_case espanol").
+//   - PKs uuid con DEFAULT gen_random_uuid() (extension pgcrypto).
+//   - Timestamps timestamptz almacenados en UTC.
+//   - email en citext (extension citext) para case-insensitive.
+//   - Notas y pesos numeric(5,2). null ≠ 0 (regla transversal D40).
+//   - Enums Postgres nativos, valores SIN tildes/Ñ, espacios → "_".
+//
+// LO QUE PRISMA NO PUEDE EXPRESAR (anadir en migracion SQL inicial):
+//   - CHECK constraints (rangos 0–100, suma de pesos = 100, coherencias rol↔estado, etc.)
+//   - UNIQUE deferrable: (modulo_id, orden) en secciones; (seccion_id, orden) en bloques
+//   - UNIQUE parcial: uq_intentos_bloque_mejor (con WHERE)
+//   - Indices parciales WHERE: idx_skills_estado, idx_modulos_estado,
+//     idx_bloques_skill_evaluable, idx_asignaciones_estado_asignado,
+//     idx_intentos_bloque_skill_vigente, idx_notif_usuario_no_leidas, idx_notif_archivar.
+//   - Trigger generico set_updated_at() BEFORE UPDATE.
+//   - REVOKE UPDATE/DELETE en tablas append-only.
+//   - Singleton CHECK (id = 1) en configuracion_sistema.
+//   - Vistas / materialized views (mv_nota_skill_bloques, v_avance_plan, v_cobertura_skills_curso).
+//
+// Estos extras viven en prisma/migrations/<timestamp>_init/migration.sql como
+// SQL adicional tras el DDL generado por `prisma migrate dev`.
+// =============================================================================
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgcrypto, citext]
 }
 
-// ═══════════════════════════════════════════
-// USUARIOS Y AUTENTICACION
-// ═══════════════════════════════════════════
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum EstadoSkill {
+  ACTIVA
+  ARCHIVADA
+
+  @@map("estado_skill_enum")
+}
+
+enum EstadoModulo {
+  ACTIVO
+  ARCHIVADO
+
+  @@map("estado_modulo_enum")
+}
+
+enum TipoBloque {
+  PARRAFO
+  TIP
+  VIDEO
+  RECURSO
+  CODIGO_ILUSTRATIVO
+  QUIZ
+  CODIGO_PREGUNTAS
+  CODIGO_TESTS
+  DIAGRAMA
+
+  @@map("tipo_bloque_enum")
+}
+
+enum EstadoBloque {
+  ACTIVO
+  ELIMINADO
+
+  @@map("estado_bloque_enum")
+}
+
+enum EstadoCurso {
+  BORRADOR
+  ACTIVO
+  CERRADO
+  ARCHIVADO
+
+  @@map("estado_curso_enum")
+}
+
+enum DesbloqueoCurso {
+  ENCADENADO
+  SIEMPRE
+  DESDE_FECHA
+
+  @@map("desbloqueo_curso_enum")
+}
+
+enum EstadoEmpleado {
+  ACTIVO
+  EX_EMPLEADO
+
+  @@map("estado_empleado_enum")
+}
+
+enum RolUsuario {
+  ADMIN
+  PARTICIPANTE
+
+  @@map("rol_usuario_enum")
+}
+
+enum RolAsignacion {
+  ASIGNADO
+  VOLUNTARIO
+
+  @@map("rol_asignacion_enum")
+}
+
+enum OrigenVoluntario {
+  INICIATIVA
+  REUTILIZACION
+
+  @@map("origen_voluntario_enum")
+}
+
+enum EstadoAsignado {
+  ASIGNADO
+  EN_PROGRESO
+  LISTO
+  APTO
+  NO_APTO
+  RETIRADO
+
+  @@map("estado_asignado_enum")
+}
+
+enum EstadoVoluntario {
+  INSCRITO
+  EN_PROGRESO
+  LISTO
+  COMPLETADO
+  RETIRADO
+
+  @@map("estado_voluntario_enum")
+}
+
+enum ResultadoEntrevistaCliente {
+  PENDIENTE
+  PASO
+  NO_PASO
+
+  @@map("resultado_entrevista_cliente_enum")
+}
+
+enum CaracterItemPlan {
+  OBLIGATORIA
+  OPCIONAL
+
+  @@map("caracter_item_plan_enum")
+}
+
+enum RazonItemPlan {
+  SKILL_FALTANTE
+  SKILL_CERCA
+  SKILL_YA_CUMPLE
+  AJUSTE_ADMIN
+
+  @@map("razon_item_plan_enum")
+}
+
+enum OrigenNotaSkill {
+  ENTREVISTA_INICIAL
+  BLOQUE
+  TRANSVERSAL
+  ENTREVISTA_IA
+  MANUAL
+
+  @@map("origen_nota_skill_enum")
+}
+
+enum FilosofiaEntrevista {
+  PREPARACION
+  FILTRO
+
+  @@map("filosofia_entrevista_enum")
+}
+
+enum ProfundidadEntrevista {
+  JUNIOR
+  SEMI_SENIOR
+  SENIOR
+
+  @@map("profundidad_entrevista_enum")
+}
+
+enum TonoEntrevista {
+  CONVERSACIONAL
+  FORMAL
+
+  @@map("tono_entrevista_enum")
+}
+
+enum TipoEventoNotif {
+  ASIGNACION_CURSO
+  PLAN_RECALCULADO
+  TRANSVERSAL_DISPONIBLE
+  ENTREVISTA_IA_DISPONIBLE
+  RECORDATORIO_DEADLINE
+  CASO_REABIERTO
+  RESULTADO_CIERRE
+  CURSO_DEADLINE
+  COLABORADOR_LISTO
+  EXCEL_CARGADO
+  MODULO_HUERFANO_SKILL
+  PLANES_DESACTUALIZADOS
+  CENTRO_REVISION
+
+  @@map("tipo_evento_notif_enum")
+}
+
+enum CanalNotif {
+  IN_APP
+  CORREO
+
+  @@map("canal_notif_enum")
+}
+
+enum ModoEntregaPassword {
+  MANUAL
+  AUTOMATICO
+
+  @@map("modo_entrega_password_enum")
+}
+
+enum AccionLogCurso {
+  CAMBIO_AREAS
+  CAMBIO_PESOS
+  CAMBIO_OBJETIVOS
+  TOGGLE_TRANSVERSAL
+  TOGGLE_ENTREVISTA
+  CAMBIO_MODULOS
+  PUBLICACION
+  CIERRE
+  DESHACER_CIERRE
+  ARCHIVADO
+  OTRO
+
+  @@map("accion_log_curso_enum")
+}
+
+enum AccionAjustePlan {
+  AGREGAR
+  QUITAR
+  EXIMIR
+  CAMBIAR_CARACTER
+
+  @@map("accion_ajuste_plan_enum")
+}
+
+enum AccionAuditoria {
+  LOGIN_OK
+  LOGIN_FAIL
+  LOGOUT
+  PASSWORD_CHANGED
+  PASSWORD_REGENERATED
+  USUARIO_DESBLOQUEADO
+  SESION_ELIMINADA
+  COLABORADOR_CREADO
+  AVISO_ACEPTADO
+  LOGIN_PARCIAL_OK
+  MFA_SETUP_INICIADO
+  MFA_ENABLED
+  MFA_VERIFY_OK
+  MFA_VERIFY_FAIL
+  MFA_DISABLED
+  AREA_CREADA
+  AREA_ACTUALIZADA
+  AREA_ELIMINADA
+  SKILL_CREADA
+  SKILL_RENOMBRADA
+  SKILL_ARCHIVADA
+  SKILL_DESARCHIVADA
+  SKILL_ELIMINADA
+  SKILL_CAMBIO_AREA
+  SKILL_FUSIONADA
+  MODULO_CREADO
+  MODULO_ACTUALIZADO
+  MODULO_ARCHIVADO
+  MODULO_DESARCHIVADO
+  MODULO_ELIMINADO
+  MODULO_HUERFANO_DETECTADO
+  SECCION_CREADA
+  SECCION_ACTUALIZADA
+  SECCION_REORDENADA
+  SECCION_ELIMINADA
+  BLOQUE_CREADO
+  BLOQUE_EDITADO_COSMETICO
+  BLOQUE_EDITADO_EVALUACION
+  BLOQUE_REORDENADO
+  BLOQUE_ELIMINADO_SOFT
+  CLIENTE_CREADO
+  CLIENTE_ACTUALIZADO
+  CLIENTE_ELIMINADO
+  EVALUACION_TEMPLATE_DESCARGADO
+  EVALUACION_PREVIEW_CREADO
+  EVALUACION_PREVIEW_DESCARTADO
+  EVALUACION_APLICADA
+  NOTA_SKILL_EDITADA_MANUALMENTE
+  ASIGNACION_CREADA
+  ASIGNACION_CONVERTIDA
+  ASIGNACION_INICIADA
+  ASIGNACION_LISTA
+  ASIGNACION_CERRADA
+  ASIGNACION_REABIERTA
+  ASIGNACION_RETIRADA
+  RESULTADO_ENTREVISTA_CLIENTE_REGISTRADO
+  VOLUNTARIO_AUTOINSCRITO
+  PLAN_RECALCULADO
+  PLAN_AJUSTADO_MANUALMENTE
+  INTENTO_BLOQUE_INVALIDADO
+  INTENTO_TRANSVERSAL_CREADO
+  INTENTO_TRANSVERSAL_FINALIZADO
+  INTENTO_TRANSVERSAL_ANULADO
+  INTENTO_TRANSVERSAL_CAPA_CARGADA
+  TRANSVERSAL_SKILLS_ACTUALIZADAS
+  INTENTO_ENTREVISTA_IA_CREADO
+  INTENTO_ENTREVISTA_IA_FINALIZADO
+  INTENTO_ENTREVISTA_IA_AJUSTADO
+  INTENTO_ENTREVISTA_IA_ANULADO
+  PREFERENCIA_NOTIFICACION_ACTUALIZADA
+  CURSO_CERRADO
+  CURSO_CIERRE_DESHECHO
+  FICHA_EXPORTADA
+  PLAN_RECALCULADO_MASIVO
+  AUDITORIA_EXPORTADA
+  LOGS_EXPORTADO
+
+  @@map("accion_auditoria_enum")
+}
+
+enum IntentoEntrevistaIaEstado {
+  EN_PROGRESO
+  FINALIZADO
+  ANULADO
+
+  @@map("intento_entrevista_ia_estado_enum")
+}
+
+enum EstadoIntentoTransversal {
+  EN_EVALUACION
+  EVALUADO
+  FINALIZADO
+  ANULADO
+
+  @@map("estado_intento_transversal_enum")
+}
+
+enum ArchivoTipo {
+  EVALUACION_INICIAL_EXCEL
+
+  @@map("archivo_tipo_enum")
+}
+
+enum TipoReporteCache {
+  EFICACIA_PLATAFORMA
+  HISTORICO_CLIENTE
+  INVENTARIO_SKILLS
+  REUTILIZACION_CATALOGO
+
+  @@map("tipo_reporte_cache_enum")
+}
+
+// =============================================================================
+// CATALOGO: areas, skills, modulos, secciones, bloques
+// =============================================================================
+
+model Area {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nombre      String   @unique
+  codigo      String   @default(dbgenerated("substr(replace(gen_random_uuid()::text, '-', ''), 1, 32)")) @db.VarChar(32)
+  descripcion String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  skills                        Skill[]
+  cursosAreasExigidas           CursoAreaExigida[]
+  rubricaEntrevistaIA           RubricaEntrevistaIA[]
+  intentosEntrevistaIANotasArea IntentoEntrevistaIANotaArea[]
+  historicoCambiosAreaAnterior  HistoricoCambiosAreaSkill[]   @relation("HistCambiosArea_Anterior")
+  historicoCambiosAreaNueva     HistoricoCambiosAreaSkill[]   @relation("HistCambiosArea_Nueva")
+
+  @@map("areas")
+}
+
+model Skill {
+  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  etiquetaVisible String      @unique @map("etiqueta_visible")
+  areaId          String      @map("area_id") @db.Uuid
+  estado          EstadoSkill @default(ACTIVA)
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  area                 Area                        @relation(fields: [areaId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  historicoRenombrados HistoricoRenombradoSkill[]
+  historicoCambiosArea HistoricoCambiosAreaSkill[]
+  seccionesSkills      SeccionSkill[]
+  bloquesEvaluan       Bloque[]
+  cursosSkillsExigidas CursoSkillExigida[]
+  transversalesSkills  TransversalSkill[]
+  notasSkill           NotaSkill[]
+  intentosBloque       IntentoBloque[]
+
+  @@index([areaId], map: "idx_skills_area_id")
+  @@map("skills")
+}
+
+model HistoricoRenombradoSkill {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  skillId          String   @map("skill_id") @db.Uuid
+  fecha            DateTime @default(now()) @db.Timestamptz(6)
+  etiquetaAnterior String   @map("etiqueta_anterior")
+  etiquetaNueva    String   @map("etiqueta_nueva")
+  autorUsuarioId   String   @map("autor_usuario_id") @db.Uuid
+  motivo           String?
+
+  skill        Skill   @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  autorUsuario Usuario @relation("HistRenombradoSkill_Autor", fields: [autorUsuarioId], references: [id], onDelete: Restrict)
+
+  @@index([skillId, fecha(sort: Desc)], map: "idx_historico_renombrados_skill_id")
+  @@map("historico_renombrados_skill")
+}
+
+model HistoricoCambiosAreaSkill {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  skillId        String   @map("skill_id") @db.Uuid
+  fecha          DateTime @default(now()) @db.Timestamptz(6)
+  areaAnteriorId String   @map("area_anterior_id") @db.Uuid
+  areaNuevaId    String   @map("area_nueva_id") @db.Uuid
+  autorUsuarioId String   @map("autor_usuario_id") @db.Uuid
+  motivo         String
+
+  skill        Skill   @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  areaAnterior Area    @relation("HistCambiosArea_Anterior", fields: [areaAnteriorId], references: [id], onDelete: Restrict)
+  areaNueva    Area    @relation("HistCambiosArea_Nueva", fields: [areaNuevaId], references: [id], onDelete: Restrict)
+  autorUsuario Usuario @relation("HistCambiosAreaSkill_Autor", fields: [autorUsuarioId], references: [id], onDelete: Restrict)
+
+  @@index([skillId, fecha(sort: Desc)])
+  @@map("historico_cambios_area_skill")
+}
+
+model Modulo {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  titulo      String
+  descripcion String?
+  estado      EstadoModulo @default(ACTIVO)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime?    @map("deleted_at") @db.Timestamptz(6)
+
+  secciones                Seccion[]
+  historicoEstados         HistoricoEstadoModulo[]
+  cursosModulosHabilitados CursoModuloHabilitado[]
+  itemsPlan                ItemPlan[]
+
+  @@map("modulos")
+}
+
+model HistoricoEstadoModulo {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  moduloId       String       @map("modulo_id") @db.Uuid
+  fecha          DateTime     @default(now()) @db.Timestamptz(6)
+  estadoAnterior EstadoModulo @map("estado_anterior")
+  estadoNuevo    EstadoModulo @map("estado_nuevo")
+  autorUsuarioId String       @map("autor_usuario_id") @db.Uuid
+  motivo         String
+
+  modulo       Modulo  @relation(fields: [moduloId], references: [id], onDelete: Restrict)
+  autorUsuario Usuario @relation("HistEstadoModulo_Autor", fields: [autorUsuarioId], references: [id], onDelete: Restrict)
+
+  @@index([moduloId, fecha(sort: Desc)])
+  @@map("historico_estados_modulo")
+}
+
+model Seccion {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  moduloId  String   @map("modulo_id") @db.Uuid
+  titulo    String
+  orden     Int
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  modulo                            Modulo                           @relation(fields: [moduloId], references: [id], onDelete: Restrict)
+  skills                            SeccionSkill[]
+  bloques                           Bloque[]
+  itemsPlan                         ItemPlan[]
+  ajustesPlan                       AjustePlan[]
+  intentosEntrevistaIASeccionesBase IntentoEntrevistaIASeccionBase[]
+  aperturas                         AperturaSeccion[]
+
+  @@unique([moduloId, orden], map: "uq_secciones_modulo_orden")
+  @@index([moduloId, orden], map: "idx_secciones_modulo")
+  @@map("secciones")
+}
+
+model SeccionSkill {
+  seccionId String @map("seccion_id") @db.Uuid
+  skillId   String @map("skill_id") @db.Uuid
+
+  seccion Seccion @relation(fields: [seccionId], references: [id], onDelete: Cascade)
+  skill   Skill   @relation(fields: [skillId], references: [id], onDelete: Restrict)
+
+  @@id([seccionId, skillId])
+  @@index([skillId], map: "idx_secciones_skills_skill")
+  @@map("secciones_skills")
+}
+
+model Bloque {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  seccionId      String       @map("seccion_id") @db.Uuid
+  orden          Int
+  tipo           TipoBloque
+  esEvaluable    Boolean      @map("es_evaluable")
+  skillQueMideId String?      @map("skill_que_mide_id") @db.Uuid
+  contenido      Json         @default("{}") @db.JsonB
+  estado         EstadoBloque @default(ACTIVO)
+  version        Int          @default(1)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  seccion      Seccion         @relation(fields: [seccionId], references: [id], onDelete: Restrict)
+  skillQueMide Skill?          @relation(fields: [skillQueMideId], references: [id], onDelete: Restrict)
+  intentos     IntentoBloque[]
+
+  @@unique([seccionId, orden], map: "uq_bloques_seccion_orden")
+  @@index([seccionId, orden], map: "idx_bloques_seccion")
+  @@map("bloques")
+}
+
+// =============================================================================
+// CLIENTES Y CURSOS
+// =============================================================================
+
+model Cliente {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nombre        String    @unique
+  datosContacto Json?     @map("datos_contacto") @db.JsonB
+  activo        Boolean   @default(true)
+  fechaCreacion DateTime  @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  cursos Curso[]
+
+  @@map("clientes")
+}
+
+/// Curso del catalogo. La FK `transversalId` (1-1 opcional) materializa el lado
+/// `Curso -> ProyectoTransversal`. La FK inversa logica `proyectos_transversales.
+/// curso_id @unique` se mantiene como double-side por compatibilidad con seeders
+/// e2e existentes (D-S8-A2, §5.110). Consolidar en una sola direccion queda
+/// diferido al rediseno de cursos cerrados (Slice 11/12) — el coste de
+/// migracion supera hoy el beneficio.
+model Curso {
+  id                     String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  titulo                 String
+  clienteId              String          @map("cliente_id") @db.Uuid
+  estado                 EstadoCurso     @default(BORRADOR)
+  fechaInicio            DateTime        @map("fecha_inicio") @db.Date
+  fechaDeadline          DateTime        @map("fecha_deadline") @db.Date
+  toggleVoluntarios      Boolean         @default(true) @map("toggle_voluntarios")
+  toggleCierreAutomatico Boolean         @default(false) @map("toggle_cierre_automatico")
+  tieneEntregaACliente   Boolean         @default(true) @map("tiene_entrega_a_cliente")
+  umbralNoCumple         Decimal         @default(10.00) @map("umbral_no_cumple") @db.Decimal(5, 2)
+  pesoBloques            Decimal         @default(70.00) @map("peso_bloques") @db.Decimal(5, 2)
+  pesoTransversal        Decimal         @default(20.00) @map("peso_transversal") @db.Decimal(5, 2)
+  pesoEntrevista         Decimal         @default(10.00) @map("peso_entrevista") @db.Decimal(5, 2)
+  transversalId          String?         @unique @map("transversal_id") @db.Uuid
+  entrevistaIaId         String?         @unique @map("entrevista_ia_id") @db.Uuid
+  umbralesLogro          Json?           @map("umbrales_logro") @db.JsonB
+  desbloqueo             DesbloqueoCurso @default(ENCADENADO)
+  fechaDesbloqueo        DateTime?       @map("fecha_desbloqueo") @db.Date
+  fechaCierre            DateTime?       @map("fecha_cierre") @db.Timestamptz(6)
+  createdAt              DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  cliente            Cliente                 @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  transversal        ProyectoTransversal?    @relation(fields: [transversalId], references: [id], onDelete: SetNull)
+  entrevistaIA       EntrevistaIA?           @relation(fields: [entrevistaIaId], references: [id], onDelete: SetNull)
+  areasExigidas      CursoAreaExigida[]
+  skillsExigidas     CursoSkillExigida[]
+  modulosHabilitados CursoModuloHabilitado[]
+  logCambios         LogCambioCurso[]
+  asignaciones       AsignacionCurso[]
+  intentosBloque     IntentoBloque[]
+  previewsEvalInicial PreviewEvaluacionInicial[] @relation("PreviewEvalInicial_Curso")
+  cargasEvalInicial   CargaEvaluacionInicial[]   @relation("CargaEvalInicial_Curso")
+  fotografiaCierre   CursoFotografiaCierre?
+
+  @@index([clienteId], map: "idx_cursos_cliente")
+  @@index([estado], map: "idx_cursos_estado")
+  @@index([fechaDeadline], map: "idx_cursos_deadline")
+  @@map("cursos")
+}
+
+model CursoFotografiaCierre {
+  cursoId         String    @id @map("curso_id") @db.Uuid
+  fechaCierre     DateTime  @map("fecha_cierre") @db.Timestamptz(6)
+  snapshot        Json      @db.JsonB
+  versionSnapshot Int       @default(1) @map("version_snapshot")
+  descartada      Boolean   @default(false)
+  descartadaAt    DateTime? @map("descartada_at") @db.Timestamptz(6)
+
+  curso Curso @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+
+  @@map("cursos_fotografia_cierre")
+}
+
+model CursoAreaExigida {
+  cursoId         String  @map("curso_id") @db.Uuid
+  areaId          String  @map("area_id") @db.Uuid
+  peso            Decimal @db.Decimal(5, 2)
+  puntajeObjetivo Decimal @map("puntaje_objetivo") @db.Decimal(5, 2)
+
+  curso Curso @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  area  Area  @relation(fields: [areaId], references: [id], onDelete: Restrict)
+
+  @@id([cursoId, areaId])
+  @@map("cursos_areas_exigidas")
+}
+
+model CursoSkillExigida {
+  cursoId    String  @map("curso_id") @db.Uuid
+  skillId    String  @map("skill_id") @db.Uuid
+  notaMinima Decimal @map("nota_minima") @db.Decimal(5, 2)
+
+  curso Curso @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Restrict)
+
+  @@id([cursoId, skillId])
+  @@map("cursos_skills_exigidas")
+}
+
+model CursoModuloHabilitado {
+  cursoId  String @map("curso_id") @db.Uuid
+  moduloId String @map("modulo_id") @db.Uuid
+  orden    Int    @default(0)
+
+  curso  Curso  @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  modulo Modulo @relation(fields: [moduloId], references: [id], onDelete: Restrict)
+
+  @@id([cursoId, moduloId])
+  @@unique([cursoId, orden], map: "uq_cmh_curso_orden")
+  @@index([moduloId], map: "idx_cmh_modulo")
+  @@index([cursoId, orden], map: "idx_cmh_curso_orden")
+  @@map("cursos_modulos_habilitados")
+}
+
+model LogCambioCurso {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cursoId        String         @map("curso_id") @db.Uuid
+  fecha          DateTime       @default(now()) @db.Timestamptz(6)
+  autorUsuarioId String         @map("autor_usuario_id") @db.Uuid
+  accion         AccionLogCurso
+  motivo         String
+  previewImpacto Json?          @map("preview_impacto") @db.JsonB
+
+  curso        Curso   @relation(fields: [cursoId], references: [id], onDelete: Restrict)
+  autorUsuario Usuario @relation("LogCambioCurso_Autor", fields: [autorUsuarioId], references: [id], onDelete: Restrict)
+  historicosAsignacion HistoricoEstadoAsignacion[]
+
+  @@index([cursoId, fecha(sort: Desc)], map: "idx_log_cambios_curso")
+  @@map("log_cambios_curso")
+}
+
+// =============================================================================
+// COLABORADORES, USUARIOS, SESIONES, CONFIG
+// =============================================================================
+
+model Colaborador {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email            String         @unique @db.Citext
+  nombre           String
+  estadoEmpleado   EstadoEmpleado @default(ACTIVO) @map("estado_empleado")
+  fechaOffBoarding DateTime?      @map("fecha_off_boarding") @db.Timestamptz(6)
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  usuario              Usuario?
+  notasSkill           NotaSkill[]
+  asignaciones         AsignacionCurso[]
+  intentosBloque       IntentoBloque[]
+  intentosTransversal  IntentoTransversal[]
+  intentosEntrevistaIA IntentoEntrevistaIA[]
+
+  @@map("colaboradores")
+}
 
 model Usuario {
-  id           String  @id @default(cuid())
-  email        String  @unique
-  nombre       String
-  apellido     String
-  passwordHash String
-  rol          String  @default("PARTICIPANTE") // PARTICIPANTE | ADMIN
-  avatar       String?
-  activo       Boolean @default(true)
+  id                     String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  colaboradorId          String     @unique @map("colaborador_id") @db.Uuid
+  rol                    RolUsuario @default(PARTICIPANTE)
+  passwordHash           String     @map("password_hash")
+  passwordInicialCaduca  DateTime?  @map("password_inicial_caduca") @db.Timestamptz(6)
+  requiereCambioPassword Boolean    @default(true) @map("requiere_cambio_password")
+  mfaHabilitado          Boolean    @default(false) @map("mfa_habilitado")
+  mfaSecret              String?    @map("mfa_secret")
+  requiereSetupMfa       Boolean    @default(false) @map("requiere_setup_mfa")
+  intentosFallidos       Int        @default(0) @map("intentos_fallidos")
+  bloqueado              Boolean    @default(false)
+  ultimoLogin            DateTime?  @map("ultimo_login") @db.Timestamptz(6)
+  createdAt              DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  // MFA
-  mfaEnabled Boolean @default(false)
-  mfaSecret  String?
+  colaborador              Colaborador                 @relation(fields: [colaboradorId], references: [id], onDelete: Restrict)
+  historicoPasswords       HistoricoPassword[]
+  notificaciones           Notificacion[]
+  preferenciasNotificacion PreferenciaNotificacion[]
+  aceptacionesAvisoPriv    AceptacionAvisoPrivacidad[]
+  consultasLogs            ConsultaLog[]
 
-  // Seguridad
-  debeCambiarPassword Boolean   @default(false)
-  passwordCambiadoEn  DateTime?
-  ultimoLoginEn       DateTime?
-  intentosFallidos    Int       @default(0)
-  bloqueadoHasta      DateTime?
-
-  creadoEn      DateTime @default(now())
-  actualizadoEn DateTime @updatedAt
+  histRenombradosSkill  HistoricoRenombradoSkill[]  @relation("HistRenombradoSkill_Autor")
+  histCambiosAreaSkill  HistoricoCambiosAreaSkill[] @relation("HistCambiosAreaSkill_Autor")
+  histEstadosModulo     HistoricoEstadoModulo[]     @relation("HistEstadoModulo_Autor")
+  logsCambioCurso       LogCambioCurso[]            @relation("LogCambioCurso_Autor")
+  histEstadosAsignacion HistoricoEstadoAsignacion[] @relation("HistEstadoAsig_Autor")
+  ajustesPlan           AjustePlan[]                @relation("AjustePlan_Autor")
+  historicoNotasSkill   HistoricoNotaSkill[]        @relation("HistNotaSkill_Autor")
+  activityLogs          ActivityLog[]
+  mfaChallenges         MfaChallenge[]
+  archivosSubidos       Archivo[]                     @relation("Archivo_SubidoPor")
+  previewsEvalInicial   PreviewEvaluacionInicial[]    @relation("PreviewEvalInicial_CreadoPor")
+  cargasEvalInicial     CargaEvaluacionInicial[]      @relation("CargaEvalInicial_AplicadoPor")
+  idempotencyKeys       IdempotencyKey[]
 
   @@map("usuarios")
 }
 
-// ═══════════════════════════════════════════
-// SESIONES (connect-pg-simple)
-// ═══════════════════════════════════════════
-// La tabla "session" la maneja connect-pg-simple automaticamente.
-// Se crea con su SQL oficial en la primera ejecucion (createTableIfMissing: true).
-// No se modela en Prisma porque la libreria espera una estructura especifica.
+/// Challenges TOTP del segundo paso del login MFA. Una fila por intento de
+/// login con MFA habilitado. Expira a los 5 min, se invalida tras 5 intentos
+/// fallidos o tras un verify exitoso. Tabla append-only desde el codigo: el
+/// `MfaService` solo crea, lee y marca `usado=true` / incrementa `intentos`.
+model MfaChallenge {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuarioId String   @map("usuario_id") @db.Uuid
+  creadoEn  DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
+  expiraEn  DateTime @map("expira_en") @db.Timestamptz(6)
+  usado     Boolean  @default(false)
+  intentos  Int      @default(0)
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, creadoEn(sort: Desc)], map: "idx_mfa_challenges_usuario")
+  @@map("mfa_challenges")
+}
+
+/// Audit log estructural (OWASP A09). Append-only desde el codigo:
+/// `AuditLogService.record()` es fire-and-forget y NUNCA propaga errores
+/// al request en curso. `usuarioId` es nullable porque eventos como
+/// LOGIN_FAIL con email inexistente no tienen usuario asociado.
+model ActivityLog {
+  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuarioId   String?         @map("usuario_id") @db.Uuid
+  accion      AccionAuditoria
+  exito       Boolean
+  recursoTipo String?         @map("recurso_tipo")
+  recursoId   String?         @map("recurso_id")
+  ip          String?
+  userAgent   String?         @map("user_agent")
+  requestId   String?         @map("request_id")
+  metadata    Json?           @db.JsonB
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  usuario Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@index([usuarioId, createdAt(sort: Desc)], map: "idx_activity_logs_usuario")
+  @@index([accion, createdAt(sort: Desc)], map: "idx_activity_logs_accion")
+  @@map("activity_logs")
+}
+
+model HistoricoPassword {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuarioId   String   @map("usuario_id") @db.Uuid
+  hash        String
+  fechaCambio DateTime @default(now()) @map("fecha_cambio") @db.Timestamptz(6)
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, fechaCambio(sort: Desc)], map: "idx_historico_passwords_usuario")
+  @@map("historico_passwords")
+}
+
+/// Tabla gestionada por connect-pg-simple. Forma estandar de la libreria.
+/// Se modela aqui para que viva en las migraciones Prisma.
+model Sesion {
+  sid    String   @id @db.VarChar
+  sess   Json     @db.Json
+  expire DateTime @db.Timestamp(6)
+
+  @@index([expire], map: "idx_sesiones_expire")
+  @@map("sesiones")
+}
+
+model ConfiguracionSistema {
+  id                  Int                 @id @default(1) @db.SmallInt
+  modoEntregaPassword ModoEntregaPassword @default(MANUAL) @map("modo_entrega_password")
+  resendApiKeyCifrada String?             @map("resend_api_key_cifrada")
+  createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("configuracion_sistema")
+}
+
+// =============================================================================
+// FICHA DE SKILLS (notas + historico)
+// =============================================================================
+
+model NotaSkill {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  colaboradorId String   @map("colaborador_id") @db.Uuid
+  skillId       String   @map("skill_id") @db.Uuid
+  notaActual    Decimal? @map("nota_actual") @db.Decimal(5, 2)
+  origenActual  Json?    @map("origen_actual") @db.JsonB
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  colaborador Colaborador          @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
+  skill       Skill                @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  historico   HistoricoNotaSkill[]
+
+  @@unique([colaboradorId, skillId])
+  @@index([skillId], map: "idx_notas_skill_skill")
+  @@index([colaboradorId], map: "idx_notas_skill_colab")
+  @@map("notas_skill")
+}
+
+model HistoricoNotaSkill {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  notaSkillId    String          @map("nota_skill_id") @db.Uuid
+  fecha          DateTime        @default(now()) @db.Timestamptz(6)
+  valor          Decimal?        @db.Decimal(5, 2)
+  origen         OrigenNotaSkill
+  referencia     Json?           @db.JsonB
+  autorUsuarioId String?         @map("autor_usuario_id") @db.Uuid
+
+  notaSkill    NotaSkill @relation(fields: [notaSkillId], references: [id], onDelete: Cascade)
+  autorUsuario Usuario?  @relation("HistNotaSkill_Autor", fields: [autorUsuarioId], references: [id], onDelete: SetNull)
+
+  @@index([notaSkillId, fecha(sort: Desc)], map: "idx_historico_notas_skill_id")
+  @@map("historico_notas_skill")
+}
+
+// =============================================================================
+// ASIGNACIONES, PLAN DE ESTUDIO, APERTURAS
+// =============================================================================
+
+/// Asignacion de un colaborador a un curso. Modelo fisico §3.23.
+///
+/// CHECK constraints aplicados via migracion raw (P6a, D-AS-3) — Prisma no
+/// los infiere desde el schema:
+///   - chk_asig_rol_estado: coherencia (rol=ASIGNADO => estado_asignado NOT NULL,
+///     estado_voluntario NULL, origen_voluntario NULL) y simetrico para
+///     rol=VOLUNTARIO.
+///   - chk_asig_resultado_solo_asignado: resultado_entrevista_cliente solo se
+///     persiste cuando rol=ASIGNADO.
+/// Indice parcial idx_asignaciones_estado_asignado(curso_id, estado_asignado)
+/// WHERE rol='ASIGNADO' aplicado via migracion raw (D-AS-4).
+model AsignacionCurso {
+  id                         String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  colaboradorId              String                      @map("colaborador_id") @db.Uuid
+  cursoId                    String                      @map("curso_id") @db.Uuid
+  rol                        RolAsignacion
+  origenVoluntario           OrigenVoluntario?           @map("origen_voluntario")
+  estadoAsignado             EstadoAsignado?             @map("estado_asignado")
+  estadoVoluntario           EstadoVoluntario?           @map("estado_voluntario")
+  fechaInicio                DateTime?                   @map("fecha_inicio") @db.Timestamptz(6)
+  fechaCierre                DateTime?                   @map("fecha_cierre") @db.Timestamptz(6)
+  observacionesAdmin         String?                     @map("observaciones_admin")
+  resultadoEntrevistaCliente ResultadoEntrevistaCliente? @default(PENDIENTE) @map("resultado_entrevista_cliente")
+  observacionesCliente       String?                     @map("observaciones_cliente")
+  fechaEntrevistaCliente     DateTime?                   @map("fecha_entrevista_cliente") @db.Date
+  createdAt                  DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                  DateTime                    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  colaborador      Colaborador                 @relation(fields: [colaboradorId], references: [id], onDelete: Restrict)
+  curso            Curso                       @relation(fields: [cursoId], references: [id], onDelete: Restrict)
+  historicoEstados HistoricoEstadoAsignacion[]
+  plan             PlanEstudio?
+  aperturas        AperturaSeccion[]
+
+  @@unique([colaboradorId, cursoId])
+  @@index([cursoId], map: "idx_asignaciones_curso")
+  @@index([colaboradorId], map: "idx_asignaciones_colab")
+  @@map("asignaciones_curso")
+}
+
+model HistoricoEstadoAsignacion {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  asignacionId      String   @map("asignacion_id") @db.Uuid
+  fecha             DateTime @default(now()) @db.Timestamptz(6)
+  estadoAnterior    String   @map("estado_anterior")
+  estadoNuevo       String   @map("estado_nuevo")
+  motivo            String?
+  autorUsuarioId    String   @map("autor_usuario_id") @db.Uuid
+  logCambioCursoId  String?  @map("log_cambio_curso_id") @db.Uuid
+
+  asignacion   AsignacionCurso @relation(fields: [asignacionId], references: [id], onDelete: Cascade)
+  autorUsuario Usuario         @relation("HistEstadoAsig_Autor", fields: [autorUsuarioId], references: [id], onDelete: Restrict)
+  logCambioCurso LogCambioCurso? @relation(fields: [logCambioCursoId], references: [id], onDelete: SetNull)
+
+  @@index([asignacionId, fecha(sort: Desc)])
+  @@index([logCambioCursoId], map: "idx_historico_log_cambio_curso_rel")
+  @@map("historico_estados_asignacion")
+}
+
+model PlanEstudio {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  asignacionId       String   @unique @map("asignacion_id") @db.Uuid
+  fechaCalculo       DateTime @default(now()) @map("fecha_calculo") @db.Timestamptz(6)
+  fichaSnapshot      Json?    @map("ficha_snapshot") @db.JsonB
+  estaDesactualizado Boolean  @default(false) @map("esta_desactualizado")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  asignacion AsignacionCurso @relation(fields: [asignacionId], references: [id], onDelete: Cascade)
+  items      ItemPlan[]
+  ajustes    AjustePlan[]
+
+  @@map("planes_estudio")
+}
+
+model ItemPlan {
+  id        String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  planId    String           @map("plan_id") @db.Uuid
+  moduloId  String           @map("modulo_id") @db.Uuid
+  seccionId String           @map("seccion_id") @db.Uuid
+  caracter  CaracterItemPlan
+  razon     RazonItemPlan
+
+  plan    PlanEstudio @relation(fields: [planId], references: [id], onDelete: Cascade)
+  modulo  Modulo      @relation(fields: [moduloId], references: [id], onDelete: Restrict)
+  seccion Seccion     @relation(fields: [seccionId], references: [id], onDelete: Restrict)
+
+  @@unique([planId, seccionId])
+  @@index([planId], map: "idx_items_plan_plan")
+  @@map("items_plan")
+}
+
+model AjustePlan {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  planId         String           @map("plan_id") @db.Uuid
+  fecha          DateTime         @default(now()) @db.Timestamptz(6)
+  accion         AccionAjustePlan
+  autorUsuarioId String           @map("autor_usuario_id") @db.Uuid
+  motivo         String
+  seccionId      String?          @map("seccion_id") @db.Uuid
+
+  plan         PlanEstudio @relation(fields: [planId], references: [id], onDelete: Cascade)
+  seccion      Seccion?    @relation(fields: [seccionId], references: [id], onDelete: SetNull)
+  autorUsuario Usuario     @relation("AjustePlan_Autor", fields: [autorUsuarioId], references: [id], onDelete: Restrict)
+
+  @@index([planId, fecha(sort: Desc)])
+  @@map("ajustes_plan")
+}
+
+model AperturaSeccion {
+  asignacionId      String   @map("asignacion_id") @db.Uuid
+  seccionId         String   @map("seccion_id") @db.Uuid
+  primeraAperturaAt DateTime @default(now()) @map("primera_apertura_at") @db.Timestamptz(6)
+
+  asignacion AsignacionCurso @relation(fields: [asignacionId], references: [id], onDelete: Cascade)
+  seccion    Seccion         @relation(fields: [seccionId], references: [id], onDelete: Restrict)
+
+  @@id([asignacionId, seccionId])
+  @@index([asignacionId], map: "idx_aperturas_seccion_asignacion")
+  @@map("aperturas_seccion")
+}
+
+// =============================================================================
+// INTENTOS DE BLOQUE
+// =============================================================================
+
+model IntentoBloque {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  colaboradorId  String   @map("colaborador_id") @db.Uuid
+  bloqueId       String   @map("bloque_id") @db.Uuid
+  skillId        String   @map("skill_id") @db.Uuid
+  cursoId        String   @map("curso_id") @db.Uuid
+  fecha          DateTime @default(now()) @db.Timestamptz(6)
+  nota           Decimal  @db.Decimal(5, 2)
+  esMejorIntento Boolean  @default(false) @map("es_mejor_intento")
+  respuestas     Json     @default("{}") @db.JsonB
+  /// B-extra.2 punto 4: lista de `preguntaId` que el participante no acerto
+  /// en este intento (solo se llena para bloques QUIZ). El frontend lo usa
+  /// para marcar solo las preguntas falladas en "mostrar solucion" sin
+  /// recomputar la correccion en cliente.
+  preguntasFalladas Json?   @map("preguntas_falladas") @db.JsonB
+  versionBloque  Int      @map("version_bloque")
+  estaInvalidado Boolean  @default(false) @map("esta_invalidado")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  colaborador Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Restrict)
+  bloque      Bloque      @relation(fields: [bloqueId], references: [id], onDelete: Restrict)
+  skill       Skill       @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  curso       Curso       @relation(fields: [cursoId], references: [id], onDelete: Restrict)
+
+  @@index([colaboradorId, bloqueId, fecha(sort: Desc)], map: "idx_intentos_bloque_colab_bloque")
+  @@index([cursoId, colaboradorId], map: "idx_intentos_bloque_curso")
+  @@map("intentos_bloque")
+}
+
+// =============================================================================
+// PROYECTOS TRANSVERSALES
+// =============================================================================
+
+/// `ProyectoTransversal` mantiene `cursoId @unique` (relacion double-side con
+/// `Curso.transversalId @unique`). La asimetria deliberada permite seeders e2e
+/// que crean primero el transversal y despues el curso (D-S8-A2, §5.110).
+/// Consolidacion diferida al Slice 11/12 (rediseno cursos cerrados).
+model ProyectoTransversal {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cursoId               String   @unique @map("curso_id") @db.Uuid
+  descripcion           String
+  umbralAprobacion      Decimal  @default(70.00) @map("umbral_aprobacion") @db.Decimal(5, 2)
+  capas                 Json     @default("{}") @db.JsonB
+  pesoCapaTests         Decimal  @default(40.00) @map("peso_capa_tests") @db.Decimal(5, 2)
+  pesoCapaCualitativa   Decimal  @default(30.00) @map("peso_capa_cualitativa") @db.Decimal(5, 2)
+  pesoCapaComprension   Decimal  @default(30.00) @map("peso_capa_comprension") @db.Decimal(5, 2)
+  capaTestsActiva       Boolean  @default(true) @map("capa_tests_activa")
+  capaCualitativaActiva Boolean  @default(true) @map("capa_cualitativa_activa")
+  capaComprensionActiva Boolean  @default(true) @map("capa_comprension_activa")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  curso    Curso?
+  skills   TransversalSkill[]
+  intentos IntentoTransversal[]
+
+  @@map("proyectos_transversales")
+}
+
+model TransversalSkill {
+  transversalId String @map("transversal_id") @db.Uuid
+  skillId       String @map("skill_id") @db.Uuid
+
+  transversal ProyectoTransversal @relation(fields: [transversalId], references: [id], onDelete: Cascade)
+  skill       Skill               @relation(fields: [skillId], references: [id], onDelete: Restrict)
+
+  @@id([transversalId, skillId])
+  @@map("transversales_skills")
+}
+
+model IntentoTransversal {
+  id                    String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  transversalId         String                   @map("transversal_id") @db.Uuid
+  colaboradorId         String                   @map("colaborador_id") @db.Uuid
+  fecha                 DateTime                 @default(now()) @db.Timestamptz(6)
+  fechaFinalizacion     DateTime?                @map("fecha_finalizacion") @db.Timestamptz(6)
+  nota                  Decimal?                 @db.Decimal(5, 2)
+  aprobado              Boolean?
+  repoOArtefacto        Json                     @default("{}") @map("repo_o_artefacto") @db.JsonB
+  evaluacionesCapas     Json                     @default("{}") @map("evaluaciones_capas") @db.JsonB
+  anulado               Boolean                  @default(false)
+  motivoAnulacion       String?                  @map("motivo_anulacion")
+  estado                EstadoIntentoTransversal @default(EN_EVALUACION)
+  repoUrl               String?                  @map("repo_url")
+  comentarioColaborador String?                  @map("comentario_colaborador")
+  notaCapaTests         Decimal?                 @map("nota_capa_tests") @db.Decimal(5, 2)
+  notaCapaCualitativa   Decimal?                 @map("nota_capa_cualitativa") @db.Decimal(5, 2)
+  notaCapaComprension   Decimal?                 @map("nota_capa_comprension") @db.Decimal(5, 2)
+  notaGlobal            Decimal?                 @map("nota_global") @db.Decimal(5, 2)
+
+  transversal ProyectoTransversal @relation(fields: [transversalId], references: [id], onDelete: Restrict)
+  colaborador Colaborador         @relation(fields: [colaboradorId], references: [id], onDelete: Restrict)
+
+  @@index([transversalId, colaboradorId, fecha(sort: Desc)], map: "idx_intentos_trans_colab")
+  @@index([estado], map: "idx_intentos_transversal_estado_no_anulado")
+  @@index([transversalId], map: "idx_intentos_transversal_transversal_id")
+  @@index([colaboradorId], map: "idx_intentos_transversal_colaborador_id")
+  @@map("intentos_transversal")
+}
+
+// =============================================================================
+// ENTREVISTAS IA
+// =============================================================================
+
+model EntrevistaIA {
+  id               String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cursoId          String                @unique @map("curso_id") @db.Uuid
+  umbralAprobacion Decimal               @default(70.00) @map("umbral_aprobacion") @db.Decimal(5, 2)
+  filosofia        FilosofiaEntrevista   @default(PREPARACION)
+  profundidad      ProfundidadEntrevista @default(SEMI_SENIOR)
+  duracionMinutos  Int                   @default(30) @map("duracion_minutos")
+  tono             TonoEntrevista        @default(CONVERSACIONAL)
+  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  curso    Curso?
+  rubrica  RubricaEntrevistaIA[]
+  intentos IntentoEntrevistaIA[]
+
+  @@map("entrevistas_ia")
+}
+
+model RubricaEntrevistaIA {
+  entrevistaIaId String  @map("entrevista_ia_id") @db.Uuid
+  areaId         String  @map("area_id") @db.Uuid
+  peso           Decimal @db.Decimal(5, 2)
+
+  entrevistaIA EntrevistaIA @relation(fields: [entrevistaIaId], references: [id], onDelete: Cascade)
+  area         Area         @relation(fields: [areaId], references: [id], onDelete: Restrict)
+
+  @@id([entrevistaIaId, areaId])
+  @@map("rubrica_entrevista_ia")
+}
+
+model IntentoEntrevistaIA {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entrevistaIaId         String                   @map("entrevista_ia_id") @db.Uuid
+  colaboradorId          String                   @map("colaborador_id") @db.Uuid
+  fecha                  DateTime                 @default(now()) @db.Timestamptz(6)
+  fechaFinalizacion      DateTime?                @map("fecha_finalizacion") @db.Timestamptz(6)
+  estado                 IntentoEntrevistaIaEstado @default(EN_PROGRESO)
+  notaGlobal             Decimal                  @map("nota_global") @db.Decimal(5, 2)
+  aprobado               Boolean
+  transcripcionOLog      Json                     @default("{}") @map("transcripcion_o_log") @db.JsonB
+  rubricaSnapshot        Json                     @default("{}") @map("rubrica_snapshot") @db.JsonB
+  seccionesBaseSnapshot  Json?                    @map("secciones_base_snapshot") @db.JsonB
+  notaAjustadaAdmin      Decimal?                 @map("nota_ajustada_admin") @db.Decimal(5, 2)
+  anulado                Boolean                  @default(false)
+  motivoAjusteOAnulacion String?                  @map("motivo_ajuste_o_anulacion")
+  reporteEvaluador       Json?                    @map("reporte_evaluador") @db.JsonB
+
+  entrevistaIA  EntrevistaIA                     @relation(fields: [entrevistaIaId], references: [id], onDelete: Restrict)
+  colaborador   Colaborador                      @relation(fields: [colaboradorId], references: [id], onDelete: Restrict)
+  notasPorArea  IntentoEntrevistaIANotaArea[]
+  seccionesBase IntentoEntrevistaIASeccionBase[]
+
+  @@index([entrevistaIaId, colaboradorId, fecha(sort: Desc)], map: "idx_intentos_eia_colab")
+  @@index([estado], map: "idx_intentos_entrevista_ia_estado")
+  @@map("intentos_entrevista_ia")
+}
+
+model IntentoEntrevistaIANotaArea {
+  intentoId String  @map("intento_id") @db.Uuid
+  areaId    String  @map("area_id") @db.Uuid
+  nota      Decimal @db.Decimal(5, 2)
+
+  intento IntentoEntrevistaIA @relation(fields: [intentoId], references: [id], onDelete: Cascade)
+  area    Area                @relation(fields: [areaId], references: [id], onDelete: Restrict)
+
+  @@id([intentoId, areaId])
+  @@map("intentos_entrevista_ia_notas_area")
+}
+
+model IntentoEntrevistaIASeccionBase {
+  intentoId String @map("intento_id") @db.Uuid
+  seccionId String @map("seccion_id") @db.Uuid
+
+  intento IntentoEntrevistaIA @relation(fields: [intentoId], references: [id], onDelete: Cascade)
+  seccion Seccion             @relation(fields: [seccionId], references: [id], onDelete: Restrict)
+
+  @@id([intentoId, seccionId])
+  @@map("intentos_entrevista_ia_secciones_base")
+}
+
+// =============================================================================
+// NOTIFICACIONES
+// =============================================================================
+
+model Notificacion {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuarioId     String          @map("usuario_id") @db.Uuid
+  tipoEvento    TipoEventoNotif @map("tipo_evento")
+  esCritico     Boolean         @map("es_critico")
+  payload       Json            @default("{}") @db.JsonB
+  fechaCreacion DateTime        @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  leida         Boolean         @default(false)
+  fechaLeida    DateTime?       @map("fecha_leida") @db.Timestamptz(6)
+  archivada     Boolean         @default(false)
+  errorCorreo   String?         @map("error_correo")
+
+  usuario Usuario             @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  canales NotificacionCanal[]
+
+  // idx_notif_usuario_no_leidas e idx_notif_archivar son indices PARCIALES con
+  // clausula WHERE — Prisma no expresa indices parciales en el schema, asi que
+  // se crean directamente en la migracion SQL (slice_10_notificaciones).
+  @@index([usuarioId, fechaCreacion(sort: Desc)], map: "idx_notif_usuario_fecha")
+  @@map("notificaciones")
+}
+
+model NotificacionCanal {
+  notificacionId String     @map("notificacion_id") @db.Uuid
+  canal          CanalNotif
+
+  notificacion Notificacion @relation(fields: [notificacionId], references: [id], onDelete: Cascade)
+
+  @@id([notificacionId, canal])
+  @@map("notificaciones_canales")
+}
+
+model PreferenciaNotificacion {
+  usuarioId  String          @map("usuario_id") @db.Uuid
+  tipoEvento TipoEventoNotif @map("tipo_evento")
+  silenciado Boolean         @default(true)
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@id([usuarioId, tipoEvento])
+  @@map("preferencias_notificacion")
+}
+
+// =============================================================================
+// PRIVACIDAD Y META-AUDITORIA
+// =============================================================================
+
+model AceptacionAvisoPrivacidad {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuarioId    String   @map("usuario_id") @db.Uuid
+  versionAviso String   @map("version_aviso")
+  fecha        DateTime @default(now()) @db.Timestamptz(6)
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, fecha(sort: Desc)], map: "idx_aap_usuario")
+  @@map("aceptaciones_aviso_privacidad")
+}
+
+model ConsultaLog {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  autorUsuarioId String   @map("autor_usuario_id") @db.Uuid
+  fecha          DateTime @default(now()) @db.Timestamptz(6)
+  endpoint       String   @default("")
+  queryParams    Json     @default("{}") @map("query_params") @db.JsonB
+  latenciaMs     Int?     @map("latencia_ms")
+
+  autorUsuario Usuario @relation(fields: [autorUsuarioId], references: [id], onDelete: Restrict)
+
+  @@index([autorUsuarioId, fecha(sort: Desc)])
+  @@index([endpoint, fecha(sort: Desc)])
+  @@map("consultas_logs")
+}
+
+/// Cache de reportes estrategicos (Slice 11 P11c — D-S11-C1, D-S11-C2).
+/// `scope_hash` = SHA256(canonicalize(scope)) para lookup O(1) por filtros
+/// normalizados. Lazy revalidate-on-miss: si `generada_at < now()-24h` el
+/// service recalcula y hace UPSERT por `scope_hash`. Cron nocturno
+/// (`ReporteCacheCron`) recalcula los top-N scopes activos.
+model ReporteCache {
+  id         String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tipo       TipoReporteCache
+  scopeHash  String           @unique @map("scope_hash")
+  scope      Json             @db.JsonB
+  payload    Json             @db.JsonB
+  generadaAt DateTime         @default(now()) @map("generada_at") @db.Timestamptz(6)
+
+  @@index([tipo, generadaAt(sort: Desc)], map: "idx_reporte_cache_tipo_generada")
+  @@map("reporte_cache")
+}
+
+// =============================================================================
+// EVALUACION INICIAL — archivos, previews y cargas (Slice 5 / D-EVI-1, D-EVI-2)
+// =============================================================================
+
+/// Registro de archivo persistido en el storage configurable (`STORAGE_ROOT`).
+/// El contenido fisico vive en filesystem (dev) o Railway Volumes (prod) en
+/// la ruta indicada por `path` (relativa a `STORAGE_ROOT`). D-EVI-1.
+model Archivo {
+  id                 String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tipo               ArchivoTipo
+  path               String
+  mimeType           String      @map("mime_type")
+  tamanioBytes       Int         @map("tamanio_bytes")
+  subidoPorUsuarioId String      @map("subido_por_usuario_id") @db.Uuid
+  metadata           Json?       @db.JsonB
+  createdAt          DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  subidoPor Usuario                    @relation("Archivo_SubidoPor", fields: [subidoPorUsuarioId], references: [id], onDelete: Restrict)
+  previews  PreviewEvaluacionInicial[] @relation("PreviewEvalInicial_Archivo")
+  cargas    CargaEvaluacionInicial[]   @relation("CargaEvalInicial_Archivo")
+
+  @@index([subidoPorUsuarioId], map: "idx_archivos_subido_por")
+  @@index([tipo, createdAt(sort: Desc)], map: "idx_archivos_tipo_fecha")
+  @@map("archivos")
+}
+
+/// Preview transitorio de evaluacion inicial (TTL 30 min). D-EVI-2.
+/// Persistencia con `expiraEn` y `aplicadoEn` para soportar replay del cliente
+/// y eventual cron de purga. `resumen/cambios/rechazos` se materializan como
+/// JSONB para no recomputar el parsing al aplicar.
+model PreviewEvaluacionInicial {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cursoId             String    @map("curso_id") @db.Uuid
+  archivoId           String    @map("archivo_id") @db.Uuid
+  creadoPorUsuarioId  String    @map("creado_por_usuario_id") @db.Uuid
+  expiraEn            DateTime  @map("expira_en") @db.Timestamptz(6)
+  aplicadoEn          DateTime? @map("aplicado_en") @db.Timestamptz(6)
+  aplicadoPorCargaId  String?   @map("aplicado_por_carga_id") @db.Uuid
+  resumen             Json      @db.JsonB
+  cambios             Json      @db.JsonB
+  rechazos            Json      @db.JsonB
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  curso        Curso                   @relation("PreviewEvalInicial_Curso", fields: [cursoId], references: [id], onDelete: Restrict)
+  archivo      Archivo                 @relation("PreviewEvalInicial_Archivo", fields: [archivoId], references: [id], onDelete: Restrict)
+  creadoPor    Usuario                 @relation("PreviewEvalInicial_CreadoPor", fields: [creadoPorUsuarioId], references: [id], onDelete: Restrict)
+  aplicadoPor  CargaEvaluacionInicial? @relation("PreviewEvalInicial_AplicadoPor", fields: [aplicadoPorCargaId], references: [id], onDelete: Restrict)
+
+  @@index([cursoId, createdAt(sort: Desc)], map: "idx_previews_eval_inicial_curso")
+  @@index([expiraEn], map: "idx_previews_eval_inicial_expira")
+  @@index([archivoId], map: "idx_previews_eval_inicial_archivo")
+  @@index([creadoPorUsuarioId], map: "idx_previews_eval_inicial_creado_por")
+  @@index([aplicadoPorCargaId], map: "idx_previews_eval_inicial_aplicado_por_carga")
+  @@map("previews_evaluacion_inicial")
+}
+
+/// Aplicacion definitiva de una carga de evaluacion inicial. Una sola fila
+/// por preview aplicado (`previewId` unique). D-EVI-7 (todo-o-nada).
+model CargaEvaluacionInicial {
+  id                       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cursoId                  String   @map("curso_id") @db.Uuid
+  previewId                String   @unique @map("preview_id") @db.Uuid
+  archivoId                String   @map("archivo_id") @db.Uuid
+  aplicadoPorUsuarioId     String   @map("aplicado_por_usuario_id") @db.Uuid
+  skillsActualizadas       Int      @default(0) @map("skills_actualizadas")
+  colaboradoresActualizados Int     @default(0) @map("colaboradores_actualizados")
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  curso        Curso                      @relation("CargaEvalInicial_Curso", fields: [cursoId], references: [id], onDelete: Restrict)
+  archivo      Archivo                    @relation("CargaEvalInicial_Archivo", fields: [archivoId], references: [id], onDelete: Restrict)
+  aplicadoPor  Usuario                    @relation("CargaEvalInicial_AplicadoPor", fields: [aplicadoPorUsuarioId], references: [id], onDelete: Restrict)
+  previews     PreviewEvaluacionInicial[] @relation("PreviewEvalInicial_AplicadoPor")
+
+  @@index([cursoId, createdAt(sort: Desc)], map: "idx_cargas_eval_inicial_curso")
+  @@index([archivoId], map: "idx_cargas_eval_inicial_archivo")
+  @@index([aplicadoPorUsuarioId], map: "idx_cargas_eval_inicial_aplicado_por")
+  @@map("cargas_evaluacion_inicial")
+}
+
+/// Llave de idempotencia transversal. D-EVI-3.
+/// PK compuesta `(scope, key, usuarioId)`. La persistencia se hace DENTRO del
+/// `$transaction` del ejecutor para garantizar atomicidad estricta.
+model IdempotencyKey {
+  scope          String
+  key            String
+  usuarioId      String   @map("usuario_id") @db.Uuid
+  requestHash    String   @map("request_hash")
+  responseStatus Int      @map("response_status")
+  responseBody   Json     @map("response_body") @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiraEn       DateTime @map("expira_en") @db.Timestamptz(6)
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  @@id([scope, key, usuarioId])
+  @@index([expiraEn], map: "idx_idempotency_keys_expira")
+  @@index([usuarioId], map: "idx_idempotency_keys_usuario")
+  @@map("idempotency_keys")
+}

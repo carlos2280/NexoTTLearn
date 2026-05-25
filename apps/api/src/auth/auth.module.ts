@@ -1,13 +1,13 @@
 import { Module } from "@nestjs/common"
-import { PassportModule } from "@nestjs/passport"
+import { PrismaModule } from "../common/prisma/prisma.module"
 import { AuthController } from "./auth.controller"
 import { AuthService } from "./auth.service"
-import { SerializadorUsuario } from "./serializador.usuario"
+import { MfaModule } from "./mfa/mfa.module"
 
 @Module({
-  imports: [PassportModule.register({ session: true })],
+  imports: [PrismaModule, MfaModule],
   controllers: [AuthController],
-  providers: [AuthService, SerializadorUsuario],
+  providers: [AuthService],
   exports: [AuthService],
 })
 export class AuthModule {}

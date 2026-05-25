@@ -1,27 +1,23 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "node16",
+    "moduleResolution": "node16",
     "target": "ES2022",
     "lib": ["ES2022"],
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "declaration": true,
     "removeComments": true,
-    "allowSyntheticDefaultImports": true,
     "sourceMap": true,
     "outDir": "./dist",
-    "baseUrl": "./",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
     "incremental": true,
-    "strictNullChecks": true,
-    "noImplicitAny": true,
-    "strictBindCallApply": true,
-    "forceConsistentCasingInFileNames": true,
-    "noFallthroughCasesInSwitch": false,
     "isolatedModules": false,
     "verbatimModuleSyntax": false
   },
-  "include": ["src/**/*", "prisma/seed.ts"],
+  "include": ["src/**/*", "test/**/*", "prisma/seed.ts", "prisma/seeds/**/*"],
   "exclude": ["node_modules", "dist"]
 }

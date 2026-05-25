@@ -1,0 +1,1675 @@
+@import "tailwindcss";
+
+@import "@fontsource-variable/manrope/index.css";
+@import "@fontsource-variable/geist/index.css";
+@import "@fontsource-variable/geist-mono/index.css";
+@import "@fontsource-variable/fraunces/index.css";
+@import "@fontsource-variable/fraunces/wght-italic.css";
+
+/* ============================================================
+   NexoTT Learn — Design Tokens
+   Cimientos visuales. Todo color, tipografía, sombra, easing
+   y z-index del producto vive aquí. NADA hardcoded fuera.
+   ============================================================ */
+
+@theme {
+  /* ---------- Color · superficies neutras ---------- */
+  --color-canvas: #fafaf9;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-subtle: #f4f4f2;
+  --color-muted: #e7e5e4;
+
+  --color-border: #e7e5e4;
+  --color-border-strong: #d6d3d1;
+  --color-border-emphasis: #a8a29e;
+
+  --color-text-primary: #0c0a09;
+  --color-text-secondary: #57534e;
+  --color-text-tertiary: #a8a29e;
+  --color-text-disabled: #d6d3d1;
+
+  /* Tinta sobre fondo de color (CTAs primary/aurora/danger, logo sobre aurora,
+     etc.). NO se override en dark: el blanco mantiene contraste tanto en light
+     como en dark sobre superficies de color saturadas. */
+  --color-on-color: #ffffff;
+
+  /* Blanco/negro explícitos para que Tailwind 4 exponga `text-white` /
+     `bg-white` / `text-black` / `bg-black` como utilities (al haber `@theme`
+     custom, las defaults pueden no generarse). */
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  /* ---------- Color · acento primario (índigo / trabajo) ---------- */
+  --color-accent: #4f46e5;
+  --color-accent-hover: #4338ca;
+  --color-accent-pressed: #3730a3;
+  --color-accent-soft: #eef2ff;
+  --color-accent-soft-hover: #e0e7ff;
+  --color-accent-text: #ffffff;
+  --color-accent-on-soft: #3730a3;
+  --color-accent-rgb: 79 70 229;
+
+  /* ---------- Color · acento cálido (ámbar / momentos emocionales) ---------- */
+  --color-warmth: #f59e0b;
+  --color-warmth-hover: #d97706;
+  --color-warmth-soft: #fef3c7;
+  --color-warmth-soft-hover: #fde68a;
+  --color-warmth-on-soft: #92400e;
+  --color-warmth-rgb: 245 158 11;
+
+  /* ---------- Color · glow rosa-coral (para mezclas de bienvenida/despedida) ---------- */
+  --color-glow: #f472b6;
+  --color-glow-rgb: 244 114 182;
+
+  /* ---------- Color · paleta aurora (identidad joven, moderna) ----------
+     Trío de protagonistas para gradientes cinematográficos del login,
+     momentos de "premio" (logros, certificados) y CTAs especiales.
+     Se usan SIEMPRE como gradiente — nunca planos sobre superficies grandes. */
+  --color-aurora-cyan: #22d3ee;
+  --color-aurora-cyan-rgb: 34 211 238;
+  --color-aurora-violet: #8b5cf6;
+  --color-aurora-violet-rgb: 139 92 246;
+  --color-aurora-magenta: #ec4899;
+  --color-aurora-magenta-rgb: 236 72 153;
+  --color-aurora-emerald: #34d399;
+  --color-aurora-emerald-rgb: 52 211 153;
+
+  /* ---------- Color · semánticos ---------- */
+  --color-success: #16a34a;
+  --color-success-soft: #dcfce7;
+  --color-success-on-soft: #15803d;
+  --color-success-rgb: 22 163 74;
+  --color-warning: #d97706;
+  --color-warning-soft: #fef3c7;
+  --color-warning-on-soft: #b45309;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fee2e2;
+  --color-danger-on-soft: #b91c1c;
+  --color-danger-rgb: 220 38 38;
+  --color-info: #0891b2;
+  --color-info-soft: #cffafe;
+  --color-info-on-soft: #0e7490;
+
+  /* ---------- Color · atmósferas del storytelling ----------
+     Cada paso del flujo tiene su propio aire. Tokens, no hex sueltos. */
+  --color-atmos-credenciales: #eef2ff;
+  --color-atmos-mfa: #e0e7ff;
+  --color-atmos-cambiar-password: #e6faf5;
+  --color-atmos-aviso-privacidad: #f3e8ff;
+  --color-atmos-bienvenida: #fff1e6;
+  --color-atmos-despedida: #fef3c7;
+
+  /* ---------- Gradientes atmosféricos por paso ----------
+     Dos radiales sutiles sobre el color sólido del paso. Aportan
+     profundidad sin gritar. Bienvenida/despedida llevan más intensidad
+     porque son momentos emocionales; el resto son casi imperceptibles. */
+  --gradient-atmos-credenciales: radial-gradient(
+      ellipse 80% 60% at 18% 22%,
+      rgb(var(--color-accent-rgb) / 0.08),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 82% 80%,
+      rgb(var(--color-accent-rgb) / 0.05),
+      transparent 70%
+    );
+
+  --gradient-atmos-mfa: radial-gradient(
+      ellipse 75% 55% at 25% 28%,
+      rgb(var(--color-accent-rgb) / 0.1),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 65% 45% at 78% 76%,
+      rgb(var(--color-accent-rgb) / 0.06),
+      transparent 70%
+    );
+
+  --gradient-atmos-cambiar-password: radial-gradient(
+      ellipse 80% 55% at 28% 30%,
+      rgb(var(--color-success-rgb) / 0.08),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 72% 74%,
+      rgb(var(--color-success-rgb) / 0.05),
+      transparent 70%
+    );
+
+  --gradient-atmos-aviso-privacidad: radial-gradient(
+      ellipse 75% 55% at 22% 25%,
+      rgb(var(--color-accent-rgb) / 0.07),
+      transparent 70%
+    ),
+    radial-gradient(ellipse 65% 50% at 80% 80%, rgb(var(--color-glow-rgb) / 0.05), transparent 70%);
+
+  --gradient-atmos-bienvenida: radial-gradient(
+      circle at 35% 55%,
+      rgb(var(--color-warmth-rgb) / 0.32),
+      transparent 55%
+    ), radial-gradient(circle at 70% 70%, rgb(var(--color-glow-rgb) / 0.22), transparent 55%);
+
+  --gradient-atmos-despedida: radial-gradient(
+      circle at 50% 60%,
+      rgb(var(--color-warmth-rgb) / 0.38),
+      transparent 60%
+    ), radial-gradient(circle at 75% 30%, rgb(var(--color-glow-rgb) / 0.16), transparent 55%);
+
+  /* ---------- Gradiente atmosférico global del admin ----------
+     Aplicado al main scrollable. Presente, no invisible: el panel
+     no es papel pálido sino un espacio vivo. Tres capas:
+     1) índigo intenso arriba-derecha (energía)
+     2) glow rosa-coral abajo-izquierda (calidez)
+     3) ámbar muy tenue en el centro (luz cálida)
+     Combinados sobre canvas, generan un fondo que invita a quedarse. */
+  --gradient-admin-canvas: radial-gradient(
+      ellipse 60% 50% at 100% 0%,
+      rgb(var(--color-accent-rgb) / 0.09),
+      transparent 60%
+    ),
+    radial-gradient(ellipse 65% 55% at 0% 100%, rgb(var(--color-glow-rgb) / 0.07), transparent 65%),
+    radial-gradient(
+      ellipse 70% 60% at 50% 50%,
+      rgb(var(--color-warmth-rgb) / 0.03),
+      transparent 70%
+    );
+
+  /* ---------- Gradiente atmosférico del participante ----------
+     Más cálido y suave que el admin. El participante "aprende" — el
+     espacio le invita a quedarse. Dos capas tenues:
+     1) warmth (ámbar) abajo-derecha — calidez de bienvenida
+     2) aurora-violet arriba-izquierda — toque de marca discreto
+     Más sutil que el admin: no compite con el contenido didáctico. */
+  --gradient-participante-canvas: radial-gradient(
+      ellipse 55% 45% at 0% 0%,
+      rgb(var(--color-aurora-violet-rgb) / 0.05),
+      transparent 65%
+    ),
+    radial-gradient(
+      ellipse 60% 50% at 100% 100%,
+      rgb(var(--color-warmth-rgb) / 0.05),
+      transparent 65%
+    ),
+    radial-gradient(ellipse 70% 55% at 60% 30%, rgb(var(--color-glow-rgb) / 0.03), transparent 70%);
+
+  /* ---------- Gradiente para la card "Pulso del día" (firma del hero) ----------
+     Acento → glow → ámbar suave en diagonal. Da energía sin gritar. */
+  --gradient-pulso-card: linear-gradient(
+    135deg,
+    rgb(var(--color-accent-rgb) / 0.92) 0%,
+    rgb(var(--color-glow-rgb) / 0.78) 60%,
+    rgb(var(--color-warmth-rgb) / 0.62) 100%
+  );
+
+  /* ---------- Gradiente sutil para cards con personalidad (KPI hero, etc.) ---------- */
+  --gradient-card-acento: linear-gradient(
+    135deg,
+    rgb(var(--color-accent-rgb) / 0.08) 0%,
+    rgb(var(--color-glow-rgb) / 0.06) 100%
+  );
+
+  /* ---------- Gradientes aurora ----------
+     Tres intensidades para que la aurora se aplique con propósito:
+     · --gradient-aurora       → CTA principal, wordmark glow, momento de premio
+     · --gradient-aurora-soft  → halos detrás de elementos, badges, hovers
+     · --gradient-aurora-radial→ fondo cinematográfico (panel marca del login) */
+  --gradient-aurora: linear-gradient(
+    135deg,
+    rgb(var(--color-aurora-cyan-rgb) / 1) 0%,
+    rgb(var(--color-aurora-violet-rgb) / 1) 55%,
+    rgb(var(--color-aurora-magenta-rgb) / 1) 100%
+  );
+
+  --gradient-aurora-soft: linear-gradient(
+    135deg,
+    rgb(var(--color-aurora-cyan-rgb) / 0.18) 0%,
+    rgb(var(--color-aurora-violet-rgb) / 0.18) 55%,
+    rgb(var(--color-aurora-magenta-rgb) / 0.18) 100%
+  );
+
+  --gradient-aurora-radial: radial-gradient(
+      ellipse 70% 55% at 18% 28%,
+      rgb(var(--color-aurora-cyan-rgb) / 0.55),
+      transparent 65%
+    ),
+    radial-gradient(
+      ellipse 75% 60% at 72% 58%,
+      rgb(var(--color-aurora-violet-rgb) / 0.6),
+      transparent 65%
+    ),
+    radial-gradient(
+      ellipse 55% 50% at 85% 88%,
+      rgb(var(--color-aurora-magenta-rgb) / 0.5),
+      transparent 60%
+    );
+
+  /* ---------- Glow aurora para CTAs/elementos premiados ---------- */
+  --shadow-aurora-glow: 0 12px 32px rgb(var(--color-aurora-violet-rgb) / 0.32), 0 4px 12px
+    rgb(var(--color-aurora-magenta-rgb) / 0.18);
+
+  /* ---------- Vignette para contenido sobre aurora ----------
+     Oscurece la esquina inferior-izquierda donde vive el wordmark y la frase.
+     La aurora sigue brillando arriba-derecha; el texto blanco recupera contraste. */
+  --gradient-aurora-vignette: radial-gradient(
+    ellipse 70% 75% at 22% 78%,
+    rgb(0 0 0 / 0.58),
+    rgb(0 0 0 / 0.28) 38%,
+    transparent 72%
+  );
+
+  /* ---------- Text-shadow para texto blanco sobre aurora ---------- */
+  --shadow-text-aurora: 0 2px 28px rgb(0 0 0 / 0.45), 0 1px 2px rgb(0 0 0 / 0.25);
+
+  /* ---------- Radius ---------- */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+  --radius-pill: 9999px;
+
+  /* ---------- Shadows · elevación neutra ---------- */
+  --shadow-sm: 0 1px 2px rgb(12 10 9 / 0.04), 0 1px 1px rgb(12 10 9 / 0.06);
+  --shadow-md: 0 4px 8px rgb(12 10 9 / 0.04), 0 2px 4px rgb(12 10 9 / 0.06);
+  --shadow-lg: 0 16px 32px rgb(12 10 9 / 0.08), 0 4px 8px rgb(12 10 9 / 0.04);
+  --shadow-overlay: 0 24px 48px rgb(12 10 9 / 0.16);
+
+  /* ---------- Shadows · glow del acento (CTA primaria, focus envolvente) ---------- */
+  --shadow-accent-glow: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 8px 24px
+    rgb(var(--color-accent-rgb) / 0.16);
+  --shadow-accent-glow-lg: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 16px 40px
+    rgb(var(--color-accent-rgb) / 0.22);
+  --shadow-warmth-glow: 0 8px 24px rgb(var(--color-warmth-rgb) / 0.22);
+
+  /* ---------- Rings · halos de focus / estado ----------
+     Reemplazan las repeticiones `focus:shadow-[0_0_0_3px_rgba(...)]`. */
+  --shadow-ring-accent: 0 0 0 3px rgb(var(--color-accent-rgb) / 0.18);
+  --shadow-ring-accent-soft: 0 0 0 3px rgb(var(--color-accent-rgb) / 0.12);
+  --shadow-ring-danger: 0 0 0 3px rgb(var(--color-danger-rgb) / 0.18);
+  --shadow-ring-danger-soft: 0 0 0 3px rgb(var(--color-danger-rgb) / 0.1);
+  --shadow-ring-aurora: 0 0 0 3px rgb(var(--color-aurora-violet-rgb) / 0.22);
+  --shadow-ring-aurora-soft: 0 0 0 3px rgb(var(--color-aurora-violet-rgb) / 0.14);
+  --shadow-ring-aurora-cyan: 0 0 0 3px rgb(var(--color-aurora-cyan-rgb) / 0.22);
+  --shadow-ring-aurora-cyan-soft: 0 0 0 3px rgb(var(--color-aurora-cyan-rgb) / 0.14);
+
+  /* ---------- Movimiento ---------- */
+  --ease-default: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-decel: cubic-bezier(0, 0, 0.2, 1);
+  --ease-accel: cubic-bezier(0.4, 0, 1, 1);
+  --ease-anticipate: cubic-bezier(0.68, -0.55, 0.32, 1.55);
+
+  --duration-instant: 80ms;
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 220ms;
+  --duration-page: 320ms;
+  --duration-storytelling: 600ms;
+  --duration-cinematic: 900ms;
+
+  /* ---------- Tipografía · familias ----------
+     Manrope: geométrica, redondeada, joven — sustituto libre de Gilroy.
+     Geist queda de fallback para mantener compatibilidad mientras migramos. */
+  --font-sans: "Manrope Variable", "Manrope", "Geist Variable", "Geist", "Inter Variable", "Inter",
+    system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Geist Mono Variable", "Geist Mono", "JetBrains Mono", ui-monospace, SFMono-Regular,
+    monospace;
+  --font-serif: "Fraunces Variable", "Fraunces", ui-serif, Georgia, serif;
+
+  /* ---------- Tipografía · escala (Tailwind v4 expone esto como `text-{name}`) ---------- */
+
+  /* eyebrow — sobrelínea uppercase con tracking; usado en headers de pasos */
+  --text-eyebrow: 11px;
+  --text-eyebrow--line-height: 16px;
+  --text-eyebrow--letter-spacing: 0.22em;
+  --text-eyebrow--font-weight: 500;
+
+  /* caption — labels, hints, microcopy */
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+
+  /* body-sm — textos densos, párrafos secundarios */
+  --text-body-sm: 13px;
+  --text-body-sm--line-height: 20px;
+
+  /* body — texto base de la app */
+  --text-body: 14px;
+  --text-body--line-height: 20px;
+
+  /* body-lg — textos de bienvenida, párrafos hero */
+  --text-body-lg: 16px;
+  --text-body-lg--line-height: 24px;
+
+  /* input — campos de formulario (15px se lee mejor a tamaño táctil) */
+  --text-input: 15px;
+  --text-input--line-height: 24px;
+
+  /* heading scale */
+  --text-h3: 20px;
+  --text-h3--line-height: 28px;
+  --text-h3--letter-spacing: -0.01em;
+  --text-h3--font-weight: 600;
+
+  --text-h2: 24px;
+  --text-h2--line-height: 32px;
+  --text-h2--letter-spacing: -0.015em;
+  --text-h2--font-weight: 600;
+
+  --text-h1: 36px;
+  --text-h1--line-height: 1.05;
+  --text-h1--letter-spacing: -0.03em;
+  --text-h1--font-weight: 600;
+
+  /* display scale — para wordmark hero, bienvenida, despedida */
+  --text-display-md: 44px;
+  --text-display-md--line-height: 1.02;
+  --text-display-md--letter-spacing: -0.035em;
+  --text-display-md--font-weight: 600;
+
+  --text-display-lg: 64px;
+  --text-display-lg--line-height: 1;
+  --text-display-lg--letter-spacing: -0.04em;
+  --text-display-lg--font-weight: 600;
+
+  --text-display-xl: 96px;
+  --text-display-xl--line-height: 0.95;
+  --text-display-xl--letter-spacing: -0.045em;
+  --text-display-xl--font-weight: 600;
+
+  /* quote — frase rotativa serif italic */
+  --text-quote: 30px;
+  --text-quote--line-height: 1.15;
+  --text-quote--letter-spacing: -0.005em;
+
+  /* mfa-digit — dígito monoespaciado grande del input MFA */
+  --text-mfa: 24px;
+  --text-mfa--line-height: 32px;
+
+  /* ============================================================
+     SISTEMA EXTENDIDO · Stripe × Apple para plataforma técnica
+     Áreas técnicas, estados de competencia, tipos de bloque,
+     dataviz, code editor, glassmorphism, motion vivo.
+     ============================================================ */
+
+  /* ---------- Áreas técnicas (8) ----------
+     Cada área tiene tinta + soft + on-soft + glow.
+     Las cards de curso heredan el color de su área dominante.
+     Las skill-chips usan la tinta del área a la que pertenecen. */
+
+  /* Frontend — cyan eléctrico (web, energía visible) */
+  --color-area-frontend: #06b6d4;
+  --color-area-frontend-rgb: 6 182 212;
+  --color-area-frontend-soft: #ecfeff;
+  --color-area-frontend-on-soft: #0e7490;
+
+  /* Backend — índigo (solidez de servidor) */
+  --color-area-backend: #6366f1;
+  --color-area-backend-rgb: 99 102 241;
+  --color-area-backend-soft: #eef2ff;
+  --color-area-backend-on-soft: #4338ca;
+
+  /* Cloud — sky (convención industria) */
+  --color-area-cloud: #0ea5e9;
+  --color-area-cloud-rgb: 14 165 233;
+  --color-area-cloud-soft: #f0f9ff;
+  --color-area-cloud-on-soft: #0369a1;
+
+  /* Data — violeta (análisis, big data) */
+  --color-area-data: #a855f7;
+  --color-area-data-rgb: 168 85 247;
+  --color-area-data-soft: #faf5ff;
+  --color-area-data-on-soft: #7e22ce;
+
+  /* Mobile — rosa-coral (energía móvil) */
+  --color-area-mobile: #f43f5e;
+  --color-area-mobile-rgb: 244 63 94;
+  --color-area-mobile-soft: #fff1f2;
+  --color-area-mobile-on-soft: #be123c;
+
+  /* DevOps — naranja (operaciones, alerta sana) */
+  --color-area-devops: #f97316;
+  --color-area-devops-rgb: 249 115 22;
+  --color-area-devops-soft: #fff7ed;
+  --color-area-devops-on-soft: #c2410c;
+
+  /* QA / Testing — verde lima (validación, "pasa") */
+  --color-area-qa: #84cc16;
+  --color-area-qa-rgb: 132 204 22;
+  --color-area-qa-soft: #f7fee7;
+  --color-area-qa-on-soft: #4d7c0f;
+
+  /* Soft Skills — ámbar cálido */
+  --color-area-soft: #f59e0b;
+  --color-area-soft-rgb: 245 158 11;
+  --color-area-soft-soft: #fffbeb;
+  --color-area-soft-on-soft: #b45309;
+
+  /* ---------- Glows de área ("lo tecnológico" en hover) ----------
+     Cada card de curso hace glow del color de su área cuando se
+     pasa el cursor. Detalle apreciable, no decorativo. */
+  --shadow-glow-area-frontend: 0 8px 32px rgb(var(--color-area-frontend-rgb) / 0.22);
+  --shadow-glow-area-backend: 0 8px 32px rgb(var(--color-area-backend-rgb) / 0.22);
+  --shadow-glow-area-cloud: 0 8px 32px rgb(var(--color-area-cloud-rgb) / 0.22);
+  --shadow-glow-area-data: 0 8px 32px rgb(var(--color-area-data-rgb) / 0.22);
+  --shadow-glow-area-mobile: 0 8px 32px rgb(var(--color-area-mobile-rgb) / 0.22);
+  --shadow-glow-area-devops: 0 8px 32px rgb(var(--color-area-devops-rgb) / 0.22);
+  --shadow-glow-area-qa: 0 8px 32px rgb(var(--color-area-qa-rgb) / 0.22);
+  --shadow-glow-area-soft: 0 8px 32px rgb(var(--color-area-soft-rgb) / 0.22);
+
+  /* ---------- Estados de competencia ----------
+     El sistema visual del progreso del colaborador.
+     Cada estado tiene tinta + soft + on-soft. */
+
+  /* PENDIENTE — aún no inicia (gris neutro vivo) */
+  --color-state-pendiente: #71717a;
+  --color-state-pendiente-rgb: 113 113 122;
+  --color-state-pendiente-soft: #f4f4f5;
+  --color-state-pendiente-on-soft: #52525b;
+
+  /* EN PROGRESO — está aprendiendo (índigo de trabajo) */
+  --color-state-progreso: #6366f1;
+  --color-state-progreso-rgb: 99 102 241;
+  --color-state-progreso-soft: #eef2ff;
+  --color-state-progreso-on-soft: #4338ca;
+
+  /* EN DESARROLLO — skill conocida pero no consolidada (ámbar suave) */
+  --color-state-en-desarrollo: #f59e0b;
+  --color-state-en-desarrollo-rgb: 245 158 11;
+  --color-state-en-desarrollo-soft: #fffbeb;
+  --color-state-en-desarrollo-on-soft: #b45309;
+
+  /* SÓLIDO — skill demostrada con buena nota (esmeralda suave) */
+  --color-state-solido: #10b981;
+  --color-state-solido-rgb: 16 185 129;
+  --color-state-solido-soft: #ecfdf5;
+  --color-state-solido-on-soft: #047857;
+
+  /* APTO — cumple criterio del cliente (verde profundo) */
+  --color-state-apto: #16a34a;
+  --color-state-apto-rgb: 22 163 74;
+  --color-state-apto-soft: #dcfce7;
+  --color-state-apto-on-soft: #15803d;
+
+  /* NO APTO — no cumple (rojo, sin drama) */
+  --color-state-no-apto: #dc2626;
+  --color-state-no-apto-rgb: 220 38 38;
+  --color-state-no-apto-soft: #fee2e2;
+  --color-state-no-apto-on-soft: #b91c1c;
+
+  /* COMPLETADO — curso terminado por colaborador (cyan, neutro positivo) */
+  --color-state-completado: #0891b2;
+  --color-state-completado-rgb: 8 145 178;
+  --color-state-completado-soft: #cffafe;
+  --color-state-completado-on-soft: #0e7490;
+
+  /* CERTIFICADO — premio aurora (sello cumbre, NO un color plano) */
+  --color-state-certificado-bg: var(--gradient-aurora);
+
+  /* Glows de estado para tarjetas que necesitan reforzar el veredicto */
+  --shadow-glow-apto: 0 8px 24px rgb(var(--color-state-apto-rgb) / 0.22);
+  --shadow-glow-solido: 0 8px 24px rgb(var(--color-state-solido-rgb) / 0.22);
+  --shadow-glow-no-apto: 0 8px 24px rgb(var(--color-state-no-apto-rgb) / 0.22);
+
+  /* ---------- Tipos de bloque didáctico ----------
+     Cada tipo tiene su personalidad visual reconocible. */
+  --color-block-parrafo: #71717a; /* texto, neutro */
+  --color-block-tip: #0891b2; /* info */
+  --color-block-video: #ec4899; /* magenta, energía visual */
+  --color-block-recurso: #0ea5e9; /* sky, descargable */
+  --color-block-codigo: #8b5cf6; /* violeta, tecnológico */
+  --color-block-quiz: #f59e0b; /* ámbar, atención */
+  --color-block-codigo-tests: #10b981; /* verde, tests pass */
+
+  /* ---------- Paleta de visualización de datos (dataviz) ----------
+     6 colores armónicos para series de gráficas + gridlines + deltas.
+     Funcionan en claro y oscuro porque están en zona media de saturación. */
+  --color-chart-1: #6366f1; /* índigo */
+  --color-chart-2: #06b6d4; /* cyan */
+  --color-chart-3: #a855f7; /* violet */
+  --color-chart-4: #f43f5e; /* rose */
+  --color-chart-5: #f59e0b; /* amber */
+  --color-chart-6: #10b981; /* emerald */
+
+  --color-chart-grid: rgb(231 229 228 / 0.6);
+  --color-chart-axis: #a8a29e;
+  --color-chart-delta-up: #16a34a;
+  --color-chart-delta-down: #dc2626;
+  --color-chart-delta-flat: #a8a29e;
+
+  /* ---------- Code editor (bloques evaluables) ----------
+     Superficie oscura tipo IDE moderno. Aplica a CÓDIGO con tests,
+     CÓDIGO con preguntas y CÓDIGO ilustrativo. */
+  --color-code-bg: #0b1020;
+  --color-code-bg-soft: rgb(11 16 32 / 0.04);
+  --color-code-bg-inline: #f1f5f9;
+  --color-code-border: #1e293b;
+  --color-code-text: #e2e8f0;
+  --color-code-line-number: #475569;
+  --color-code-line-active: rgb(99 102 241 / 0.12);
+  --color-code-selection: rgb(99 102 241 / 0.35);
+  --color-code-cursor: #818cf8;
+
+  /* Syntax tokens (sintaxis sobre fondo oscuro del code editor) */
+  --color-syntax-keyword: #c084fc; /* púrpura claro */
+  --color-syntax-string: #86efac; /* verde claro */
+  --color-syntax-number: #fbbf24; /* ámbar */
+  --color-syntax-comment: #64748b; /* slate */
+  --color-syntax-function: #60a5fa; /* azul */
+  --color-syntax-variable: #e2e8f0; /* texto base */
+  --color-syntax-type: #5eead4; /* teal */
+  --color-syntax-operator: #f472b6; /* rosa */
+  --color-syntax-punctuation: #94a3b8; /* slate medio */
+
+  /* Test results (badge + glow) */
+  --color-test-pass: #22c55e;
+  --color-test-fail: #ef4444;
+  --color-test-pending: #a8a29e;
+  --shadow-glow-test-pass: 0 0 20px rgb(34 197 94 / 0.4);
+  --shadow-glow-test-fail: 0 0 16px rgb(239 68 68 / 0.35);
+
+  /* Diff colors para code preview con cambios */
+  --color-diff-added-bg: rgb(34 197 94 / 0.14);
+  --color-diff-added-text: #166534;
+  --color-diff-removed-bg: rgb(239 68 68 / 0.14);
+  --color-diff-removed-text: #991b1b;
+
+  /* ---------- Glassmorphism (overlays premium) ----------
+     Frosted glass para popovers, command palette, hero overlays. */
+  --glass-bg-light: rgb(255 255 255 / 0.72);
+  --glass-bg-dark: rgb(20 20 22 / 0.72);
+  --glass-border-light: rgb(255 255 255 / 0.18);
+  --glass-border-dark: rgb(255 255 255 / 0.08);
+  --glass-blur: blur(20px) saturate(180%);
+  --glass-blur-strong: blur(40px) saturate(200%);
+
+  /* ---------- Radios adicionales ----------
+     2xl ya existe. 3xl y 4xl son para superficies grandes muy redondeadas
+     (cards de curso hero, modales de bienvenida). */
+  --radius-3xl: 32px;
+  --radius-4xl: 40px;
+
+  /* ---------- Sombras adicionales ----------
+     Multi-layer para profundidad real (no flat).
+     hover-up: lo que reciben cards al pasar el cursor. */
+  --shadow-xs: 0 1px 1px rgb(12 10 9 / 0.04);
+  --shadow-2xl: 0 32px 64px rgb(12 10 9 / 0.12), 0 12px 24px rgb(12 10 9 / 0.06);
+  --shadow-hover-up: 0 12px 28px rgb(12 10 9 / 0.1), 0 6px 12px rgb(12 10 9 / 0.05);
+  --shadow-card-resting: 0 1px 3px rgb(12 10 9 / 0.05), 0 1px 2px rgb(12 10 9 / 0.03);
+  --shadow-card-elevated: 0 20px 40px rgb(12 10 9 / 0.08), 0 8px 16px rgb(12 10 9 / 0.04), 0 0 0 1px
+    rgb(231 229 228 / 0.6);
+
+  /* Glows semánticos para reforzar feedback de estado */
+  --shadow-glow-success: 0 8px 24px rgb(var(--color-success-rgb) / 0.22);
+  --shadow-glow-danger: 0 8px 24px rgb(var(--color-danger-rgb) / 0.22);
+  --shadow-glow-info: 0 8px 24px rgb(8 145 178 / 0.22);
+
+  /* ---------- Motion vivo ----------
+     Más vivacidad que la default. El producto debe sentirse "fresco". */
+  --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-soft-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-snap: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --duration-snap: 100ms;
+  --duration-bouncy: 280ms;
+
+  /* Spring params estándar (Framer Motion los usa como números) */
+  --spring-stiffness: 120;
+  --spring-damping: 18;
+  --spring-mass: 0.7;
+
+  /* Hover lift — desplazamiento vertical al pasar cursor */
+  --lift-translate-sm: -1px;
+  --lift-translate-md: -2px;
+  --lift-translate-lg: -4px;
+}
+
+/* ============================================================
+   Layered tokens — no son `@theme` porque dependen de
+   contexto (z-index escalonado, contornos compuestos).
+   ============================================================ */
+
+:root {
+  --z-base: 0;
+  --z-raised: 10;
+  --z-sticky: 20;
+  --z-overlay: 100;
+  --z-modal: 200;
+  --z-popover: 250;
+  --z-toast: 300;
+  --z-tooltip: 400;
+
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "ss02", "ss03", "ss04", "tnum", "cv01", "cv11";
+  color-scheme: light;
+
+  /* ============================================================
+     SISTEMA EXTENDIDO · garantía de variables en :root.
+     Tailwind v4 expone tokens de @theme al :root, pero cuando
+     no se usan como utility Tailwind directamente, conviene
+     duplicar para asegurar que var(--color-area-X) resuelve
+     siempre. Estos NO definen utilities; solo CSS vars.
+     ============================================================ */
+
+  /* Áreas técnicas */
+  --color-area-frontend: #06b6d4;
+  --color-area-frontend-rgb: 6 182 212;
+  --color-area-frontend-soft: #ecfeff;
+  --color-area-frontend-on-soft: #0e7490;
+  --color-area-backend: #6366f1;
+  --color-area-backend-rgb: 99 102 241;
+  --color-area-backend-soft: #eef2ff;
+  --color-area-backend-on-soft: #4338ca;
+  --color-area-cloud: #0ea5e9;
+  --color-area-cloud-rgb: 14 165 233;
+  --color-area-cloud-soft: #f0f9ff;
+  --color-area-cloud-on-soft: #0369a1;
+  --color-area-data: #a855f7;
+  --color-area-data-rgb: 168 85 247;
+  --color-area-data-soft: #faf5ff;
+  --color-area-data-on-soft: #7e22ce;
+  --color-area-mobile: #f43f5e;
+  --color-area-mobile-rgb: 244 63 94;
+  --color-area-mobile-soft: #fff1f2;
+  --color-area-mobile-on-soft: #be123c;
+  --color-area-devops: #f97316;
+  --color-area-devops-rgb: 249 115 22;
+  --color-area-devops-soft: #fff7ed;
+  --color-area-devops-on-soft: #c2410c;
+  --color-area-qa: #84cc16;
+  --color-area-qa-rgb: 132 204 22;
+  --color-area-qa-soft: #f7fee7;
+  --color-area-qa-on-soft: #4d7c0f;
+  --color-area-soft: #f59e0b;
+  --color-area-soft-rgb: 245 158 11;
+  --color-area-soft-soft: #fffbeb;
+  --color-area-soft-on-soft: #b45309;
+
+  /* Glows de área */
+  --shadow-glow-area-frontend: 0 8px 32px rgb(var(--color-area-frontend-rgb) / 0.22);
+  --shadow-glow-area-backend: 0 8px 32px rgb(var(--color-area-backend-rgb) / 0.22);
+  --shadow-glow-area-cloud: 0 8px 32px rgb(var(--color-area-cloud-rgb) / 0.22);
+  --shadow-glow-area-data: 0 8px 32px rgb(var(--color-area-data-rgb) / 0.22);
+  --shadow-glow-area-mobile: 0 8px 32px rgb(var(--color-area-mobile-rgb) / 0.22);
+  --shadow-glow-area-devops: 0 8px 32px rgb(var(--color-area-devops-rgb) / 0.22);
+  --shadow-glow-area-qa: 0 8px 32px rgb(var(--color-area-qa-rgb) / 0.22);
+  --shadow-glow-area-soft: 0 8px 32px rgb(var(--color-area-soft-rgb) / 0.22);
+
+  /* Estados de competencia */
+  --color-state-pendiente: #71717a;
+  --color-state-pendiente-rgb: 113 113 122;
+  --color-state-pendiente-soft: #f4f4f5;
+  --color-state-pendiente-on-soft: #52525b;
+  --color-state-progreso: #6366f1;
+  --color-state-progreso-rgb: 99 102 241;
+  --color-state-progreso-soft: #eef2ff;
+  --color-state-progreso-on-soft: #4338ca;
+  --color-state-en-desarrollo: #f59e0b;
+  --color-state-en-desarrollo-rgb: 245 158 11;
+  --color-state-en-desarrollo-soft: #fffbeb;
+  --color-state-en-desarrollo-on-soft: #b45309;
+  --color-state-solido: #10b981;
+  --color-state-solido-rgb: 16 185 129;
+  --color-state-solido-soft: #ecfdf5;
+  --color-state-solido-on-soft: #047857;
+  --color-state-apto: #16a34a;
+  --color-state-apto-rgb: 22 163 74;
+  --color-state-apto-soft: #dcfce7;
+  --color-state-apto-on-soft: #15803d;
+  --color-state-no-apto: #dc2626;
+  --color-state-no-apto-rgb: 220 38 38;
+  --color-state-no-apto-soft: #fee2e2;
+  --color-state-no-apto-on-soft: #b91c1c;
+  --color-state-completado: #0891b2;
+  --color-state-completado-rgb: 8 145 178;
+  --color-state-completado-soft: #cffafe;
+  --color-state-completado-on-soft: #0e7490;
+
+  /* Code editor */
+  --color-code-bg: #0b1020;
+  --color-code-text: #e2e8f0;
+  --color-code-line-number: #475569;
+  --color-syntax-keyword: #c084fc;
+  --color-syntax-string: #86efac;
+  --color-syntax-number: #fbbf24;
+  --color-syntax-comment: #64748b;
+  --color-syntax-function: #60a5fa;
+  --color-syntax-variable: #e2e8f0;
+  --color-syntax-type: #5eead4;
+  --color-syntax-operator: #f472b6;
+  --color-syntax-punctuation: #94a3b8;
+  --color-test-pass: #22c55e;
+  --color-test-fail: #ef4444;
+  --shadow-glow-test-pass: 0 0 20px rgb(34 197 94 / 0.4);
+  --shadow-glow-test-fail: 0 0 16px rgb(239 68 68 / 0.35);
+
+  /* Dataviz */
+  --color-chart-delta-up: #16a34a;
+  --color-chart-delta-down: #dc2626;
+  --color-chart-delta-flat: #a8a29e;
+
+  /* Sombras de card */
+  --shadow-card-resting: 0 1px 3px rgb(12 10 9 / 0.05), 0 1px 2px rgb(12 10 9 / 0.03);
+  --shadow-card-elevated: 0 20px 40px rgb(12 10 9 / 0.08), 0 8px 16px rgb(12 10 9 / 0.04), 0 0 0 1px
+    rgb(231 229 228 / 0.6);
+}
+
+/* ============================================================
+   Modo oscuro · sobrescribe tokens semánticos
+   Los componentes leen siempre los mismos --color-*; aquí
+   redefinimos sus valores cuando html[data-theme="dark"].
+   La paleta aurora se MANTIENE: es identidad, no superficie.
+   ============================================================ */
+
+[data-theme="dark"] {
+  /* Superficies — del blanco editorial al carbón profundo */
+  --color-canvas: #0a0a0c;
+  --color-surface: #111114;
+  --color-surface-raised: #18181c;
+  --color-subtle: #1c1c22;
+  --color-muted: #26262d;
+
+  --color-border: #26262d;
+  --color-border-strong: #383841;
+  --color-border-emphasis: #525258;
+
+  /* Texto — invertido con jerarquía mantenida */
+  --color-text-primary: #fafaf9;
+  --color-text-secondary: #a8a29e;
+  --color-text-tertiary: #71717a;
+  --color-text-disabled: #3f3f46;
+
+  /* Acento — un poco más claro para AA en fondo oscuro */
+  --color-accent: #818cf8;
+  --color-accent-hover: #a5b4fc;
+  --color-accent-pressed: #6366f1;
+  --color-accent-soft: rgb(99 102 241 / 0.16);
+  --color-accent-soft-hover: rgb(99 102 241 / 0.24);
+  --color-accent-on-soft: #c7d2fe;
+
+  /* Cálido — ajustado para no quemar en fondo oscuro */
+  --color-warmth: #fbbf24;
+  --color-warmth-hover: #fcd34d;
+  --color-warmth-soft: rgb(245 158 11 / 0.16);
+  --color-warmth-soft-hover: rgb(245 158 11 / 0.24);
+  --color-warmth-on-soft: #fde68a;
+
+  /* Semánticos — versiones para fondo oscuro */
+  --color-success: #34d399;
+  --color-success-soft: rgb(16 185 129 / 0.16);
+  --color-success-on-soft: #6ee7b7;
+  --color-warning: #fbbf24;
+  --color-warning-soft: rgb(245 158 11 / 0.16);
+  --color-warning-on-soft: #fde68a;
+  --color-danger: #f87171;
+  --color-danger-soft: rgb(220 38 38 / 0.16);
+  --color-danger-on-soft: #fca5a5;
+  --color-info: #22d3ee;
+  --color-info-soft: rgb(34 211 238 / 0.16);
+  --color-info-on-soft: #67e8f9;
+
+  /* Atmósferas oscuras por paso — el escenario respira */
+  --color-atmos-credenciales: #0a0a0f;
+  --color-atmos-mfa: #0c0a12;
+  --color-atmos-cambiar-password: #0a0f0d;
+  --color-atmos-aviso-privacidad: #100a14;
+  --color-atmos-bienvenida: #140e0a;
+  --color-atmos-despedida: #18120c;
+
+  /* Sombras — más profundas porque el fondo es oscuro */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4), 0 1px 1px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 8px rgb(0 0 0 / 0.35), 0 2px 4px rgb(0 0 0 / 0.25);
+  --shadow-lg: 0 16px 32px rgb(0 0 0 / 0.45), 0 4px 8px rgb(0 0 0 / 0.25);
+  --shadow-overlay: 0 24px 48px rgb(0 0 0 / 0.6);
+
+  /* ---------- Sistema extendido en dark ----------
+     Las TINTAS de áreas y estados se aclaran ligeramente; los SOFT
+     pasan de blancos pasteles a tintas muy translúcidas sobre el oscuro. */
+
+  --color-area-frontend: #22d3ee;
+  --color-area-frontend-soft: rgb(34 211 238 / 0.12);
+  --color-area-frontend-on-soft: #67e8f9;
+
+  --color-area-backend: #818cf8;
+  --color-area-backend-soft: rgb(129 140 248 / 0.14);
+  --color-area-backend-on-soft: #c7d2fe;
+
+  --color-area-cloud: #38bdf8;
+  --color-area-cloud-soft: rgb(56 189 248 / 0.12);
+  --color-area-cloud-on-soft: #7dd3fc;
+
+  --color-area-data: #c084fc;
+  --color-area-data-soft: rgb(192 132 252 / 0.12);
+  --color-area-data-on-soft: #ddd6fe;
+
+  --color-area-mobile: #fb7185;
+  --color-area-mobile-soft: rgb(251 113 133 / 0.12);
+  --color-area-mobile-on-soft: #fda4af;
+
+  --color-area-devops: #fb923c;
+  --color-area-devops-soft: rgb(251 146 60 / 0.12);
+  --color-area-devops-on-soft: #fdba74;
+
+  --color-area-qa: #a3e635;
+  --color-area-qa-soft: rgb(163 230 53 / 0.12);
+  --color-area-qa-on-soft: #bef264;
+
+  --color-area-soft: #fbbf24;
+  --color-area-soft-soft: rgb(251 191 36 / 0.12);
+  --color-area-soft-on-soft: #fcd34d;
+
+  /* Estados de competencia en dark */
+  --color-state-pendiente: #a1a1aa;
+  --color-state-pendiente-soft: rgb(161 161 170 / 0.14);
+  --color-state-pendiente-on-soft: #d4d4d8;
+
+  --color-state-progreso: #818cf8;
+  --color-state-progreso-soft: rgb(129 140 248 / 0.14);
+  --color-state-progreso-on-soft: #c7d2fe;
+
+  --color-state-en-desarrollo: #fbbf24;
+  --color-state-en-desarrollo-soft: rgb(251 191 36 / 0.14);
+  --color-state-en-desarrollo-on-soft: #fcd34d;
+
+  --color-state-solido: #34d399;
+  --color-state-solido-soft: rgb(52 211 153 / 0.14);
+  --color-state-solido-on-soft: #6ee7b7;
+
+  --color-state-apto: #4ade80;
+  --color-state-apto-soft: rgb(74 222 128 / 0.14);
+  --color-state-apto-on-soft: #86efac;
+
+  --color-state-no-apto: #f87171;
+  --color-state-no-apto-soft: rgb(248 113 113 / 0.14);
+  --color-state-no-apto-on-soft: #fca5a5;
+
+  --color-state-completado: #22d3ee;
+  --color-state-completado-soft: rgb(34 211 238 / 0.14);
+  --color-state-completado-on-soft: #67e8f9;
+
+  /* Dataviz en dark */
+  --color-chart-grid: rgb(56 56 65 / 0.6);
+  --color-chart-axis: #71717a;
+
+  /* Code editor en dark — el fondo se mantiene oscuro; ajustamos inline */
+  --color-code-bg-inline: rgb(99 102 241 / 0.14);
+  --color-diff-added-text: #86efac;
+  --color-diff-removed-text: #fca5a5;
+
+  /* Sombras de card en dark — el border interno se ve */
+  --shadow-card-resting: 0 1px 2px rgb(0 0 0 / 0.4), 0 0 0 1px rgb(56 56 65 / 0.4);
+  --shadow-card-elevated: 0 20px 40px rgb(0 0 0 / 0.5), 0 8px 16px rgb(0 0 0 / 0.3), 0 0 0 1px
+    rgb(56 56 65 / 0.6);
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.5);
+  --shadow-hover-up: 0 12px 24px rgb(0 0 0 / 0.5);
+
+  /* ============================================================
+     *-rgb que cambian con el tema.
+     Crítico: las composiciones `rgb(var(--color-X-rgb) / alpha)`
+     leen el rgb (no el color directo). Sin override aquí, las
+     sombras, glows y bordes con alpha quedan con el rgb claro
+     sobre fondo oscuro y se ven desviados o invisibles.
+     Tras este override, --shadow-glow-area-*, --shadow-accent-glow*,
+     y cualquier rgb compuesto recalculan automáticamente.
+     ============================================================ */
+  --color-accent-rgb: 129 140 248; /* #818cf8 */
+  --color-success-rgb: 52 211 153; /* #34d399 */
+  --color-warning-rgb: 251 191 36; /* #fbbf24 */
+  --color-danger-rgb: 248 113 113; /* #f87171 */
+  --color-info-rgb: 34 211 238; /* #22d3ee */
+  --color-warmth-rgb: 251 191 36; /* #fbbf24 — más cálido en dark */
+
+  --color-area-frontend-rgb: 34 211 238;
+  --color-area-backend-rgb: 129 140 248;
+  --color-area-cloud-rgb: 56 189 248;
+  --color-area-data-rgb: 192 132 252;
+  --color-area-mobile-rgb: 251 113 133;
+  --color-area-devops-rgb: 251 146 60;
+  --color-area-qa-rgb: 163 230 53;
+  --color-area-soft-rgb: 251 191 36;
+
+  --color-state-pendiente-rgb: 161 161 170;
+  --color-state-progreso-rgb: 129 140 248;
+  --color-state-en-desarrollo-rgb: 251 191 36;
+  --color-state-solido-rgb: 52 211 153;
+  --color-state-apto-rgb: 74 222 128;
+  --color-state-no-apto-rgb: 248 113 113;
+  --color-state-completado-rgb: 34 211 238;
+
+  /* Glows un punto más intensos en dark para que respiren sobre el carbón */
+  --shadow-glow-area-frontend: 0 8px 32px rgb(var(--color-area-frontend-rgb) / 0.32);
+  --shadow-glow-area-backend: 0 8px 32px rgb(var(--color-area-backend-rgb) / 0.32);
+  --shadow-glow-area-cloud: 0 8px 32px rgb(var(--color-area-cloud-rgb) / 0.32);
+  --shadow-glow-area-data: 0 8px 32px rgb(var(--color-area-data-rgb) / 0.32);
+  --shadow-glow-area-mobile: 0 8px 32px rgb(var(--color-area-mobile-rgb) / 0.32);
+  --shadow-glow-area-devops: 0 8px 32px rgb(var(--color-area-devops-rgb) / 0.32);
+  --shadow-glow-area-qa: 0 8px 32px rgb(var(--color-area-qa-rgb) / 0.32);
+  --shadow-glow-area-soft: 0 8px 32px rgb(var(--color-area-soft-rgb) / 0.32);
+  --shadow-accent-glow: 0 8px 24px rgb(var(--color-accent-rgb) / 0.32);
+  --shadow-accent-glow-lg: 0 14px 36px rgb(var(--color-accent-rgb) / 0.4);
+
+  /* Dataviz series — más brillantes para fondo oscuro */
+  --color-chart-1: #818cf8;
+  --color-chart-2: #34d399;
+  --color-chart-3: #fbbf24;
+  --color-chart-4: #22d3ee;
+  --color-chart-5: #c084fc;
+  --color-chart-6: #fb7185;
+  --color-chart-delta-up: #34d399;
+  --color-chart-delta-down: #f87171;
+  --color-chart-delta-flat: #71717a;
+
+  color-scheme: dark;
+}
+
+/* ============================================================
+   Base — reset mínimo + tipografía por defecto
+   ============================================================ */
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-text-primary);
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-on-soft);
+}
+
+input,
+textarea,
+select {
+  caret-color: var(--color-accent);
+}
+
+/* Focus visible — fallback global para links y elementos sin tratamiento propio.
+   Los componentes de formulario (input, textarea, select) y botones definen su
+   propio lenguaje de focus (border + ring suave) y suprimen este outline. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 80ms !important;
+  }
+}
+
+/* ============================================================
+   Utilities · duraciones nombradas
+   (Tailwind v4 no expone `--duration-*` como utility automática;
+    las exponemos a mano para mantener `duration-fast` legible.)
+   ============================================================ */
+
+@utility duration-instant {
+  transition-duration: var(--duration-instant);
+}
+@utility duration-fast {
+  transition-duration: var(--duration-fast);
+}
+@utility duration-base {
+  transition-duration: var(--duration-base);
+}
+@utility duration-slow {
+  transition-duration: var(--duration-slow);
+}
+@utility duration-page {
+  transition-duration: var(--duration-page);
+}
+@utility duration-storytelling {
+  transition-duration: var(--duration-storytelling);
+}
+@utility duration-cinematic {
+  transition-duration: var(--duration-cinematic);
+}
+
+/* ============================================================
+   Preflight overrides — restauran defaults que Tailwind 4 retira.
+   ============================================================ */
+
+/* Tailwind 4 deja los <button> con cursor: auto. Restauramos el clásico
+   cursor: pointer salvo en disabled, donde el cursor: not-allowed manda. */
+button:not(:disabled):not([aria-disabled="true"]):not([data-disabled]) {
+  cursor: pointer;
+}
+
+/* ============================================================
+   Utility classes — pequeñas, intencionales.
+   Solo lo que Tailwind no expresa limpio en una clase.
+   ============================================================ */
+
+.font-serif {
+  font-family: var(--font-serif);
+  font-feature-settings: "ss01", "tnum";
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Eyebrow uppercase — la sobrelínea con tracking que se repite en cada paso */
+.nx-eyebrow {
+  font-family: var(--font-sans);
+  font-size: var(--text-eyebrow);
+  line-height: var(--text-eyebrow--line-height);
+  letter-spacing: var(--text-eyebrow--letter-spacing);
+  font-weight: var(--text-eyebrow--font-weight);
+  text-transform: uppercase;
+}
+
+/* Grano sutil para superficies de marca */
+.nx-grain {
+  position: relative;
+}
+.nx-grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/></svg>");
+  opacity: 0.05;
+  mix-blend-mode: multiply;
+}
+
+/* Pulse del indicador de "sistema activo" */
+@keyframes nx-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+.nx-pulse-dot {
+  position: relative;
+}
+.nx-pulse-dot::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+  animation: nx-pulse 2s ease-out infinite;
+}
+
+/* Aurora drifting — el panel marca del login respira de forma cinematográfica.
+   Movimiento contenido (translate < 3%) + scale leve. Nada que distraiga. */
+@keyframes nx-aurora-drift {
+  0%,
+  100% {
+    transform: translate3d(0%, 0%, 0) scale(1.06);
+  }
+  33% {
+    transform: translate3d(2%, -1.5%, 0) scale(1.08);
+  }
+  66% {
+    transform: translate3d(-1.5%, 1%, 0) scale(1.06);
+  }
+}
+
+.nx-aurora-drift {
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-aurora-radial);
+  animation: nx-aurora-drift 28s var(--ease-default) infinite;
+  will-change: transform;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-aurora-drift {
+    animation: none;
+    transform: scale(1.06);
+  }
+}
+
+/* Halo respirando para CTA primaria en hero del logout */
+@keyframes nx-breathe {
+  0%,
+  100% {
+    box-shadow: 0 8px 24px rgb(var(--color-accent-rgb) / 0.16);
+  }
+  50% {
+    box-shadow: 0 12px 36px rgb(var(--color-accent-rgb) / 0.28);
+  }
+}
+.nx-breathe {
+  animation: nx-breathe 3.6s var(--ease-default) infinite;
+}
+
+/* Pulso aurora cyan — sello "subió tu skill" cuando un bloque evaluable
+ * aprueba por PRIMERA VEZ. Único momento del canvas donde aparece aurora.
+ * Una sola pasada, 1.5s — no es loop, no decora; comunica un hito
+ * (manifiesto: aurora = recompensa cumbre). Reduced motion lo neutraliza.
+ */
+@keyframes nx-aurora-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(var(--color-aurora-cyan-rgb) / 0);
+  }
+  30% {
+    box-shadow: 0 0 0 6px rgb(var(--color-aurora-cyan-rgb) / 0.32);
+  }
+  100% {
+    box-shadow: 0 0 0 14px rgb(var(--color-aurora-cyan-rgb) / 0);
+  }
+}
+.nx-aurora-pulse {
+  animation: nx-aurora-pulse 1.5s var(--ease-default) 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nx-aurora-pulse {
+    animation: none;
+  }
+}
+
+/* ============================================================
+ * Motion · Overlays · Dialogs · Drawers · Popovers
+ * Sistema unificado de transiciones para componentes Radix.
+ * Cada utility reacciona a [data-state="open|closed"] del
+ * primitivo, sin dependencias externas.
+ *
+ * Curvas:
+ *   --ease-decel    → entradas (asentamiento, decelera)
+ *   --ease-accel    → salidas (irse rápido)
+ *   --ease-default  → drawer/dialog (out-expo suave)
+ *
+ * Respetan @media prefers-reduced-motion: reduce.
+ * ============================================================ */
+
+/* Overlay (backdrop oscuro) */
+@keyframes nx-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes nx-overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.nx-motion-overlay[data-state="open"] {
+  animation: nx-overlay-in 220ms var(--ease-decel) both;
+}
+.nx-motion-overlay[data-state="closed"] {
+  animation: nx-overlay-out 180ms var(--ease-accel) both;
+}
+
+/* Dialog centrado (modal, paleta de comandos) */
+@keyframes nx-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes nx-dialog-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+  }
+}
+.nx-motion-dialog {
+  transform-origin: top center;
+}
+.nx-motion-dialog[data-state="open"] {
+  animation: nx-dialog-in 280ms var(--ease-default) both;
+}
+.nx-motion-dialog[data-state="closed"] {
+  animation: nx-dialog-out 200ms var(--ease-accel) both;
+}
+
+/* Drawer lateral derecho (SidePeek) — slide corto + fade, estilo Linear */
+@keyframes nx-drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes nx-drawer-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+.nx-motion-drawer[data-state="open"] {
+  animation: nx-drawer-in 320ms var(--ease-default) both;
+}
+.nx-motion-drawer[data-state="closed"] {
+  animation: nx-drawer-out 220ms var(--ease-accel) both;
+}
+
+/* Popover · Dropdown menu · Tooltip — zoom desde el trigger */
+@keyframes nx-popover-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+@keyframes nx-popover-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+.nx-motion-popover {
+  transform-origin: var(--radix-popper-transform-origin, center top);
+}
+.nx-motion-popover[data-state="open"],
+.nx-motion-popover[data-state="delayed-open"],
+.nx-motion-popover[data-state="instant-open"] {
+  animation: nx-popover-in 180ms var(--ease-decel) both;
+}
+.nx-motion-popover[data-state="closed"] {
+  animation: nx-popover-out 120ms var(--ease-accel) both;
+}
+
+/* Pantalla inmersiva (builder de módulos, futuras vistas full-screen) — la
+   entrada se siente como "entrar en un espacio", no como un cambio de página. */
+@keyframes nx-immersive-in {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.nx-motion-immersive {
+  animation: nx-immersive-in 380ms var(--ease-default) both;
+  transform-origin: center top;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-motion-overlay[data-state="open"],
+  .nx-motion-overlay[data-state="closed"],
+  .nx-motion-dialog[data-state="open"],
+  .nx-motion-dialog[data-state="closed"],
+  .nx-motion-drawer[data-state="open"],
+  .nx-motion-drawer[data-state="closed"],
+  .nx-motion-popover[data-state="open"],
+  .nx-motion-popover[data-state="delayed-open"],
+  .nx-motion-popover[data-state="instant-open"],
+  .nx-motion-popover[data-state="closed"],
+  .nx-motion-immersive {
+    animation: none;
+  }
+}
+
+/* ============================================================
+ * Prism syntax highlighting — tokens mapeados a `--color-syntax-*`.
+ * Aplican dentro del CodeEditor (react-simple-code-editor + Prism).
+ * El fondo oscuro `--color-code-bg` vive en el contenedor, no aquí.
+ * ============================================================ */
+
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: var(--color-syntax-comment);
+  font-style: italic;
+}
+
+.token.keyword,
+.token.boolean,
+.token.atrule,
+.token.attr-name,
+.token.tag,
+.token.symbol,
+.token.deleted {
+  color: var(--color-syntax-keyword);
+}
+
+.token.string,
+.token.char,
+.token.attr-value,
+.token.regex,
+.token.inserted,
+.token.selector {
+  color: var(--color-syntax-string);
+}
+
+.token.number {
+  color: var(--color-syntax-number);
+}
+
+.token.function,
+.token.function-variable {
+  color: var(--color-syntax-function);
+}
+
+.token.class-name,
+.token.builtin,
+.token.namespace {
+  color: var(--color-syntax-type);
+}
+
+.token.operator,
+.token.entity,
+.token.url {
+  color: var(--color-syntax-operator);
+}
+
+.token.punctuation {
+  color: var(--color-syntax-punctuation);
+}
+
+.token.variable,
+.token.constant,
+.token.property {
+  color: var(--color-syntax-variable);
+}
+
+.token.important,
+.token.bold {
+  font-weight: 700;
+}
+
+.token.italic {
+  font-style: italic;
+}
+
+/* Textarea editable de react-simple-code-editor: transparente para que
+   el <pre> coloreado de Prism, situado debajo, se vea. El caret y el
+   placeholder sí necesitan tinte propio. */
+.nx-code-textarea {
+  outline: none !important;
+}
+.nx-code-textarea::placeholder {
+  color: var(--color-code-line-number);
+}
+
+/* ============================================================
+ * Tiptap — estilos del contenido editable del builder.
+ * Aplican dentro del elemento .tiptap (ProseMirror) y dentro de
+ * .tiptap-content cuando se renderiza el HTML guardado sin editor.
+ * ============================================================ */
+.tiptap {
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--color-text-primary);
+  min-height: 1.7em;
+}
+.tiptap:focus {
+  outline: none;
+}
+.tiptap p {
+  margin: 0 0 0.85em;
+}
+.tiptap p:last-child {
+  margin-bottom: 0;
+}
+.tiptap strong,
+.tiptap b {
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.tiptap em,
+.tiptap i {
+  font-style: italic;
+  color: var(--color-text-primary);
+}
+.tiptap h2 {
+  font-size: 22px;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 1.2em 0 0.4em;
+}
+.tiptap h2:first-child {
+  margin-top: 0;
+}
+.tiptap h3 {
+  font-size: 18px;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 1em 0 0.3em;
+}
+.tiptap ul,
+.tiptap ol {
+  margin: 0 0 0.85em;
+  padding-left: 1.4em;
+}
+.tiptap ul {
+  list-style: disc;
+}
+.tiptap ol {
+  list-style: decimal;
+}
+.tiptap li {
+  margin: 0.25em 0;
+}
+.tiptap li::marker {
+  color: var(--color-aurora-violet);
+}
+.tiptap ol li::marker {
+  font-weight: 600;
+}
+.tiptap li p {
+  margin: 0;
+}
+.tiptap blockquote {
+  margin: 1.2em 0;
+  padding: 0.9em 1.2em;
+  border-left: 4px solid var(--color-aurora-violet);
+  background: var(--color-subtle);
+  border-radius: 0 0.5rem 0.5rem 0;
+  color: var(--color-text-primary);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.05em;
+  line-height: 1.55;
+}
+.tiptap blockquote p:last-child {
+  margin-bottom: 0;
+}
+.tiptap a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: color 120ms ease, text-decoration-color 120ms ease;
+}
+.tiptap a:hover {
+  color: var(--color-accent-hover);
+  text-decoration-thickness: 2px;
+}
+.tiptap code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  font-weight: 500;
+  padding: 0.15em 0.4em;
+  background: var(--color-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-aurora-violet);
+}
+.tiptap mark {
+  background: rgb(var(--color-aurora-violet-rgb) / 0.15);
+  color: var(--color-text-primary);
+  padding: 0.1em 0.25em;
+  border-radius: 3px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.tiptap kbd {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0.25em 0.5em;
+  margin: 0 0.1em;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  box-shadow: 0 1px 0 var(--color-border-strong);
+  vertical-align: 0.05em;
+  white-space: nowrap;
+}
+.tiptap pre {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.6;
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.9em 1.1em;
+  margin: 0 0 0.85em;
+  overflow-x: auto;
+}
+.tiptap pre code {
+  color: var(--color-text-primary);
+}
+.tiptap pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+}
+.tiptap hr {
+  border: none;
+  height: 1.5em;
+  margin: 1.5em 0;
+  background-image: radial-gradient(circle, var(--color-aurora-violet) 1.2px, transparent 1.5px);
+  background-size: 1em 1.5em;
+  background-position: center;
+  background-repeat: repeat-x;
+  mask-image: linear-gradient(to right, transparent, black 35%, black 65%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 35%, black 65%, transparent);
+  opacity: 0.7;
+}
+.tiptap img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 0.5em 0;
+}
+.tiptap table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 0.75em;
+  table-layout: fixed;
+}
+.tiptap th,
+.tiptap td {
+  border: 1px solid var(--color-border);
+  padding: 0.45em 0.6em;
+  vertical-align: top;
+  text-align: left;
+}
+.tiptap th {
+  background: var(--color-subtle);
+  font-weight: 600;
+}
+.tiptap ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.25em;
+}
+.tiptap ul[data-type="taskList"] li {
+  display: flex;
+  gap: 0.5em;
+  align-items: flex-start;
+}
+.tiptap ul[data-type="taskList"] li > label {
+  margin-top: 0.25em;
+}
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--color-text-tertiary);
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+/* Syntax highlighting (lowlight / highlight.js tokens) — paleta sobria
+ * coherente con la identidad: índigo / cyan suave / texto secundario. */
+.tiptap pre code .hljs-keyword,
+.tiptap pre code .hljs-selector-tag,
+.tiptap pre code .hljs-built_in,
+.tiptap pre code .hljs-tag {
+  color: var(--color-accent);
+}
+.tiptap pre code .hljs-string,
+.tiptap pre code .hljs-attr,
+.tiptap pre code .hljs-template-variable {
+  color: var(--color-success-on-soft);
+}
+.tiptap pre code .hljs-number,
+.tiptap pre code .hljs-literal {
+  color: var(--color-warning-on-soft);
+}
+.tiptap pre code .hljs-comment,
+.tiptap pre code .hljs-quote {
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+.tiptap pre code .hljs-title,
+.tiptap pre code .hljs-name,
+.tiptap pre code .hljs-function {
+  color: var(--color-aurora-violet);
+}

@@ -1,7 +1,10 @@
 /// <reference types="vite/client" />
 
-declare module "*.css"
-declare module "@carlos2280/nexott-ui/tokens"
-declare module "@carlos2280/nexott-ui/animations"
-declare module "@carlos2280/nexott-ui/utilities"
-declare module "@carlos2280/nexott-ui/themes/*"
+interface ImportMetaEnv {
+  readonly VITE_API_URL?: string
+  readonly VITE_USE_MOCKS?: string
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv
+}

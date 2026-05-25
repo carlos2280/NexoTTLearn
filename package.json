@@ -7,6 +7,7 @@
     "dev:web": "turbo dev --filter=@nexott-learn/web",
     "dev:api": "turbo dev --filter=@nexott-learn/api",
     "build": "turbo build",
+    "typecheck": "turbo typecheck",
     "lint": "turbo lint",
     "test": "turbo test",
     "db:migrate": "turbo db:migrate --filter=@nexott-learn/api",
@@ -30,7 +31,8 @@
     "pnpm": ">=10"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,jsx,json,md}": ["biome check --write --no-errors-on-unmatched"]
+    "*.{ts,js,json,md}": ["biome check --write --no-errors-on-unmatched"],
+    "*.{tsx,jsx}": ["biome format --write --no-errors-on-unmatched"]
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -41,6 +43,14 @@
       "bcrypt",
       "esbuild",
       "prisma"
-    ]
+    ],
+    "overrides": {
+      "lodash@<4.18.0": "^4.18.1",
+      "lodash-es@<4.18.0": "^4.18.1",
+      "path-to-regexp@<0.1.13": "^0.1.13",
+      "@remix-run/router@<1.23.2": "^1.23.2",
+      "tar@<7.5.11": "^7.5.11",
+      "multer": "^2.1.1"
+    }
   }
 }

@@ -1,0 +1,80 @@
+# Dependabot — actualizaciones automaticas de dependencias
+#
+# Politica (P1a.2):
+#   - Patch en devDependencies     -> label "automerge" (auto-merge si CI pasa).
+#   - Minor / major en cualquier   -> label "needs-review" (PR manual).
+#   - Major de Prisma se ignora    -> requiere migracion planificada.
+#
+# Docs: https://docs.github.com/code-security/dependabot/dependabot-version-updates
+
+version: 2
+updates:
+  # ── pnpm workspace (raiz + apps + packages) ──
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Santiago
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+    groups:
+      # Patch en devDependencies -> automerge (CI sigue mandando)
+      devdeps-patch:
+        dependency-type: development
+        update-types: ["patch"]
+      # Patch en deps de produccion -> revision manual
+      prod-patch:
+        dependency-type: production
+        update-types: ["patch"]
+      # Minor agrupado para reducir ruido (revision manual)
+      minor-updates:
+        patterns: ["*"]
+        update-types: ["minor"]
+      # Stacks majors agrupados por familia
+      typescript-stack:
+        patterns: ["typescript", "@types/*", "tsx"]
+        update-types: ["major"]
+      nestjs-stack:
+        patterns: ["@nestjs/*"]
+        update-types: ["major"]
+      react-stack:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "react-router-dom"
+        update-types: ["major"]
+      vite-stack:
+        patterns: ["vite", "@vitejs/*", "vitest"]
+        update-types: ["major"]
+    labels:
+      - dependencies
+      - needs-review
+    ignore:
+      # Major de Prisma requiere plan de migracion explicito
+      - dependency-name: "@prisma/client"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "prisma"
+        update-types: ["version-update:semver-major"]
+
+  # ── GitHub Actions ──
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Santiago
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions
+      - needs-review
+    commit-message:
+      prefix: "ci(deps)"
+      include: scope

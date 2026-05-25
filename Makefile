@@ -18,7 +18,6 @@ C_RED   := \033[31m
 
 # Rutas
 ROOT := $(shell pwd)
-LIB  := $(ROOT)/../nexott-ui
 
 # ─────────────────────────────────────────────────────────
 # Help
@@ -48,44 +47,55 @@ clean: kill ## Limpia node_modules, dist y .turbo
 	@printf "$(C_GREEN)✓ Limpio$(C_RESET)\n"
 
 # ─────────────────────────────────────────────────────────
-# Librería local (nexott-ui)
-# ─────────────────────────────────────────────────────────
-
-.PHONY: lib-build
-lib-build: ## Compila la librería nexott-ui (../nexott-ui)
-	@printf "$(C_BLUE)→ Building nexott-ui…$(C_RESET)\n"
-	cd $(LIB) && pnpm build
-
-.PHONY: lib-rebuild
-lib-rebuild: lib-build install ## Compila la librería y reinstala (refresca enlace)
-	@printf "$(C_GREEN)✓ Librería recompilada y enlazada$(C_RESET)\n"
-
-.PHONY: lib-storybook
-lib-storybook: ## Levanta Storybook de la librería (localhost:6006)
-	cd $(LIB) && pnpm storybook
-
-# ─────────────────────────────────────────────────────────
 # Base de datos
 # ─────────────────────────────────────────────────────────
 
 .PHONY: db-up
 db-up: ## Levanta Postgres en Docker
 	@printf "$(C_BLUE)→ Levantando Postgres…$(C_RESET)\n"
-	docker compose up -d
-	@printf "$(C_GREEN)✓ Postgres listo en localhost:5434$(C_RESET)\n"
+	docker compose up -d postgres
+	@printf "$(C_GREEN)✓ Postgres listo en localhost:5435$(C_RESET)\n"
 
 .PHONY: db-down
 db-down: ## Detiene Postgres
 	@printf "$(C_YELLOW)→ Deteniendo Postgres…$(C_RESET)\n"
 	docker compose down
 
+.PHONY: sandbox-up
+sandbox-up: ## Levanta Piston (sandbox de codigo) e instala JS/TS/Python
+	@printf "$(C_BLUE)→ Levantando Piston…$(C_RESET)\n"
+	docker compose up -d piston
+	@printf "$(C_BLUE)→ Esperando healthy…$(C_RESET)\n"
+	@for i in $$(seq 1 30); do \
+	  if curl -sf http://localhost:2000/api/v2/runtimes > /dev/null 2>&1; then break; fi; \
+	  sleep 1; \
+	done
+	@printf "$(C_BLUE)→ Instalando runtimes (idempotente)…$(C_RESET)\n"
+	@for pkg in '{"language":"node","version":"20.11.1"}' '{"language":"typescript","version":"5.0.3"}' '{"language":"python","version":"3.12.0"}'; do \
+	  curl -s -X POST http://localhost:2000/api/v2/packages -H "Content-Type: application/json" -d "$$pkg" > /dev/null; \
+	done
+	@printf "$(C_GREEN)✓ Piston listo en localhost:2000$(C_RESET)\n"
+	@curl -s http://localhost:2000/api/v2/runtimes | head -c 200; echo
+
+.PHONY: sandbox-down
+sandbox-down: ## Detiene Piston
+	@printf "$(C_YELLOW)→ Deteniendo Piston…$(C_RESET)\n"
+	docker compose stop piston
+
 .PHONY: db-migrate
 db-migrate: ## Aplica migraciones Prisma
 	pnpm db:migrate
 
 .PHONY: db-seed
-db-seed: ## Ejecuta seed (admin@nexott.local / Admin1234!)
+db-seed: ## Ejecuta seed (curso 'Frontend para devs backend' + 3 admins + 10 participantes)
 	pnpm db:seed
+
+.PHONY: db-seed-fresh
+db-seed-fresh: ## ⚠ Reset destructivo + migrate + seed (entorno limpio en un comando)
+	@printf "$(C_RED)⚠  Esto borrará TODOS los datos y volverá a sembrar desde cero.$(C_RESET)\n"
+	cd apps/api && pnpm exec prisma migrate reset --force --skip-seed
+	cd apps/api && pnpm db:seed
+	@printf "$(C_GREEN)✓ BD sembrada. Levanta la app con 'make dev'.$(C_RESET)\n"
 
 .PHONY: db-studio
 db-studio: ## Abre Prisma Studio
@@ -106,6 +116,11 @@ dev: kill ## Levanta web + api en paralelo (foreground)
 	@printf "$(C_BLUE)→ Levantando web + api…$(C_RESET)\n"
 	pnpm dev
 
+.PHONY: dev-fresh
+dev-fresh: kill vite-cache-clear ## Levanta dev con cache de Vite limpio
+	@printf "$(C_BLUE)→ Levantando web + api con cache limpio…$(C_RESET)\n"
+	pnpm dev
+
 .PHONY: dev-web
 dev-web: ## Levanta solo el frontend (Vite, localhost:5173)
 	pnpm dev:web
@@ -113,6 +128,12 @@ dev-web: ## Levanta solo el frontend (Vite, localhost:5173)
 .PHONY: dev-api
 dev-api: ## Levanta solo el backend (Nest, localhost:4000)
 	pnpm dev:api
+
+.PHONY: vite-cache-clear
+vite-cache-clear: ## Limpia el cache de pre-bundling de Vite
+	@printf "$(C_YELLOW)→ Limpiando cache de Vite…$(C_RESET)\n"
+	@rm -rf apps/web/node_modules/.vite
+	@printf "$(C_GREEN)✓ Cache de Vite limpio$(C_RESET)\n"
 
 # ─────────────────────────────────────────────────────────
 # Procesos
@@ -136,8 +157,8 @@ ps: ## Lista procesos dev del proyecto
 .PHONY: ports
 ports: ## Muestra qué procesos ocupan los puertos del proyecto
 	@printf "$(C_BLUE)Puertos del proyecto:$(C_RESET)\n"
-	@echo "  5173 (web), 5174 (web fallback), 4000 (api), 5434 (postgres)"
-	@ss -tlnp 2>/dev/null | grep -E ":5173|:5174|:4000|:5434" || echo "  (todos libres)"
+	@echo "  5173 (web), 5174 (web fallback), 4000 (api), 5435 (postgres)"
+	@ss -tlnp 2>/dev/null | grep -E ":5173|:5174|:4000|:5435" || echo "  (todos libres)"
 
 # ─────────────────────────────────────────────────────────
 # Calidad

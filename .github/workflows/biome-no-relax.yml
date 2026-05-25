@@ -1,0 +1,116 @@
+name: Blindaje · Biome no se relaja
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "biome.json"
+      - "biome.jsonc"
+      - "**/biome.json"
+      - "**/biome.jsonc"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  detect-relax:
+    name: Detectar relajación de severidad en Biome
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Obtener biome.json del base y del head
+        id: get
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          mkdir -p /tmp/biome-diff
+          git show "${BASE_SHA}:biome.json" > /tmp/biome-diff/base.json 2>/dev/null || echo '{}' > /tmp/biome-diff/base.json
+          cp biome.json /tmp/biome-diff/head.json
+          echo "base=/tmp/biome-diff/base.json" >> "$GITHUB_OUTPUT"
+          echo "head=/tmp/biome-diff/head.json" >> "$GITHUB_OUTPUT"
+
+      - name: Verificar que no se relaja ninguna regla
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, sys
+
+          SEVERITY_RANK = {"off": 0, "warn": 1, "info": 1, "error": 2}
+          PROTECTED_BOOLS = [
+              "linter.rules.recommended",
+              "linter.rules.a11y.all",
+              "linter.rules.correctness.all",
+              "linter.rules.security.all",
+              "linter.rules.suspicious.all",
+              "linter.rules.performance.all",
+              "linter.rules.complexity.all",
+              "linter.rules.style.all",
+              "formatter.enabled",
+              "linter.enabled",
+              "organizeImports.enabled",
+          ]
+
+          def get_path(obj, dotted):
+              cur = obj
+              for part in dotted.split('.'):
+                  if not isinstance(cur, dict) or part not in cur:
+                      return None
+                  cur = cur[part]
+              return cur
+
+          def severity_of(node):
+              if isinstance(node, str):
+                  return node
+              if isinstance(node, dict) and "level" in node:
+                  return node["level"]
+              return None
+
+          def walk_severities(obj, path="", out=None):
+              if out is None:
+                  out = {}
+              if isinstance(obj, dict):
+                  sev = severity_of(obj)
+                  if sev is not None and path:
+                      out[path] = sev
+                  for k, v in obj.items():
+                      walk_severities(v, f"{path}.{k}" if path else k, out)
+              elif isinstance(obj, str) and path:
+                  if obj in SEVERITY_RANK:
+                      out[path] = obj
+              return out
+
+          base = json.load(open('/tmp/biome-diff/base.json'))
+          head = json.load(open('/tmp/biome-diff/head.json'))
+
+          errors = []
+
+          # 1) Booleanos protegidos: no pueden pasar de true a false ni desaparecer.
+          for key in PROTECTED_BOOLS:
+              base_val = get_path(base, key)
+              head_val = get_path(head, key)
+              if base_val is True and head_val is not True:
+                  errors.append(f"PROHIBIDO: '{key}' pasó de true a {head_val!r} (relajación de categoría completa)")
+
+          # 2) Severidades por regla: no pueden bajar.
+          base_sev = walk_severities(base.get("linter", {}).get("rules", {}))
+          head_sev = walk_severities(head.get("linter", {}).get("rules", {}))
+          for rule_path, base_level in base_sev.items():
+              head_level = head_sev.get(rule_path)
+              if head_level is None:
+                  continue  # regla eliminada se considera relajación si la categoría también desapareció (cubierto en check 1)
+              if SEVERITY_RANK.get(head_level, 2) < SEVERITY_RANK.get(base_level, 0):
+                  errors.append(f"PROHIBIDO: regla '{rule_path}' bajó de '{base_level}' a '{head_level}'")
+
+          if errors:
+              print("\n".join(errors), file=sys.stderr)
+              print("\nLas reglas de Biome no se pueden relajar. Si necesitas un override puntual, hazlo via 'overrides' por archivo o '// biome-ignore' justificado, no bajando severidad global.", file=sys.stderr)
+              sys.exit(1)
+          print("OK — biome.json no relaja ninguna regla.")
+          PY

@@ -2,20 +2,20 @@
   "name": "@nexott-learn/shared-types",
   "version": "0.1.0",
   "private": true,
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "types": "./dist/cjs/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./src/index.ts",
-      "require": "./dist/index.js",
-      "default": "./dist/index.js"
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js",
+      "types": "./dist/cjs/index.d.ts"
     }
   },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "lint": "cd ../.. && biome check packages/shared-types/src/"
+    "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.build.esm.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "cd ../.. && biome check packages/shared-types/src/",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "zod": "3.24.1"

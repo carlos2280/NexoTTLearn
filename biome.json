@@ -81,19 +81,47 @@
   },
   "overrides": [
     {
-      "include": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"],
+      "include": ["apps/web/**/*.tsx", "apps/web/**/*.jsx"],
       "linter": {
         "rules": {
-          "suspicious": { "noExplicitAny": "off" },
-          "style": { "noNonNullAssertion": "off" }
+          "suspicious": {
+            "noReactSpecificProps": "off"
+          }
         }
       }
     },
     {
-      "include": ["apps/api/prisma/seed.ts", "apps/api/scripts/**"],
+      "include": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"],
       "linter": {
         "rules": {
-          "suspicious": { "noConsoleLog": "off", "noConsole": "off" }
+          "suspicious": {
+            "noExplicitAny": "off",
+            "noExportsInTest": "off",
+            "noMisplacedAssertion": "off"
+          },
+          "style": { "noNonNullAssertion": "off" },
+          "performance": { "noDelete": "off", "useTopLevelRegex": "off" },
+          "correctness": { "noUndeclaredDependencies": "off" },
+          "complexity": { "noExcessiveCognitiveComplexity": "off" },
+          "security": { "noGlobalEval": "off" },
+          "nursery": { "noSecrets": "off" }
+        }
+      }
+    },
+    {
+      "include": [
+        "apps/api/prisma/seed.ts",
+        "apps/api/prisma/seeds/**",
+        "apps/api/scripts/**",
+        "apps/web/server.js"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": { "noConsoleLog": "off", "noConsole": "off", "useAwait": "off" },
+          "correctness": { "noNodejsModules": "off" },
+          "complexity": { "noExcessiveCognitiveComplexity": "off" },
+          "nursery": { "noSecrets": "off" },
+          "style": { "useNamingConvention": "off" }
         }
       }
     },
@@ -104,6 +132,9 @@
           "style": {
             "useImportType": "off",
             "noParameterProperties": "off"
+          },
+          "correctness": {
+            "noNodejsModules": "off"
           }
         }
       }
@@ -115,6 +146,16 @@
           "performance": {
             "noBarrelFile": "off",
             "noReExportAll": "off"
+          }
+        }
+      }
+    },
+    {
+      "include": ["apps/web/src/**/*.tsx"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noReactSpecificProps": "off"
           }
         }
       }

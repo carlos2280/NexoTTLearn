@@ -1,81 +1,40 @@
 import "reflect-metadata"
-import { Logger } from "@nestjs/common"
+import { ConfigService } from "@nestjs/config"
 import { NestFactory } from "@nestjs/core"
-import type { NestExpressApplication } from "@nestjs/platform-express"
-import ConnectPgSimple from "connect-pg-simple"
-import cookieParser from "cookie-parser"
-import session from "express-session"
-import helmet from "helmet"
-import passport from "passport"
+import { Logger } from "nestjs-pino"
 import { AppModule } from "./app.module"
+import { configurarHttp } from "./bootstrap-http"
+import { AppEnv } from "./config/env.validation"
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    logger: ["log", "error", "warn", "debug"],
-  })
+  // bufferLogs: los logs emitidos antes de useLogger() se reproducen tras
+  // engancharse pino. Sin esto, el banner de arranque sale por consola "raw".
+  const app = await NestFactory.create(AppModule, { bufferLogs: true })
 
-  const port = Number(process.env.API_PORT ?? 4000)
-  const sessionSecret = process.env.SESSION_SECRET
-  const databaseUrl = process.env.DATABASE_URL
-  const isProd = process.env.NODE_ENV === "production"
+  // Sustituye el LoggerService por defecto de Nest por el de nestjs-pino.
+  // Los `new Logger(name)` repartidos por los services se enrutan automatic-
+  // amente a este logger compartido (mismo contrato `LoggerService`).
+  const pinoLogger = app.get(Logger)
+  // biome-ignore lint/correctness/useHookAtTopLevel: app.useLogger no es un React hook.
+  app.useLogger(pinoLogger)
 
-  if (!sessionSecret || sessionSecret.length < 32) {
-    throw new Error("SESSION_SECRET debe tener al menos 32 caracteres")
-  }
-  if (!databaseUrl) {
-    throw new Error("DATABASE_URL no configurada")
-  }
+  configurarHttp(app)
 
-  app.use(helmet())
-  app.use(cookieParser())
+  const config = app.get<ConfigService<AppEnv, true>>(ConfigService)
+  const port = config.get("PORT", { infer: true })
 
-  app.enableCors({
-    origin: (origin, callback) => {
-      const permitidos = [
-        "http://localhost:5173",
-        "http://localhost:3000",
-        process.env.WEB_ORIGIN,
-      ].filter(Boolean)
-      if (!origin || permitidos.includes(origin)) {
-        callback(null, true)
-      } else {
-        callback(new Error(`Origen no permitido: ${origin}`))
-      }
-    },
-    credentials: true,
-  })
-
-  const PgStore = ConnectPgSimple(session)
-  app.use(
-    session({
-      store: new PgStore({
-        conString: databaseUrl,
-        createTableIfMissing: true,
-        tableName: "sesiones",
-      }),
-      secret: sessionSecret,
-      resave: false,
-      saveUninitialized: false,
-      name: "nexott.sid",
-      cookie: {
-        httpOnly: true,
-        secure: isProd,
-        sameSite: isProd ? "strict" : "lax",
-        maxAge: 1000 * 60 * 60 * 8, // 8 horas
-      },
-    }),
-  )
-
-  app.use(passport.initialize())
-  app.use(passport.session())
-
-  app.setGlobalPrefix("api")
+  // Habilita SIGTERM/SIGINT -> OnModuleDestroy: cierra pool de Prisma, crons
+  // y sesiones limpiamente cuando Railway redepliega.
+  app.enableShutdownHooks()
 
   await app.listen(port)
-  Logger.log(`API escuchando en http://localhost:${port}/api`, "Bootstrap")
+  pinoLogger.log(`API escuchando en puerto ${port}`, "Bootstrap")
 }
 
-bootstrap().catch((err) => {
-  Logger.error(err, "Bootstrap")
+bootstrap().catch((error: unknown) => {
+  const detalle = error instanceof Error ? (error.stack ?? error.message) : String(error)
+  // El logger pino aun no esta levantado aqui; salida directa a stderr
+  // (console.error esta permitido por la regla noConsole — allow: warn/error).
+  console.error(`Error fatal en bootstrap: ${detalle}`)
   process.exit(1)
 })
