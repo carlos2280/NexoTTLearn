@@ -13,6 +13,13 @@ interface Props {
   readonly abierto: boolean
   readonly asignacion: Asignacion | undefined
   readonly onCambiarAbierto: (abierto: boolean) => void
+  /**
+   * Cuando es `false` el copy del diálogo refleja que el cierre es el final
+   * del proceso (no hay fase posterior de "entrevista cliente"): el título
+   * pasa a "Cerrar curso" y los botones a "Aprobado / No aprobado". El
+   * backend sigue persistiendo APTO/NO_APTO como hasta ahora.
+   */
+  readonly tieneEntregaACliente: boolean
 }
 
 type Resultado = "APTO" | "NO_APTO"
@@ -30,7 +37,12 @@ function construirBody(
   return obs
 }
 
-export function DialogoCerrarCaso({ abierto, asignacion, onCambiarAbierto }: Props) {
+export function DialogoCerrarCaso({
+  abierto,
+  asignacion,
+  onCambiarAbierto,
+  tieneEntregaACliente,
+}: Props) {
   const [resultado, setResultado] = useState<Resultado>("APTO")
   const [observaciones, setObservaciones] = useState("")
   const [motivo, setMotivo] = useState("")
@@ -69,11 +81,15 @@ export function DialogoCerrarCaso({ abierto, asignacion, onCambiarAbierto }: Pro
     }
   }
 
+  const tituloAsignado = tieneEntregaACliente ? "Cerrar caso" : "Cerrar curso"
+  const etiquetaApto = tieneEntregaACliente ? "Apto" : "Aprobado"
+  const etiquetaNoApto = tieneEntregaACliente ? "No apto" : "No aprobado"
+
   return (
     <Dialog
       abierto={abierto}
       onCambiarAbierto={onCambiarAbierto}
-      titulo={esAsignado ? "Cerrar caso" : "Cerrar como completado"}
+      titulo={esAsignado ? tituloAsignado : "Cerrar como completado"}
       descripcion={`Colaborador: ${asignacion.colaborador.nombreCompleto}`}
       ancho="md"
     >
@@ -88,7 +104,7 @@ export function DialogoCerrarCaso({ abierto, asignacion, onCambiarAbierto }: Pro
                   variant={resultado === "APTO" ? "primary" : "secondary"}
                   onClick={() => setResultado("APTO")}
                 >
-                  Apto
+                  {etiquetaApto}
                 </Button>
                 <Button
                   type="button"
@@ -96,7 +112,7 @@ export function DialogoCerrarCaso({ abierto, asignacion, onCambiarAbierto }: Pro
                   variant={resultado === "NO_APTO" ? "danger" : "secondary"}
                   onClick={() => setResultado("NO_APTO")}
                 >
-                  No apto
+                  {etiquetaNoApto}
                 </Button>
               </div>
             )}
@@ -145,7 +161,7 @@ export function DialogoCerrarCaso({ abierto, asignacion, onCambiarAbierto }: Pro
             type="submit"
             isLoading={mutation.isPending}
           >
-            Cerrar caso
+            {esAsignado ? tituloAsignado : "Cerrar"}
           </Button>
         </DialogFooter>
       </form>

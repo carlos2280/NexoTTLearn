@@ -6,6 +6,7 @@ import { AsignacionesVista } from "./components/asignaciones-vista"
 export function AsignacionesPage() {
   const { cursoId } = useParams<{ cursoId: string }>()
   const cursoQuery = useObtenerCurso(cursoId)
+  const tieneEntregaACliente = cursoQuery.data?.tieneEntregaACliente ?? true
 
   return (
     <div className="mx-auto flex max-w-[1280px] flex-col gap-6">
@@ -21,12 +22,13 @@ export function AsignacionesPage() {
           {cursoQuery.data?.titulo ?? "Asignaciones del curso"}
         </h1>
         <p className="max-w-2xl text-body text-text-secondary">
-          Gestiona el flujo de cada caso: convertir voluntarios, marcar listo, cerrar caso, reabrir
-          o retirar.
+          {tieneEntregaACliente
+            ? "Gestiona el flujo de cada caso: convertir voluntarios, marcar listo, cerrar caso, reabrir o retirar."
+            : "Gestiona el flujo de cada caso: convertir voluntarios, marcar listo, cerrar curso, reabrir o retirar."}
         </p>
       </header>
 
-      <AsignacionesVista cursoId={cursoId ?? ""} />
+      <AsignacionesVista cursoId={cursoId ?? ""} tieneEntregaACliente={tieneEntregaACliente} />
     </div>
   )
 }

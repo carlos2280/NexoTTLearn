@@ -47,3 +47,9 @@ export type {
 
 export { patchResultadoEntrevistaRequestSchema } from "./resultado-entrevista.schema"
 export type { PatchResultadoEntrevistaRequest } from "./resultado-entrevista.schema"
+
+export { listarColaboradoresDisponiblesQuerySchema } from "./colaboradores-disponibles.schema"
+export type {
+  ListarColaboradoresDisponiblesQuery,
+  ColaboradorDisponible,
+} from "./colaboradores-disponibles.schema"

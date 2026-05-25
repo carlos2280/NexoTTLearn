@@ -6,10 +6,12 @@ import type {
   AutoInscripcionRequest,
   CerrarCasoAsignadoRequest,
   CerrarCasoVoluntarioRequest,
+  ColaboradorDisponible,
   CrearAsignacionesBatchRequest,
   CrearAsignacionesBatchResponse,
   CursoDisponibleVoluntario,
   ListarAsignacionesQuery,
+  ListarColaboradoresDisponiblesQuery,
   PaginacionQuery,
   Paginated,
   PatchResultadoEntrevistaRequest,
@@ -141,4 +143,21 @@ export function autoInscribirseEnCurso(
   input: AutoInscripcionRequest,
 ): Promise<Asignacion> {
   return httpClient.post<Asignacion>(`/cursos/${cursoId}/auto-inscripcion`, input)
+}
+
+function buildColaboradoresDisponiblesQuery(query: ListarColaboradoresDisponiblesQuery): string {
+  const params = new URLSearchParams()
+  params.set("page", String(query.page))
+  params.set("pageSize", String(query.pageSize))
+  pushIfDefined(params, "q", query.q?.trim())
+  return `?${params.toString()}`
+}
+
+export function listarColaboradoresDisponibles(
+  cursoId: string,
+  query: ListarColaboradoresDisponiblesQuery,
+): Promise<Paginated<ColaboradorDisponible>> {
+  return httpClient.get<Paginated<ColaboradorDisponible>>(
+    `/cursos/${cursoId}/colaboradores-disponibles${buildColaboradoresDisponiblesQuery(query)}`,
+  )
 }

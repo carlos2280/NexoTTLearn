@@ -49,9 +49,10 @@ function Campo({ etiqueta, valor }: CampoProps) {
 
 interface CuerpoProps {
   readonly detalle: AsignacionDetallada
+  readonly tieneEntregaACliente: boolean
 }
 
-function CuerpoDetalle({ detalle }: CuerpoProps) {
+function CuerpoDetalle({ detalle, tieneEntregaACliente }: CuerpoProps) {
   return (
     <>
       <SidePeekSeccion titulo="Resumen">
@@ -78,7 +79,7 @@ function CuerpoDetalle({ detalle }: CuerpoProps) {
         </SidePeekSeccion>
       ) : null}
 
-      {detalle.rol === "ASIGNADO" ? (
+      {detalle.rol === "ASIGNADO" && tieneEntregaACliente ? (
         <SidePeekSeccion titulo="Entrevista cliente">
           <div className="grid grid-cols-2 gap-4">
             <Campo
@@ -103,9 +104,10 @@ function CuerpoDetalle({ detalle }: CuerpoProps) {
 interface Props {
   readonly asignacionId: string | null
   readonly onCerrar: () => void
+  readonly tieneEntregaACliente: boolean
 }
 
-export function PeekAsignacion({ asignacionId, onCerrar }: Props) {
+export function PeekAsignacion({ asignacionId, onCerrar, tieneEntregaACliente }: Props) {
   const query = useObtenerAsignacion(asignacionId ?? undefined)
   const detalle = query.data
 
@@ -115,7 +117,11 @@ export function PeekAsignacion({ asignacionId, onCerrar }: Props) {
       onCambiarAbierto={(open) => (open ? null : onCerrar())}
       titulo={detalle?.colaborador.nombreCompleto ?? "Asignación"}
       descripcion={detalle?.colaborador.email}
-      cabeceraExtra={detalle ? <BadgeEstadoAsignacion asignacion={detalle} /> : null}
+      cabeceraExtra={
+        detalle ? (
+          <BadgeEstadoAsignacion asignacion={detalle} tieneEntregaACliente={tieneEntregaACliente} />
+        ) : null
+      }
       ancho="xl"
     >
       {query.isLoading || !detalle ? (
@@ -125,7 +131,7 @@ export function PeekAsignacion({ asignacionId, onCerrar }: Props) {
           <Skeleton className="h-48 w-full" />
         </div>
       ) : (
-        <CuerpoDetalle detalle={detalle} />
+        <CuerpoDetalle detalle={detalle} tieneEntregaACliente={tieneEntregaACliente} />
       )}
     </SidePeek>
   )

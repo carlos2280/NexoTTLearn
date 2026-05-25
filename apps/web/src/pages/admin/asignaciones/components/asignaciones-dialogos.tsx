@@ -9,7 +9,7 @@ import { ConfirmDialog } from "@/shared/components/ui/confirm-dialog"
 import { ConfirmMotivoDialog } from "@/shared/components/ui/confirm-motivo-dialog"
 import type { Asignacion } from "@nexott-learn/shared-types"
 import type { DialogoAbierto } from "../asignaciones.types"
-import { DialogoAsignarBatch } from "./dialogo-asignar-batch"
+import { DialogoAsignarColaboradores } from "./dialogo-asignar-colaboradores"
 import { DialogoCerrarCaso } from "./dialogo-cerrar-caso"
 import { DialogoResultadoCliente } from "./dialogo-resultado-cliente"
 
@@ -17,13 +17,14 @@ interface Props {
   readonly cursoId: string
   readonly dialogo: DialogoAbierto | null
   readonly onCerrar: () => void
+  readonly tieneEntregaACliente: boolean
 }
 
 function nombre(a: Asignacion | undefined): string {
   return a?.colaborador.nombreCompleto ?? ""
 }
 
-export function AsignacionesDialogos({ cursoId, dialogo, onCerrar }: Props) {
+export function AsignacionesDialogos({ cursoId, dialogo, onCerrar, tieneEntregaACliente }: Props) {
   const convertir = useConvertirAAsignado()
   const iniciar = useIniciarProgreso()
   const marcarListo = useMarcarListo()
@@ -35,7 +36,7 @@ export function AsignacionesDialogos({ cursoId, dialogo, onCerrar }: Props) {
 
   return (
     <>
-      <DialogoAsignarBatch
+      <DialogoAsignarColaboradores
         abierto={accion === "asignar-batch"}
         cursoId={cursoId}
         onCambiarAbierto={(open) => (open ? null : onCerrar())}
@@ -45,12 +46,15 @@ export function AsignacionesDialogos({ cursoId, dialogo, onCerrar }: Props) {
         abierto={accion === "cerrar-caso"}
         asignacion={a}
         onCambiarAbierto={(open) => (open ? null : onCerrar())}
+        tieneEntregaACliente={tieneEntregaACliente}
       />
-      <DialogoResultadoCliente
-        abierto={accion === "resultado-cliente"}
-        asignacion={a}
-        onCambiarAbierto={(open) => (open ? null : onCerrar())}
-      />
+      {tieneEntregaACliente ? (
+        <DialogoResultadoCliente
+          abierto={accion === "resultado-cliente"}
+          asignacion={a}
+          onCambiarAbierto={(open) => (open ? null : onCerrar())}
+        />
+      ) : null}
       <ConfirmMotivoDialog
         abierto={accion === "convertir" && Boolean(a)}
         onCambiarAbierto={(open) => (open ? null : onCerrar())}

@@ -48,7 +48,7 @@ interface MockPrisma {
     findMany: ReturnType<typeof vi.fn>
     count: ReturnType<typeof vi.fn>
   }
-  colaborador: { findMany: ReturnType<typeof vi.fn> }
+  colaborador: { findMany: ReturnType<typeof vi.fn>; count: ReturnType<typeof vi.fn> }
   usuario: {
     findUnique: ReturnType<typeof vi.fn>
     findMany: ReturnType<typeof vi.fn>
@@ -85,7 +85,7 @@ function buildPrismaMock(): MockPrisma {
     },
     historicoEstadoAsignacion: { create: vi.fn(), findMany: vi.fn(), count: vi.fn() },
     curso: { findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), findMany: vi.fn(), count: vi.fn() },
-    colaborador: { findMany: vi.fn() },
+    colaborador: { findMany: vi.fn(), count: vi.fn() },
     usuario: {
       findUnique: vi.fn(),
       // P11.5b: broadcastAdminsActivos consulta admins activos. Default vacio
@@ -297,6 +297,80 @@ describe("AsignacionesService.crearBatch", () => {
     const res = await service.crearBatch(CURSO_ID, { colaboradorIds: [idOk, idRace] })
     expect(res.creadas).toHaveLength(1)
     expect(res.rechazadas).toEqual([{ colaboradorId: idRace, motivo: "YA_INSCRITO" }])
+  })
+})
+
+describe("AsignacionesService.listarColaboradoresDisponibles", () => {
+  it("404 si el curso no existe", async () => {
+    prisma.curso.findUnique.mockResolvedValue(null)
+
+    await expect(
+      service.listarColaboradoresDisponibles(CURSO_ID, { page: 1, pageSize: 20 }),
+    ).rejects.toBeInstanceOf(NotFoundException)
+  })
+
+  it("devuelve colaboradores ACTIVOS no inscritos en el curso, paginados", async () => {
+    prisma.curso.findUnique.mockResolvedValue({ id: CURSO_ID })
+    prisma.colaborador.findMany.mockResolvedValue([
+      { id: COLABORADOR_ID, nombre: "Ana Test", email: "ana@nttdata.test" },
+      { id: OTRO_COLABORADOR_ID, nombre: "Bruno Test", email: "bruno@nttdata.test" },
+    ])
+    prisma.colaborador.count.mockResolvedValue(2)
+
+    const res = await service.listarColaboradoresDisponibles(CURSO_ID, { page: 1, pageSize: 20 })
+
+    expect(res.data).toEqual([
+      { id: COLABORADOR_ID, nombre: "Ana Test", email: "ana@nttdata.test" },
+      { id: OTRO_COLABORADOR_ID, nombre: "Bruno Test", email: "bruno@nttdata.test" },
+    ])
+    expect(res.meta).toEqual({ page: 1, pageSize: 20, total: 2, totalPages: 1 })
+
+    // Verifica el WHERE: ACTIVO + sin asignacion en este curso.
+    const llamada = prisma.colaborador.findMany.mock.calls[0]?.[0] as {
+      where: { estadoEmpleado: string; asignaciones: { none: { cursoId: string } } }
+    }
+    expect(llamada.where.estadoEmpleado).toBe("ACTIVO")
+    expect(llamada.where.asignaciones).toEqual({ none: { cursoId: CURSO_ID } })
+  })
+
+  it("aplica filtro de busqueda por nombre/email cuando q viene con texto", async () => {
+    prisma.curso.findUnique.mockResolvedValue({ id: CURSO_ID })
+    prisma.colaborador.findMany.mockResolvedValue([])
+    prisma.colaborador.count.mockResolvedValue(0)
+
+    await service.listarColaboradoresDisponibles(CURSO_ID, {
+      page: 1,
+      pageSize: 20,
+      q: "  ana ",
+    })
+
+    const llamada = prisma.colaborador.findMany.mock.calls[0]?.[0] as {
+      where: {
+        // biome-ignore lint/style/useNamingConvention: clave Prisma WHERE OR.
+        OR?: { nombre?: { contains: string }; email?: { contains: string } }[]
+      }
+    }
+    expect(llamada.where.OR).toEqual([
+      { nombre: { contains: "ana", mode: "insensitive" } },
+      { email: { contains: "ana", mode: "insensitive" } },
+    ])
+  })
+
+  it("ignora q vacio (solo espacios)", async () => {
+    prisma.curso.findUnique.mockResolvedValue({ id: CURSO_ID })
+    prisma.colaborador.findMany.mockResolvedValue([])
+    prisma.colaborador.count.mockResolvedValue(0)
+
+    await service.listarColaboradoresDisponibles(CURSO_ID, {
+      page: 1,
+      pageSize: 20,
+      q: "   ",
+    })
+
+    const llamada = prisma.colaborador.findMany.mock.calls[0]?.[0] as {
+      where: Record<string, unknown>
+    }
+    expect(llamada.where).not.toHaveProperty("OR")
   })
 })
 

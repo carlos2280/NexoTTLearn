@@ -33,9 +33,15 @@ function etiquetaTab(t: TabRol): string {
 interface Props {
   readonly cursoId: string
   readonly nombreCurso?: string
+  /**
+   * Si el curso entrega el perfil a un cliente externo. Cuando es `false`,
+   * la UI oculta la fase "entrevista cliente" (sección en peek, accion de
+   * registrar resultado) y renombra "Apto/No apto" a "Aprobado/No aprobado".
+   */
+  readonly tieneEntregaACliente: boolean
 }
 
-export function AsignacionesVista({ cursoId, nombreCurso }: Props) {
+export function AsignacionesVista({ cursoId, nombreCurso, tieneEntregaACliente }: Props) {
   const [rolTab, setRolTab] = useState<TabRol>("TODOS")
   const [busqueda, setBusqueda] = useState("")
   const [page, setPage] = useState(1)
@@ -49,7 +55,10 @@ export function AsignacionesVista({ cursoId, nombreCurso }: Props) {
     q: busqueda.trim().length >= 2 ? busqueda.trim() : undefined,
   })
 
-  const columnas = useMemo(() => construirColumnasAsignaciones(), [])
+  const columnas = useMemo(
+    () => construirColumnasAsignaciones(tieneEntregaACliente),
+    [tieneEntregaACliente],
+  )
 
   function disparar(accion: DialogoAbierto["accion"], asignacion?: Asignacion) {
     setDialogo({ accion, asignacion })
@@ -103,7 +112,7 @@ export function AsignacionesVista({ cursoId, nombreCurso }: Props) {
         vacioDescripcion="Asigna colaboradores o cambia de pestaña para ver otro rol."
         onClickFila={(a) => setPeekId(a.id)}
         accionFila={(a) => {
-          const grupos = obtenerAccionesAsignacion(a, disparar)
+          const grupos = obtenerAccionesAsignacion(a, disparar, tieneEntregaACliente)
           if (grupos.length === 0) {
             return null
           }
@@ -123,9 +132,18 @@ export function AsignacionesVista({ cursoId, nombreCurso }: Props) {
         onCambiarPage={setPage}
       />
 
-      <AsignacionesDialogos cursoId={cursoId} dialogo={dialogo} onCerrar={() => setDialogo(null)} />
+      <AsignacionesDialogos
+        cursoId={cursoId}
+        dialogo={dialogo}
+        onCerrar={() => setDialogo(null)}
+        tieneEntregaACliente={tieneEntregaACliente}
+      />
 
-      <PeekAsignacion asignacionId={peekId} onCerrar={() => setPeekId(null)} />
+      <PeekAsignacion
+        asignacionId={peekId}
+        onCerrar={() => setPeekId(null)}
+        tieneEntregaACliente={tieneEntregaACliente}
+      />
     </div>
   )
 }

@@ -568,6 +568,7 @@ model Curso {
   fechaDeadline          DateTime        @map("fecha_deadline") @db.Date
   toggleVoluntarios      Boolean         @default(true) @map("toggle_voluntarios")
   toggleCierreAutomatico Boolean         @default(false) @map("toggle_cierre_automatico")
+  tieneEntregaACliente   Boolean         @default(true) @map("tiene_entrega_a_cliente")
   umbralNoCumple         Decimal         @default(10.00) @map("umbral_no_cumple") @db.Decimal(5, 2)
   pesoBloques            Decimal         @default(70.00) @map("peso_bloques") @db.Decimal(5, 2)
   pesoTransversal        Decimal         @default(20.00) @map("peso_transversal") @db.Decimal(5, 2)

@@ -15,7 +15,9 @@ function formatearFechaCorta(iso: string | null): string {
   return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short" })
 }
 
-export function construirColumnasAsignaciones(): readonly ColumnaTabla<Asignacion>[] {
+export function construirColumnasAsignaciones(
+  tieneEntregaACliente: boolean,
+): readonly ColumnaTabla<Asignacion>[] {
   return [
     {
       id: "persona",
@@ -46,7 +48,9 @@ export function construirColumnasAsignaciones(): readonly ColumnaTabla<Asignacio
       id: "estado",
       cabecera: "Estado",
       anchoFijo: "160px",
-      accesor: (a) => <BadgeEstadoAsignacion asignacion={a} />,
+      accesor: (a) => (
+        <BadgeEstadoAsignacion asignacion={a} tieneEntregaACliente={tieneEntregaACliente} />
+      ),
     },
     {
       id: "inicio",
