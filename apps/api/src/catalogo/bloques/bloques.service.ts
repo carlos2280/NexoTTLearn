@@ -144,6 +144,34 @@ export class BloquesService {
     return filas.map(toBloqueResponse)
   }
 
+  /**
+   * `GET /catalogo/secciones/:seccionId/contenido` — devuelve TODOS los bloques
+   * ACTIVOS de la seccion CON `contenido` incluido, en una sola query. Elimina
+   * el N+1 que hacia el frontend (un `GET /bloques/:id` por bloque) y permite
+   * a una seccion con muchos bloques cargarse sin reventar el throttler.
+   *
+   * Filtra `estado === ACTIVO`, ordena por `orden ASC`. 404 si la seccion no
+   * existe. Lectura, sin audit.
+   */
+  async obtenerContenidoPorSeccion(seccionId: string): Promise<readonly BloqueDetalleResponse[]> {
+    const seccion = await this.prisma.seccion.findUnique({
+      where: { id: seccionId },
+      select: { id: true },
+    })
+    if (!seccion) {
+      throw new NotFoundException({
+        code: apiErrorCodes.seccionNoEncontrada,
+        message: "Seccion no encontrada.",
+      })
+    }
+    const filas = await this.prisma.bloque.findMany({
+      where: { seccionId, estado: EstadoBloque.ACTIVO },
+      select: SELECT_BLOQUE_DETALLE_FIELDS,
+      orderBy: { orden: "asc" },
+    })
+    return filas.map(toBloqueDetalleResponse)
+  }
+
   async obtenerPorIdOrThrow(id: string): Promise<BloqueDetalleResponse> {
     const fila = await this.prisma.bloque.findUnique({
       where: { id },

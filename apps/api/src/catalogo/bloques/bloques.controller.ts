@@ -58,6 +58,19 @@ export class BloquesController {
     return await this.bloquesService.listarPorSeccion(seccionId)
   }
 
+  /**
+   * Devuelve los bloques ACTIVOS de la seccion con su `contenido` incluido en
+   * una sola query. Sustituye al patron N+1 que hacia el frontend (un GET por
+   * bloque, ver `use-bloques-de-seccion.ts`).
+   */
+  @Get("secciones/:seccionId/contenido")
+  @Roles(RolUsuario.ADMIN, RolUsuario.PARTICIPANTE)
+  async obtenerContenidoPorSeccion(
+    @Param("seccionId", ParseUUIDPipe) seccionId: string,
+  ): Promise<readonly BloqueDetalleResponse[]> {
+    return await this.bloquesService.obtenerContenidoPorSeccion(seccionId)
+  }
+
   @Get("bloques/:id")
   @Roles(RolUsuario.ADMIN, RolUsuario.PARTICIPANTE)
   async obtener(@Param("id", ParseUUIDPipe) id: string): Promise<BloqueDetalleResponse> {

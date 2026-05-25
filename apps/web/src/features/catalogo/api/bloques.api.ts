@@ -44,6 +44,19 @@ export function obtenerBloque(id: string): Promise<BloqueDetalleResponse> {
   return httpClient.get<BloqueDetalleResponse>(`/catalogo/bloques/${id}`)
 }
 
+/**
+ * Devuelve los bloques ACTIVOS de la sección CON `contenido` incluido en una
+ * sola llamada. Reemplaza al patrón N+1 (listar metadatos + un GET por bloque)
+ * que reventaba el throttler en secciones con muchos bloques.
+ */
+export function obtenerContenidoDeSeccion(
+  seccionId: string,
+): Promise<readonly BloqueDetalleResponse[]> {
+  return httpClient.get<readonly BloqueDetalleResponse[]>(
+    `/catalogo/secciones/${seccionId}/contenido`,
+  )
+}
+
 export function crearBloque(
   seccionId: string,
   input: CrearBloqueInput,
