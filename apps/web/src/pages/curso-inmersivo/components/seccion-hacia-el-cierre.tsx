@@ -24,7 +24,9 @@ export function SeccionHaciaElCierre({
   entrevistaIa,
   onAbrirHito,
 }: SeccionHaciaElCierreProps) {
-  if (!(transversal || entrevistaIa)) {
+  const mostrarEntrevistaIa =
+    entrevistaIa !== undefined && entrevistaIa.razon !== "ENTREVISTA_IA_NO_CONFIGURADA"
+  if (!(transversal || mostrarEntrevistaIa)) {
     return null
   }
   return (
@@ -38,10 +40,10 @@ export function SeccionHaciaElCierre({
             enCurso={false}
             motivoBloqueo={transversal.motivoBloqueo ?? null}
             onClick={() => onAbrirHito("transversal")}
-            esUltimo={!entrevistaIa}
+            esUltimo={!mostrarEntrevistaIa}
           />
         ) : null}
-        {entrevistaIa ? (
+        {mostrarEntrevistaIa && entrevistaIa ? (
           <ItemHito
             etiqueta="Entrevista IA"
             disponible={entrevistaIa.disponible}

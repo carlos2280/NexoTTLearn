@@ -1,4 +1,5 @@
 import { CodeEditorNexott } from "@/shared/components/ui/code-editor-nexott"
+import { sanitizarHtml } from "@/shared/lib/sanitize-html"
 import { contenidoCodigoIlustrativoSchema } from "@nexott-learn/shared-types"
 
 interface BloqueCodigoIlustrativoProps {
@@ -17,6 +18,8 @@ export function BloqueCodigoIlustrativo({ contenido }: BloqueCodigoIlustrativoPr
   }
   const { lenguaje, codigo, descripcion } = parsed.data
   const lineas = codigo.split("\n").length
+  const descripcionHtml = sanitizarHtml(descripcion)
+  const tieneDescripcion = descripcionHtml.replace(/<[^>]*>/g, "").trim().length > 0
 
   return (
     <figure className="flex flex-col gap-2">
@@ -26,8 +29,12 @@ export function BloqueCodigoIlustrativo({ contenido }: BloqueCodigoIlustrativoPr
         readOnly={true}
         rows={Math.min(Math.max(lineas, 4), 24)}
       />
-      {descripcion.trim().length > 0 ? (
-        <figcaption className="text-body-sm text-text-secondary">{descripcion}</figcaption>
+      {tieneDescripcion ? (
+        <figcaption
+          className="tiptap max-w-prose text-body-sm text-text-secondary"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML del editor Tiptap, sanitizado por sanitizarHtml.
+          dangerouslySetInnerHTML={{ __html: descripcionHtml }}
+        />
       ) : null}
     </figure>
   )

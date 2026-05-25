@@ -1,3 +1,4 @@
+import { sanitizarHtml } from "@/shared/lib/sanitize-html"
 import { contenidoRecursoSchema } from "@nexott-learn/shared-types"
 import { ExternalLink, FileDown, Paperclip } from "lucide-react"
 
@@ -20,6 +21,8 @@ export function BloqueRecurso({ contenido }: BloqueRecursoProps) {
   const target = subtipo === "adjunto" || abrirNuevaPestana ? "_blank" : undefined
   const rel = target === "_blank" ? "noopener noreferrer" : undefined
   const Icono = subtipo === "adjunto" ? FileDown : ExternalLink
+  const descripcionHtml = sanitizarHtml(descripcion)
+  const tieneDescripcion = descripcionHtml.replace(/<[^>]*>/g, "").trim().length > 0
 
   return (
     <a
@@ -45,8 +48,12 @@ export function BloqueRecurso({ contenido }: BloqueRecursoProps) {
             aria-hidden={true}
           />
         </div>
-        {descripcion.trim().length > 0 ? (
-          <p className="text-body-sm text-text-secondary">{descripcion}</p>
+        {tieneDescripcion ? (
+          <div
+            className="tiptap max-w-prose text-body-sm text-text-secondary"
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML del editor Tiptap, sanitizado por sanitizarHtml.
+            dangerouslySetInnerHTML={{ __html: descripcionHtml }}
+          />
         ) : null}
         <p className="font-mono text-[10px] text-text-tertiary uppercase tracking-wider">
           {subtipo === "adjunto" ? "Adjunto" : "Enlace externo"}

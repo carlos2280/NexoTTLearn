@@ -1,5 +1,6 @@
 import type { ResultadoEjecucionSuite, ResultadoTestUI } from "@/features/codigo-ejecucion"
 import { cn } from "@/shared/lib/cn"
+import { extraerTextoPlano } from "@/shared/lib/sanitize-html"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { useEffect, useRef } from "react"
 
@@ -205,7 +206,7 @@ function FilaTestTerminal({ resultado }: { readonly resultado: ResultadoTestUI }
           {simbolo}
         </span>
         <span className={cn(aprobado ? "text-white/85" : "text-white")}>
-          {resultado.descripcion || resultado.testId}
+          {extraerTextoPlano(resultado.descripcion) || resultado.testId}
         </span>
         <span
           className="ml-auto text-[10px] tracking-wider"

@@ -32,7 +32,9 @@ export function BloqueHitosSidebar({
   onAbrirHito,
   soloLectura,
 }: BloqueHitosSidebarProps) {
-  if (!(transversal || entrevistaIa)) {
+  const mostrarEntrevistaIa =
+    entrevistaIa !== undefined && entrevistaIa.razon !== "ENTREVISTA_IA_NO_CONFIGURADA"
+  if (!(transversal || mostrarEntrevistaIa)) {
     return null
   }
   return (
@@ -54,7 +56,7 @@ export function BloqueHitosSidebar({
             soloLectura={soloLectura}
           />
         ) : null}
-        {entrevistaIa ? (
+        {mostrarEntrevistaIa && entrevistaIa ? (
           <ItemHito
             etiqueta="Entrevista IA"
             disponible={entrevistaIa.disponible}

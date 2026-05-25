@@ -26,26 +26,34 @@ interface EstiloVariante {
   readonly icono: LucideIcon
   readonly chipBg: string
   readonly chipText: string
+  readonly contenedorBg: string
+  readonly contenedorBordeL: string
   readonly titulo: string
 }
 
 const ESTILO_POR_VARIANTE: Record<VarianteTip, EstiloVariante> = {
   info: {
     icono: Info,
-    chipBg: "bg-info-soft",
+    chipBg: "bg-surface",
     chipText: "text-info-on-soft",
+    contenedorBg: "bg-info-soft",
+    contenedorBordeL: "border-l-info",
     titulo: "Nota",
   },
   warning: {
     icono: TriangleAlert,
-    chipBg: "bg-warning-soft",
+    chipBg: "bg-surface",
     chipText: "text-warning-on-soft",
+    contenedorBg: "bg-warning-soft",
+    contenedorBordeL: "border-l-warning",
     titulo: "Atención",
   },
   exito: {
     icono: CheckCircle2,
-    chipBg: "bg-success-soft",
+    chipBg: "bg-surface",
     chipText: "text-success-on-soft",
+    contenedorBg: "bg-success-soft",
+    contenedorBordeL: "border-l-success",
     titulo: "Buena práctica",
   },
 }
@@ -63,7 +71,13 @@ export function BloqueTip({ contenido }: BloqueTipProps) {
   const Icono = estilo.icono
 
   return (
-    <aside className="flex items-start gap-3 rounded-2xl border border-border bg-surface px-5 py-4">
+    <aside
+      className={cn(
+        "flex items-start gap-3 rounded-2xl border border-border border-l-4 px-5 py-4",
+        estilo.contenedorBordeL,
+        estilo.contenedorBg,
+      )}
+    >
       <div
         aria-hidden={true}
         className={cn(
@@ -75,9 +89,9 @@ export function BloqueTip({ contenido }: BloqueTipProps) {
         <Icono className="h-4 w-4" strokeWidth={1.5} />
       </div>
       <div className="flex flex-col gap-1 pt-1">
-        <p className="font-medium text-body text-text-primary">{estilo.titulo}</p>
+        <p className="font-semibold text-body text-text-primary">{estilo.titulo}</p>
         <div
-          className="tiptap max-w-prose text-body-sm text-text-secondary"
+          className="tiptap max-w-prose text-text-primary"
           // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML del editor Tiptap, sanitizado.
           dangerouslySetInnerHTML={{ __html: html }}
         />

@@ -7,10 +7,10 @@ import type {
   PlanResponseParticipante,
 } from "@nexott-learn/shared-types"
 import { BloqueHitosSidebar } from "./bloque-hitos-sidebar"
-import { ContadorSidebar } from "./contador-sidebar"
 import { FooterAtajos } from "./footer-atajos"
 import { ModuloGrupo } from "./modulo-grupo"
-import { eyebrowSidebar, indexarPlanPorSeccion } from "./sidebar-plan.helpers"
+import { SidebarHeader } from "./sidebar-header"
+import { indexarPlanPorSeccion } from "./sidebar-plan.helpers"
 import { SidebarShell } from "./sidebar-shell"
 
 type HitoTipo = "transversal" | "entrevistaIa"
@@ -43,6 +43,11 @@ interface SidebarPlanProps {
    * blur sutil para que el chat tenga foco absoluto. Mantiene el grid intacto.
    */
   readonly atenuado?: boolean
+  /**
+   * Callback para colapsar el sidebar a su estado oculto. El botón flotante
+   * para reabrirlo vive en la página, sobre el canvas.
+   */
+  readonly onColapsar: () => void
 }
 
 /**
@@ -66,6 +71,7 @@ export function SidebarPlan({
   seccionesAbiertasIds,
   soloLectura,
   atenuado,
+  onColapsar,
 }: SidebarPlanProps) {
   const seccionesAbiertasSet = new Set(seccionesAbiertasIds)
   const claseAtenuado = atenuado
@@ -103,16 +109,14 @@ export function SidebarPlan({
       )}
     >
       <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-5 py-6">
-        <header className="flex items-baseline justify-between gap-2">
-          <h2 className="nx-eyebrow text-text-tertiary">{eyebrowSidebar(modo, soloLectura)}</h2>
-          <ContadorSidebar
-            modo={modo}
-            soloLectura={soloLectura}
-            plan={plan}
-            seccionesAbiertasSet={seccionesAbiertasSet}
-            totalSecciones={totalSecciones}
-          />
-        </header>
+        <SidebarHeader
+          modo={modo}
+          soloLectura={soloLectura}
+          plan={plan}
+          seccionesAbiertasSet={seccionesAbiertasSet}
+          totalSecciones={totalSecciones}
+          onColapsar={onColapsar}
+        />
         <nav aria-label="Contenido del curso" className="flex flex-col gap-5">
           {arbol.map((modulo) => (
             <ModuloGrupo
