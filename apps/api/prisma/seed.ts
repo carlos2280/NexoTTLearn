@@ -1,46 +1,44 @@
 /**
- * seed.ts — Orquestador único.
+ * seed.ts — Orquestador unico del seed.
  *
- * Siembra el curso destacado "Frontend para devs backend" (10 modulos,
- * 22 secciones, 44 bloques placeholder) + 3 admins + 10 participantes
- * con escenarios reales para validar la plataforma de punta a punta.
+ * Siembra el unico curso vivo de la plataforma:
+ *   "Frontend desde Cero: Mentalidad, Codigo y Confianza"
+ * con 3 admins + 1 participante de prueba inscrito al curso. Pensado para
+ * QA manual y demos.
  *
  * Cada fase vive en su propio modulo bajo `seeds/`. Ver `seeds/README.md`.
  *
- * Comando: `pnpm db:seed`  (o `make db-seed`).
+ * Comando: `pnpm db:seed` (o `make db-seed`).
  *
  * Idempotente: re-correrlo NO duplica, actualiza.
  *
  * Credenciales (override via env QA_ADMIN_PASSWORD / QA_USER_PASSWORD):
- *  - Admins:        Cambiar2026!
- *  - Participantes: Qa1234!
+ *   - Admins:        Cambiar2026!
+ *   - Participante:  Qa1234!
  */
 
 import { PrismaClient } from "@prisma/client"
+
 import { log } from "./seeds/_utils"
 import {
   ADMINS,
   AREAS,
   CLIENTE_NOMBRE,
   PARTICIPANTES,
-  SKILLS_FRONTEND,
   seedAdmins,
   seedAreas,
   seedCliente,
   seedParticipantes,
-  seedSkillsFrontend,
 } from "./seeds/catalogo"
-import { seedCurso, seedModulos } from "./seeds/curso"
 import {
   CURSO_SOPORTE_REACT_TITULO,
   SKILLS_SOPORTE_REACT,
   seedCursoSoporteReact,
+  seedInscripcionSoporte,
   seedModulosSoporteReact,
   seedSkillsSoporteReact,
 } from "./seeds/curso-soporte-react"
-import { MODULOS_FRONTEND } from "./seeds/modulos"
 import { MODULOS_SOPORTE_REACT } from "./seeds/modulos/soporte-react"
-import { seedAsignacionesFrontend, seedNotasSkill } from "./seeds/progreso"
 
 async function main(): Promise<void> {
   if (process.env.DATABASE_URL?.includes("@prod") || process.env.NODE_ENV === "production") {
@@ -48,27 +46,22 @@ async function main(): Promise<void> {
   }
   const prisma = new PrismaClient()
   try {
-    log("Iniciando seed (curso 'Frontend para devs backend')...")
+    log(`Iniciando seed (curso '${CURSO_SOPORTE_REACT_TITULO}')...`)
+
     await seedAdmins(prisma)
     await seedParticipantes(prisma)
     const areaIdByNombre = await seedAreas(prisma)
     const clienteIdResolved = await seedCliente(prisma)
-    const skillIdByEtiqueta = await seedSkillsFrontend(prisma, areaIdByNombre)
-    const modulos = await seedModulos(prisma, skillIdByEtiqueta)
-    const cursoIdResolved = await seedCurso(prisma, clienteIdResolved, modulos, skillIdByEtiqueta)
-    await seedAsignacionesFrontend(prisma, cursoIdResolved, modulos)
-    await seedNotasSkill(prisma, cursoIdResolved, skillIdByEtiqueta)
 
-    // ---- Curso #2: "De Soporte a Frontend Dev" ----
-    // Skills + modulos + curso. Reusa el cliente y las areas globales.
-    const skillIdSoporte = await seedSkillsSoporteReact(prisma, areaIdByNombre)
-    const modulosSoporte = await seedModulosSoporteReact(prisma, skillIdSoporte)
-    const cursoSoporteId = await seedCursoSoporteReact(
+    const skillIdByEtiqueta = await seedSkillsSoporteReact(prisma, areaIdByNombre)
+    const modulos = await seedModulosSoporteReact(prisma, skillIdByEtiqueta)
+    const cursoIdResolved = await seedCursoSoporteReact(
       prisma,
       clienteIdResolved,
-      modulosSoporte,
-      skillIdSoporte,
+      modulos,
+      skillIdByEtiqueta,
     )
+    await seedInscripcionSoporte(prisma, cursoIdResolved, modulos)
 
     log("")
     log("===== RESUMEN seed =====")
@@ -76,19 +69,11 @@ async function main(): Promise<void> {
     log(`Participantes:   ${PARTICIPANTES.length}`)
     log(`Cliente:         ${CLIENTE_NOMBRE}`)
     log(`Areas:           ${AREAS.length}`)
-    log(`Skills:          ${SKILLS_FRONTEND.length}`)
-    log(`Modulos:         ${MODULOS_FRONTEND.length}`)
-    log(`Secciones:       ${MODULOS_FRONTEND.reduce((acc, m) => acc + m.secciones.length, 0)}`)
-    log(`Asignaciones:    ${PARTICIPANTES.length}`)
+    log(`Skills:          ${SKILLS_SOPORTE_REACT.length}`)
+    log(`Modulos:         ${MODULOS_SOPORTE_REACT.length}`)
+    log(`Secciones:       ${MODULOS_SOPORTE_REACT.reduce((acc, m) => acc + m.secciones.length, 0)}`)
     log("")
-    log("Curso destacado: 'Frontend para devs backend' (10 modulos placeholder).")
-    log("Entrevista IA y Transversal habilitados.")
-    log("")
-    log(`Curso #2: '${CURSO_SOPORTE_REACT_TITULO}' (cursoId=${cursoSoporteId})`)
-    log(`  Modulos:  ${MODULOS_SOPORTE_REACT.length}`)
-    log(`  Secciones: ${MODULOS_SOPORTE_REACT.reduce((acc, m) => acc + m.secciones.length, 0)}`)
-    log(`  Skills:   ${SKILLS_SOPORTE_REACT.length}`)
-    log("  Estado: M00 con bloques reales; M01-M08 con placeholder (en preparacion).")
+    log(`Curso vivo: '${CURSO_SOPORTE_REACT_TITULO}' (cursoId=${cursoIdResolved})`)
     log("")
     log("Admins (password Cambiar2026!):")
     for (const a of ADMINS) {
@@ -97,9 +82,9 @@ async function main(): Promise<void> {
       )
     }
     log("")
-    log("Participantes (password Qa1234!):")
-    for (const a of PARTICIPANTES) {
-      log(`  - ${a.email.padEnd(40)} → ${a.estado}`)
+    log("Participante de prueba (password Qa1234!):")
+    for (const p of PARTICIPANTES) {
+      log(`  - ${p.email.padEnd(40)} (sin cambio pwd, inscrito en estado ASIGNADO)`)
     }
     log("========================")
   } catch (err) {

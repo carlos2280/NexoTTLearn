@@ -1,40 +1,48 @@
-// Curso "De Soporte a Frontend Dev" — primer curso oficial de la plataforma.
+// Curso "Frontend desde Cero: Mentalidad, Codigo y Confianza" — primer curso
+// oficial de la plataforma NexoTT Learn.
 //
-// Publico: equipo de soporte que da el salto a desarrollo frontend.
+// Publico: profesionales sin experiencia previa en frontend (tipicamente
+// soporte, QA manual o backend liviano) que dan el salto a React + TS.
 // Stack final: React + TypeScript + Tanstack Query.
 // Filosofia: menos es mas, microvictorias, IA como copiloto, mantra "todavia no".
 //
-// Este archivo es paralelo a `curso.ts` (curso "Frontend para devs backend"):
-// no toca skills/modulos del curso anterior. Usa rangos altos de IDs (20+) para
-// evitar colisiones con el curso destacado existente.
+// Unico curso vivo del seed. IDs en rango 20+ por compatibilidad historica con
+// las migraciones existentes (antes convivia con un curso placeholder).
 
 import {
+  CaracterItemPlan,
   DesbloqueoCurso,
+  EstadoAsignado,
   EstadoBloque,
   EstadoCurso,
   EstadoModulo,
   EstadoSkill,
   type Prisma,
   type PrismaClient,
+  RazonItemPlan,
+  RolAsignacion,
   TipoBloque,
 } from "@prisma/client"
 
 import {
+  asigId,
   bloqueId,
   cursoId,
   dateNDaysAgo,
   dateNDaysAhead,
   log,
   moduloId,
+  partId,
   placeholderParrafo,
   placeholderQuiz,
+  planId,
   seccionId,
   skillId,
   ymd,
 } from "./_utils"
-import type { ModuloPersistido } from "./curso"
-import type { BloqueRealDef, ModuloDef } from "./modulos"
+import { PARTICIPANTES } from "./catalogo"
 import { MODULOS_SOPORTE_REACT } from "./modulos/soporte-react"
+import type { BloqueRealDef, ModuloDef, ModuloPersistido } from "./modulos/types"
 
 // ============================================================================
 // Skills del curso (idx 20+ para no chocar con el curso "Frontend para devs
@@ -79,8 +87,8 @@ const BLQ_CURSOR_INICIO = 30000
 // Constantes del curso
 // ============================================================================
 
-const CURSO_ID_INDICE = 2 // cursoId(2) — el 1 lo ocupa "Frontend para devs backend"
-export const CURSO_SOPORTE_REACT_TITULO = "De Soporte a Frontend Dev"
+const CURSO_ID_INDICE = 2 // cursoId(2) por compatibilidad con migraciones previas.
+export const CURSO_SOPORTE_REACT_TITULO = "Frontend desde Cero: Mentalidad, Codigo y Confianza"
 
 // ID del ProyectoTransversal de este curso. Sufijo 02 para no chocar con el
 // del curso "Frontend para devs backend" (sufijo 01 en _config.ts).
@@ -118,8 +126,9 @@ export async function seedSkillsSoporteReact(
 }
 
 // ============================================================================
-// seedModulosSoporteReact — inserta modulos + secciones + bloques
-// (version paralela a seedModulos del curso anterior, con cursors aislados)
+// seedModulosSoporteReact — inserta modulos + secciones + bloques.
+// Los cursors arrancan en rangos altos (SEC 200+, BLQ 30000+) por
+// compatibilidad con IDs reservados en migraciones previas.
 // ============================================================================
 
 export async function seedModulosSoporteReact(
@@ -173,6 +182,21 @@ export async function seedModulosSoporteReact(
           create: { seccionId: sId, skillId: skillIdResolved },
         })
       }
+
+      // Resetea los bloques de la seccion antes de sembrar: el orden de los
+      // bloques cambia cuando se anaden/quitan piezas, y los IDs por cursor
+      // se desplazan. Sin esta limpieza, un re-seed que altera el largo de
+      // una seccion revienta con `Unique(seccion_id, orden)` al chocar con
+      // los bloques previos.
+      // IntentoBloque.bloque tiene onDelete: Restrict, asi que un solo
+      // intento vivo bloquea el deleteMany. En el seed de QA esto no
+      // deberia ocurrir, pero pasa si un dev exploro el inmersivo antes
+      // de re-seedear. Cascada manual: borrar intentos primero. Es seguro
+      // porque este seeder solo corre en local; en produccion no se ejecuta.
+      await prisma.intentoBloque.deleteMany({
+        where: { bloque: { seccionId: sId } },
+      })
+      await prisma.bloque.deleteMany({ where: { seccionId: sId } })
 
       // Si la seccion define bloques reales, los crea; si no, fallback a
       // 1 PARRAFO + 1 QUIZ placeholder (modulos en preparacion).
@@ -240,7 +264,7 @@ export async function seedModulosSoporteReact(
 }
 
 // ============================================================================
-// seedCursoSoporteReact — crea el curso #2: "De Soporte a Frontend Dev"
+// seedCursoSoporteReact — crea el curso "Frontend desde Cero"
 // ============================================================================
 
 export async function seedCursoSoporteReact(
@@ -249,7 +273,7 @@ export async function seedCursoSoporteReact(
   modulos: readonly ModuloPersistido[],
   skillIdByEtiqueta: ReadonlyMap<string, string>,
 ): Promise<string> {
-  log("Fase 6d: curso 'De Soporte a Frontend Dev' + areas/skills exigidas...")
+  log("Fase 6d: curso 'Frontend desde Cero' + areas/skills exigidas...")
   const cId = cursoId(CURSO_ID_INDICE)
   const fechaInicio = ymd(dateNDaysAgo(5))
   const fechaDeadline = ymd(dateNDaysAhead(60))
@@ -353,67 +377,48 @@ export async function seedCursoSoporteReact(
   // Para este publico (soporte que migra a frontend), las capas se inclinan
   // hacia lo cualitativo (50%) y la defensa (30%). Tests pesa menos (20%)
   // porque recien aprenden testing en M08 — pedir 40% seria severo.
-  // Brief que ve el alumno. Se renderiza con `whitespace-pre-line` (sin HTML,
-  // saltos de linea respetados). No incluir umbral, pesos ni skills: la UI los
-  // muestra por separado.
-  const descripcionProyecto = `Hace nueve módulos no sabías escribir un componente. Hoy te toca construir uno completo, con datos reales, calidad mínima y URL pública. Sin tutorial, sin video paso a paso, sin alguien guiándote. Solo tú, lo que aprendiste y este brief.
-
-El Mini Centro de Tickets es una app pequeña pero honesta: hace una sola cosa y la hace bien. Es lo que en la empresa llamaríamos un MVP — lo mínimo que ya sirve. Si lo entregas bien hecho, demuestras de un golpe que sabes pensar en componentes, traer datos del servidor, mantener tipos sanos, escribir un test que valga la pena y entregar algo que vive en internet.
-
-
-QUÉ TIENES QUE CONSTRUIR
-
-Una app en React + TypeScript con esto:
-
-  1. Una lista de tickets. Cada ticket tiene id, título, prioridad (alta, media, baja) y estado (abierto, cerrado).
-
-  2. Un filtro por estado. El usuario puede ver solo los abiertos, solo los cerrados, o todos.
-
-  3. Crear un ticket nuevo. Un formulario simple: título + prioridad. Al enviar, aparece en la lista.
-
-  4. Marcar un ticket como resuelto. Un botón por ticket que lo pasa de abierto a cerrado.
-
-  5. Estados de carga. Mientras los datos cargan, el usuario ve algo. Si algo falla, ve un mensaje claro. Nunca pantalla en blanco.
-
-  6. Una URL pública. Deploy a Vercel. Que cualquier persona del mundo pueda abrirla.
-
-
-STACK OBLIGATORIO
-
-  · React + TypeScript (cero JavaScript suelto, todo tipado).
-  · Tanstack Query para los datos (loading + error + success bien manejados).
-  · Zod para validar los tipos de los tickets que vienen del mock.
-  · Un test mínimo de una función pura (validar un email, calcular tiempo abierto, lo que decidas — uno bien hecho basta).
-  · Deploy a Vercel desde GitHub.
-
-Los datos vienen de un mock interno (un array en el código + setTimeout para simular latencia, igual que viste en el módulo 06). No necesitas backend real. La gracia es que Tanstack Query no nota la diferencia entre tu mock y una API real, así que aprendes el patrón correcto.
-
-
-CÓMO SE VE BIEN HECHO
-
-Cuatro señales que la IA y un dev senior van a buscar en tu repo:
-
-  · Los componentes son chicos y hacen una sola cosa. Ninguno tiene 200 líneas. Si crece, refactoras.
-  · Los tipos no mienten. Si un campo puede ser undefined, lo manejas con optional chaining o un if. Nada de "any" para salir del paso.
-  · Los estados de carga existen de verdad. No solo "loading..." plano: algo que comunique que la app está viva.
-  · El README tiene 5 líneas: qué hace, cómo correrlo local, cuál es la URL pública, qué decisiones tomaste, qué dejaste fuera y por qué.
-
-
-ENTREGA
-
-Cuando esté listo, pegas dos cosas:
-
-  · La URL del repositorio en GitHub (público o con acceso).
-  · Tu deploy en Vercel debe estar arriba y funcionando — la evaluación intenta abrirlo.
-
-A los pocos minutos recibes la nota de cada capa y la global. Si pasaste el umbral, el curso queda cerrado y aprobado. Si no, puedes iterar y volver a entregar.
-
-
-UNA COSA MÁS
-
-Sin tabú: no se trata de impresionar. Se trata de que tú mismo, cuando abras esta URL en un mes, digas "esto lo hice yo, sigue funcionando, lo entiendo línea por línea". Esa es la victoria real del curso.
-
-Nos vemos al otro lado.`
+  // Brief que ve el alumno. Se renderiza con Tiptap (HTML sanitizado) en
+  // vista-brief-transversal.tsx. No incluir umbral, pesos ni skills: la UI
+  // los muestra por separado.
+  const descripcionProyecto = `<p>Hace nueve módulos no sabías escribir un componente. Hoy te toca construir uno completo, con datos reales, calidad mínima y URL pública. Sin tutorial, sin video paso a paso, sin alguien guiándote. Solo tú, lo que aprendiste y este brief.</p>
+<p>El <strong>Mini Centro de Tickets</strong> es una app pequeña pero honesta: hace una sola cosa y la hace bien. Es lo que en la empresa llamaríamos un <strong>MVP</strong> — lo mínimo que ya sirve. Si lo entregas bien hecho, demuestras de un golpe que sabes pensar en componentes, traer datos del servidor, mantener tipos sanos, escribir un test que valga la pena y entregar algo que vive en internet.</p>
+<h3>Qué tienes que construir</h3>
+<p>Una app en <strong>React + TypeScript</strong> con esto:</p>
+<ol>
+  <li><strong>Una lista de tickets.</strong> Cada ticket tiene <code>id</code>, <code>título</code>, <code>prioridad</code> (alta, media, baja) y <code>estado</code> (abierto, cerrado).</li>
+  <li><strong>Un filtro por estado.</strong> El usuario puede ver solo los abiertos, solo los cerrados, o todos.</li>
+  <li><strong>Crear un ticket nuevo.</strong> Un formulario simple: título + prioridad. Al enviar, aparece en la lista.</li>
+  <li><strong>Marcar un ticket como resuelto.</strong> Un botón por ticket que lo pasa de <em>abierto</em> a <em>cerrado</em>.</li>
+  <li><strong>Estados de carga.</strong> Mientras los datos cargan, el usuario ve algo. Si algo falla, ve un mensaje claro. <em>Nunca pantalla en blanco.</em></li>
+  <li><strong>Una URL pública.</strong> Deploy a Vercel. Que cualquier persona del mundo pueda abrirla.</li>
+</ol>
+<h3>Stack obligatorio</h3>
+<ul>
+  <li><strong>React + TypeScript</strong> (cero JavaScript suelto, todo tipado).</li>
+  <li><strong>Tanstack Query</strong> para los datos (loading + error + success bien manejados).</li>
+  <li><strong>Zod</strong> para validar los tipos de los tickets que vienen del mock.</li>
+  <li><strong>Un test mínimo</strong> de una función pura (validar un email, calcular tiempo abierto, lo que decidas — uno bien hecho basta).</li>
+  <li><strong>Deploy a Vercel</strong> desde GitHub.</li>
+</ul>
+<p>Los datos vienen de un mock interno (un array en el código + <code>setTimeout</code> para simular latencia, igual que viste en el módulo 06). No necesitas backend real. La gracia es que <strong>Tanstack Query no nota la diferencia</strong> entre tu mock y una API real, así que aprendes el patrón correcto.</p>
+<h3>Cómo se ve bien hecho</h3>
+<p>Cuatro señales que la IA y un dev senior van a buscar en tu repo:</p>
+<ul>
+  <li><strong>Los componentes son chicos y hacen una sola cosa.</strong> Ninguno tiene 200 líneas. Si crece, refactoras.</li>
+  <li><strong>Los tipos no mienten.</strong> Si un campo puede ser <code>undefined</code>, lo manejas con <em>optional chaining</em> o un <code>if</code>. Nada de <code>any</code> para salir del paso.</li>
+  <li><strong>Los estados de carga existen de verdad.</strong> No solo "loading..." plano: algo que comunique que la app está viva.</li>
+  <li><strong>El README tiene 5 líneas:</strong> qué hace, cómo correrlo local, cuál es la URL pública, qué decisiones tomaste, qué dejaste fuera y por qué.</li>
+</ul>
+<h3>Entrega</h3>
+<p>Cuando esté listo, pegas dos cosas:</p>
+<ul>
+  <li>La <strong>URL del repositorio</strong> en GitHub (público o con acceso).</li>
+  <li>Tu <strong>deploy en Vercel</strong> debe estar arriba y funcionando — la evaluación intenta abrirlo.</li>
+</ul>
+<p>A los pocos minutos recibes la nota de cada capa y la global. Si pasaste el umbral, el curso queda cerrado y aprobado. Si no, puedes iterar y volver a entregar.</p>
+<h3>Una cosa más</h3>
+<p>Sin tabú: <em>no se trata de impresionar.</em> Se trata de que tú mismo, cuando abras esta URL en un mes, digas <em>"esto lo hice yo, sigue funcionando, lo entiendo línea por línea".</em> Esa es la victoria real del curso.</p>
+<p><strong>Nos vemos al otro lado.</strong></p>`
 
   await prisma.proyectoTransversal.upsert({
     where: { id: ID_TRANSVERSAL_SOPORTE },
@@ -473,4 +478,80 @@ Nos vemos al otro lado.`
   })
 
   return cId
+}
+
+// ============================================================================
+// seedInscripcionSoporte — inscribe al(los) participante(s) de prueba al curso
+// y deja un PlanEstudio listo (1 item por seccion del curso, todas obligatorias).
+//
+// El plan tiene que existir desde el seed: el endpoint que abre el curso
+// (`GET /asignaciones/:id/plan`) responde 404 PLAN_NO_ENCONTRADO si no
+// existe, y el participante quedaria bloqueado en la pantalla de "Mi curso".
+// ============================================================================
+
+export async function seedInscripcionSoporte(
+  prisma: PrismaClient,
+  cursoIdResolved: string,
+  modulos: readonly ModuloPersistido[],
+): Promise<void> {
+  log(`Fase 7: ${PARTICIPANTES.length} inscripcion(es) al curso 'Frontend desde Cero'...`)
+
+  const itemsPorPlan: ReadonlyArray<{ readonly moduloId: string; readonly seccionId: string }> =
+    modulos.flatMap((m) =>
+      m.secciones.map((s) => ({ moduloId: m.moduloId, seccionId: s.seccionId })),
+    )
+
+  for (const p of PARTICIPANTES) {
+    const aId = asigId(p.idx)
+    const colaboradorIdResolved = partId(p.idx)
+
+    await prisma.asignacionCurso.upsert({
+      where: { id: aId },
+      update: {
+        rol: RolAsignacion.ASIGNADO,
+        estadoAsignado: EstadoAsignado.ASIGNADO,
+        estadoVoluntario: null,
+        origenVoluntario: null,
+      },
+      create: {
+        id: aId,
+        colaboradorId: colaboradorIdResolved,
+        cursoId: cursoIdResolved,
+        rol: RolAsignacion.ASIGNADO,
+        estadoAsignado: EstadoAsignado.ASIGNADO,
+        fechaInicio: dateNDaysAgo(2),
+      },
+    })
+
+    const pId = planId(p.idx)
+    await prisma.planEstudio.upsert({
+      where: { id: pId },
+      update: {
+        fichaSnapshot: { sembrado: "seed-soporte" } satisfies Prisma.InputJsonValue,
+        estaDesactualizado: false,
+      },
+      create: {
+        id: pId,
+        asignacionId: aId,
+        fichaSnapshot: { sembrado: "seed-soporte" } satisfies Prisma.InputJsonValue,
+        estaDesactualizado: false,
+      },
+    })
+
+    // Rehacer items en cada seed: garantiza coherencia tras cambios de modulo
+    // (alta/baja de secciones). El plan vive con `onDelete: Cascade`, pero
+    // basta con borrar items: el plan sigue.
+    await prisma.itemPlan.deleteMany({ where: { planId: pId } })
+    for (const item of itemsPorPlan) {
+      await prisma.itemPlan.create({
+        data: {
+          planId: pId,
+          moduloId: item.moduloId,
+          seccionId: item.seccionId,
+          caracter: CaracterItemPlan.OBLIGATORIA,
+          razon: RazonItemPlan.SKILL_FALTANTE,
+        },
+      })
+    }
+  }
 }

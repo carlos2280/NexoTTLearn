@@ -7,6 +7,7 @@ import {
   Lightbulb,
   type LucideIcon,
   Paperclip,
+  PencilRuler,
   Terminal,
   Video,
 } from "lucide-react"
@@ -68,6 +69,12 @@ const META: Record<TipoBloque, TipoBloqueMeta> = {
     icono: FlaskConical,
     descripcionCorta: "Tests automáticos asociados a un reto.",
   },
+  // biome-ignore lint/style/useNamingConvention: clave del enum TipoBloque
+  DIAGRAMA: {
+    etiqueta: "Diagrama",
+    icono: PencilRuler,
+    descripcionCorta: "Esquema dibujado a mano con Excalidraw.",
+  },
 }
 
 export function tipoBloqueMeta(tipo: TipoBloque): TipoBloqueMeta {
@@ -78,6 +85,7 @@ export function tiposBloqueOrdenados(): readonly TipoBloque[] {
   return [
     "PARRAFO",
     "TIP",
+    "DIAGRAMA",
     "VIDEO",
     "RECURSO",
     "QUIZ",
@@ -127,6 +135,13 @@ export function resumenBloque(
       const resumen = enunciado || descripcion
       const head = lenguaje ? `${lenguaje}: ` : ""
       return resumen ? `${head}${resumen.slice(0, 110)}` : meta.etiqueta
+    }
+    case "DIAGRAMA": {
+      const caption = typeof contenido.caption === "string" ? contenido.caption : ""
+      const altText = typeof contenido.altText === "string" ? contenido.altText : ""
+      const elementos = Array.isArray(contenido.elements) ? contenido.elements.length : 0
+      const resumen = caption || altText
+      return resumen ? resumen.slice(0, 120) : `${elementos} elemento${elementos === 1 ? "" : "s"}`
     }
     default:
       return meta.etiqueta

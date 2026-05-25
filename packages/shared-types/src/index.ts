@@ -119,6 +119,7 @@ export {
   proveedorVideoSchema,
   contenidoRecursoSchema,
   subtipoRecursoSchema,
+  contenidoDiagramaSchema,
   contenidoBloquePorTipo,
   schemaContenidoBloquePorTipo,
   validarContenidoBloque,
@@ -132,6 +133,7 @@ export type {
   ProveedorVideo,
   ContenidoRecurso,
   SubtipoRecurso,
+  ContenidoDiagrama,
 } from "./catalogo/bloques/contenido"
 export { listarClientesQuerySchema } from "./catalogo/clientes/listar-clientes.schema"
 export type { ListarClientesQuery } from "./catalogo/clientes/listar-clientes.schema"

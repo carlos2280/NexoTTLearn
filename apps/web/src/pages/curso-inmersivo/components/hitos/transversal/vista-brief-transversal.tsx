@@ -1,3 +1,4 @@
+import { sanitizarHtml } from "@/shared/lib/sanitize-html"
 import type { TransversalResponse } from "@nexott-learn/shared-types"
 import { FormEnvioTransversal } from "./form-envio-transversal"
 import { LoQueSeEvaluara } from "./lo-que-se-evaluara"
@@ -26,9 +27,11 @@ export function VistaBriefTransversal({
       <header className="flex flex-col gap-2">
         <span className="nx-eyebrow text-aurora-violet">Hito de cierre</span>
         <h2 className="text-display-md text-text-primary leading-tight">Proyecto transversal</h2>
-        <p className="whitespace-pre-line text-body text-text-secondary">
-          {transversal.descripcion}
-        </p>
+        <article
+          className="tiptap max-w-prose text-body text-text-secondary"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: descripcion del editor admin, sanitizada.
+          dangerouslySetInnerHTML={{ __html: sanitizarHtml(transversal.descripcion) }}
+        />
       </header>
 
       <LoQueSeEvaluara capasActivas={transversal.capasActivas} />

@@ -1,5 +1,7 @@
-// Modulos del curso "De Soporte a Frontend Dev" — primer curso oficial de
-// NexoTT Learn. Publico: personal de soporte que aprende React + TS.
+// Modulos del curso "Frontend desde Cero: Mentalidad, Codigo y Confianza"
+// — primer curso oficial de NexoTT Learn. Publico: profesionales sin
+// experiencia frontend (soporte, QA manual, backend liviano) que aprenden
+// React + TS.
 //
 // Tono: espanol de Chile neutro, calido, sin garabatos. Referentes: midudev
 // y mouredev. Filosofia: menos es mas, microvictorias frecuentes, IA como
@@ -23,12 +25,14 @@ import {
   buildCodigoIlustrativo,
   buildCodigoPreguntas,
   buildCodigoTests,
+  buildDiagrama,
   buildParrafo,
   buildQuiz,
   buildRecurso,
   buildTip,
 } from "../_utils"
-import type { ModuloDef } from "./index"
+import { caja, etiqueta, flecha } from "../diagrama-helpers"
+import type { ModuloDef } from "./types"
 
 // ============================================================================
 // IDs preasignados para bloques CODIGO_TESTS que referencian a CODIGO_PREGUNTAS.
@@ -86,7 +90,7 @@ export const MODULOS_SOPORTE_REACT: readonly ModuloDef[] = [
             tipo: TipoBloque.PARRAFO,
             esEvaluable: false,
             contenido: buildParrafo(
-              `<p>Si llegaste hasta acá es porque alguien — tu jefatura, tú mismo, o el azar — decidió que dabas para más. Y tiene razón.</p>
+              `<p>Si llegaste hasta acá es porque alguien — tu equipo, tú mismo, o el azar — decidió que dabas para más. Y tiene razón.</p>
 <p>Llevas tiempo en soporte. Has leído mil logs, has visto bugs que el dev "ya arregló" tres veces, has explicado por chat lo que un usuario no entiende ni por teléfono. Eso, aunque no lo tengas claro, ya es <strong>media carrera de desarrollador</strong>. Lo que te falta no es inteligencia: es <strong>vocabulario técnico</strong> y <strong>horas de pista</strong>.</p>
 <p>Este curso no parte de cero. <em>Parte de ti</em>.</p>
 <p>En las próximas semanas vamos a hacer tres cosas:</p>
@@ -516,7 +520,7 @@ cd mi-camino-dev          # entrar a ella
             tipo: TipoBloque.PARRAFO,
             esEvaluable: false,
             contenido: buildParrafo(
-              `<p>¿Alguna vez has visto un archivo llamado <code>informe_final_v23_definitivo_AHORA_SI.docx</code>? Todos lo hemos visto. Esa cadena de "_v23", "_final", "_final_FINAL", "_revisado_jefe", es la versión casera de Git que el mundo inventó antes de que existiera Git. Funciona... más o menos. Hasta el día en que abres el archivo equivocado y mandas a imprimir la versión vieja al cliente.</p>
+              `<p>¿Alguna vez has visto un archivo llamado <code>informe_final_v23_definitivo_AHORA_SI.docx</code>? Todos lo hemos visto. Esa cadena de "_v23", "_final", "_final_FINAL", "_revisado_FINAL", es la versión casera de Git que el mundo inventó antes de que existiera Git. Funciona... más o menos. Hasta el día en que abres el archivo equivocado y mandas a imprimir la versión vieja al cliente.</p>
 <p>Git resuelve eso. <strong>Es un sistema que guarda la historia completa de tu trabajo sin que tú tengas que pensar en "v23".</strong> Cada vez que terminas algo, le dices a Git "guarda esto", y queda registrado para siempre. Si mañana metes la pata, vuelves a ese punto sin perder nada.</p>
 <p>Otra forma de verlo: <strong>Git es el ctrl+z infinito y compartido</strong>. Pero un ctrl+z con memoria, con nombres, con autores, y con la capacidad de trabajar varias personas en el mismo proyecto sin pisarse.</p>`,
               "soporte-m01-s1-intro",
@@ -592,6 +596,71 @@ git commit -m "docs: primer commit con la bitacora del curso"
 git log`,
               "El ciclo completo: de carpeta cualquiera a repositorio con su primer commit. Esto se hace UNA vez al iniciar un proyecto; los pasos 3-4 los repites cada vez que termines algo.",
               "soporte-m01-s1-comandos-basicos",
+            ),
+          },
+          {
+            tipo: TipoBloque.DIAGRAMA,
+            esEvaluable: false,
+            contenido: buildDiagrama(
+              [
+                ...caja({
+                  id: "git-1",
+                  x: 40,
+                  y: 120,
+                  w: 180,
+                  h: 90,
+                  texto: "Tu carpeta\n(working dir)",
+                }),
+                ...caja({
+                  id: "git-2",
+                  x: 280,
+                  y: 120,
+                  w: 180,
+                  h: 90,
+                  texto: "Staging\n(git add)",
+                }),
+                ...caja({
+                  id: "git-3",
+                  x: 520,
+                  y: 120,
+                  w: 180,
+                  h: 90,
+                  texto: "Repo local\n(git commit)",
+                }),
+                ...caja({
+                  id: "git-4",
+                  x: 760,
+                  y: 120,
+                  w: 180,
+                  h: 90,
+                  texto: "GitHub\n(git push)",
+                }),
+                flecha({ id: "git-f1", x1: 220, y1: 165, x2: 280, y2: 165 }),
+                flecha({ id: "git-f2", x1: 460, y1: 165, x2: 520, y2: 165 }),
+                flecha({ id: "git-f3", x1: 700, y1: 165, x2: 760, y2: 165 }),
+                etiqueta({ id: "git-l1", x: 220, y: 90, w: 60, h: 20, texto: "add", fontSize: 14 }),
+                etiqueta({
+                  id: "git-l2",
+                  x: 460,
+                  y: 90,
+                  w: 60,
+                  h: 20,
+                  texto: "commit",
+                  fontSize: 14,
+                }),
+                etiqueta({
+                  id: "git-l3",
+                  x: 700,
+                  y: 90,
+                  w: 60,
+                  h: 20,
+                  texto: "push",
+                  fontSize: 14,
+                }),
+              ],
+              "Flujo de Git en cuatro estados: tu carpeta de trabajo, el area de staging, el repositorio local y el repositorio remoto en GitHub. Las flechas conectan los pasos: git add, git commit y git push.",
+              "El viaje de un cambio: desde que lo escribes hasta que vive en GitHub.",
+              "soporte-m01-s1-diagrama-git",
             ),
           },
           {
@@ -877,20 +946,18 @@ git push -u origin feat/agregar-bitacora
             idForzado: ID_SOP_M01_S2_PREG,
             contenido: buildCodigoPreguntas(
               "javascript",
-              `Escribe un programa que IMPRIMA (con console.log) un mensaje de commit valido segun Conventional Commits para describir el siguiente cambio:
-
-Cambio: agregaste un campo "telefono" al modelo Usuario del modulo "usuarios".
-
-Reglas:
-  - Tipo: feat (es una funcionalidad nueva).
-  - Scope: usuarios.
-  - Descripcion: en minusculas, sin punto final, en presente. Debe contener la palabra "telefono".
-  - Una sola linea, sin saltos extra.
-
-Ejemplo de formato: feat(scope): descripcion en minusculas
-
-Salida exacta esperada:
-  feat(usuarios): agrega campo telefono al modelo Usuario`,
+              `<p>Escribe un programa que <strong>imprima</strong> (con <code>console.log</code>) un mensaje de commit válido según <em>Conventional Commits</em> para describir el siguiente cambio:</p>
+<p><strong>Cambio:</strong> agregaste un campo <code>telefono</code> al modelo <code>Usuario</code> del módulo <code>usuarios</code>.</p>
+<p><strong>Reglas:</strong></p>
+<ul>
+  <li><strong>Tipo:</strong> <code>feat</code> (es una funcionalidad nueva).</li>
+  <li><strong>Scope:</strong> <code>usuarios</code>.</li>
+  <li><strong>Descripción:</strong> en minúsculas, sin punto final, en presente. Debe contener la palabra <code>telefono</code>.</li>
+  <li>Una sola línea, sin saltos extra.</li>
+</ul>
+<p><strong>Formato:</strong> <code>feat(scope): descripcion en minusculas</code></p>
+<p><strong>Salida exacta esperada:</strong></p>
+<p><code>feat(usuarios): agrega campo telefono al modelo Usuario</code></p>`,
               `// Escribe tu solucion abajo.
 // Pista: console.log("feat(...)...");
 
@@ -946,7 +1013,7 @@ Salida exacta esperada:
   <li>El concepto de ramas y pull request, aunque aún no los hayas usado en serio.</li>
   <li>(Bonus) Si ya tienes cuenta de GitHub y subiste tu bitácora, ya partiste tu CV vivo.</li>
 </ul>
-<p>En el <strong>Módulo 02</strong> entramos a la web por dentro: HTML, CSS, y cómo funciona internet en humano. Spoiler: vas a entender por qué el navegador a veces se cae y por qué tu jefe insiste en que "actualices la página con ctrl+f5".</p>
+<p>En el <strong>Módulo 02</strong> entramos a la web por dentro: HTML, CSS, y cómo funciona internet en humano. Spoiler: vas a entender por qué el navegador a veces se cae y por qué la gente termina haciendo "ctrl+f5" sin saber bien por qué.</p>
 <p><strong>Nos vemos al otro lado.</strong></p>`,
               "soporte-m01-s2-cierre",
             ),
@@ -1040,6 +1107,64 @@ Salida exacta esperada:
 </ul>
 <p><strong>Regla mnemotécnica:</strong> los <strong>4xx</strong> son culpa del cliente (tú o el navegador), los <strong>5xx</strong> son culpa del servidor.</p>`,
               "soporte-m02-s1-status-codes",
+            ),
+          },
+          {
+            tipo: TipoBloque.DIAGRAMA,
+            esEvaluable: false,
+            contenido: buildDiagrama(
+              [
+                ...caja({
+                  id: "http-1",
+                  x: 40,
+                  y: 140,
+                  w: 200,
+                  h: 90,
+                  texto: "Tu navegador\n(cliente)",
+                }),
+                ...caja({ id: "http-2", x: 360, y: 140, w: 200, h: 90, texto: "DNS\n(la guía)" }),
+                ...caja({
+                  id: "http-3",
+                  x: 680,
+                  y: 140,
+                  w: 200,
+                  h: 90,
+                  texto: "Servidor\n(la cocina)",
+                }),
+                flecha({ id: "http-f1", x1: 240, y1: 175, x2: 360, y2: 175 }),
+                flecha({ id: "http-f2", x1: 560, y1: 175, x2: 680, y2: 175 }),
+                flecha({ id: "http-f3", x1: 680, y1: 195, x2: 240, y2: 195 }),
+                etiqueta({
+                  id: "http-l1",
+                  x: 240,
+                  y: 110,
+                  w: 120,
+                  h: 20,
+                  texto: "1. ¿IP de X?",
+                  fontSize: 13,
+                }),
+                etiqueta({
+                  id: "http-l2",
+                  x: 560,
+                  y: 110,
+                  w: 120,
+                  h: 20,
+                  texto: "2. request",
+                  fontSize: 13,
+                }),
+                etiqueta({
+                  id: "http-l3",
+                  x: 360,
+                  y: 215,
+                  w: 320,
+                  h: 20,
+                  texto: "3. response (HTML / JSON / 404 / 500)",
+                  fontSize: 13,
+                }),
+              ],
+              "Viaje de una peticion HTTP: el navegador le pregunta al DNS la IP del servidor, manda la request al servidor, y el servidor responde con HTML, JSON o un codigo de error.",
+              "Lo que pasa cuando escribes una URL: tres actores, tres pasos.",
+              "soporte-m02-s1-diagrama-http",
             ),
           },
           {
@@ -2113,7 +2238,7 @@ console.log(todosCerrados)   // false  (los tickets 1 y 3 estan abiertos)`,
             contenido: buildParrafo(
               `<p><strong>Reto autocorregido del módulo: contar tickets urgentes.</strong></p>
 <p>Te vas a enfrentar al primer reto autocorregido. El sistema corre tu código y verifica la salida. Si pasa, queda registrado. Si no pasa, te dice qué falló y vuelves a intentar.</p>
-<p>El escenario: eres el oficial de soporte que tiene que reportarle al jefe cuántos tickets urgentes hay abiertos en este momento. <strong>Mismo problema que vivirías en producción</strong>, resuelto con dos líneas de JavaScript moderno.</p>
+<p>El escenario: eres tú, mirando la lista de tickets de la mañana, y necesitas priorizar por dónde empezar. <strong>Mismo problema que vivirías en producción</strong>, resuelto con dos líneas de JavaScript moderno.</p>
 <p>Lee el enunciado con calma. La pista te marca el camino. Y recuerda: <em>todavía no</em> dominas filter, pero al final de este reto, vas a haberlo escrito al menos una vez.</p>`,
               "soporte-m03-s3-intro-reto",
             ),
@@ -2125,20 +2250,20 @@ console.log(todosCerrados)   // false  (los tickets 1 y 3 estan abiertos)`,
             idForzado: ID_SOP_M03_S3_PREG,
             contenido: buildCodigoPreguntas(
               "javascript",
-              `Tu jefe te pide saber cuantos tickets urgentes hay abiertos en este momento.
-
-La lista de tickets de la semana esta en la variable "tickets" (ya viene escrita en el esqueleto). Cada ticket es un objeto con:
-  - id (numero)
-  - estado: "abierto" o "cerrado"
-  - prioridad: "alta", "media" o "baja"
-
-Tu tarea:
-  1. Filtra los tickets que esten "abierto" Y prioridad "alta".
-  2. Imprime UN SOLO numero con console.log: la cantidad de tickets que cumplen.
-
-Pista: usa .filter(...) y la propiedad .length del resultado.
-
-Salida exacta esperada: 3`,
+              `<p>Necesitas saber <strong>cuántos tickets urgentes</strong> hay abiertos en este momento para priorizar tu mañana.</p>
+<p>La lista de tickets de la semana está en la variable <code>tickets</code> (ya viene escrita en el esqueleto). Cada ticket es un objeto con:</p>
+<ul>
+  <li><code>id</code> (número)</li>
+  <li><code>estado</code>: <code>"abierto"</code> o <code>"cerrado"</code></li>
+  <li><code>prioridad</code>: <code>"alta"</code>, <code>"media"</code> o <code>"baja"</code></li>
+</ul>
+<p><strong>Tu tarea:</strong></p>
+<ol>
+  <li>Filtra los tickets que estén <code>"abierto"</code> <strong>Y</strong> prioridad <code>"alta"</code>.</li>
+  <li>Imprime <strong>un solo número</strong> con <code>console.log</code>: la cantidad de tickets que cumplen.</li>
+</ol>
+<p><strong>Pista:</strong> usa <code>.filter(...)</code> y la propiedad <code>.length</code> del resultado.</p>
+<p><strong>Salida exacta esperada:</strong> <code>3</code></p>`,
               `const tickets = [
   { id: 1, estado: "abierto", prioridad: "alta" },
   { id: 2, estado: "cerrado", prioridad: "alta" },
@@ -2362,24 +2487,20 @@ console.log(datos)   // Promise { &lt;pending&gt; }</code></pre>
             idForzado: ID_SOP_M03_S4_PREG,
             contenido: buildCodigoPreguntas(
               "javascript",
-              `Tu tarea: escribir una funcion async que salude despues de una espera.
-
-  1. Crea una funcion async llamada "saludar" que reciba un nombre (string).
-  2. La funcion debe esperar 50 milisegundos (simulando un delay de red).
-  3. Despues debe devolver el string: "Hola, [nombre]!"
-     (con el nombre interpolado, sin las llaves cuadradas).
-  4. Llama a saludar("Carlos") y haz console.log del resultado.
-
-Pista para el delay:
-  await new Promise(resolve => setTimeout(resolve, 50))
-
-Pista para el saludo:
-  return \`Hola, \${nombre}!\`     ← template literal (comilla invertida)
-
-Pista para llamar la funcion:
-  saludar("Carlos").then(saludo => console.log(saludo))
-
-Salida exacta esperada: Hola, Carlos!`,
+              `<p><strong>Tu tarea:</strong> escribir una función <code>async</code> que salude después de una espera.</p>
+<ol>
+  <li>Crea una función <code>async</code> llamada <code>saludar</code> que reciba un <code>nombre</code> (string).</li>
+  <li>La función debe esperar <strong>50 milisegundos</strong> (simulando un delay de red).</li>
+  <li>Después debe devolver el string: <code>"Hola, [nombre]!"</code> (con el nombre interpolado, sin las llaves cuadradas).</li>
+  <li>Llama a <code>saludar("Carlos")</code> y haz <code>console.log</code> del resultado.</li>
+</ol>
+<p><strong>Pista para el delay:</strong></p>
+<p><code>await new Promise(resolve =&gt; setTimeout(resolve, 50))</code></p>
+<p><strong>Pista para el saludo</strong> (template literal con comilla invertida):</p>
+<p><code>return \`Hola, \${nombre}!\`</code></p>
+<p><strong>Pista para llamar la función:</strong></p>
+<p><code>saludar("Carlos").then(saludo =&gt; console.log(saludo))</code></p>
+<p><strong>Salida exacta esperada:</strong> <code>Hola, Carlos!</code></p>`,
               `// Escribe tu solucion abajo.
 // Recordatorio: la funcion debe ser async para usar await dentro.
 
@@ -3102,27 +3223,28 @@ function saludarConDefault(nombre: string, titulo: string = ""): string {
             idForzado: ID_SOP_M04_S2_PREG,
             contenido: buildCodigoPreguntas(
               "typescript",
-              `Tu tarea: escribir una funcion TIPADA llamada "calcularTotal".
-
-Reglas:
-  - Recibe un parametro "precio" (number) — OBLIGATORIO.
-  - Recibe un parametro "descuento" (number) — OPCIONAL. Si viene, es un valor entre 0 y 1 (ej. 0.2 = 20% de descuento).
-  - Devuelve un number:
-      - Si el descuento NO viene: devuelve el precio tal cual.
-      - Si el descuento viene: devuelve precio - (precio * descuento).
-  - Tipa explicitamente parametros y retorno.
-
-Despues haz exactamente estos 3 console.log:
-  console.log(calcularTotal(100, 0.2))   // espera 80
-  console.log(calcularTotal(50))         // espera 50
-  console.log(calcularTotal(200, 0.5))   // espera 100
-
-Pista: el parametro opcional se marca con '?' despues del nombre.
-
-Salida exacta esperada (3 lineas):
-80
-50
-100`,
+              `<p><strong>Tu tarea:</strong> escribir una función <strong>tipada</strong> llamada <code>calcularTotal</code>.</p>
+<p><strong>Reglas:</strong></p>
+<ul>
+  <li>Recibe un parámetro <code>precio</code> (<code>number</code>) — <strong>obligatorio</strong>.</li>
+  <li>Recibe un parámetro <code>descuento</code> (<code>number</code>) — <strong>opcional</strong>. Si viene, es un valor entre <code>0</code> y <code>1</code> (ej. <code>0.2</code> = 20% de descuento).</li>
+  <li>Devuelve un <code>number</code>:
+    <ul>
+      <li>Si el descuento <strong>no</strong> viene: devuelve el precio tal cual.</li>
+      <li>Si el descuento viene: devuelve <code>precio - (precio * descuento)</code>.</li>
+    </ul>
+  </li>
+  <li>Tipa explícitamente parámetros y retorno.</li>
+</ul>
+<p>Después haz exactamente estos 3 <code>console.log</code>:</p>
+<ul>
+  <li><code>console.log(calcularTotal(100, 0.2))</code> // espera <code>80</code></li>
+  <li><code>console.log(calcularTotal(50))</code> // espera <code>50</code></li>
+  <li><code>console.log(calcularTotal(200, 0.5))</code> // espera <code>100</code></li>
+</ul>
+<p><strong>Pista:</strong> el parámetro opcional se marca con <code>?</code> después del nombre.</p>
+<p><strong>Salida exacta esperada (3 líneas):</strong></p>
+<p><code>80</code><br><code>50</code><br><code>100</code></p>`,
               `// Escribe tu solucion abajo.
 // Plantilla sugerida:
 //
@@ -3384,30 +3506,35 @@ function mostrarDescripcion(p: Producto): string {
             idForzado: ID_SOP_M04_S3_PREG,
             contenido: buildCodigoPreguntas(
               "typescript",
-              `Tu tarea: escribir codigo TypeScript que use interface + funcion tipada.
-
-  1. Define una interface llamada "Ticket" con estos 3 campos:
-       - id: number
-       - titulo: string
-       - estado: "abierto" o "cerrado"  (union literal)
-
-  2. Crea una variable "lista" tipada como Ticket[] con estos 4 elementos:
-       { id: 1, titulo: "Login no anda", estado: "abierto" }
-       { id: 2, titulo: "Logo corrido", estado: "cerrado" }
-       { id: 3, titulo: "Pago falla", estado: "abierto" }
-       { id: 4, titulo: "Tipografia rara", estado: "abierto" }
-
-  3. Escribe una funcion tipada "contarAbiertos" que reciba un array de Tickets
-     y devuelva un number con la cantidad de tickets en estado "abierto".
-
-  4. Imprime el resultado: console.log(contarAbiertos(lista))
-
-Pistas:
-  - El estado se declara con uniones literales: estado: "abierto" | "cerrado"
-  - Para la funcion: function contarAbiertos(tickets: Ticket[]): number { ... }
-  - Usa .filter(...) y la propiedad .length.
-
-Salida exacta esperada: 3`,
+              `<p><strong>Tu tarea:</strong> escribir código TypeScript que use <code>interface</code> + función tipada.</p>
+<ol>
+  <li>
+    Define una interface llamada <code>Ticket</code> con estos 3 campos:
+    <ul>
+      <li><code>id: number</code></li>
+      <li><code>titulo: string</code></li>
+      <li><code>estado: "abierto"</code> o <code>"cerrado"</code> (<strong>unión literal</strong>)</li>
+    </ul>
+  </li>
+  <li>
+    Crea una variable <code>lista</code> tipada como <code>Ticket[]</code> con estos 4 elementos:
+    <ul>
+      <li><code>{ id: 1, titulo: "Login no anda", estado: "abierto" }</code></li>
+      <li><code>{ id: 2, titulo: "Logo corrido", estado: "cerrado" }</code></li>
+      <li><code>{ id: 3, titulo: "Pago falla", estado: "abierto" }</code></li>
+      <li><code>{ id: 4, titulo: "Tipografia rara", estado: "abierto" }</code></li>
+    </ul>
+  </li>
+  <li>Escribe una función tipada <code>contarAbiertos</code> que reciba un array de <code>Ticket</code> y devuelva un <code>number</code> con la cantidad de tickets en estado <code>"abierto"</code>.</li>
+  <li>Imprime el resultado: <code>console.log(contarAbiertos(lista))</code></li>
+</ol>
+<p><strong>Pistas:</strong></p>
+<ul>
+  <li>El estado se declara con uniones literales: <code>estado: "abierto" | "cerrado"</code></li>
+  <li>Para la función: <code>function contarAbiertos(tickets: Ticket[]): number { ... }</code></li>
+  <li>Usa <code>.filter(...)</code> y la propiedad <code>.length</code>.</li>
+</ul>
+<p><strong>Salida exacta esperada:</strong> <code>3</code></p>`,
               `// Escribe tu solucion abajo.
 // Plantilla sugerida:
 //
@@ -4093,6 +4220,47 @@ function SaludoTipado({ nombre }: SaludoProps) {
             ),
           },
           {
+            tipo: TipoBloque.DIAGRAMA,
+            esEvaluable: false,
+            contenido: buildDiagrama(
+              [
+                ...caja({ id: "cmp-1", x: 40, y: 160, w: 160, h: 80, texto: "Props\n(entran)" }),
+                ...caja({
+                  id: "cmp-2",
+                  x: 340,
+                  y: 120,
+                  w: 240,
+                  h: 160,
+                  texto: "Tu componente\n(función)",
+                }),
+                ...caja({ id: "cmp-3", x: 720, y: 160, w: 200, h: 80, texto: "JSX\n(sale)" }),
+                ...caja({
+                  id: "cmp-4",
+                  x: 340,
+                  y: 340,
+                  w: 240,
+                  h: 70,
+                  texto: "Estado interno\n(useState)",
+                }),
+                flecha({ id: "cmp-f1", x1: 200, y1: 200, x2: 340, y2: 200 }),
+                flecha({ id: "cmp-f2", x1: 580, y1: 200, x2: 720, y2: 200 }),
+                flecha({ id: "cmp-f3", x1: 460, y1: 340, x2: 460, y2: 280 }),
+                etiqueta({
+                  id: "cmp-l1",
+                  x: 720,
+                  y: 250,
+                  w: 200,
+                  h: 20,
+                  texto: "→ Pantalla",
+                  fontSize: 14,
+                }),
+              ],
+              "Anatomia de un componente React: las props entran por la izquierda, el estado interno vive abajo, y por la derecha sale el JSX que React pinta en pantalla.",
+              "Un componente es una función: entran props, sale JSX. El estado es su memoria privada.",
+              "soporte-m05-s3-diagrama-componente",
+            ),
+          },
+          {
             tipo: TipoBloque.PARRAFO,
             esEvaluable: false,
             contenido: buildParrafo(
@@ -4444,30 +4612,30 @@ export function Aviso({ hayPendientes, cantidad }: { hayPendientes: boolean; can
             idForzado: ID_SOP_M05_S4_PREG,
             contenido: buildCodigoPreguntas(
               "typescript",
-              `Tu tarea: escribir una funcion TIPADA llamada "siguienteContador" que React llamaria dentro del onClick de un boton.
-
-Reglas:
-  - Recibe "actual" (number): el valor actual del contador.
-  - Recibe "accion" (string literal): una de "incrementar", "decrementar" o "reset".
-    Usa una UNION LITERAL como tipo.
-  - Devuelve un number con el nuevo valor:
-      - "incrementar" → actual + 1
-      - "decrementar" → actual - 1
-      - "reset" → 0
-  - Tipa explicitamente parametros y retorno.
-
-Despues haz exactamente estos 3 console.log:
-  console.log(siguienteContador(5, "incrementar"))
-  console.log(siguienteContador(5, "decrementar"))
-  console.log(siguienteContador(5, "reset"))
-
-Pista — la union literal:
-  type Accion = "incrementar" | "decrementar" | "reset"
-
-Salida exacta esperada (3 lineas):
-6
-4
-0`,
+              `<p><strong>Tu tarea:</strong> escribir una función <strong>tipada</strong> llamada <code>siguienteContador</code> que React llamaría dentro del <code>onClick</code> de un botón.</p>
+<p><strong>Reglas:</strong></p>
+<ul>
+  <li>Recibe <code>actual</code> (<code>number</code>): el valor actual del contador.</li>
+  <li>Recibe <code>accion</code> (string literal): una de <code>"incrementar"</code>, <code>"decrementar"</code> o <code>"reset"</code>. Usa una <strong>unión literal</strong> como tipo.</li>
+  <li>Devuelve un <code>number</code> con el nuevo valor:
+    <ul>
+      <li><code>"incrementar"</code> → <code>actual + 1</code></li>
+      <li><code>"decrementar"</code> → <code>actual - 1</code></li>
+      <li><code>"reset"</code> → <code>0</code></li>
+    </ul>
+  </li>
+  <li>Tipa explícitamente parámetros y retorno.</li>
+</ul>
+<p>Después haz exactamente estos 3 <code>console.log</code>:</p>
+<ul>
+  <li><code>console.log(siguienteContador(5, "incrementar"))</code></li>
+  <li><code>console.log(siguienteContador(5, "decrementar"))</code></li>
+  <li><code>console.log(siguienteContador(5, "reset"))</code></li>
+</ul>
+<p><strong>Pista — la unión literal:</strong></p>
+<p><code>type Accion = "incrementar" | "decrementar" | "reset"</code></p>
+<p><strong>Salida exacta esperada (3 líneas):</strong></p>
+<p><code>6</code><br><code>4</code><br><code>0</code></p>`,
               `// Escribe tu solucion abajo.
 // Plantilla sugerida:
 //
@@ -5070,7 +5238,7 @@ export default function App() {
             esEvaluable: false,
             contenido: buildParrafo(
               `<p><strong>Bienvenido al otro lado.</strong></p>
-<p>La app de tareas del módulo 5 está corriendo en tu compu. Te funciona. Te enorgulleces. Cierras la pestaña, vuelves a abrirla y... <strong>todo se borró</strong>. Tu jefe te mira raro porque le habías mostrado tu "app". Le explicas que "los datos están en la memoria del navegador" y te dice "ah, ok". Pero los dos saben que eso no es una app de verdad.</p>
+<p>La app de tareas del módulo 5 está corriendo en tu compu. Te funciona. Te enorgulleces. Cierras la pestaña, vuelves a abrirla y... <strong>todo se borró</strong>. Le habías mostrado tu "app" a un compañero, y los dos se quedan mirándose. Los datos vivían solo en la memoria del navegador y desaparecieron al cerrar la pestaña. Eso todavía no es una app de verdad.</p>
 <p>Hoy lo arreglamos. Hoy aprendes a hablar con un <strong>servidor</strong>: ese computador remoto donde viven los datos que sobreviven al refresh, al reinicio de tu compu y a que tú te vayas de vacaciones.</p>`,
               "soporte-m06-s1-intro",
             ),
@@ -5170,6 +5338,16 @@ export function ListaTicketsIngenua() {
 </ul>
 <p>Pero para <strong>pedir datos al servidor</strong>, mejor herramienta. La regla mental: <em>si lo que vas a hacer es leer datos de una API, NO uses useEffect a pelo. Usa Tanstack Query</em>. Eso es lo que viene.</p>`,
               "soporte-m06-s1-tip-useeffect-no-es-malo",
+            ),
+          },
+          {
+            tipo: TipoBloque.PARRAFO,
+            esEvaluable: false,
+            contenido: buildParrafo(
+              `<p>Una grieta más fina, que ni Tanstack Query te tapa por arte de magia: <strong>TypeScript te protege en compile time, pero el servidor vive en otro mundo</strong>. Cuando escribes <code>useQuery&lt;Ticket[]&gt;(...)</code>, TypeScript te cree. Asume que lo que llega son tickets bien formados, con todos sus campos, en el formato que tú definiste.</p>
+<p>Pero en <strong>runtime</strong> puede llegar cualquier cosa: un backend que cambió de versión y ya no manda <code>prioridad</code>, un campo que viene como número cuando esperabas string, un objeto con la mitad de las llaves faltando porque alguien hizo un deploy a medias. Y tu app explota — no en tu compu durante el desarrollo, sino en <em>producción</em>, frente a un usuario, con un error feo y críptico en la consola del navegador.</p>
+<p>La defensa: <strong>nunca confiar ciegamente en lo que viene del servidor</strong>. Validar la forma de la respuesta ANTES de tipar, en runtime. Eso es lo que cierra el módulo, con una librería pequeñita llamada <strong>Zod</strong>.</p>`,
+              "soporte-m06-s1-puente-zod",
             ),
           },
           {
@@ -5310,6 +5488,79 @@ export function ListaTickets() {
             ),
           },
           {
+            tipo: TipoBloque.DIAGRAMA,
+            esEvaluable: false,
+            contenido: buildDiagrama(
+              [
+                ...caja({
+                  id: "cache-1",
+                  x: 40,
+                  y: 60,
+                  w: 200,
+                  h: 70,
+                  texto: "Componente A\nuseQuery(['tickets'])",
+                }),
+                ...caja({
+                  id: "cache-2",
+                  x: 40,
+                  y: 200,
+                  w: 200,
+                  h: 70,
+                  texto: "Componente B\nuseQuery(['tickets'])",
+                }),
+                ...caja({
+                  id: "cache-3",
+                  x: 380,
+                  y: 130,
+                  w: 200,
+                  h: 90,
+                  texto: "Cache\n['tickets']",
+                }),
+                ...caja({
+                  id: "cache-4",
+                  x: 720,
+                  y: 130,
+                  w: 200,
+                  h: 90,
+                  texto: "Servidor\n(fetch real)",
+                }),
+                flecha({ id: "cache-f1", x1: 240, y1: 95, x2: 380, y2: 160 }),
+                flecha({ id: "cache-f2", x1: 240, y1: 235, x2: 380, y2: 190 }),
+                flecha({ id: "cache-f3", x1: 580, y1: 175, x2: 720, y2: 175 }),
+                etiqueta({
+                  id: "cache-l1",
+                  x: 260,
+                  y: 110,
+                  w: 100,
+                  h: 18,
+                  texto: "1. pide",
+                  fontSize: 13,
+                }),
+                etiqueta({
+                  id: "cache-l2",
+                  x: 260,
+                  y: 250,
+                  w: 140,
+                  h: 18,
+                  texto: "2. ya está (hit)",
+                  fontSize: 13,
+                }),
+                etiqueta({
+                  id: "cache-l3",
+                  x: 580,
+                  y: 200,
+                  w: 140,
+                  h: 18,
+                  texto: "solo la 1ra vez",
+                  fontSize: 13,
+                }),
+              ],
+              "Cache de Tanstack Query: dos componentes piden la misma queryKey ['tickets']. El primero gatilla un fetch al servidor; el segundo recibe los datos del cache sin volver a pedir.",
+              "Misma queryKey = mismo cache. Dos componentes que piden lo mismo, una sola petición al servidor.",
+              "soporte-m06-s2-diagrama-cache",
+            ),
+          },
+          {
             tipo: TipoBloque.PARRAFO,
             esEvaluable: false,
             contenido: buildParrafo(
@@ -5345,7 +5596,7 @@ return <p>Tienes {cantidadUrgentes} tickets urgentes abiertos</p>`,
             esEvaluable: false,
             contenido: buildParrafo(
               `<p><strong>Reto autocorregido del módulo: la función que vive dentro de un <code>select</code>.</strong></p>
-<p>Tu jefe te pide saber el ID del <strong>ticket abierto más urgente</strong> para atender primero. Tienes la lista completa de tickets que llegó del servidor. Necesitas filtrar los abiertos de prioridad alta y, de esos, devolver el ID del que se creó <strong>primero</strong> (el que lleva más tiempo esperando).</p>
+<p>Necesitas saber el ID del <strong>ticket abierto más urgente</strong> para atender primero. Tienes la lista completa de tickets que llegó del servidor. Hay que filtrar los abiertos de prioridad alta y, de esos, devolver el ID del que se creó <strong>primero</strong> (el que lleva más tiempo esperando).</p>
 <p>La función que vas a escribir es <strong>pura</strong>: recibe la lista, devuelve un ID. Sin React, sin servidor, sin DOM. Es <em>literalmente</em> la función que después le pasarías al <code>select</code> de un <code>useQuery</code> en la app real. Por ser pura, es testeable con <code>console.log</code> y la plataforma la corre por ti.</p>
 <p>Lee bien el enunciado. La pista te marca el camino. Si te trabas, respira y vuelve al ejemplo del select de arriba. <em>Todavía no</em> te sale a la primera, pero saldrá.</p>`,
               "soporte-m06-s2-intro-reto",
@@ -5358,30 +5609,24 @@ return <p>Tienes {cantidadUrgentes} tickets urgentes abiertos</p>`,
             idForzado: ID_SOP_M06_S2_PREG,
             contenido: buildCodigoPreguntas(
               "javascript",
-              `Tu jefe te pide saber el ID del ticket abierto MAS URGENTE para atender primero.
-
-La lista de tickets esta en la variable "tickets" (ya viene escrita en el esqueleto). Cada ticket tiene:
-  - id (number)
-  - estado: "abierto" o "cerrado"
-  - prioridad: "alta", "media" o "baja"
-  - createdAt (string ISO, formato "YYYY-MM-DD"): la fecha en que se creo
-
-Tu tarea:
-  1. Filtra los tickets que esten "abierto" Y prioridad "alta".
-  2. De esos, encuentra el que se creo PRIMERO (el createdAt mas antiguo, es decir, el menor alfabeticamente — funciona porque el formato YYYY-MM-DD se ordena bien como string).
-  3. Si NO hay ninguno, imprime exactamente "ninguno".
-  4. Si hay al menos uno, imprime el ID con console.log (un numero).
-
-Pista — un camino posible:
-  const urgentes = tickets.filter(t => t.estado === "abierto" && t.prioridad === "alta")
-  if (urgentes.length === 0) {
-    console.log("ninguno")
-  } else {
-    const masViejo = urgentes.reduce((mejor, t) => t.createdAt < mejor.createdAt ? t : mejor)
-    console.log(masViejo.id)
-  }
-
-Salida exacta esperada: 7`,
+              `<p>Necesitas saber el <strong>ID del ticket abierto más urgente</strong> para atender primero.</p>
+<p>La lista de tickets está en la variable <code>tickets</code> (ya viene escrita en el esqueleto). Cada ticket tiene:</p>
+<ul>
+  <li><code>id</code> (<code>number</code>)</li>
+  <li><code>estado</code>: <code>"abierto"</code> o <code>"cerrado"</code></li>
+  <li><code>prioridad</code>: <code>"alta"</code>, <code>"media"</code> o <code>"baja"</code></li>
+  <li><code>createdAt</code> (string ISO, formato <code>"YYYY-MM-DD"</code>): la fecha en que se creó</li>
+</ul>
+<p><strong>Tu tarea:</strong></p>
+<ol>
+  <li>Filtra los tickets que estén <code>"abierto"</code> <strong>Y</strong> prioridad <code>"alta"</code>.</li>
+  <li>De esos, encuentra el que se creó <strong>primero</strong> (el <code>createdAt</code> más antiguo, es decir, el menor alfabéticamente — funciona porque el formato <code>YYYY-MM-DD</code> se ordena bien como string).</li>
+  <li>Si <strong>no</strong> hay ninguno, imprime exactamente <code>"ninguno"</code>.</li>
+  <li>Si hay al menos uno, imprime el <code>id</code> con <code>console.log</code> (un número).</li>
+</ol>
+<p><strong>Pista — un camino posible:</strong></p>
+<p><code>const urgentes = tickets.filter(t =&gt; t.estado === "abierto" &amp;&amp; t.prioridad === "alta")</code><br><code>if (urgentes.length === 0) { console.log("ninguno") }</code><br><code>else { const masViejo = urgentes.reduce((mejor, t) =&gt; t.createdAt &lt; mejor.createdAt ? t : mejor); console.log(masViejo.id) }</code></p>
+<p><strong>Salida exacta esperada:</strong> <code>7</code></p>`,
               `const tickets = [
   { id: 1, estado: "abierto", prioridad: "media", createdAt: "2026-05-18" },
   { id: 2, estado: "cerrado", prioridad: "alta", createdAt: "2026-05-10" },
@@ -5544,6 +5789,108 @@ export function BotonCrearTicket() {
 <p>Resultado en la UI: el usuario aprieta "Crear ticket", el botón se pone en "Creando...", el servidor responde, la lista de tickets de la otra parte de la pantalla se refresca SOLA con el ticket nuevo arriba. Sin que tú hayas tocado nada de eso a mano.</p>
 <p>Esa magia es Tanstack Query haciendo su trabajo. Tú solo le dijiste "este dato ya no es confiable". Él se encarga.</p>`,
               "soporte-m06-s3-invalidacion",
+            ),
+          },
+          {
+            tipo: TipoBloque.DIAGRAMA,
+            esEvaluable: false,
+            contenido: buildDiagrama(
+              [
+                ...caja({
+                  id: "mut-1",
+                  x: 40,
+                  y: 60,
+                  w: 200,
+                  h: 70,
+                  texto: "Usuario\nllena formulario",
+                }),
+                ...caja({
+                  id: "mut-2",
+                  x: 340,
+                  y: 60,
+                  w: 200,
+                  h: 70,
+                  texto: "useMutation\nmutate(data)",
+                }),
+                ...caja({ id: "mut-3", x: 640, y: 60, w: 200, h: 70, texto: "Servidor\n(POST)" }),
+                ...caja({
+                  id: "mut-4",
+                  x: 340,
+                  y: 220,
+                  w: 200,
+                  h: 70,
+                  texto: "invalidateQueries\n(['tickets'])",
+                }),
+                ...caja({
+                  id: "mut-5",
+                  x: 40,
+                  y: 360,
+                  w: 200,
+                  h: 70,
+                  texto: "useQuery\n(['tickets'])",
+                }),
+                ...caja({
+                  id: "mut-6",
+                  x: 640,
+                  y: 360,
+                  w: 200,
+                  h: 70,
+                  texto: "Lista en pantalla\n(refetch automático)",
+                }),
+                flecha({ id: "mut-fa", x1: 240, y1: 95, x2: 340, y2: 95 }),
+                flecha({ id: "mut-fb", x1: 540, y1: 95, x2: 640, y2: 95 }),
+                flecha({ id: "mut-fc", x1: 640, y1: 130, x2: 540, y2: 220 }),
+                flecha({ id: "mut-fd", x1: 340, y1: 255, x2: 240, y2: 360 }),
+                flecha({ id: "mut-fe", x1: 240, y1: 395, x2: 640, y2: 395 }),
+                etiqueta({
+                  id: "mut-l1",
+                  x: 240,
+                  y: 30,
+                  w: 100,
+                  h: 18,
+                  texto: "1. submit",
+                  fontSize: 13,
+                }),
+                etiqueta({
+                  id: "mut-l2",
+                  x: 540,
+                  y: 30,
+                  w: 100,
+                  h: 18,
+                  texto: "2. POST",
+                  fontSize: 13,
+                }),
+                etiqueta({
+                  id: "mut-l3",
+                  x: 545,
+                  y: 150,
+                  w: 140,
+                  h: 18,
+                  texto: "3. onSuccess →",
+                  fontSize: 13,
+                }),
+                etiqueta({
+                  id: "mut-l4",
+                  x: 240,
+                  y: 290,
+                  w: 140,
+                  h: 18,
+                  texto: "4. cache obsoleto",
+                  fontSize: 13,
+                }),
+                etiqueta({
+                  id: "mut-l5",
+                  x: 320,
+                  y: 410,
+                  w: 200,
+                  h: 18,
+                  texto: "5. refetch sin tocar nada",
+                  fontSize: 13,
+                }),
+              ],
+              "Coreografia de useMutation con invalidateQueries: el usuario envia el formulario, useMutation llama al servidor, al exito invalida el cache, y el useQuery que escucha esa key vuelve a pedir los datos automaticamente.",
+              "Crear + invalidar + refetch: el ticket nuevo aparece en la lista sin que tú hayas tocado nada.",
+              "soporte-m06-s3-diagrama-mutation",
             ),
           },
           {
@@ -5799,7 +6146,7 @@ export function NuevoTicket() {
   <li><strong>Validación antes de mandar</strong>: nunca confíes en que el usuario va a tipear bien.</li>
   <li><strong>Navegación al éxito</strong>: vuelves a la lista, no dejas al usuario mirando un formulario vacío preguntándose si funcionó.</li>
 </ul>
-<p>Cinco detalles. Tu jefe los nota aunque no sepa explicarlos. <em>"Es que se siente bien hecho"</em> — eso es lo que va a decir.</p>`,
+<p>Cinco detalles. Cualquier dev senior los nota aunque no sepa explicarlos. <em>"Es que se siente bien hecho"</em> — eso es lo que va a decir un code review serio.</p>`,
               "soporte-m06-s4-tip-detalles",
             ),
           },
@@ -6371,6 +6718,79 @@ function NuevoTicket() {
 <p><em>Todavía no</em> eres un dev senior. Pero ya hiciste el salto más grande del curso: pasaste de "página tonta" a "aplicación real". El resto es pulir y entregar.</p>
 <p><strong>Nos vemos al otro lado.</strong></p>`,
               "soporte-m06-s5-cierre",
+            ),
+          },
+        ],
+      },
+
+      // ----------------------------------------------------------------------
+      // Seccion 6 — Zod: validar lo que viene del servidor (opcional)
+      // ----------------------------------------------------------------------
+      {
+        titulo: "Zod: validar lo que viene del servidor (opcional pero recomendado)",
+        skill: "React real con datos del servidor",
+        temas:
+          "Por qué Zod existe: cerrar la grieta entre compile time (TypeScript) y runtime (servidor). Patrón básico: z.object para describir la forma, .parse para validar, z.infer para derivar el tipo. Integración natural con Tanstack Query: validar en el queryFn antes de devolver. Decisión de scope para el proyecto integrador: deseable, no obligatorio.",
+        bloques: [
+          {
+            tipo: TipoBloque.PARRAFO,
+            esEvaluable: false,
+            contenido: buildParrafo(
+              `<p>Cerramos el módulo con una herramienta pequeña y muy poderosa: <strong>Zod</strong>. La librería que cierra la grieta entre lo que TypeScript te promete en compile time y lo que el servidor te entrega en runtime.</p>
+<p>La idea es simple. Tú declaras la forma <strong>exacta</strong> que esperas de los datos — qué campos hay, qué tipo tiene cada uno, cuáles son opcionales. Eso se llama un <em>schema</em>. Luego, cuando llegan los datos del servidor, le pides a Zod que los valide: si todo cuadra, te los devuelve tipados; si algo no cuadra, lanza un error claro con la ruta exacta del problema (<em>"el campo prioridad llegó como número, esperaba string"</em>). No más adivinar dónde reventó la cadena.</p>
+<p>El patrón es de tres líneas: <code>z.object({...})</code> para describir la forma, <code>.parse(respuesta)</code> para validar, y un <code>type</code> derivado con <code>z.infer&lt;typeof schema&gt;</code> para que TypeScript sepa qué es lo que sale. <strong>No tienes que mantener el tipo y el schema por separado</strong> — el schema es la fuente de verdad y el tipo se deduce de él automáticamente. Cero duplicación, cero deriva.</p>
+<p>Lo bonito viene cuando lo enchufas a Tanstack Query: el <code>queryFn</code> puede llamar a <code>.parse</code> antes de devolver los datos. Si el servidor te traiciona, lo detectas <strong>ahí</strong>, en un lugar centralizado, antes de que tu componente reciba basura. Mira:</p>`,
+              "soporte-m06-s6-intro-zod",
+            ),
+          },
+          {
+            tipo: TipoBloque.CODIGO_ILUSTRATIVO,
+            esEvaluable: false,
+            contenido: buildCodigoIlustrativo(
+              "tsx",
+              `import { z } from "zod"
+import { useQuery } from "@tanstack/react-query"
+
+// 1. El schema: la forma EXACTA que esperamos del servidor
+const ticketSchema = z.object({
+  id: z.number(),
+  titulo: z.string(),
+  estado: z.enum(["abierto", "cerrado"]),
+  prioridad: z.enum(["alta", "media", "baja"]),
+  createdAt: z.string(),
+})
+const listaTicketsSchema = z.array(ticketSchema)
+
+// 2. El tipo se DERIVA del schema (no lo escribes a mano)
+type Ticket = z.infer<typeof ticketSchema>
+
+// 3. El queryFn valida ANTES de devolver
+async function obtenerTickets(): Promise<Ticket[]> {
+  const r = await fetch("/api/tickets")
+  if (!r.ok) throw new Error("No pude pedir los tickets")
+  const json = await r.json()
+  return listaTicketsSchema.parse(json) // si algo viene raro, lanza aqui
+}
+
+export function ListaTickets() {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["tickets"],
+    queryFn: obtenerTickets,
+  })
+  // ... el componente ya no se preocupa por datos raros
+}`,
+              "Si el backend rompe el contrato — un campo de menos, un tipo cambiado, un valor fuera del enum — el error aparece en el queryFn con la ruta exacta del problema, no a cinco componentes de distancia. Esa es la diferencia entre 'mi app explotó y no sé por qué' y 'el servidor cambió la API'.",
+              "soporte-m06-s6-codigo-zod",
+            ),
+          },
+          {
+            tipo: TipoBloque.TIP,
+            esEvaluable: false,
+            contenido: buildTip(
+              "info",
+              `<p>Para el <strong>proyecto integrador</strong> (Mini Centro de Tickets) este patrón con Zod es <strong>deseable pero no obligatorio</strong>. Tu mock vive en el mismo código, así que la forma no va a cambiarte por sorpresa — no hay servidor real que te traicione.</p>
+<p>Pero si lo añades, ganas dos cosas: practicas un patrón que vas a usar el resto de tu carrera, y demuestras que entiendes la diferencia entre <em>compile time</em> y <em>runtime</em> — una señal de seriedad técnica que se nota en una entrevista. Si te queda tiempo después de tener todo lo obligatorio funcionando, súmalo. Si no, no te frustres: con tener Tanstack Query bien usado ya pasaste el listón del módulo.</p>`,
+              "soporte-m06-s6-tip-scope",
             ),
           },
         ],
@@ -7461,7 +7881,7 @@ function procesa(t) {
   <li>Un refactor con IA documentado en tu bitácora pública.</li>
 </ul>
 <p>En el <strong>Módulo 08</strong> entra el último ingrediente del curso: <strong>calidad mínima y entrega</strong>. Aprendes a leer un stack trace sin pánico, a escribir un test que valga la pena, a usar lint/format sin pelearte con la herramienta, y a hacer deploy de tu proyecto a una URL pública en 5 minutos con Vercel. Es la última pieza antes del proyecto integrador.</p>
-<p>Sin tabú: <em>no se trata de "ser ingeniero de calidad"</em>. Se trata de que tu proyecto integrador sea defendible y tengas una URL para mandar el lunes a tu jefe. Lo mínimo necesario, hecho bien.</p>
+<p>Sin tabú: <em>no se trata de "ser ingeniero de calidad"</em>. Se trata de que tu proyecto integrador sea defendible y tengas una URL para enseñar el lunes a quien quieras: a tu equipo, a un reclutador, o a ti mismo dentro de un mes. Lo mínimo necesario, hecho bien.</p>
 <p><em>Todavía no</em> estás listo para el integrador. Te faltan los últimos detalles de pulido. Pero ya casi llegamos.</p>
 <p><strong>Nos vemos al otro lado.</strong></p>`,
               "soporte-m07-s5-cierre",
@@ -7700,36 +8120,24 @@ console.assert(calcularDescuento(100, 150) === 100, "caso limite: porcentaje inv
             idForzado: ID_SOP_M08_S1_PREG,
             contenido: buildCodigoPreguntas(
               "javascript",
-              `Tu jefe del Mini Centro de Tickets quiere una funcion que valide el email del usuario antes de abrir un ticket.
-
-Reglas del negocio (cortas y claras):
-  1. Tiene que ser un string.
-  2. Tiene que contener exactamente un "@".
-  3. Despues del "@" tiene que haber al menos un punto "." (para el dominio).
-  4. No puede estar vacio ni tener espacios.
-
-Tu tarea:
-  - Escribe una funcion "esEmailValido(email)" que devuelva true o false.
-  - Despues, llamala con los 4 valores del array "casos" que viene en el esqueleto.
-  - Imprime con console.log el resultado de cada uno, UNA LINEA POR CASO, exactamente "true" o "false".
-
-Pista — un camino posible:
-  function esEmailValido(email) {
-    if (typeof email !== "string") return false
-    if (email.includes(" ")) return false
-    const partes = email.split("@")
-    if (partes.length !== 2) return false
-    if (partes[0].length === 0) return false
-    if (!partes[1].includes(".")) return false
-    return true
-  }
-  for (const c of casos) console.log(esEmailValido(c))
-
-Salida exacta esperada (4 lineas):
-true
-false
-false
-false`,
+              `<p>El Mini Centro de Tickets necesita una función que valide el <strong>email del usuario</strong> antes de abrir un ticket.</p>
+<p><strong>Reglas del negocio (cortas y claras):</strong></p>
+<ol>
+  <li>Tiene que ser un <code>string</code>.</li>
+  <li>Tiene que contener exactamente un <code>@</code>.</li>
+  <li>Después del <code>@</code> tiene que haber al menos un punto <code>.</code> (para el dominio).</li>
+  <li>No puede estar vacío ni tener espacios.</li>
+</ol>
+<p><strong>Tu tarea:</strong></p>
+<ul>
+  <li>Escribe una función <code>esEmailValido(email)</code> que devuelva <code>true</code> o <code>false</code>.</li>
+  <li>Después llámala con los 4 valores del array <code>casos</code> que viene en el esqueleto.</li>
+  <li>Imprime con <code>console.log</code> el resultado de cada uno, <strong>una línea por caso</strong>, exactamente <code>"true"</code> o <code>"false"</code>.</li>
+</ul>
+<p><strong>Pista — un camino posible:</strong></p>
+<p><code>function esEmailValido(email) {</code><br><code>&nbsp;&nbsp;if (typeof email !== "string") return false</code><br><code>&nbsp;&nbsp;if (email.includes(" ")) return false</code><br><code>&nbsp;&nbsp;const partes = email.split("@")</code><br><code>&nbsp;&nbsp;if (partes.length !== 2) return false</code><br><code>&nbsp;&nbsp;if (partes[0].length === 0) return false</code><br><code>&nbsp;&nbsp;if (!partes[1].includes(".")) return false</code><br><code>&nbsp;&nbsp;return true</code><br><code>}</code><br><code>for (const c of casos) console.log(esEmailValido(c))</code></p>
+<p><strong>Salida exacta esperada (4 líneas):</strong></p>
+<p><code>true</code><br><code>false</code><br><code>false</code><br><code>false</code></p>`,
               `// Los 4 casos a validar (en orden):
 //   1. "ana@ntt.cl"     → email valido normal
 //   2. "ana ntt.cl"     → no tiene @
@@ -8019,7 +8427,7 @@ function esEmailValido(email) {
             esEvaluable: false,
             contenido: buildParrafo(
               `<p><strong>El último kilómetro.</strong></p>
-<p>Hasta aquí tu proyecto vive en <code>localhost:5173</code> — solo lo ves tú. Para que alguien más pueda abrirlo (tu jefe el lunes, un reclutador en LinkedIn, tu mamá), necesita una <strong>URL pública</strong>. Eso es lo que llamamos "deploy" (en inglés: desplegar): subir tu código a un servidor que lo sirva al mundo.</p>
+<p>Hasta aquí tu proyecto vive en <code>localhost:5173</code> — solo lo ves tú. Para que alguien más pueda abrirlo (tu equipo el lunes, un reclutador en LinkedIn, tu mamá), necesita una <strong>URL pública</strong>. Eso es lo que llamamos "deploy" (en inglés: desplegar): subir tu código a un servidor que lo sirva al mundo.</p>
 <p>Antes esto era doloroso: alquilar servidor, configurarlo, mantenerlo. Hoy <strong>Vercel</strong> lo resuelve en 5 minutos, gratis para proyectos personales, sin tarjeta de crédito. Conectas tu repo de GitHub y cada vez que haces <code>git push</code>, tu app pública se actualiza sola. Magia, pero real.</p>`,
               "soporte-m08-s2-apertura",
             ),

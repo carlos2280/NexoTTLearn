@@ -5,6 +5,7 @@ import { tipoBloqueMeta } from "../bloque-tipo-meta"
 import { EditorCodigoIlustrativo } from "../editores/editor-codigo-ilustrativo"
 import { EditorCodigoPreguntas } from "../editores/editor-codigo-preguntas"
 import { EditorCodigoTests } from "../editores/editor-codigo-tests"
+import { EditorDiagrama } from "../editores/editor-diagrama"
 import { EditorParrafo } from "../editores/editor-parrafo"
 import { EditorQuiz } from "../editores/editor-quiz"
 import { EditorRecurso } from "../editores/editor-recurso"
@@ -105,6 +106,9 @@ function ContextoBloque({
   }
   if (bloque.tipo === "CODIGO_TESTS") {
     return <EditorCodigoTests bloque={bloque} />
+  }
+  if (bloque.tipo === "DIAGRAMA") {
+    return <EditorDiagrama bloque={bloque} />
   }
   const meta = tipoBloqueMeta(bloque.tipo)
   const Icono = meta.icono

@@ -141,6 +141,27 @@ export function buildRecurso(
   )
 }
 
+/**
+ * Bloque DIAGRAMA (Excalidraw embebido).
+ *
+ * Para el seed sembramos solo el placeholder con un texto que invita al
+ * admin a editar — el diagrama real se construye desde la UI del admin
+ * con la libreria visual. Los `elements` siguen el shape de Excalidraw:
+ * un objeto por figura/texto/flecha con sus props.
+ */
+export function buildDiagrama(
+  elements: readonly Record<string, unknown>[],
+  altText: string,
+  caption: string | undefined,
+  ctx: string,
+): Prisma.InputJsonValue {
+  return validarOExplotar(
+    TipoBloque.DIAGRAMA,
+    caption ? { elements, altText, caption } : { elements, altText },
+    ctx,
+  )
+}
+
 export interface OpcionQuiz {
   readonly id: string
   readonly texto: string

@@ -65,6 +65,7 @@ enum TipoBloque {
   QUIZ
   CODIGO_PREGUNTAS
   CODIGO_TESTS
+  DIAGRAMA
 
   @@map("tipo_bloque_enum")
 }

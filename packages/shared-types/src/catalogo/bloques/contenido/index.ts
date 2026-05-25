@@ -15,6 +15,8 @@ export { contenidoVideoSchema, proveedorVideoSchema } from "./video.schema"
 export type { ContenidoVideo, ProveedorVideo } from "./video.schema"
 export { contenidoRecursoSchema, subtipoRecursoSchema } from "./recurso.schema"
 export type { ContenidoRecurso, SubtipoRecurso } from "./recurso.schema"
+export { contenidoDiagramaSchema } from "./diagrama.schema"
+export type { ContenidoDiagrama } from "./diagrama.schema"
 export {
   contenidoBloquePorTipo,
   schemaContenidoBloquePorTipo,

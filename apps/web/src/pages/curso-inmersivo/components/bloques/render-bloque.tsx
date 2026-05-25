@@ -6,6 +6,7 @@ import type {
 import { contenidoQuizSchema } from "@nexott-learn/shared-types"
 import { BloqueCodigoIlustrativo } from "./bloque-codigo-ilustrativo"
 import { BloqueCodigoPreguntas } from "./bloque-codigo-preguntas"
+import { BloqueDiagrama } from "./bloque-diagrama"
 import { BloqueEvaluableCerrado } from "./bloque-evaluable-cerrado"
 import { BloqueEvaluablePreviewLock } from "./bloque-evaluable-preview-lock"
 import { BloqueParrafo } from "./bloque-parrafo"
@@ -71,6 +72,8 @@ export function RenderBloque({
       return <BloqueRecurso contenido={bloque.contenido} />
     case "CODIGO_ILUSTRATIVO":
       return <BloqueCodigoIlustrativo contenido={bloque.contenido} />
+    case "DIAGRAMA":
+      return <BloqueDiagrama contenido={bloque.contenido} />
     case "QUIZ": {
       const notaMinima = notaMinimaQuiz(bloque.contenido)
       if (soloLectura) {
