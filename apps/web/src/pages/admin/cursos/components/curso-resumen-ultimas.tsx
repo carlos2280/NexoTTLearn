@@ -6,13 +6,18 @@ import type { Asignacion } from "@nexott-learn/shared-types"
 interface CursoResumenUltimasProps {
   readonly asignaciones: readonly Asignacion[]
   readonly max?: number
+  readonly tieneEntregaACliente: boolean
 }
 
 function fechaAbsoluta(iso: string): string {
   return new Date(iso).toLocaleString("es-ES", { dateStyle: "long", timeStyle: "short" })
 }
 
-export function CursoResumenUltimas({ asignaciones, max = 5 }: CursoResumenUltimasProps) {
+export function CursoResumenUltimas({
+  asignaciones,
+  max = 5,
+  tieneEntregaACliente,
+}: CursoResumenUltimasProps) {
   const ultimas = [...asignaciones]
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, max)
@@ -41,7 +46,7 @@ export function CursoResumenUltimas({ asignaciones, max = 5 }: CursoResumenUltim
                 </span>
               </div>
               <div className="flex shrink-0 items-center gap-3">
-                <BadgeEstadoAsignacion asignacion={a} />
+                <BadgeEstadoAsignacion asignacion={a} tieneEntregaACliente={tieneEntregaACliente} />
                 <time
                   dateTime={a.updatedAt}
                   title={fechaAbsoluta(a.updatedAt)}

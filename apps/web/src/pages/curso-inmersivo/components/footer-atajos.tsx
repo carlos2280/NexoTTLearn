@@ -6,11 +6,15 @@ import { Kbd } from "@/shared/components/ui/kbd"
  */
 export function FooterAtajos() {
   return (
-    <footer className="flex items-center justify-between gap-2 border-border border-t bg-canvas/40 px-5 py-3">
+    <footer className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-border border-t bg-canvas/40 px-5 py-3">
       <div className="flex items-center gap-2">
         <Kbd>[</Kbd>
         <Kbd>]</Kbd>
         <span className="text-caption text-text-tertiary">navegar</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Kbd>\</Kbd>
+        <span className="text-caption text-text-tertiary">ocultar</span>
       </div>
       <div className="flex items-center gap-2">
         <Kbd>Esc</Kbd>

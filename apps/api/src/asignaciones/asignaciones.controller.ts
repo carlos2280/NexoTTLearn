@@ -17,10 +17,12 @@ import {
   AsignacionDetallada,
   AsignacionHistoricoEntrada,
   AutoInscripcionRequest,
+  ColaboradorDisponible,
   CrearAsignacionesBatchRequest,
   CrearAsignacionesBatchResponse,
   CursoDisponibleVoluntario,
   ListarAsignacionesQuery,
+  ListarColaboradoresDisponiblesQuery,
   PaginacionQuery,
   Paginated,
   PatchResultadoEntrevistaRequest,
@@ -28,6 +30,7 @@ import {
   autoInscripcionRequestSchema,
   crearAsignacionesBatchRequestSchema,
   listarAsignacionesQuerySchema,
+  listarColaboradoresDisponiblesQuerySchema,
   paginacionQuerySchema,
   patchResultadoEntrevistaRequestSchema,
   reabrirRetirarBodySchema,
@@ -108,6 +111,22 @@ export class AsignacionesController {
     @CurrentUser() usuario: SesionUsuario | undefined,
   ): Promise<AsignacionDetallada> {
     return await this.asignacionesService.obtenerPorId(asignacionId, this.requireUsuario(usuario))
+  }
+
+  /**
+   * Alimenta el selector visual del dialogo "Asignar colaboradores" en admin.
+   * Lista colaboradores ACTIVOS no inscritos aun en este curso, paginados y
+   * con busqueda opcional por nombre/email. Sin audit log (lectura admin
+   * frecuente).
+   */
+  @Get("cursos/:cursoId/colaboradores-disponibles")
+  @Roles(RolUsuario.ADMIN)
+  async listarColaboradoresDisponibles(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+    @Query(new ZodValidationPipe(listarColaboradoresDisponiblesQuerySchema))
+    query: ListarColaboradoresDisponiblesQuery,
+  ): Promise<Paginated<ColaboradorDisponible>> {
+    return await this.asignacionesService.listarColaboradoresDisponibles(cursoId, query)
   }
 
   @Post("cursos/:cursoId/asignaciones")

@@ -6,6 +6,7 @@ import type {
   ActualizarSkillsExigidasCursoInput,
   ActualizarTransversalCursoInput,
   ActualizarUmbralesLogroCursoInput,
+  ReordenarModulosHabilitadosCursoInput,
 } from "@nexott-learn/shared-types"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
@@ -16,6 +17,7 @@ import {
   actualizarSkillsExigidasCurso,
   actualizarTransversalCurso,
   actualizarUmbralesLogroCurso,
+  reordenarModulosHabilitadosCurso,
 } from "../api/cursos.api"
 import { CURSOS_QUERY_KEY } from "./use-listar-cursos"
 
@@ -53,6 +55,15 @@ export function useActualizarModulosHabilitadosCurso() {
   return useMutation({
     mutationFn: ({ cursoId, input, motivo }: ArgsBase<ActualizarModulosHabilitadosCursoInput>) =>
       actualizarModulosHabilitadosCurso(cursoId, input, motivo),
+    onSuccess: () => invalidar(),
+  })
+}
+
+export function useReordenarModulosHabilitadosCurso() {
+  const invalidar = useInvalidarTodo()
+  return useMutation({
+    mutationFn: ({ cursoId, input, motivo }: ArgsBase<ReordenarModulosHabilitadosCursoInput>) =>
+      reordenarModulosHabilitadosCurso(cursoId, input, motivo),
     onSuccess: () => invalidar(),
   })
 }

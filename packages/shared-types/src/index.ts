@@ -119,6 +119,7 @@ export {
   proveedorVideoSchema,
   contenidoRecursoSchema,
   subtipoRecursoSchema,
+  contenidoDiagramaSchema,
   contenidoBloquePorTipo,
   schemaContenidoBloquePorTipo,
   validarContenidoBloque,
@@ -132,6 +133,7 @@ export type {
   ProveedorVideo,
   ContenidoRecurso,
   SubtipoRecurso,
+  ContenidoDiagrama,
 } from "./catalogo/bloques/contenido"
 export { listarClientesQuerySchema } from "./catalogo/clientes/listar-clientes.schema"
 export type { ListarClientesQuery } from "./catalogo/clientes/listar-clientes.schema"
@@ -198,6 +200,8 @@ export type {
   ActualizarModulosHabilitadosCursoInput,
   SkillSinCobertura,
 } from "./cursos/actualizar-modulos-habilitados-curso.schema"
+export { reordenarModulosHabilitadosCursoSchema } from "./cursos/reordenar-modulos-habilitados-curso.schema"
+export type { ReordenarModulosHabilitadosCursoInput } from "./cursos/reordenar-modulos-habilitados-curso.schema"
 export { actualizarPesosCursoSchema } from "./cursos/actualizar-pesos-curso.schema"
 export type { ActualizarPesosCursoInput } from "./cursos/actualizar-pesos-curso.schema"
 export { actualizarUmbralesLogroCursoSchema } from "./cursos/actualizar-umbrales-logro-curso.schema"
@@ -282,6 +286,7 @@ export {
   cerrarCasoVoluntarioSchema,
   reabrirRetirarBodySchema,
   patchResultadoEntrevistaRequestSchema,
+  listarColaboradoresDisponiblesQuerySchema,
 } from "./asignaciones"
 
 // Plan personal — Slice 7 P7a (D-S7-B3, D-S7-D2).
@@ -349,6 +354,8 @@ export type {
   ReabrirRetirarBody,
   CondicionesListoFaltante,
   PatchResultadoEntrevistaRequest,
+  ListarColaboradoresDisponiblesQuery,
+  ColaboradorDisponible,
 } from "./asignaciones"
 
 // Intentos de bloque — Slice 7 P7b (D-S7-C1..C6) + codigo (CODIGO_PREGUNTAS).

@@ -13,7 +13,11 @@ import type { AccionAsignacion } from "../asignaciones.types"
 
 type Disparador = (accion: AccionAsignacion, asignacion: Asignacion) => void
 
-function accionesAsignado(asignacion: Asignacion, disparar: Disparador): AccionMenu[] {
+function accionesAsignado(
+  asignacion: Asignacion,
+  disparar: Disparador,
+  tieneEntregaACliente: boolean,
+): AccionMenu[] {
   const estado = asignacion.estadoAsignado
   if (estado === "ASIGNADO") {
     return [
@@ -29,15 +33,25 @@ function accionesAsignado(asignacion: Asignacion, disparar: Disparador): AccionM
   }
   if (estado === "LISTO") {
     return [
-      ac("cerrar-caso", "Cerrar caso…", Briefcase, asignacion, disparar),
+      ac(
+        "cerrar-caso",
+        tieneEntregaACliente ? "Cerrar caso…" : "Cerrar curso…",
+        Briefcase,
+        asignacion,
+        disparar,
+      ),
       ac("retirar", "Retirar", UserMinus, asignacion, disparar, true),
     ]
   }
   if (estado === "APTO" || estado === "NO_APTO") {
-    return [
-      ac("resultado-cliente", "Registrar resultado cliente…", Briefcase, asignacion, disparar),
-      ac("reabrir-caso", "Reabrir caso…", RotateCcw, asignacion, disparar),
-    ]
+    const acciones: AccionMenu[] = []
+    if (tieneEntregaACliente) {
+      acciones.push(
+        ac("resultado-cliente", "Registrar resultado cliente…", Briefcase, asignacion, disparar),
+      )
+    }
+    acciones.push(ac("reabrir-caso", "Reabrir caso…", RotateCcw, asignacion, disparar))
+    return acciones
   }
   return []
 }
@@ -86,10 +100,11 @@ function ac(
 export function obtenerAccionesAsignacion(
   asignacion: Asignacion,
   disparar: Disparador,
+  tieneEntregaACliente: boolean,
 ): readonly (readonly AccionMenu[])[] {
   const acciones =
     asignacion.rol === "ASIGNADO"
-      ? accionesAsignado(asignacion, disparar)
+      ? accionesAsignado(asignacion, disparar, tieneEntregaACliente)
       : accionesVoluntario(asignacion, disparar)
   return acciones.length > 0 ? [acciones] : []
 }

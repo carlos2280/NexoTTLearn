@@ -1,5 +1,6 @@
 import { sanitizarHtml } from "@/shared/lib/sanitize-html"
 import type { PreguntaQuiz } from "@nexott-learn/shared-types"
+import { Check, X } from "lucide-react"
 import { QuizPreguntaOpcionMultiple } from "./quiz-pregunta-opcion-multiple"
 import { QuizPreguntaOpcionUnica } from "./quiz-pregunta-opcion-unica"
 import { QuizPreguntaRespuestaCorta } from "./quiz-pregunta-respuesta-corta"
@@ -11,12 +12,11 @@ interface PreguntaItemProps {
   readonly pregunta: PreguntaQuiz
   readonly respuestas: UseQuizRespuestasResult
   readonly bloqueado: boolean
-  readonly mostrarSolucion: boolean
+  /** Controlado por `solucionVisible` del quiz: revela respuestas correctas + explicación. */
+  readonly verSolucion: boolean
   /**
-   * B-extra.2 punto 4: ids de preguntas falladas tal como vinieron del server
-   * en el ultimo intento. Si `undefined`, no hay intento aun y se trata todo
-   * como "no fallado" (no se muestra cierre pedagogico — coherente con el
-   * modo "antes de enviar").
+   * Ids de preguntas falladas en el último intento (server). `undefined` ⇒ aún
+   * no se envió ningún intento; los componentes se renderizan en modo "edición".
    */
   readonly preguntasFalladas?: ReadonlySet<string>
 }
@@ -26,20 +26,17 @@ export function PreguntaItem({
   pregunta,
   respuestas,
   bloqueado,
-  mostrarSolucion,
+  verSolucion,
   preguntasFalladas,
 }: PreguntaItemProps) {
-  // 04 R7 + decision opcion B: cuando el participante ACERTO la pregunta, no
-  // mostramos la marca verde ni la explicacion — su atencion se foca en lo
-  // que aun no domino (cumplido se desvanece). Solo en las falladas
-  // aparece la solucion + el "Por que esto es correcto".
-  //
-  // La membresia en `preguntasFalladas` la decide el server (B-extra.2): el
-  // cliente ya no recomputa la correccion para no divergir de la logica
-  // canonica del backend.
-  const acertada =
-    mostrarSolucion && preguntasFalladas !== undefined && !preguntasFalladas.has(pregunta.id)
-  const mostrarSolucionEstaPregunta = mostrarSolucion && !acertada
+  // Feedback acierto/fallo SIEMPRE tras intento (independiente de verSolucion).
+  // Saber si acerté es derecho mínimo del participante; revelar la respuesta
+  // correcta depende del modo `solucionVisible` configurado por el admin.
+  const hayIntento = preguntasFalladas !== undefined
+  const acertada: boolean | null = hayIntento ? !preguntasFalladas.has(pregunta.id) : null
+  // Explicación solo cuando se revela la solución Y la falló (en aciertos el
+  // "por qué" sería ruido: ya lo sabes).
+  const verExplicacion = verSolucion && acertada === false
 
   return (
     <li className="flex flex-col gap-3">
@@ -47,15 +44,21 @@ export function PreguntaItem({
         <span className="tabular shrink-0 font-mono font-semibold text-caption text-text-tertiary">
           {String(numero).padStart(2, "0")}
         </span>
-        <p className="text-body text-text-primary">{pregunta.enunciado}</p>
+        <div
+          className="flex-1 text-body text-text-primary [&_code]:rounded [&_code]:bg-subtle [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-body-sm"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: enunciado del admin, sanitizado.
+          dangerouslySetInnerHTML={{ __html: sanitizarHtml(pregunta.enunciado) }}
+        />
+        {acertada !== null ? <BadgeAcierto acertada={acertada} /> : null}
       </div>
       <ContenidoPregunta
         pregunta={pregunta}
         respuestas={respuestas}
         bloqueado={bloqueado}
-        mostrarSolucion={mostrarSolucionEstaPregunta}
+        acertada={acertada}
+        verSolucion={verSolucion}
       />
-      {mostrarSolucionEstaPregunta && pregunta.explicacion ? (
+      {verExplicacion && pregunta.explicacion ? (
         <aside className="flex flex-col gap-1.5 rounded-xl border border-border bg-subtle p-3">
           <span className="nx-eyebrow text-text-tertiary">Por qué esto es correcto</span>
           <div
@@ -69,18 +72,37 @@ export function PreguntaItem({
   )
 }
 
+function BadgeAcierto({ acertada }: { readonly acertada: boolean }) {
+  if (acertada) {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-pill border border-success/30 bg-success-soft px-2 py-0.5 font-mono text-[10px] text-success-on-soft uppercase tracking-wider">
+        <Check className="h-3 w-3" aria-hidden={true} />
+        Acertaste
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-pill border border-warmth/30 bg-warning-soft px-2 py-0.5 font-mono text-[10px] text-warning-on-soft uppercase tracking-wider">
+      <X className="h-3 w-3" aria-hidden={true} />
+      Falló
+    </span>
+  )
+}
+
 interface ContenidoPreguntaProps {
   readonly pregunta: PreguntaQuiz
   readonly respuestas: UseQuizRespuestasResult
   readonly bloqueado: boolean
-  readonly mostrarSolucion: boolean
+  readonly acertada: boolean | null
+  readonly verSolucion: boolean
 }
 
 function ContenidoPregunta({
   pregunta,
   respuestas,
   bloqueado,
-  mostrarSolucion,
+  acertada,
+  verSolucion,
 }: ContenidoPreguntaProps) {
   switch (pregunta.tipo) {
     case "OPCION_UNICA":
@@ -91,7 +113,8 @@ function ContenidoPregunta({
           onCambiar={(opcionId) => respuestas.setOpcionUnica(pregunta.id, opcionId)}
           bloqueado={bloqueado}
           opcionCorrectaId={pregunta.opciones.find((o) => o.esCorrecta)?.id ?? null}
-          mostrarSolucion={mostrarSolucion}
+          acertada={acertada}
+          verSolucion={verSolucion}
         />
       )
     case "OPCION_MULTIPLE":
@@ -102,7 +125,8 @@ function ContenidoPregunta({
           onToggle={(opcionId) => respuestas.toggleOpcionMultiple(pregunta.id, opcionId)}
           bloqueado={bloqueado}
           opcionesCorrectasIds={pregunta.opciones.filter((o) => o.esCorrecta).map((o) => o.id)}
-          mostrarSolucion={mostrarSolucion}
+          acertada={acertada}
+          verSolucion={verSolucion}
         />
       )
     case "VERDADERO_FALSO":
@@ -112,7 +136,8 @@ function ContenidoPregunta({
           valor={respuestas.vf(pregunta.id)}
           onCambiar={(valor) => respuestas.setVerdaderoFalso(pregunta.id, valor)}
           bloqueado={bloqueado}
-          mostrarSolucion={mostrarSolucion}
+          acertada={acertada}
+          verSolucion={verSolucion}
         />
       )
     case "RESPUESTA_CORTA":
@@ -122,7 +147,8 @@ function ContenidoPregunta({
           texto={respuestas.texto(pregunta.id)}
           onCambiar={(texto) => respuestas.setTexto(pregunta.id, texto)}
           bloqueado={bloqueado}
-          mostrarSolucion={mostrarSolucion}
+          acertada={acertada}
+          verSolucion={verSolucion}
         />
       )
     default: {

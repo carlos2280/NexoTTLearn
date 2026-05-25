@@ -34,6 +34,7 @@ import {
   ListarLogCambiosQuery,
   LogCambioCurso,
   Paginated,
+  ReordenarModulosHabilitadosCursoInput,
   actualizarAreasCursoSchema,
   actualizarCursoSchema,
   actualizarEntrevistaIaCursoSchema,
@@ -47,6 +48,7 @@ import {
   duplicarCursoSchema,
   listarCursosQuerySchema,
   listarLogCambiosQuerySchema,
+  reordenarModulosHabilitadosCursoSchema,
 } from "@nexott-learn/shared-types"
 import { AccionAuditoria, RolUsuario } from "@prisma/client"
 import { Request } from "express"
@@ -344,6 +346,23 @@ export class CursosController {
     @CurrentUser() usuario: SesionUsuario | undefined,
   ): Promise<CursoConfiguracionResponse> {
     return await this.cursosService.actualizarModulosHabilitados(
+      cursoId,
+      input,
+      motivo,
+      this.requireUsuario(usuario).usuarioId,
+    )
+  }
+
+  @Patch(":cursoId/modulos-habilitados/orden")
+  @Roles(RolUsuario.ADMIN)
+  async reordenarModulosHabilitados(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+    @Body(new ZodValidationPipe(reordenarModulosHabilitadosCursoSchema))
+    input: ReordenarModulosHabilitadosCursoInput,
+    @Motivo() motivo: string | undefined,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<CursoConfiguracionResponse> {
+    return await this.cursosService.reordenarModulosHabilitados(
       cursoId,
       input,
       motivo,

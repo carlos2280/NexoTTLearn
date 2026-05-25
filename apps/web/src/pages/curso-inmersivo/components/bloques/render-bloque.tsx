@@ -6,13 +6,14 @@ import type {
 import { contenidoQuizSchema } from "@nexott-learn/shared-types"
 import { BloqueCodigoIlustrativo } from "./bloque-codigo-ilustrativo"
 import { BloqueCodigoPreguntas } from "./bloque-codigo-preguntas"
+import { BloqueDiagrama } from "./bloque-diagrama"
 import { BloqueEvaluableCerrado } from "./bloque-evaluable-cerrado"
 import { BloqueEvaluablePreviewLock } from "./bloque-evaluable-preview-lock"
 import { BloqueParrafo } from "./bloque-parrafo"
 import { BloqueRecurso } from "./bloque-recurso"
 import { BloqueTip } from "./bloque-tip"
 import { BloqueVideo } from "./bloque-video"
-import { EvaluableConColapso } from "./evaluable-con-colapso"
+import { EvaluableConIndicador } from "./evaluable-con-indicador"
 import { BloqueQuiz } from "./quiz/bloque-quiz"
 
 const NOTA_APROBADO_CODIGO_DEFAULT = 60
@@ -71,6 +72,8 @@ export function RenderBloque({
       return <BloqueRecurso contenido={bloque.contenido} />
     case "CODIGO_ILUSTRATIVO":
       return <BloqueCodigoIlustrativo contenido={bloque.contenido} />
+    case "DIAGRAMA":
+      return <BloqueDiagrama contenido={bloque.contenido} />
     case "QUIZ": {
       const notaMinima = notaMinimaQuiz(bloque.contenido)
       if (soloLectura) {
@@ -87,11 +90,10 @@ export function RenderBloque({
         return <BloqueEvaluablePreviewLock titulo="Quiz" />
       }
       return (
-        <EvaluableConColapso
+        <EvaluableConIndicador
           bloqueId={bloque.id}
           colaboradorId={colaboradorId}
           notaMinima={notaMinima}
-          tituloColapsado="Quiz"
         >
           <BloqueQuiz
             bloqueId={bloque.id}
@@ -99,7 +101,7 @@ export function RenderBloque({
             colaboradorId={colaboradorId}
             contenido={bloque.contenido}
           />
-        </EvaluableConColapso>
+        </EvaluableConIndicador>
       )
     }
     case "CODIGO_PREGUNTAS": {
@@ -117,11 +119,10 @@ export function RenderBloque({
         return <BloqueEvaluablePreviewLock titulo="Ejercicio de código" />
       }
       return (
-        <EvaluableConColapso
+        <EvaluableConIndicador
           bloqueId={bloque.id}
           colaboradorId={colaboradorId}
           notaMinima={NOTA_APROBADO_CODIGO_DEFAULT}
-          tituloColapsado="Ejercicio de código"
         >
           <BloqueCodigoPreguntas
             bloqueId={bloque.id}
@@ -130,7 +131,7 @@ export function RenderBloque({
             contenido={bloque.contenido}
             contenidoTests={contenidoTests}
           />
-        </EvaluableConColapso>
+        </EvaluableConIndicador>
       )
     }
     case "CODIGO_TESTS":

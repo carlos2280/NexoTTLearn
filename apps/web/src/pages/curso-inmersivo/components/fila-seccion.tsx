@@ -1,7 +1,7 @@
 import { cn } from "@/shared/lib/cn"
 import type { ModoCursoParticipante, SeccionPlanItemParticipante } from "@nexott-learn/shared-types"
+import { BookOpen, Code2 } from "lucide-react"
 import { calcularSeccionCompletada } from "./calcular-seccion-completada"
-import { IconoEstadoSeccion } from "./icono-estado-seccion"
 
 interface FilaSeccionProps {
   readonly titulo: string
@@ -15,9 +15,13 @@ interface FilaSeccionProps {
 }
 
 /**
- * Fila individual del sidebar (una seccion). El calculo de `completada` vive
- * en `calcularSeccionCompletada` para mantener la decision por modo testeada
- * en aislado (BUG-QA-3).
+ * Fila individual del sidebar. Un solo ícono comunica tipo + estado:
+ *  - shape: BookOpen (lectura) | Code2 (sección con bloques evaluables)
+ *  - color: activa → aurora-violet; completada → success desvanecido
+ *    (manifiesto §07); pendiente → tertiary.
+ *
+ * El cálculo de `completada` vive en `calcularSeccionCompletada` para
+ * mantener la decisión por modo testeada en aislado (BUG-QA-3).
  */
 export function FilaSeccion({
   titulo,
@@ -36,24 +40,31 @@ export function FilaSeccion({
     abiertaPorAperturas,
   })
   const esOpcional = plan?.caracter === "OPCIONAL"
+  const esReto = (plan?.avance?.bloquesTotales ?? 0) > 0
+  const IconoTipo = esReto ? Code2 : BookOpen
+  const colorIcono = activa
+    ? "text-aurora-violet"
+    : completada
+      ? "text-success-on-soft opacity-60"
+      : "text-text-tertiary"
   return (
     <li>
       <button
         type="button"
         onClick={() => onSeleccionar(seccionId)}
         aria-current={activa ? "true" : undefined}
+        aria-label={ariaLabelSeccion(titulo, esReto, completada, esOpcional)}
         className={cn(
-          "group flex w-full items-start gap-3 rounded-lg px-2.5 py-2 text-left transition-colors duration-fast ease-default",
+          "group flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-fast ease-default",
           activa
             ? "bg-accent-soft text-accent-on-soft"
             : "text-text-secondary hover:bg-surface hover:text-text-primary",
         )}
       >
-        <IconoEstadoSeccion
-          completada={completada}
-          esOpcional={esOpcional}
-          activa={activa}
-          modo={modo}
+        <IconoTipo
+          aria-hidden={true}
+          strokeWidth={1.75}
+          className={cn("mt-0.5 h-4 w-4 shrink-0", colorIcono)}
         />
         <span className="min-w-0 flex-1">
           <span
@@ -75,4 +86,16 @@ export function FilaSeccion({
       </button>
     </li>
   )
+}
+
+function ariaLabelSeccion(
+  titulo: string,
+  esReto: boolean,
+  completada: boolean,
+  esOpcional: boolean,
+): string {
+  const tipo = esReto ? "Sección con reto" : "Sección de lectura"
+  const estado = completada ? "completada" : "pendiente"
+  const opcional = esOpcional ? ", opcional" : ""
+  return `${tipo}${opcional}, ${estado}: ${titulo}`
 }

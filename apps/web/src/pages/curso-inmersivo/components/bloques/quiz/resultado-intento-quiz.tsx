@@ -5,6 +5,7 @@ import { CheckCircle2, RotateCcw } from "lucide-react"
 interface ResultadoIntentoQuizProps {
   readonly intento: IntentoBloqueResponse
   readonly notaMinima: number
+  readonly totalPreguntas: number
   /**
    * Mejor intento *previo* al actual. Sirve para distinguir entre "primera vez
    * que apruebas" (banner caluroso) y "ya estabas aprobado y reintentaste"
@@ -16,11 +17,13 @@ interface ResultadoIntentoQuizProps {
 export function ResultadoIntentoQuiz({
   intento,
   notaMinima,
+  totalPreguntas,
   mejorPrevio,
 }: ResultadoIntentoQuizProps) {
   const aprobado = intento.nota >= notaMinima
   const yaEstabaAprobado = (mejorPrevio?.nota ?? -1) >= notaMinima
   const primeraVez = aprobado && !yaEstabaAprobado
+  const acertadas = totalPreguntas - intento.preguntasFalladas.length
 
   const Icono = aprobado ? CheckCircle2 : RotateCcw
   const mensaje = construirMensaje({ aprobado, primeraVez })
@@ -37,9 +40,26 @@ export function ResultadoIntentoQuiz({
         className={cn("mt-0.5 h-5 w-5 shrink-0", aprobado ? "text-success" : "text-warmth")}
         aria-hidden={true}
       />
-      <p className={cn("text-body-sm", aprobado ? "text-success-on-soft" : "text-warning-on-soft")}>
-        {mensaje}
-      </p>
+      <div className="flex flex-1 flex-col gap-1">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span
+            className={cn(
+              "tabular font-mono font-semibold text-body",
+              aprobado ? "text-success-on-soft" : "text-warning-on-soft",
+            )}
+          >
+            {Math.round(intento.nota)}%
+          </span>
+          <span className="text-caption text-text-tertiary">
+            Acertaste {acertadas} de {totalPreguntas} · umbral {notaMinima}%
+          </span>
+        </div>
+        <p
+          className={cn("text-body-sm", aprobado ? "text-success-on-soft" : "text-warning-on-soft")}
+        >
+          {mensaje}
+        </p>
+      </div>
     </aside>
   )
 }

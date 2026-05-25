@@ -16,7 +16,13 @@ export function CursoDetallePanel({ tab, curso }: CursoDetallePanelProps) {
     return <CursoDetalleResumen curso={curso} />
   }
   if (tab === "asignados") {
-    return <AsignacionesVista cursoId={curso.id} nombreCurso={curso.titulo} />
+    return (
+      <AsignacionesVista
+        cursoId={curso.id}
+        nombreCurso={curso.titulo}
+        tieneEntregaACliente={curso.tieneEntregaACliente}
+      />
+    )
   }
   if (tab === "evaluaciones") {
     return <PanelEvaluaciones cursoId={curso.id} />

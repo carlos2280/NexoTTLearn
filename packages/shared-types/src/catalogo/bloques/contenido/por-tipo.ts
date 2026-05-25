@@ -6,6 +6,7 @@ import {
 } from "../../../intentos-bloque"
 import type { TipoBloque } from "../listar-bloques.schema"
 import { contenidoCodigoIlustrativoSchema } from "./codigo-ilustrativo.schema"
+import { contenidoDiagramaSchema } from "./diagrama.schema"
 import { contenidoParrafoSchema } from "./parrafo.schema"
 import { contenidoRecursoSchema } from "./recurso.schema"
 import { contenidoTipSchema } from "./tip.schema"
@@ -40,6 +41,8 @@ export const contenidoBloquePorTipo = {
   CODIGO_PREGUNTAS: contenidoCodigoPreguntasSchema,
   // biome-ignore lint/style/useNamingConvention: clave es valor de enum Prisma `TipoBloque`.
   CODIGO_TESTS: contenidoCodigoTestsSchema,
+  // biome-ignore lint/style/useNamingConvention: clave es valor de enum Prisma `TipoBloque`.
+  DIAGRAMA: contenidoDiagramaSchema,
 } as const satisfies Record<TipoBloque, z.ZodTypeAny>
 
 /**

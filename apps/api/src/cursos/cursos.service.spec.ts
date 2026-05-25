@@ -63,6 +63,8 @@ interface MockPrisma {
   cursoModuloHabilitado: {
     createMany: ReturnType<typeof vi.fn>
     deleteMany: ReturnType<typeof vi.fn>
+    aggregate: ReturnType<typeof vi.fn>
+    update: ReturnType<typeof vi.fn>
   }
   modulo: { findMany: ReturnType<typeof vi.fn> }
   seccionSkill: { findMany: ReturnType<typeof vi.fn> }
@@ -122,7 +124,12 @@ function buildPrismaMock(): MockPrisma {
     cursoFotografiaCierre: { create: vi.fn(), updateMany: vi.fn() },
     cursoAreaExigida: { createMany: vi.fn(), deleteMany: vi.fn(), update: vi.fn() },
     cursoSkillExigida: { createMany: vi.fn(), deleteMany: vi.fn(), update: vi.fn() },
-    cursoModuloHabilitado: { createMany: vi.fn(), deleteMany: vi.fn() },
+    cursoModuloHabilitado: {
+      createMany: vi.fn(),
+      deleteMany: vi.fn(),
+      aggregate: vi.fn().mockResolvedValue({ _max: { orden: null } }),
+      update: vi.fn(),
+    },
     modulo: { findMany: vi.fn() },
     seccionSkill: { findMany: vi.fn() },
     skill: { findMany: vi.fn() },
@@ -186,6 +193,7 @@ function buildCursoDetalleRow(overrides: Partial<{ estado: EstadoCurso; titulo: 
     fechaCierre: null,
     toggleVoluntarios: true,
     toggleCierreAutomatico: false,
+    tieneEntregaACliente: true,
     umbralNoCumple: decimal(10),
     pesoBloques: decimal(70),
     pesoTransversal: decimal(20),
@@ -683,6 +691,7 @@ describe("CursosService.duplicar", () => {
       fechaDeadline: new Date("2026-06-30"),
       toggleVoluntarios: true,
       toggleCierreAutomatico: false,
+      tieneEntregaACliente: true,
       umbralNoCumple: decimal(10),
       pesoBloques: decimal(70),
       pesoTransversal: decimal(20),
@@ -719,7 +728,7 @@ describe("CursosService.duplicar", () => {
     )
     expect(res.modulosExcluidos).toEqual([{ moduloId: modArchivoId, titulo: "M archivado" }])
     expect(prisma.cursoModuloHabilitado.createMany).toHaveBeenCalledWith({
-      data: [{ cursoId: newCursoId, moduloId: modActivoId }],
+      data: [{ cursoId: newCursoId, moduloId: modActivoId, orden: 0 }],
     })
   })
 
@@ -793,7 +802,7 @@ function buildCursoConfigRow(
     estado: EstadoCurso
     areasExigidas: ReadonlyArray<{ areaId: string; peso: number; puntajeObjetivo: number }>
     skillsExigidas: ReadonlyArray<{ skillId: string; notaMinima: number }>
-    modulosHabilitados: ReadonlyArray<{ moduloId: string }>
+    modulosHabilitados: ReadonlyArray<{ moduloId: string; orden?: number }>
     transversalId: string | null
     entrevistaIaId: string | null
     umbralesLogro: Prisma.JsonValue | null
@@ -814,7 +823,10 @@ function buildCursoConfigRow(
       skillId: s.skillId,
       notaMinima: decimal(s.notaMinima),
     })),
-    modulosHabilitados: (overrides.modulosHabilitados ?? []).map((m) => ({ moduloId: m.moduloId })),
+    modulosHabilitados: (overrides.modulosHabilitados ?? []).map((m, i) => ({
+      moduloId: m.moduloId,
+      orden: m.orden ?? i,
+    })),
   }
 }
 
@@ -1072,6 +1084,95 @@ describe("CursosService.actualizarModulosHabilitados", () => {
     ).rejects.toMatchObject({
       response: { code: apiErrorCodes.conflictModuloArchivadoNoHabilitable },
     })
+  })
+})
+
+describe("CursosService.reordenarModulosHabilitados", () => {
+  it("BORRADOR: reordena, actualiza orden por modulo y registra LogCambioCurso", async () => {
+    prisma.curso.findUnique.mockResolvedValue(
+      buildCursoConfigRow({
+        estado: EstadoCurso.BORRADOR,
+        modulosHabilitados: [
+          { moduloId: MOD_A, orden: 0 },
+          { moduloId: MOD_B, orden: 1 },
+        ],
+      }),
+    )
+
+    await service.reordenarModulosHabilitados(
+      CURSO_ID,
+      { moduloIds: [MOD_B, MOD_A] },
+      undefined,
+      ADMIN_ID,
+    )
+
+    // Cada modulo recibe su nuevo orden via update.
+    expect(prisma.cursoModuloHabilitado.update).toHaveBeenCalledTimes(2)
+    expect(prisma.cursoModuloHabilitado.update).toHaveBeenNthCalledWith(1, {
+      // biome-ignore lint/style/useNamingConvention: clave compuesta generada por Prisma.
+      where: { cursoId_moduloId: { cursoId: CURSO_ID, moduloId: MOD_B } },
+      data: { orden: 0 },
+    })
+    expect(prisma.cursoModuloHabilitado.update).toHaveBeenNthCalledWith(2, {
+      // biome-ignore lint/style/useNamingConvention: clave compuesta generada por Prisma.
+      where: { cursoId_moduloId: { cursoId: CURSO_ID, moduloId: MOD_A } },
+      data: { orden: 1 },
+    })
+    expect(prisma.logCambioCurso.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          accion: AccionLogCurso.CAMBIO_MODULOS,
+          previewImpacto: expect.objectContaining({
+            tipo: "REORDEN",
+            ordenPrevio: [MOD_A, MOD_B],
+            ordenNuevo: [MOD_B, MOD_A],
+          }),
+        }),
+      }),
+    )
+  })
+
+  it("Sin cambios: no actualiza ni loggea cuando el orden ya es el actual", async () => {
+    prisma.curso.findUnique.mockResolvedValue(
+      buildCursoConfigRow({
+        estado: EstadoCurso.BORRADOR,
+        modulosHabilitados: [
+          { moduloId: MOD_A, orden: 0 },
+          { moduloId: MOD_B, orden: 1 },
+        ],
+      }),
+    )
+
+    await service.reordenarModulosHabilitados(
+      CURSO_ID,
+      { moduloIds: [MOD_A, MOD_B] },
+      undefined,
+      ADMIN_ID,
+    )
+
+    expect(prisma.cursoModuloHabilitado.update).not.toHaveBeenCalled()
+    expect(prisma.logCambioCurso.create).not.toHaveBeenCalled()
+  })
+
+  it("Rechaza 422 si el set de moduloIds no coincide con los habilitados", async () => {
+    prisma.curso.findUnique.mockResolvedValue(
+      buildCursoConfigRow({
+        estado: EstadoCurso.BORRADOR,
+        modulosHabilitados: [{ moduloId: MOD_A, orden: 0 }],
+      }),
+    )
+
+    await expect(
+      service.reordenarModulosHabilitados(
+        CURSO_ID,
+        { moduloIds: [MOD_A, MOD_B] },
+        undefined,
+        ADMIN_ID,
+      ),
+    ).rejects.toMatchObject({
+      response: { code: apiErrorCodes.validacionModulosReordenSetDistinto },
+    })
+    expect(prisma.cursoModuloHabilitado.update).not.toHaveBeenCalled()
   })
 })
 
@@ -1928,6 +2029,7 @@ describe("CursosService.cerrarCurso — FIX-P11a-tests §5.125", () => {
         createdAt: FECHA.toISOString(),
         updatedAt: FECHA.toISOString(),
         toggleCierreAutomatico: false,
+        tieneEntregaACliente: true,
         umbralNoCumple: 10,
         pesoBloques: 70,
         pesoTransversal: 20,
@@ -2143,6 +2245,7 @@ describe("CursosService.deshacerCierre — FIX-P11a-tests §5.125", () => {
         createdAt: FECHA.toISOString(),
         updatedAt: FECHA.toISOString(),
         toggleCierreAutomatico: false,
+        tieneEntregaACliente: true,
         umbralNoCumple: 10,
         pesoBloques: 70,
         pesoTransversal: 20,

@@ -6,22 +6,24 @@ interface QuizPreguntaRespuestaCortaProps {
   readonly texto: string
   readonly onCambiar: (texto: string) => void
   readonly bloqueado: boolean
-  readonly mostrarSolucion: boolean
+  readonly acertada: boolean | null
+  readonly verSolucion: boolean
 }
 
 /**
- * Pregunta de respuesta corta (input). El motor normaliza ambas partes
- * (trim, mayúsculas, acentos, espacios dobles) según `pregunta.normalizacion`
- * antes de comparar contra `respuestasAceptadas`. Al ver la solución se
- * muestra la primera respuesta aceptada como referencia.
+ * Pregunta de respuesta corta. Tras el intento, el input lleva borde verde si
+ * acertó o ámbar si falló (feedback siempre). La respuesta aceptada solo se
+ * revela cuando `verSolucion` lo permite.
  */
 export function QuizPreguntaRespuestaCorta({
   pregunta,
   texto,
   onCambiar,
   bloqueado,
-  mostrarSolucion,
+  acertada,
+  verSolucion,
 }: QuizPreguntaRespuestaCortaProps) {
+  const hayIntento = acertada !== null
   return (
     <div className="flex flex-col gap-2">
       <input
@@ -32,12 +34,14 @@ export function QuizPreguntaRespuestaCorta({
         maxLength={500}
         className={cn(
           "rounded-xl border bg-surface px-3 py-2 text-body text-text-primary outline-none transition-colors duration-fast ease-default",
-          "border-border focus:border-accent focus:shadow-ring-accent-soft",
+          !hayIntento && "border-border focus:border-accent focus:shadow-ring-accent-soft",
+          acertada === true && "border-success/40 bg-success-soft",
+          acertada === false && "border-warmth/30 bg-warning-soft",
           bloqueado && "cursor-not-allowed opacity-70",
         )}
         placeholder="Escribe tu respuesta"
       />
-      {mostrarSolucion ? (
+      {verSolucion ? (
         <p className="text-caption text-text-tertiary">
           Respuesta aceptada:{" "}
           <span className="font-mono text-text-primary">{pregunta.respuestasAceptadas[0]}</span>

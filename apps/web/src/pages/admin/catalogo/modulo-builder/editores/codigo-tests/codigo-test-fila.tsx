@@ -1,9 +1,12 @@
 import { Button } from "@/shared/components/ui/button"
 import { Field } from "@/shared/components/ui/field"
-import { Input } from "@/shared/components/ui/input"
+import { Switch } from "@/shared/components/ui/switch"
 import { cn } from "@/shared/lib/cn"
+import { extraerTextoPlano } from "@/shared/lib/sanitize-html"
 import { ChevronDown, ChevronRight, Eye, EyeOff, Trash2 } from "lucide-react"
 import { CodeEditor } from "../shared/code-editor"
+import { TiptapEditor } from "../shared/tiptap-editor"
+import { extensionesMinimas } from "../shared/tiptap-extensiones"
 
 export interface TestUnit {
   readonly id: string
@@ -30,6 +33,7 @@ export function CodigoTestFila({
   onCambiar,
   onEliminar,
 }: CodigoTestFilaProps) {
+  const resumen = extraerTextoPlano(test.descripcion)
   return (
     <li className="rounded-lg border border-border bg-surface shadow-xs">
       <button
@@ -46,7 +50,11 @@ export function CodigoTestFila({
         </span>
         <span className="tabular shrink-0 text-caption text-text-tertiary">{numero}.</span>
         <span className="flex-1 truncate font-medium text-body-sm text-text-primary">
-          {test.descripcion || <span className="text-text-tertiary">Sin descripción</span>}
+          {resumen.length > 0 ? (
+            resumen
+          ) : (
+            <span className="text-text-tertiary">Sin descripción</span>
+          )}
         </span>
         <span
           className={cn(
@@ -65,13 +73,18 @@ export function CodigoTestFila({
 
       {expandido ? (
         <div className="flex flex-col gap-4 border-border border-t px-4 py-4">
-          <Field label="Descripción" hint="Resumen corto del caso de prueba.">
-            {(attrs) => (
-              <Input
-                {...attrs}
-                value={test.descripcion}
-                onChange={(e) => onCambiar({ ...test, descripcion: e.target.value })}
-                placeholder="Ej. Lista vacía retorna 0"
+          <Field
+            label="Descripción"
+            hint="Resumen del caso. Acepta negrita, cursiva, listas, código inline y enlaces."
+          >
+            {(_attrs) => (
+              <TiptapEditor
+                key={test.id}
+                htmlInicial={test.descripcion}
+                extensiones={extensionesMinimas("Ej. Lista vacía retorna 0")}
+                variante="minima"
+                altoMin="80px"
+                onCambio={(html) => onCambiar({ ...test, descripcion: html })}
               />
             )}
           </Field>
@@ -104,15 +117,12 @@ export function CodigoTestFila({
           </div>
 
           <div className="flex items-center justify-between gap-3">
-            <label className="inline-flex items-center gap-2 text-body-sm text-text-secondary">
-              <input
-                type="checkbox"
-                checked={test.visible}
-                onChange={(e) => onCambiar({ ...test, visible: e.target.checked })}
-                className="h-4 w-4 rounded border-border-strong text-accent focus:ring-accent"
-              />
-              Visible para el participante
-            </label>
+            <Switch
+              checked={test.visible}
+              onCambio={(v) => onCambiar({ ...test, visible: v })}
+              label="Visible para el participante"
+              descripcion="Si está apagado, el caso es oculto: el participante sabe que falló pero no la entrada/salida."
+            />
             <Button
               variant="ghost"
               size="sm"

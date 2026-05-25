@@ -1,26 +1,30 @@
-# Seeds — Curso destacado "Frontend para devs backend"
+# Seeds — Curso vivo "Frontend desde Cero: Mentalidad, Codigo y Confianza"
 
 Modulos del seed. La orquestacion real vive en `apps/api/prisma/seed.ts`
 (no aqui). Ejecutar con `pnpm db:seed` o `make db-seed`.
 
+Estado actual (post-simplificacion): la plataforma siembra UN solo curso
+vivo, con 3 admins y 1 participante de prueba inscrito. Pensado para QA
+manual y demos.
+
 ## Archivos
 
-- `_config.ts` — constantes inmutables (prefijos UUID, passwords, dias, ids
-  fijos del transversal y de la entrevista IA).
-- `_utils.ts` — helpers comunes: pad, id-builders, `log`, `validarOExplotar`
-  y los `buildX` que crean cada tipo de bloque pedagogico validado con Zod.
-- `catalogo.ts` — datos canonicos de actores + helpers de estado, mas las
-  funciones `seedAdmins`, `seedParticipantes`, `seedAreas`, `seedCliente` y
-  `seedSkillsFrontend`. Incluye tambien los IDs preasignados de bloques
-  CODIGO_PREGUNTAS / CODIGO_TESTS para resolver sus dependencias internas.
-- `modulos/index.ts` — array `MODULOS_FRONTEND` con los 10 modulos reales
-  (Git, IA, HTML, CSS, JS, TS, Disciplina, React, Tanstack Query, Testing).
-  Contenido pedagogico inline.
-- `curso.ts` — `seedModulos` (inserta modulos + secciones + bloques) y
-  `seedCurso` (curso destacado, areas y skills exigidas, transversal,
-  entrevista IA, rubricas).
-- `progreso.ts` — `seedAsignacionesFrontend`, `seedHistoriaParticipante` y
-  `seedNotasSkill`.
+- `_config.ts` — constantes inmutables (prefijos UUID, passwords, dias).
+- `_utils.ts` — helpers comunes: pad, id-builders, `log`,
+  `validarOExplotar` y los `buildX` que crean cada tipo de bloque
+  pedagogico validado con Zod.
+- `catalogo.ts` — datos canonicos de actores + `seedAdmins`,
+  `seedParticipantes`, `seedAreas`, `seedCliente`. Sin tipos de
+  transversal/entrevista (no aplican al curso actual).
+- `modulos/soporte-react.ts` — array `MODULOS_SOPORTE_REACT` con los 9
+  modulos pedagogicos del curso (Bienvenida, Git, Web, JavaScript,
+  TypeScript, React, Datos del servidor, IA, Calidad).
+- `modulos/types.ts` — tipos compartidos `BloqueRealDef`, `SeccionDef`,
+  `ModuloDef`, `ModuloPersistido`.
+- `curso-soporte-react.ts` — `seedSkillsSoporteReact`,
+  `seedModulosSoporteReact`, `seedCursoSoporteReact` (curso + areas /
+  skills exigidas + proyecto transversal "Mini Centro de Tickets") y
+  `seedInscripcionSoporte` (asignacion del participante de prueba).
 
 ## Orden de orquestacion (de `seed.ts`)
 
@@ -28,34 +32,36 @@ Modulos del seed. La orquestacion real vive en `apps/api/prisma/seed.ts`
 2. `seedParticipantes`
 3. `seedAreas` → devuelve `Map<nombreArea, areaId>`
 4. `seedCliente` → devuelve `clienteId`
-5. `seedSkillsFrontend(areaIdByNombre)` → devuelve `Map<etiquetaSkill, skillId>`
-6. `seedModulos(skillIdByEtiqueta)` → devuelve `ModuloPersistido[]`
-7. `seedCurso(clienteId, modulos, skillIdByEtiqueta)` → devuelve `cursoId`
-8. `seedAsignacionesFrontend(cursoId, modulos)` (esto invoca
-   `seedHistoriaParticipante` por participante)
-9. `seedNotasSkill(cursoId, skillIdByEtiqueta)`
+5. `seedSkillsSoporteReact(areaIdByNombre)` → devuelve
+   `Map<etiquetaSkill, skillId>`
+6. `seedModulosSoporteReact(skillIdByEtiqueta)` → devuelve
+   `ModuloPersistido[]`
+7. `seedCursoSoporteReact(clienteId, modulos, skillIdByEtiqueta)` →
+   devuelve `cursoId`
+8. `seedInscripcionSoporte(cursoId)` — inscribe al participante de prueba
 
-## Anadir contenido pedagogico real a un modulo
+## Anadir o editar contenido pedagogico
 
-Edita el `MODULOS_FRONTEND` en `modulos/index.ts`. Cada seccion puede
-declarar su array `bloques` con `BloqueRealDef[]`; si lo omites, el seed
-genera 1 PARRAFO + 1 QUIZ placeholder a partir de `temas`. Los builders
-(`buildParrafo`, `buildTip`, `buildQuiz`, `buildCodigoPreguntas`,
-`buildCodigoTests`, `buildCodigoIlustrativo`, `buildRecurso`) validan el
-contenido con Zod del `shared-types` antes de insertarlo.
+Edita `MODULOS_SOPORTE_REACT` en `modulos/soporte-react.ts`. Cada seccion
+puede declarar su array `bloques` con `BloqueRealDef[]`; si lo omites, el
+seed genera 1 PARRAFO + 1 QUIZ placeholder a partir de `temas`. Los
+builders (`buildParrafo`, `buildTip`, `buildQuiz`,
+`buildCodigoPreguntas`, `buildCodigoTests`, `buildCodigoIlustrativo`,
+`buildRecurso`) validan el contenido con Zod del `shared-types` antes de
+insertarlo.
 
 Para bloques `CODIGO_PREGUNTAS` con su `CODIGO_TESTS` asociado, usa los
-IDs preasignados de `catalogo.ts` (`ID_M{N}_S2_PREG`, `ID_M{N}_S2_TEST`)
-para que el test apunte al `codigoPreguntasId` correcto.
+IDs preasignados declarados al inicio de `modulos/soporte-react.ts`
+(`ID_SOP_M{N}_S{S}_PREG`, `ID_SOP_M{N}_S{S}_TEST`) para que el test
+apunte al `codigoPreguntasId` correcto.
 
-Si un modulo crece demasiado y dificulta la edicion del archivo unico,
-muevelo a `modulos/m{N}-{slug}.ts` exportando `MODULO_{N}_{SLUG}` y
-reexportalo desde `modulos/index.ts`.
+## Credenciales
 
-## Fix critico aplicado
+| Rol | Email | Password | Cambio pwd al primer login |
+|---|---|---|---|
+| Admin | `royarzun@emeal.nttdata.com` | `Cambiar2026!` | Si |
+| Admin | `carlos.fuentes.fuentes@emeal.nttdata.com` | `Cambiar2026!` | Si |
+| Admin | `qa-admin@nexott.local` | `Cambiar2026!` | No (atajo QA) |
+| Participante | `participante@nexott.local` | `Qa1234!` | No |
 
-`progreso.ts → seedAsignacionesFrontend`: ahora aprueba TODOS los bloques
-evaluables de cada seccion (no solo el primero). El avance del
-participante requiere mejor-intento aprobado en cada bloque evaluable; si
-quedara alguno fuera, la seccion no se contaria como completada aunque
-el quiz principal estuviera aprobado.
+Overrides via entorno: `QA_ADMIN_PASSWORD`, `QA_USER_PASSWORD`.

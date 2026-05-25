@@ -6,6 +6,7 @@ interface UseAtajosCursoInput {
   readonly seccionActivaId: string | null
   readonly onSeleccionar: (seccionId: string) => void
   readonly onSalir: () => void
+  readonly onToggleSidebar: () => void
 }
 
 const TAGS_INPUT = new Set(["INPUT", "TEXTAREA", "SELECT"])
@@ -14,13 +15,14 @@ const TAGS_INPUT = new Set(["INPUT", "TEXTAREA", "SELECT"])
  * Atajos de teclado del modo inmersivo:
  *  - `[` → sección anterior del plan (recorre módulos en orden).
  *  - `]` → sección siguiente del plan.
+ *  - `\` → mostrar/ocultar el sidebar.
  *  - `Esc` → volver a la bandeja.
  *
  * Ignoramos eventos cuando el foco está en un input/textarea/select o cuando
  * un quiz/editor de código está usando el teclado para escribir.
  */
 export function useAtajosCurso(input: UseAtajosCursoInput): void {
-  const { arbol, seccionActivaId, onSeleccionar, onSalir } = input
+  const { arbol, seccionActivaId, onSeleccionar, onSalir, onToggleSidebar } = input
 
   const seccionesEnOrden = useMemo(() => {
     return arbol.flatMap((m) => m.secciones.map((s) => s.seccionId))
@@ -40,18 +42,23 @@ export function useAtajosCurso(input: UseAtajosCursoInput): void {
         onSalir()
         return
       }
+      if (accion === "toggleSidebar") {
+        onToggleSidebar()
+        return
+      }
       const delta = accion === "anterior" ? -1 : 1
       navegar(delta, seccionesEnOrden, seccionActivaId, onSeleccionar)
     }
     window.addEventListener("keydown", handleKey)
     return () => window.removeEventListener("keydown", handleKey)
-  }, [seccionesEnOrden, seccionActivaId, onSeleccionar, onSalir])
+  }, [seccionesEnOrden, seccionActivaId, onSeleccionar, onSalir, onToggleSidebar])
 }
 
-type Accion = "anterior" | "siguiente" | "salir"
+type Accion = "anterior" | "siguiente" | "salir" | "toggleSidebar"
 const MAPA_ACCIONES: ReadonlyMap<string, Accion> = new Map([
   ["[", "anterior"],
   ["]", "siguiente"],
+  ["\\", "toggleSidebar"],
   ["Escape", "salir"],
 ])
 

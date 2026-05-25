@@ -78,6 +78,7 @@ const CONTENIDO_VALIDO_POR_TIPO = new Map<TipoBloque, Record<string, unknown>>([
       tests: [{ id: "t1", descripcion: "ok", entrada: "1", salidaEsperada: "1", visible: true }],
     },
   ],
+  ["DIAGRAMA", { elements: [], altText: "Diagrama vacio listo para editar" }],
 ])
 
 describe("contenidoBloquePorTipo — cobertura completa de tipos", () => {
@@ -91,6 +92,7 @@ describe("contenidoBloquePorTipo — cobertura completa de tipos", () => {
       "QUIZ",
       "CODIGO_PREGUNTAS",
       "CODIGO_TESTS",
+      "DIAGRAMA",
     ]
     for (const t of tipos) {
       expect(contenidoBloquePorTipo[t]).toBeDefined()
@@ -111,6 +113,7 @@ describe("validarContenidoBloque — happy path por tipo", () => {
     ["QUIZ"],
     ["CODIGO_PREGUNTAS"],
     ["CODIGO_TESTS"],
+    ["DIAGRAMA"],
   ])("acepta el contenido valido minimo para %s", (tipo) => {
     const valido = CONTENIDO_VALIDO_POR_TIPO.get(tipo)
     expect(valido).toBeDefined()

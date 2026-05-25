@@ -35,7 +35,10 @@ export function CursoDetalleResumen({ curso }: CursoDetalleResumenProps) {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <CursoResumenDistribucion kpis={kpis} />
-        <CursoResumenUltimas asignaciones={asignaciones} />
+        <CursoResumenUltimas
+          asignaciones={asignaciones}
+          tieneEntregaACliente={curso.tieneEntregaACliente}
+        />
       </div>
     </div>
   )

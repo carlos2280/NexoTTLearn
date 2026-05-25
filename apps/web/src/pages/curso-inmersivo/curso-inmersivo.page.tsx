@@ -2,6 +2,7 @@ import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
 import { RUTAS } from "@/shared/constants/rutas"
 import { useCallback, useState } from "react"
 import { Navigate, useNavigate, useParams } from "react-router-dom"
+import { BotonReabrirFlotante } from "./components/boton-toggle-sidebar"
 import { CanvasHito } from "./components/canvas-hito"
 import { CanvasSeccion } from "./components/canvas-seccion"
 import { CursoInmersivoSkeleton } from "./components/curso-inmersivo-skeleton"
@@ -14,6 +15,7 @@ import { useAtajosCurso } from "./hooks/use-atajos-curso"
 import { useCursoInmersivo } from "./hooks/use-curso-inmersivo"
 import { useEfectoApertura } from "./hooks/use-efecto-apertura"
 import { useSeccionActiva } from "./hooks/use-seccion-activa"
+import { useSidebarColapsado } from "./hooks/use-sidebar-colapsado"
 
 type HitoTipo = "transversal" | "entrevistaIa"
 
@@ -44,6 +46,7 @@ export function CursoInmersivoPage() {
   })
   const [hitoActivo, setHitoActivo] = useState<HitoTipo | null>(null)
   const [chatEntrevistaIaActivo, setChatEntrevistaIaActivo] = useState(false)
+  const { colapsado: sidebarColapsado, toggle: toggleSidebar } = useSidebarColapsado()
 
   const seleccionarSeccion = useCallback(
     (seccionId: string) => {
@@ -67,6 +70,7 @@ export function CursoInmersivoPage() {
     seccionActivaId: seccion.seccionActiva?.seccionId ?? null,
     onSeleccionar: seleccionarSeccion,
     onSalir: () => navigate(RUTAS.bandeja),
+    onToggleSidebar: toggleSidebar,
   })
 
   if (!cursoId) {
@@ -112,6 +116,8 @@ export function CursoInmersivoPage() {
       asignacionId={detalle.asignacionId}
       modoFocus={chatEntrevistaIaActivo}
       onChatEntrevistaIaActivo={setChatEntrevistaIaActivo}
+      sidebarColapsado={sidebarColapsado}
+      onToggleSidebar={toggleSidebar}
     />
   )
 }
@@ -133,6 +139,8 @@ interface CursoInmersivoLayoutProps {
   readonly asignacionId: string | null
   readonly modoFocus: boolean
   readonly onChatEntrevistaIaActivo: (activo: boolean) => void
+  readonly sidebarColapsado: boolean
+  readonly onToggleSidebar: () => void
 }
 
 function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
@@ -153,13 +161,16 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
     asignacionId,
     modoFocus,
     onChatEntrevistaIaActivo,
+    sidebarColapsado,
+    onToggleSidebar,
   } = props
   const seccionActivaId = hitoActivo === null ? (seccionActiva?.seccionId ?? null) : null
   const esPreview = modo === "preview"
   const muestraPanelContexto = !esPreview && avance !== undefined
-  const grid = muestraPanelContexto
-    ? "grid flex-1 grid-cols-[280px_minmax(0,1fr)_320px] overflow-hidden"
-    : "grid flex-1 grid-cols-[280px_minmax(0,1fr)] overflow-hidden"
+  const anchoSidebar = sidebarColapsado ? "0px" : "320px"
+  const gridTemplate = muestraPanelContexto
+    ? `${anchoSidebar} minmax(0,1fr) 320px`
+    : `${anchoSidebar} minmax(0,1fr)`
 
   return (
     <div className="nx-motion-immersive flex h-screen flex-col bg-canvas">
@@ -173,7 +184,10 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
         etiquetaCualitativaFinal={avance?.etiquetaCualitativaFinal ?? null}
         atenuado={modoFocus}
       />
-      <div className={grid}>
+      <div
+        className="relative grid flex-1 overflow-hidden transition-[grid-template-columns] duration-base ease-default"
+        style={{ gridTemplateColumns: gridTemplate }}
+      >
         <SidebarPlan
           modo={modo}
           arbol={arbol.modulos}
@@ -188,7 +202,9 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
           seccionesAbiertasIds={avance?.seccionesAbiertasIds ?? []}
           soloLectura={soloLectura}
           atenuado={modoFocus}
+          onColapsar={onToggleSidebar}
         />
+        <BotonReabrirFlotante visible={sidebarColapsado && !modoFocus} onToggle={onToggleSidebar} />
         {hitoActivo === null ? (
           <CanvasSeccion
             seccionActiva={seccionActiva}

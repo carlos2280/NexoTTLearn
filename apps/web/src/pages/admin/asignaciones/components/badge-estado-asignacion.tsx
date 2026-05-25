@@ -47,15 +47,34 @@ function etiqueta(estado: string): string {
   return enMinus.replace(PRIMERA_LETRA_REGEX, (c) => c.toUpperCase())
 }
 
-interface Props {
-  readonly asignacion: Asignacion
+function etiquetaAsignado(estado: EstadoAsignado, tieneEntregaACliente: boolean): string {
+  if (!tieneEntregaACliente) {
+    if (estado === "APTO") {
+      return "Aprobado"
+    }
+    if (estado === "NO_APTO") {
+      return "No aprobado"
+    }
+  }
+  return etiqueta(estado)
 }
 
-export function BadgeEstadoAsignacion({ asignacion }: Props) {
+interface Props {
+  readonly asignacion: Asignacion
+  /**
+   * Si el curso no entrega a cliente, APTO/NO_APTO se renombran a
+   * "Aprobado/No aprobado" — el binario "apto/no apto" presupone fase
+   * cliente posterior que aqui no aplica. Default true mantiene el copy
+   * historico.
+   */
+  readonly tieneEntregaACliente?: boolean
+}
+
+export function BadgeEstadoAsignacion({ asignacion, tieneEntregaACliente = true }: Props) {
   if (asignacion.rol === "ASIGNADO" && asignacion.estadoAsignado) {
     return (
       <Badge tono={tonoAsignado(asignacion.estadoAsignado)}>
-        {etiqueta(asignacion.estadoAsignado)}
+        {etiquetaAsignado(asignacion.estadoAsignado, tieneEntregaACliente)}
       </Badge>
     )
   }

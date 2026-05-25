@@ -65,6 +65,7 @@ enum TipoBloque {
   QUIZ
   CODIGO_PREGUNTAS
   CODIGO_TESTS
+  DIAGRAMA
 
   @@map("tipo_bloque_enum")
 }
@@ -568,6 +569,7 @@ model Curso {
   fechaDeadline          DateTime        @map("fecha_deadline") @db.Date
   toggleVoluntarios      Boolean         @default(true) @map("toggle_voluntarios")
   toggleCierreAutomatico Boolean         @default(false) @map("toggle_cierre_automatico")
+  tieneEntregaACliente   Boolean         @default(true) @map("tiene_entrega_a_cliente")
   umbralNoCumple         Decimal         @default(10.00) @map("umbral_no_cumple") @db.Decimal(5, 2)
   pesoBloques            Decimal         @default(70.00) @map("peso_bloques") @db.Decimal(5, 2)
   pesoTransversal        Decimal         @default(20.00) @map("peso_transversal") @db.Decimal(5, 2)
@@ -641,12 +643,15 @@ model CursoSkillExigida {
 model CursoModuloHabilitado {
   cursoId  String @map("curso_id") @db.Uuid
   moduloId String @map("modulo_id") @db.Uuid
+  orden    Int    @default(0)
 
   curso  Curso  @relation(fields: [cursoId], references: [id], onDelete: Cascade)
   modulo Modulo @relation(fields: [moduloId], references: [id], onDelete: Restrict)
 
   @@id([cursoId, moduloId])
+  @@unique([cursoId, orden], map: "uq_cmh_curso_orden")
   @@index([moduloId], map: "idx_cmh_modulo")
+  @@index([cursoId, orden], map: "idx_cmh_curso_orden")
   @@map("cursos_modulos_habilitados")
 }
 

@@ -29,6 +29,7 @@ function cursoRow(overrides?: {
   modulos?: ReadonlyArray<{
     id: string
     titulo: string
+    orden?: number
     secciones: ReadonlyArray<{ id: string; titulo: string; orden: number; bloques: number }>
   }>
   areasExigidas?: ReadonlyArray<{ peso: number; codigo: string; nombre: string; id: string }>
@@ -59,7 +60,8 @@ function cursoRow(overrides?: {
         area: { codigo: s.areaCodigo },
       },
     })),
-    modulosHabilitados: (overrides?.modulos ?? []).map((m) => ({
+    modulosHabilitados: (overrides?.modulos ?? []).map((m, indice) => ({
+      orden: m.orden ?? indice,
       modulo: {
         id: m.id,
         titulo: m.titulo,
@@ -148,22 +150,27 @@ describe("MeCursoArbolService.obtenerArbol", () => {
     )
   })
 
-  it("proyecta modulos ordenados por titulo alfabetico y secciones por orden", async () => {
+  it("proyecta modulos ordenados por CursoModuloHabilitado.orden (no por titulo)", async () => {
     prisma.curso.findUnique.mockResolvedValue(
       cursoRow({
         modulos: [
+          // Forzamos orden explicito: el modulo "Z" va primero porque tiene
+          // orden=0; el modulo "A" va segundo con orden=1. Demuestra que el
+          // sort YA NO depende del titulo (antes era localeCompare).
           {
-            id: "m-b",
-            titulo: "B Modulo",
-            secciones: [
-              { id: "s2", titulo: "S2", orden: 1, bloques: 3 },
-              { id: "s1", titulo: "S1", orden: 0, bloques: 5 },
-            ],
+            id: "m-z",
+            titulo: "Z Modulo",
+            orden: 0,
+            secciones: [{ id: "s0", titulo: "S0", orden: 0, bloques: 2 }],
           },
           {
             id: "m-a",
             titulo: "A Modulo",
-            secciones: [{ id: "s0", titulo: "S0", orden: 0, bloques: 2 }],
+            orden: 1,
+            secciones: [
+              { id: "s2", titulo: "S2", orden: 1, bloques: 3 },
+              { id: "s1", titulo: "S1", orden: 0, bloques: 5 },
+            ],
           },
         ],
       }),
@@ -172,10 +179,10 @@ describe("MeCursoArbolService.obtenerArbol", () => {
 
     const res = await service.obtenerArbol(USUARIO_ID, CURSO_ID)
 
-    expect(res.modulos.map((m) => m.titulo)).toEqual(["A Modulo", "B Modulo"])
+    expect(res.modulos.map((m) => m.titulo)).toEqual(["Z Modulo", "A Modulo"])
     expect(res.modulos[0]?.orden).toBe(0)
     expect(res.modulos[1]?.orden).toBe(1)
-    // Las secciones del modulo "B Modulo" vienen del findMany con orderBy del
+    // Las secciones del modulo "A Modulo" vienen del findMany con orderBy del
     // schema, asi que el mock las recibe en el orden que las definimos. El
     // service no debe re-ordenarlas.
     expect(res.modulos[1]?.secciones[0]?.seccionId).toBe("s2")

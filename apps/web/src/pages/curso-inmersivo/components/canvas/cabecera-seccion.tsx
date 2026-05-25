@@ -1,3 +1,4 @@
+import { IlustracionModulo } from "@/shared/components/ilustracion-modulo"
 import type { ModoCursoParticipante } from "@nexott-learn/shared-types"
 import type { SeccionActiva } from "../../hooks/use-seccion-activa"
 
@@ -7,24 +8,42 @@ interface CabeceraSeccionProps {
 }
 
 export function CabeceraSeccion({ seccion, modo }: CabeceraSeccionProps) {
+  const partes = partesEyebrow(seccion, modo)
   return (
-    <header className="flex flex-col gap-2">
-      <span className="nx-eyebrow text-text-tertiary">{eyebrowDeSeccion(seccion, modo)}</span>
-      <h2 className="text-display-md text-text-primary leading-tight">{seccion.titulo}</h2>
-      <p className="text-body-sm text-text-tertiary">{copySubtitulo(seccion, modo)}</p>
+    <header className="flex flex-col items-start gap-4 sm:flex-row sm:items-start sm:gap-5">
+      <IlustracionModulo
+        tituloModulo={seccion.moduloTitulo}
+        className="h-16 w-16 shrink-0 sm:mt-1.5"
+      />
+      <div className="flex min-w-0 flex-col gap-2">
+        <span className="nx-eyebrow text-text-secondary">
+          <span>{partes.prefijo}</span>
+          <span className="text-aurora-violet">{partes.modulo}</span>
+          {partes.sufijo ? <span className="text-text-tertiary"> · {partes.sufijo}</span> : null}
+        </span>
+        <h2 className="text-display-md text-text-primary leading-tight">{seccion.titulo}</h2>
+        <p className="text-body text-text-secondary">{copySubtitulo(seccion, modo)}</p>
+      </div>
     </header>
   )
 }
 
-function eyebrowDeSeccion(seccion: SeccionActiva, modo: ModoCursoParticipante): string {
-  const base = `Módulo ${seccion.moduloOrden} · ${seccion.moduloTitulo}`
+interface PartesEyebrow {
+  readonly prefijo: string
+  readonly modulo: string
+  readonly sufijo: string | null
+}
+
+function partesEyebrow(seccion: SeccionActiva, modo: ModoCursoParticipante): PartesEyebrow {
+  const prefijo = `Módulo ${seccion.moduloOrden} · `
+  const modulo = seccion.moduloTitulo
   if (modo === "preview") {
-    return `${base} · Vista previa`
+    return { prefijo, modulo, sufijo: "Vista previa" }
   }
   if (seccion.caracter === "OPCIONAL") {
-    return `${base} · Opcional`
+    return { prefijo, modulo, sufijo: "Opcional" }
   }
-  return base
+  return { prefijo, modulo, sufijo: null }
 }
 
 function copySubtitulo(seccion: SeccionActiva, modo: ModoCursoParticipante): string {

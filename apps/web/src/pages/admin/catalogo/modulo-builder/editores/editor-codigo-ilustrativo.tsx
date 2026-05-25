@@ -1,5 +1,4 @@
 import { Field } from "@/shared/components/ui/field"
-import { Textarea } from "@/shared/components/ui/textarea"
 import {
   type BloqueDetalleResponse,
   contenidoCodigoIlustrativoSchema,
@@ -8,6 +7,8 @@ import { useRef, useState } from "react"
 import { CodeEditor } from "./shared/code-editor"
 import { EditorBloqueShell } from "./shared/editor-bloque-shell"
 import { SelectLenguaje } from "./shared/select-lenguaje"
+import { TiptapEditor } from "./shared/tiptap-editor"
+import { extensionesMinimas } from "./shared/tiptap-extensiones"
 import { useAutoGuardarBloque } from "./shared/use-auto-guardar-bloque"
 
 interface EditorCodigoIlustrativoProps {
@@ -77,14 +78,20 @@ export function EditorCodigoIlustrativo({ bloque }: EditorCodigoIlustrativoProps
         )}
       </Field>
 
-      <Field label="Descripción" hint="Opcional. Aparece debajo del snippet.">
-        {(attrs) => (
-          <Textarea
-            {...attrs}
-            rows={3}
-            value={datos.descripcion}
-            onChange={(e) => actualizar({ descripcion: e.target.value })}
-            placeholder="Ej. Pipeline típico de Streams con filter + map + collect."
+      <Field
+        label="Descripción"
+        hint="Opcional. Acepta negrita, cursiva, listas, código inline y enlaces."
+      >
+        {(_attrs) => (
+          <TiptapEditor
+            key={bloque.id}
+            htmlInicial={datos.descripcion}
+            extensiones={extensionesMinimas(
+              "Ej. Pipeline típico de Streams con filter + map + collect.",
+            )}
+            variante="minima"
+            altoMin="100px"
+            onCambio={(html) => actualizar({ descripcion: html })}
           />
         )}
       </Field>

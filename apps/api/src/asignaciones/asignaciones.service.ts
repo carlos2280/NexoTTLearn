@@ -15,10 +15,12 @@ import {
   AutoInscripcionRequest,
   CerrarCasoAsignadoRequest,
   CerrarCasoVoluntarioRequest,
+  ColaboradorDisponible,
   CrearAsignacionesBatchRequest,
   CrearAsignacionesBatchResponse,
   CursoDisponibleVoluntario,
   ListarAsignacionesQuery,
+  ListarColaboradoresDisponiblesQuery,
   PaginacionQuery,
   Paginated,
   PatchResultadoEntrevistaRequest,
@@ -192,6 +194,66 @@ export class AsignacionesService {
     const { aCrear, rechazadas } = await this.clasificarBatch(cursoId, input.colaboradorIds)
     const creadas = await this.crearAsignacionesAdmin(cursoId, aCrear, rechazadas)
     return { creadas, rechazadas }
+  }
+
+  /**
+   * Alimenta el selector visual del dialogo "Asignar colaboradores": devuelve
+   * los colaboradores ACTIVOS que aun no estan inscritos en el curso (ni
+   * ASIGNADO ni VOLUNTARIO). Filtro opcional por nombre/email para que el
+   * admin busque sin scrollear. Paginado.
+   */
+  async listarColaboradoresDisponibles(
+    cursoId: string,
+    query: ListarColaboradoresDisponiblesQuery,
+  ): Promise<Paginated<ColaboradorDisponible>> {
+    const curso = await this.prisma.curso.findUnique({
+      where: { id: cursoId },
+      select: { id: true },
+    })
+    if (!curso) {
+      throw new NotFoundException({
+        code: apiErrorCodes.cursoNoEncontrado,
+        message: `Curso ${cursoId} no encontrado.`,
+      })
+    }
+
+    const { page, pageSize, q } = query
+    const skip = (page - 1) * pageSize
+    const trimmed = q?.trim()
+    const where: Prisma.ColaboradorWhereInput = {
+      estadoEmpleado: "ACTIVO",
+      asignaciones: { none: { cursoId } },
+      ...(trimmed && trimmed.length > 0
+        ? {
+            // biome-ignore lint/style/useNamingConvention: clave Prisma WHERE OR.
+            OR: [
+              { nombre: { contains: trimmed, mode: "insensitive" } },
+              { email: { contains: trimmed, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    }
+
+    const [filas, total] = await this.prisma.$transaction([
+      this.prisma.colaborador.findMany({
+        where,
+        select: { id: true, nombre: true, email: true },
+        orderBy: [{ nombre: "asc" }],
+        skip,
+        take: pageSize,
+      }),
+      this.prisma.colaborador.count({ where }),
+    ])
+
+    return {
+      data: filas.map((c) => ({ id: c.id, nombre: c.nombre, email: c.email })),
+      meta: {
+        page,
+        pageSize,
+        total,
+        totalPages: pageSize > 0 ? Math.ceil(total / pageSize) : 0,
+      },
+    }
   }
 
   private async clasificarBatch(

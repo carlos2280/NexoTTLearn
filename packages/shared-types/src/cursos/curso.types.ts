@@ -69,6 +69,7 @@ export interface CursoModuloHabilitado {
 
 export interface CursoDetalle extends CursoResumen {
   readonly toggleCierreAutomatico: boolean
+  readonly tieneEntregaACliente: boolean
   readonly umbralNoCumple: number
   readonly pesoBloques: number
   readonly pesoTransversal: number

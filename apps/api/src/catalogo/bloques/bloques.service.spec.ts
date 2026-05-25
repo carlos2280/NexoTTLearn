@@ -173,6 +173,40 @@ describe("BloquesService.obtenerPorIdOrThrow", () => {
   })
 })
 
+describe("BloquesService.obtenerContenidoPorSeccion", () => {
+  it("seccion inexistente: 404 SECCION_NO_ENCONTRADA", async () => {
+    prisma.seccion.findUnique.mockResolvedValue(null)
+    try {
+      await service.obtenerContenidoPorSeccion(SEC_ID)
+      throw new Error("expected throw")
+    } catch (error) {
+      expect(error).toBeInstanceOf(NotFoundException)
+      const r = (error as NotFoundException).getResponse() as { code: string }
+      expect(r.code).toBe(apiErrorCodes.seccionNoEncontrada)
+    }
+  })
+
+  it("devuelve bloques ACTIVOS con `contenido` incluido, ordenados por orden ASC", async () => {
+    prisma.seccion.findUnique.mockResolvedValue({ id: SEC_ID })
+    prisma.bloque.findMany.mockResolvedValue([
+      buildDetalleRow({ tipo: TipoBloque.PARRAFO, contenido: CONTENIDO_PARRAFO_VACIO }),
+    ])
+    const result = await service.obtenerContenidoPorSeccion(SEC_ID)
+
+    const llamada = prisma.bloque.findMany.mock.calls[0]?.[0] as {
+      where: { seccionId: string; estado: EstadoBloque }
+      select: Record<string, true>
+      orderBy: { orden: "asc" | "desc" }
+    }
+    expect(llamada.where.seccionId).toBe(SEC_ID)
+    expect(llamada.where.estado).toBe(EstadoBloque.ACTIVO)
+    expect(llamada.select).toHaveProperty("contenido", true)
+    expect(llamada.orderBy.orden).toBe("asc")
+    expect(result).toHaveLength(1)
+    expect(result[0]?.contenido).toEqual(CONTENIDO_PARRAFO_VACIO)
+  })
+})
+
 describe("BloquesService.crear", () => {
   it("seccion inexistente: 404 SECCION_NO_ENCONTRADA", async () => {
     prisma.seccion.findUnique.mockResolvedValue(null)
