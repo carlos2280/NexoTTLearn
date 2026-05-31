@@ -189,6 +189,21 @@ export type {
 export { listarLogCambiosQuerySchema } from "./cursos/log-cambios.query.schema"
 export type { ListarLogCambiosQuery } from "./cursos/log-cambios.query.schema"
 
+// Cursos — importar curso desde Markdown (D-IMP-1).
+export {
+  importarCursoSchema,
+  importarCursoBodySchema,
+} from "./cursos/importar-curso.schema"
+export type {
+  ImportarCursoInput,
+  ImportarCursoBody,
+  ImportarCursoResponse,
+  CursoImportadoMeta,
+  ModuloImportado,
+  SeccionImportada,
+  BloqueImportado,
+} from "./cursos/importar-curso.schema"
+
 // Cursos P4b — configuracion (areas, skills exigidas, modulos habilitados,
 // pesos, umbrales de logro, transversal, entrevista IA).
 export { actualizarAreasCursoSchema } from "./cursos/actualizar-areas-curso.schema"

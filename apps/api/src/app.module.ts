@@ -23,6 +23,7 @@ import { PrismaModule } from "./common/prisma/prisma.module"
 import { StorageModule } from "./common/storage/storage.module"
 import { validateEnv } from "./config/env.validation"
 import { CursosModule } from "./cursos/cursos.module"
+import { ImportarCursoModule } from "./cursos/importar-curso/importar-curso.module"
 import { EntrevistaIaModule } from "./entrevista-ia/entrevista-ia.module"
 import { EvaluacionInicialModule } from "./evaluacion-inicial/evaluacion-inicial.module"
 import { HealthModule } from "./health/health.module"
@@ -80,6 +81,7 @@ import { TransversalModule } from "./transversal/transversal.module"
     ColaboradoresModule,
     AsignacionesModule,
     CursosModule,
+    ImportarCursoModule,
     EvaluacionInicialModule,
     PlanPersonalModule,
     IntentosBloqueModule,

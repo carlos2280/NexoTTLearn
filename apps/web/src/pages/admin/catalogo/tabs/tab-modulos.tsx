@@ -7,7 +7,7 @@ import { SearchField } from "@/shared/components/ui/search-field"
 import { Select, SelectItem } from "@/shared/components/ui/select"
 import { RUTAS } from "@/shared/constants/rutas"
 import type { EstadoModulo } from "@nexott-learn/shared-types"
-import { Library, Plus } from "lucide-react"
+import { Library, Plus, Upload } from "lucide-react"
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { accionesPorModulo } from "./modulos-acciones-menu"
@@ -59,10 +59,20 @@ export function TabModulos() {
             <SelectItem value="ARCHIVADO">Archivados</SelectItem>
           </Select>
         </div>
-        <Button variant="primary" size="md" onClick={() => orq.abrir("crear")}>
-          <Plus className="h-4 w-4" strokeWidth={1.75} aria-hidden={true} />
-          Nuevo módulo
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={() => navigate(RUTAS.admin.catalogoImportar)}
+          >
+            <Upload className="h-4 w-4" strokeWidth={1.75} aria-hidden={true} />
+            Importar curso
+          </Button>
+          <Button variant="primary" size="md" onClick={() => orq.abrir("crear")}>
+            <Plus className="h-4 w-4" strokeWidth={1.75} aria-hidden={true} />
+            Nuevo módulo
+          </Button>
+        </div>
       </div>
       <DataTable
         columnas={COLUMNAS_MODULOS}

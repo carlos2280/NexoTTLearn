@@ -2,6 +2,7 @@ import { AdminShell } from "@/features/admin/layout/components/admin-shell"
 import { ParticipanteShell } from "@/features/participante-layout/components/participante-shell"
 import { AsignacionesPage } from "@/pages/admin/asignaciones/asignaciones.page"
 import { CatalogoPage } from "@/pages/admin/catalogo/catalogo.page"
+import { ImportarCursoPage } from "@/pages/admin/catalogo/importar/importar.page"
 import { ModuloBuilderPage } from "@/pages/admin/catalogo/modulo-builder/modulo-builder.page"
 import { CursoDetallePage } from "@/pages/admin/cursos/curso-detalle.page"
 import { CursosPage } from "@/pages/admin/cursos/cursos.page"
@@ -118,6 +119,7 @@ export function AppRoutes() {
       >
         <Route index={true} element={<InicioPage />} />
         <Route path="catalogo" element={<CatalogoPage />} />
+        <Route path="catalogo/importar" element={<ImportarCursoPage />} />
         <Route
           path="clientes"
           element={<Navigate to="/admin/catalogo?tab=clientes" replace={true} />}
