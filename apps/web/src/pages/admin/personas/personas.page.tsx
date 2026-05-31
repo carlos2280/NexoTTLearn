@@ -1,7 +1,6 @@
 import { useListarPersonas } from "@/features/personas/hooks/use-listar-personas"
 import { Button } from "@/shared/components/ui/button"
 import { DataTable } from "@/shared/components/ui/data-table"
-import { MenuAcciones } from "@/shared/components/ui/menu-acciones"
 import { PageHeader, PageHeaderStat } from "@/shared/components/ui/page-header"
 import { Pagination } from "@/shared/components/ui/pagination"
 import { Select, SelectItem } from "@/shared/components/ui/select"
@@ -12,7 +11,6 @@ import type {
 } from "@nexott-learn/shared-types"
 import { Plus, Users } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
-import { accionesPorPersona } from "./components/personas-acciones-menu"
 import { COLUMNAS_PERSONAS } from "./components/personas-columnas"
 import { PersonasDialogos } from "./components/personas-dialogos"
 import { PersonasExportarBoton } from "./components/personas-exportar-boton"
@@ -108,12 +106,6 @@ export function PersonasPage() {
           vacioTitulo="Sin colaboradores con esos filtros"
           vacioDescripcion="Prueba a ampliar los filtros o crea un nuevo colaborador."
           onClickFila={(p) => orq.abrir("ver-ficha", p)}
-          accionFila={(p) => (
-            <MenuAcciones
-              etiquetaAria={`Acciones de ${p.nombre}`}
-              grupos={accionesPorPersona(p, orq)}
-            />
-          )}
         />
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
