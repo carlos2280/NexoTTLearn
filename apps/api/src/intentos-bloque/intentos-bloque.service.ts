@@ -949,7 +949,9 @@ function agregarPreguntasFalladas(
       conteo.set(v, (conteo.get(v) ?? 0) + 1)
     }
   }
-  if (conteo.size === 0) return undefined
+  if (conteo.size === 0) {
+    return undefined
+  }
   return [...conteo.entries()]
     .map(([preguntaId, c]) => ({ preguntaId, conteo: c }))
     .sort((a, b) => b.conteo - a.conteo)

@@ -7,14 +7,14 @@ import { useExcalidrawTheme } from "@/pages/admin/catalogo/modulo-builder/editor
 interface ExcalidrawCanvasProps {
   /** Datos iniciales serializados de Excalidraw. */
   readonly initialData?: {
-    readonly elements?: ReadonlyArray<Record<string, unknown>>
+    readonly elements?: readonly Record<string, unknown>[]
     readonly files?: Record<string, unknown>
     readonly appState?: Record<string, unknown>
   }
   /** `true` para modo lectura (sin toolbar editable). */
   readonly viewMode?: boolean
   /** Callback de cambios; solo se invoca en modo edicion. */
-  readonly onChange?: (elements: ReadonlyArray<unknown>, appState: unknown, files: unknown) => void
+  readonly onChange?: (elements: readonly unknown[], appState: unknown, files: unknown) => void
 }
 
 /**
@@ -27,7 +27,6 @@ interface ExcalidrawCanvasProps {
  * unknown> y se los pasamos tal cual: la libreria los valida internamente
  * al deserializar.
  */
-// biome-ignore lint/style/noDefaultExport: requerido por React.lazy()
 export default function ExcalidrawCanvas({
   initialData,
   viewMode = false,
