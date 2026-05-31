@@ -1,5 +1,6 @@
+import { tv } from "@/shared/lib/tv"
 import type { HTMLAttributes } from "react"
-import { type VariantProps, tv } from "tailwind-variants"
+import type { VariantProps } from "tailwind-variants"
 
 /**
  * Badge — etiqueta de estado o categoría.

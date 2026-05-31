@@ -1,10 +1,10 @@
-import { useFichaPersona } from "@/features/personas/hooks/use-ficha-persona"
 import { Badge } from "@/shared/components/ui/badge"
-import { Banner } from "@/shared/components/ui/banner"
+import { Button } from "@/shared/components/ui/button"
 import { SidePeek, SidePeekSeccion } from "@/shared/components/ui/side-peek"
-import { Skeleton } from "@/shared/components/ui/skeleton"
-import type { ColaboradorAdminResumen, FichaResponse } from "@nexott-learn/shared-types"
+import type { ColaboradorAdminResumen } from "@nexott-learn/shared-types"
+import { KeyRound, ShieldCheck } from "lucide-react"
 import type { ReactNode } from "react"
+import type { usePersonasOrquestacion } from "../use-personas-orquestacion"
 import { BadgeEstadoEmpleado } from "./badge-estado-empleado"
 import { BadgeRol } from "./badge-rol"
 
@@ -12,6 +12,7 @@ interface PersonaFichaPeekProps {
   readonly abierto: boolean
   readonly persona: ColaboradorAdminResumen | null
   readonly onCambiarAbierto: (abierto: boolean) => void
+  readonly orq: ReturnType<typeof usePersonasOrquestacion>
 }
 
 function formatearFecha(iso: string | null): string {
@@ -45,9 +46,12 @@ function Campo({ etiqueta, valor }: CampoProps) {
   )
 }
 
-export function PersonaFichaPeek({ abierto, persona, onCambiarAbierto }: PersonaFichaPeekProps) {
-  const { data, isLoading, error } = useFichaPersona(persona?.id ?? null)
-
+export function PersonaFichaPeek({
+  abierto,
+  persona,
+  onCambiarAbierto,
+  orq,
+}: PersonaFichaPeekProps) {
   return (
     <SidePeek
       abierto={abierto}
@@ -90,66 +94,39 @@ export function PersonaFichaPeek({ abierto, persona, onCambiarAbierto }: Persona
             </div>
           </SidePeekSeccion>
 
-          <SidePeekSeccion titulo="Ficha de skills">
-            <SkillsBloque isLoading={isLoading} error={error} data={data ?? null} />
+          <SidePeekSeccion titulo="Acciones de cuenta">
+            {persona.usuario ? (
+              <div className="flex flex-col gap-2">
+                <Button
+                  variant="secondary"
+                  size="md"
+                  fullWidth={true}
+                  onClick={() => orq.abrir("regenerar-password", persona)}
+                >
+                  <KeyRound className="h-4 w-4" aria-hidden={true} />
+                  Regenerar contraseña…
+                </Button>
+                {persona.usuario.bloqueado ? (
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    fullWidth={true}
+                    onClick={() => orq.abrir("desbloquear", persona)}
+                  >
+                    <ShieldCheck className="h-4 w-4" aria-hidden={true} />
+                    Desbloquear cuenta…
+                  </Button>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-body-sm text-text-tertiary">
+                Esta persona no tiene cuenta de acceso. Créala desde la lista para habilitar
+                acciones.
+              </p>
+            )}
           </SidePeekSeccion>
         </>
       ) : null}
     </SidePeek>
-  )
-}
-
-interface SkillsBloqueProps {
-  readonly isLoading: boolean
-  readonly error: unknown
-  readonly data: FichaResponse | null
-}
-
-function SkillsBloque({ isLoading, error, data }: SkillsBloqueProps) {
-  if (isLoading) {
-    return (
-      <div className="flex flex-col gap-2">
-        <Skeleton className="h-12" />
-        <Skeleton className="h-12" />
-        <Skeleton className="h-12" />
-      </div>
-    )
-  }
-  if (error) {
-    return <Banner tone="danger">No se pudo cargar la ficha.</Banner>
-  }
-  if (!data || data.porArea.length === 0) {
-    return (
-      <p className="text-body-sm text-text-tertiary">Aún no hay áreas con notas registradas.</p>
-    )
-  }
-  return (
-    <ul className="flex flex-col gap-2">
-      {data.porArea.map((area) => {
-        const cobertura =
-          area.skillsTotales > 0 ? (area.skillsConNota / area.skillsTotales) * 100 : 0
-        return (
-          <li
-            key={area.areaId}
-            className="flex flex-col gap-2 rounded-lg border border-border bg-surface px-4 py-3"
-          >
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="font-medium text-body-sm text-text-primary">{area.nombre}</span>
-              <span className="tabular font-medium font-mono text-h3 text-text-primary">
-                {area.promedio === null ? "—" : area.promedio.toFixed(1)}
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="h-1 flex-1 overflow-hidden rounded-pill bg-subtle" aria-hidden={true}>
-                <div className="h-full rounded-pill bg-accent" style={{ width: `${cobertura}%` }} />
-              </div>
-              <span className="tabular shrink-0 text-caption text-text-tertiary">
-                {area.skillsConNota} / {area.skillsTotales}
-              </span>
-            </div>
-          </li>
-        )
-      })}
-    </ul>
   )
 }
