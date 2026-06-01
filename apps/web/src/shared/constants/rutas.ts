@@ -22,6 +22,7 @@ export const RUTAS = {
     catalogo: "/admin/catalogo",
     // El detalle de módulo abre directamente el builder inmersivo.
     catalogoModuloDetalle: (id: string) => `/admin/catalogo/modulos/${id}`,
+    catalogoImportar: "/admin/catalogo/importar",
     reportes: "/admin/reportes",
     sistema: "/admin/sistema",
     intentoEntrevistaIa: (intentoId: string) => `/admin/intentos-entrevista-ia/${intentoId}`,

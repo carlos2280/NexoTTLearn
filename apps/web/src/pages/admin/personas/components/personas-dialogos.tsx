@@ -26,6 +26,7 @@ export function PersonasDialogos({ orq }: PersonasDialogosProps) {
         abierto={orq.dialog.modo === "ver-ficha"}
         persona={persona}
         onCambiarAbierto={cerrarSiCierra}
+        orq={orq}
       />
 
       <ConfirmMotivoDialog

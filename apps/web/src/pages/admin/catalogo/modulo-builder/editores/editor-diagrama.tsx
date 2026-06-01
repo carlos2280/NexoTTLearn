@@ -10,7 +10,7 @@ interface EditorDiagramaProps {
 }
 
 interface Borrador {
-  readonly elements: ReadonlyArray<Record<string, unknown>>
+  readonly elements: readonly Record<string, unknown>[]
   readonly files?: Record<string, unknown>
   readonly appState?: Record<string, unknown>
   readonly altText: string
@@ -65,14 +65,10 @@ export function EditorDiagrama({ bloque }: EditorDiagramaProps) {
     auto.marcarSucio()
   }
 
-  function cuandoCambiaDiagrama(
-    elements: ReadonlyArray<unknown>,
-    appState: unknown,
-    files: unknown,
-  ) {
+  function cuandoCambiaDiagrama(elements: readonly unknown[], appState: unknown, files: unknown) {
     borradorRef.current = {
       ...borradorRef.current,
-      elements: elements as ReadonlyArray<Record<string, unknown>>,
+      elements: elements as readonly Record<string, unknown>[],
       appState: appState as Record<string, unknown>,
       files: files as Record<string, unknown>,
     }
