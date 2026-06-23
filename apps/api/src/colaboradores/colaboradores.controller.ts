@@ -16,6 +16,8 @@ import {
 } from "@nestjs/common"
 import { Throttle } from "@nestjs/throttler"
 import {
+  CambiarRolInput,
+  CambiarRolResponse,
   ColaboradorAdminResumen,
   CrearColaboradorInput,
   EntradaHistoricoNotaSkill,
@@ -26,6 +28,7 @@ import {
   Paginated,
   PatchSkillRequest,
   PatchSkillResponse,
+  cambiarRolSchema,
   crearColaboradorSchema,
   exportarColaboradoresQuerySchema,
   listarColaboradoresQuerySchema,
@@ -192,6 +195,39 @@ export class ColaboradoresController {
       ...extractContextoHttp(req),
     })
     return resultado.response
+  }
+
+  /**
+   * Cambia el rol (ADMIN <-> PARTICIPANTE) de la cuenta del colaborador. Accion
+   * administrativa de alto valor: `@Roles(ADMIN)`, `X-Motivo` obligatorio via
+   * `@RequiereMotivo()` y auditoria `USUARIO_ROL_CAMBIADO` desde el service. La
+   * identidad del actor sale de la sesion (`@CurrentUser`), nunca del body.
+   */
+  @Patch(":colaboradorId/rol")
+  @Roles(RolUsuario.ADMIN)
+  @RequiereMotivo()
+  @HttpCode(HttpStatus.OK)
+  async cambiarRol(
+    @Param("colaboradorId", ParseUUIDPipe) colaboradorId: string,
+    @Body(new ZodValidationPipe(cambiarRolSchema)) body: CambiarRolInput,
+    @Motivo() motivo: string | undefined,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+    @Req() req: Request,
+  ): Promise<CambiarRolResponse> {
+    const sesion = this.requireUsuario(usuario)
+    if (!motivo) {
+      throw new InternalServerErrorException({
+        code: apiErrorCodes.errorInterno,
+        message: "Motivo ausente tras pasar MotivoGuard.",
+      })
+    }
+    return await this.colaboradoresService.cambiarRol(
+      colaboradorId,
+      body.rol,
+      sesion.usuarioId,
+      motivo,
+      extractContextoHttp(req),
+    )
   }
 
   @Get(":colaboradorId/ficha/skills/:skillId/historico")

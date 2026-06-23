@@ -263,6 +263,7 @@ enum AccionAuditoria {
   PASSWORD_CHANGED
   PASSWORD_REGENERATED
   USUARIO_DESBLOQUEADO
+  USUARIO_ROL_CAMBIADO
   SESION_ELIMINADA
   COLABORADOR_CREADO
   AVISO_ACEPTADO
@@ -732,6 +733,7 @@ model Usuario {
   cargasEvalInicial     CargaEvaluacionInicial[]      @relation("CargaEvalInicial_AplicadoPor")
   idempotencyKeys       IdempotencyKey[]
 
+  @@index([rol])
   @@map("usuarios")
 }
 

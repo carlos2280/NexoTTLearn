@@ -16,6 +16,8 @@ export { regenerarPasswordInicialSchema } from "./auth/regenerar-password.schema
 export type { RegenerarPasswordInicialInput } from "./auth/regenerar-password.schema"
 export { desbloquearSchema } from "./auth/desbloquear.schema"
 export type { DesbloquearInput } from "./auth/desbloquear.schema"
+export { cambiarRolSchema } from "./auth/cambiar-rol.schema"
+export type { CambiarRolInput, CambiarRolResponse } from "./auth/cambiar-rol.schema"
 export { mfaEnableSchema } from "./auth/mfa-enable.schema"
 export type { MfaEnableInput } from "./auth/mfa-enable.schema"
 export type { MfaSetupResponse } from "./auth/mfa-setup.types"

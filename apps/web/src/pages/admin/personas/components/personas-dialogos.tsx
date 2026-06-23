@@ -12,6 +12,7 @@ export function PersonasDialogos({ orq }: PersonasDialogosProps) {
   const cerrarSiCierra = (v: boolean) => (v ? null : orq.cerrar())
   const persona = orq.dialog.persona
   const cred = orq.dialog.credencial
+  const rolDestino = persona?.usuario?.rol === "ADMIN" ? "Participante" : "Administrador"
 
   return (
     <>
@@ -57,6 +58,21 @@ export function PersonasDialogos({ orq }: PersonasDialogosProps) {
         placeholderMotivo="Motivo del desbloqueo…"
         enviando={orq.estado.enviandoDesbloquear}
         onConfirmar={orq.ejecutar.desbloquear}
+      />
+
+      <ConfirmMotivoDialog
+        abierto={orq.dialog.modo === "cambiar-rol"}
+        onCambiarAbierto={cerrarSiCierra}
+        titulo={`Cambiar rol a ${rolDestino}`}
+        descripcion={
+          persona
+            ? `${persona.nombre} pasará a tener el rol de ${rolDestino}. El cambio aplica en su próximo inicio de sesión.`
+            : undefined
+        }
+        textoConfirmar={`Cambiar a ${rolDestino}`}
+        placeholderMotivo="Motivo del cambio de rol…"
+        enviando={orq.estado.enviandoCambiarRol}
+        onConfirmar={orq.ejecutar.cambiarRol}
       />
 
       {cred ? (

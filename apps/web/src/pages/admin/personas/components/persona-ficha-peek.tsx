@@ -2,7 +2,7 @@ import { Badge } from "@/shared/components/ui/badge"
 import { Button } from "@/shared/components/ui/button"
 import { SidePeek, SidePeekSeccion } from "@/shared/components/ui/side-peek"
 import type { ColaboradorAdminResumen } from "@nexott-learn/shared-types"
-import { KeyRound, ShieldCheck } from "lucide-react"
+import { KeyRound, ShieldCheck, UserCog } from "lucide-react"
 import type { ReactNode } from "react"
 import type { usePersonasOrquestacion } from "../use-personas-orquestacion"
 import { BadgeEstadoEmpleado } from "./badge-estado-empleado"
@@ -105,6 +105,17 @@ export function PersonaFichaPeek({
                 >
                   <KeyRound className="h-4 w-4" aria-hidden={true} />
                   Regenerar contraseña…
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="md"
+                  fullWidth={true}
+                  onClick={() => orq.abrir("cambiar-rol", persona)}
+                >
+                  <UserCog className="h-4 w-4" aria-hidden={true} />
+                  {persona.usuario.rol === "ADMIN"
+                    ? "Cambiar a Participante…"
+                    : "Cambiar a Administrador…"}
                 </Button>
                 {persona.usuario.bloqueado ? (
                   <Button
