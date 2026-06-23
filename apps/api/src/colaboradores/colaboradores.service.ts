@@ -1,12 +1,20 @@
-import { ConflictException, Injectable, Logger, NotImplementedException } from "@nestjs/common"
 import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  NotImplementedException,
+} from "@nestjs/common"
+import {
+  CambiarRolResponse,
   ColaboradorAdminResumen,
   CrearColaboradorInput,
   ExportarColaboradoresQuery,
   ListarColaboradoresQuery,
   Paginated,
 } from "@nexott-learn/shared-types"
-import { AccionAuditoria, ModoEntregaPassword, Prisma } from "@prisma/client"
+import { AccionAuditoria, ModoEntregaPassword, Prisma, RolUsuario } from "@prisma/client"
 import bcrypt from "bcrypt"
 import { AuditLogService } from "../common/audit/audit-log.service"
 import { ContextoHttpAuditoria } from "../common/audit/audit-log.types"
@@ -119,6 +127,114 @@ export class ColaboradoresService {
       }
       throw error
     }
+  }
+
+  /**
+   * Cambia el rol (ADMIN <-> PARTICIPANTE) de la cuenta de un colaborador.
+   * Accion administrativa de alto valor (OWASP A09): identidad del actor SIEMPRE
+   * de la sesion, motivo obligatorio y auditoria estructural.
+   *
+   * Protecciones de negocio:
+   *  - Un admin no puede cambiar su propio rol (evita auto-bloqueo / escalada).
+   *  - No se permite degradar al ultimo ADMIN activo (evita dejar el sistema sin
+   *    administradores).
+   *  - Cambiar al mismo rol es un no-op rechazado (409) para no ensuciar la
+   *    auditoria con eventos vacios.
+   */
+  async cambiarRol(
+    colaboradorId: string,
+    rolNuevo: RolUsuario,
+    adminUsuarioId: string,
+    motivo: string,
+    contexto: ContextoHttpAuditoria = {},
+  ): Promise<CambiarRolResponse> {
+    const colaborador = await this.prisma.colaborador.findUnique({
+      where: { id: colaboradorId },
+      select: { usuario: { select: { id: true, rol: true } } },
+    })
+    if (!colaborador) {
+      throw new NotFoundException({
+        code: apiErrorCodes.noEncontrado,
+        message: "Colaborador no encontrado.",
+      })
+    }
+    const usuario = colaborador.usuario
+    if (!usuario) {
+      throw new ConflictException({
+        code: apiErrorCodes.conflict,
+        message: "El colaborador no tiene cuenta de acceso; no se puede asignar un rol.",
+      })
+    }
+    if (usuario.id === adminUsuarioId) {
+      throw new ForbiddenException({
+        code: apiErrorCodes.prohibido,
+        message: "Un administrador no puede cambiar su propio rol.",
+      })
+    }
+    if (usuario.rol === rolNuevo) {
+      throw new ConflictException({
+        code: apiErrorCodes.conflict,
+        message: "El colaborador ya tiene ese rol.",
+      })
+    }
+
+    const esDegradacion = usuario.rol === RolUsuario.ADMIN && rolNuevo === RolUsuario.PARTICIPANTE
+    try {
+      // Check del "ultimo admin" + update en una transaccion serializable: el
+      // recuento y la escritura deben ser atomicos, de lo contrario dos
+      // degradaciones concurrentes del penultimo admin dejarian el sistema con
+      // cero administradores (TOCTOU). Bajo Serializable, la segunda transaccion
+      // falla con P2034 y se traduce a 409.
+      await this.prisma.$transaction(
+        async (tx) => {
+          if (esDegradacion) {
+            // Solo cuentan los administradores *efectivos* (no bloqueados y con
+            // colaborador activo): un admin bloqueado o ex-empleado no puede
+            // administrar, asi que no protege contra quedarse sin admin operativo.
+            const adminsEfectivos = await tx.usuario.count({
+              where: {
+                rol: RolUsuario.ADMIN,
+                bloqueado: false,
+                colaborador: { estadoEmpleado: "ACTIVO" },
+              },
+            })
+            if (adminsEfectivos <= 1) {
+              throw new ConflictException({
+                code: apiErrorCodes.conflict,
+                message: "No se puede degradar al ultimo administrador del sistema.",
+              })
+            }
+          }
+          await tx.usuario.update({
+            where: { id: usuario.id },
+            data: { rol: rolNuevo },
+            select: { id: true },
+          })
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+        throw new ConflictException({
+          code: apiErrorCodes.conflict,
+          message: "Conflicto de concurrencia al cambiar el rol. Reintenta.",
+        })
+      }
+      throw error
+    }
+
+    this.logger.log(`Rol cambiado para usuario ${usuario.id}: ${usuario.rol} -> ${rolNuevo}`)
+    await this.auditLog.record({
+      usuarioId: adminUsuarioId,
+      accion: AccionAuditoria.USUARIO_ROL_CAMBIADO,
+      exito: true,
+      recursoTipo: "usuario",
+      recursoId: usuario.id,
+      metadata: { rolAnterior: usuario.rol, rolNuevo, motivo },
+      ...contexto,
+    })
+
+    return { usuarioId: usuario.id, rolAnterior: usuario.rol, rolNuevo }
   }
 
   async listar(query: ListarColaboradoresQuery): Promise<Paginated<ColaboradorAdminResumen>> {

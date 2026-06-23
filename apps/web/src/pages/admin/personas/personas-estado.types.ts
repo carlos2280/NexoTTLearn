@@ -6,6 +6,7 @@ export type ModoDialogPersonas =
   | "ver-ficha"
   | "regenerar-password"
   | "desbloquear"
+  | "cambiar-rol"
   | "credencial-creada"
   | "credencial-regenerada"
 

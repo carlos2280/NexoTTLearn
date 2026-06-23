@@ -4,9 +4,11 @@ import type { CredencialMostrar, EstadoDialog } from "./personas-estado.types"
 import {
   type CrearPersonaInput,
   type PersonasMutaciones,
+  cambiarRol as cambiarRolAccion,
   crear as crearAccion,
   desbloquear as desbloquearAccion,
   regenerar as regenerarAccion,
+  rolOpuesto,
 } from "./use-personas-acciones"
 
 interface BuildArgs {
@@ -52,6 +54,20 @@ export function buildHandlers({ mut, dialog, setDialog }: BuildArgs) {
       }
       await desbloquearAccion(mut, persona, motivo)
       toast.success(`${persona.nombre} fue desbloqueado`)
+      setDialog({ modo: "cerrado", persona: null, credencial: null })
+    },
+    cambiarRol: async (motivo: string) => {
+      const persona: ColaboradorAdminResumen | null = dialog.persona
+      if (!persona?.usuario) {
+        return
+      }
+      const destino = rolOpuesto(persona.usuario.rol)
+      const r = await cambiarRolAccion(mut, persona, motivo)
+      if (!r) {
+        return
+      }
+      const etiqueta = destino === "ADMIN" ? "Administrador" : "Participante"
+      toast.success(`${persona.nombre} ahora es ${etiqueta}`)
       setDialog({ modo: "cerrado", persona: null, credencial: null })
     },
   }
