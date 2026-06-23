@@ -1,5 +1,6 @@
 import { httpClient } from "@/shared/api/http-client"
 import type {
+  CambiarRolResponse,
   ColaboradorAdminResumen,
   CrearColaboradorInput,
   FichaResponse,
@@ -7,6 +8,7 @@ import type {
   Paginated,
   PatchSkillRequest,
   PatchSkillResponse,
+  RolUsuario,
 } from "@nexott-learn/shared-types"
 
 interface AltaColaboradorResponse {
@@ -75,4 +77,16 @@ export function editarNotaSkill(args: {
   )
 }
 
-export type { AltaColaboradorResponse }
+export function cambiarRolColaborador(args: {
+  readonly colaboradorId: string
+  readonly rol: RolUsuario
+  readonly motivo: string
+}): Promise<CambiarRolResponse> {
+  return httpClient.patch<CambiarRolResponse>(
+    `/colaboradores/${args.colaboradorId}/rol`,
+    { rol: args.rol },
+    { motivo: args.motivo },
+  )
+}
+
+export type { AltaColaboradorResponse, CambiarRolResponse }

@@ -1,4 +1,9 @@
-import { ConflictException, NotImplementedException } from "@nestjs/common"
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+  NotImplementedException,
+} from "@nestjs/common"
 import { AccionAuditoria, ModoEntregaPassword, Prisma, RolUsuario } from "@prisma/client"
 import bcrypt from "bcrypt"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -9,6 +14,8 @@ import { ColaboradoresService } from "./colaboradores.service"
 
 interface MockPrisma {
   configuracionSistema: { findUnique: ReturnType<typeof vi.fn> }
+  colaborador: { findUnique: ReturnType<typeof vi.fn> }
+  usuario: { update: ReturnType<typeof vi.fn>; count: ReturnType<typeof vi.fn> }
   $transaction: ReturnType<typeof vi.fn>
 }
 
@@ -17,6 +24,8 @@ function buildPrismaMock(): MockPrisma {
     configuracionSistema: {
       findUnique: vi.fn().mockResolvedValue({ modoEntregaPassword: ModoEntregaPassword.MANUAL }),
     },
+    colaborador: { findUnique: vi.fn() },
+    usuario: { update: vi.fn().mockResolvedValue(undefined), count: vi.fn() },
     $transaction: vi.fn(),
   }
 }
@@ -281,5 +290,158 @@ describe("ColaboradoresService.crear", () => {
     )
     expect(requiereSetupPersistido).toBe(false)
     expect(result.usuario.requiereSetupMfa).toBe(false)
+  })
+})
+
+describe("ColaboradoresService.cambiarRol", () => {
+  const colaboradorId = "col-1"
+  const usuarioObjetivoId = "usr-objetivo"
+
+  beforeEach(() => {
+    // El check del "ultimo admin" + el update viven en una transaccion
+    // serializable. El mock ejecuta el callback pasando `prisma` como `tx`, de
+    // modo que `tx.usuario.count`/`tx.usuario.update` son los mismos spies.
+    prisma.$transaction.mockImplementation(
+      async (cb: (tx: unknown) => Promise<unknown>) => await cb(prisma),
+    )
+  })
+
+  it("happy path PARTICIPANTE -> ADMIN: actualiza rol y audita USUARIO_ROL_CAMBIADO", async () => {
+    prisma.colaborador.findUnique.mockResolvedValue({
+      usuario: { id: usuarioObjetivoId, rol: RolUsuario.PARTICIPANTE },
+    })
+
+    const result = await service.cambiarRol(
+      colaboradorId,
+      RolUsuario.ADMIN,
+      ADMIN_ID,
+      "promocion aprobada por RRHH",
+    )
+
+    expect(result).toEqual({
+      usuarioId: usuarioObjetivoId,
+      rolAnterior: RolUsuario.PARTICIPANTE,
+      rolNuevo: RolUsuario.ADMIN,
+    })
+    expect(prisma.usuario.update).toHaveBeenCalledWith({
+      where: { id: usuarioObjetivoId },
+      data: { rol: RolUsuario.ADMIN },
+      select: { id: true },
+    })
+    expect(auditLog.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usuarioId: ADMIN_ID,
+        accion: AccionAuditoria.USUARIO_ROL_CAMBIADO,
+        exito: true,
+        recursoTipo: "usuario",
+        recursoId: usuarioObjetivoId,
+        metadata: {
+          rolAnterior: RolUsuario.PARTICIPANTE,
+          rolNuevo: RolUsuario.ADMIN,
+          motivo: "promocion aprobada por RRHH",
+        },
+      }),
+    )
+  })
+
+  it("colaborador inexistente: 404 NO_ENCONTRADO", async () => {
+    prisma.colaborador.findUnique.mockResolvedValue(null)
+    await expect(
+      service.cambiarRol(colaboradorId, RolUsuario.ADMIN, ADMIN_ID, "x"),
+    ).rejects.toBeInstanceOf(NotFoundException)
+    expect(prisma.usuario.update).not.toHaveBeenCalled()
+  })
+
+  it("colaborador sin cuenta de acceso: 409 CONFLICT", async () => {
+    prisma.colaborador.findUnique.mockResolvedValue({ usuario: null })
+    await expect(
+      service.cambiarRol(colaboradorId, RolUsuario.ADMIN, ADMIN_ID, "x"),
+    ).rejects.toBeInstanceOf(ConflictException)
+    expect(prisma.usuario.update).not.toHaveBeenCalled()
+  })
+
+  it("un admin no puede cambiar su propio rol: 403 PROHIBIDO", async () => {
+    prisma.colaborador.findUnique.mockResolvedValue({
+      usuario: { id: ADMIN_ID, rol: RolUsuario.ADMIN },
+    })
+    await expect(
+      service.cambiarRol(colaboradorId, RolUsuario.PARTICIPANTE, ADMIN_ID, "x"),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+    expect(prisma.usuario.update).not.toHaveBeenCalled()
+  })
+
+  it("cambiar al mismo rol es un no-op rechazado: 409 CONFLICT", async () => {
+    prisma.colaborador.findUnique.mockResolvedValue({
+      usuario: { id: usuarioObjetivoId, rol: RolUsuario.PARTICIPANTE },
+    })
+    await expect(
+      service.cambiarRol(colaboradorId, RolUsuario.PARTICIPANTE, ADMIN_ID, "x"),
+    ).rejects.toBeInstanceOf(ConflictException)
+    expect(prisma.usuario.update).not.toHaveBeenCalled()
+  })
+
+  it("no permite degradar al ultimo administrador: 409 CONFLICT", async () => {
+    prisma.colaborador.findUnique.mockResolvedValue({
+      usuario: { id: usuarioObjetivoId, rol: RolUsuario.ADMIN },
+    })
+    prisma.usuario.count.mockResolvedValue(1)
+    await expect(
+      service.cambiarRol(colaboradorId, RolUsuario.PARTICIPANTE, ADMIN_ID, "x"),
+    ).rejects.toBeInstanceOf(ConflictException)
+    expect(prisma.usuario.update).not.toHaveBeenCalled()
+  })
+
+  it("el recuento del ultimo admin solo cuenta administradores efectivos (no bloqueados ni ex-empleados)", async () => {
+    prisma.colaborador.findUnique.mockResolvedValue({
+      usuario: { id: usuarioObjetivoId, rol: RolUsuario.ADMIN },
+    })
+    prisma.usuario.count.mockResolvedValue(2)
+
+    await service.cambiarRol(colaboradorId, RolUsuario.PARTICIPANTE, ADMIN_ID, "rotacion")
+
+    expect(prisma.usuario.count).toHaveBeenCalledWith({
+      where: {
+        rol: RolUsuario.ADMIN,
+        bloqueado: false,
+        colaborador: { estadoEmpleado: "ACTIVO" },
+      },
+    })
+  })
+
+  it("conflicto de concurrencia (P2034) en la transaccion: 409 CONFLICT", async () => {
+    prisma.colaborador.findUnique.mockResolvedValue({
+      usuario: { id: usuarioObjetivoId, rol: RolUsuario.ADMIN },
+    })
+    prisma.usuario.count.mockResolvedValue(2)
+    prisma.$transaction.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("serialization failure", {
+        code: "P2034",
+        clientVersion: "test",
+      }),
+    )
+    await expect(
+      service.cambiarRol(colaboradorId, RolUsuario.PARTICIPANTE, ADMIN_ID, "x"),
+    ).rejects.toBeInstanceOf(ConflictException)
+  })
+
+  it("permite degradar un admin cuando hay mas de uno", async () => {
+    prisma.colaborador.findUnique.mockResolvedValue({
+      usuario: { id: usuarioObjetivoId, rol: RolUsuario.ADMIN },
+    })
+    prisma.usuario.count.mockResolvedValue(2)
+
+    const result = await service.cambiarRol(
+      colaboradorId,
+      RolUsuario.PARTICIPANTE,
+      ADMIN_ID,
+      "rotacion de funciones",
+    )
+
+    expect(result.rolNuevo).toBe(RolUsuario.PARTICIPANTE)
+    expect(prisma.usuario.update).toHaveBeenCalledWith({
+      where: { id: usuarioObjetivoId },
+      data: { rol: RolUsuario.PARTICIPANTE },
+      select: { id: true },
+    })
   })
 })

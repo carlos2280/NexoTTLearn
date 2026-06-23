@@ -23,6 +23,7 @@ export function usePersonasOrquestacion() {
       enviandoCrear: mut.crear.isPending,
       enviandoRegenerar: mut.regenerar.isPending,
       enviandoDesbloquear: mut.desbloquear.isPending,
+      enviandoCambiarRol: mut.cambiarRol.isPending,
     },
   }
 }
