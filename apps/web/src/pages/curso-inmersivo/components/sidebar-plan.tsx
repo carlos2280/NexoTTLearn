@@ -43,11 +43,6 @@ interface SidebarPlanProps {
    * blur sutil para que el chat tenga foco absoluto. Mantiene el grid intacto.
    */
   readonly atenuado?: boolean
-  /**
-   * Callback para colapsar el sidebar a su estado oculto. El botón flotante
-   * para reabrirlo vive en la página, sobre el canvas.
-   */
-  readonly onColapsar: () => void
 }
 
 /**
@@ -71,7 +66,6 @@ export function SidebarPlan({
   seccionesAbiertasIds,
   soloLectura,
   atenuado,
-  onColapsar,
 }: SidebarPlanProps) {
   const seccionesAbiertasSet = new Set(seccionesAbiertasIds)
   const claseAtenuado = atenuado
@@ -115,9 +109,8 @@ export function SidebarPlan({
           plan={plan}
           seccionesAbiertasSet={seccionesAbiertasSet}
           totalSecciones={totalSecciones}
-          onColapsar={onColapsar}
         />
-        <nav aria-label="Contenido del curso" className="flex flex-col gap-5">
+        <nav aria-label="Contenido del curso" className="flex flex-col gap-0.5">
           {arbol.map((modulo) => (
             <ModuloGrupo
               key={modulo.moduloId}
@@ -132,16 +125,16 @@ export function SidebarPlan({
             />
           ))}
         </nav>
-        {modo !== "preview" ? (
-          <BloqueHitosSidebar
-            transversal={transversal}
-            entrevistaIa={entrevistaIa}
-            hitoActivo={hitoActivo}
-            onAbrirHito={onAbrirHito}
-            soloLectura={soloLectura}
-          />
-        ) : null}
       </div>
+      {modo !== "preview" ? (
+        <BloqueHitosSidebar
+          transversal={transversal}
+          entrevistaIa={entrevistaIa}
+          hitoActivo={hitoActivo}
+          onAbrirHito={onAbrirHito}
+          soloLectura={soloLectura}
+        />
+      ) : null}
       <FooterAtajos />
     </aside>
   )

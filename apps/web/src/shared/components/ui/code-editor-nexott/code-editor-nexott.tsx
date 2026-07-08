@@ -95,11 +95,11 @@ export function CodeEditorNexott({
             aria-hidden={true}
             className="inline-block h-1.5 w-1.5 rounded-pill bg-aurora-cyan/70"
           />
-          <span className="font-mono text-[color:var(--color-syntax-comment)] text-caption tracking-wide">
+          <span className="font-code text-[color:var(--color-syntax-comment)] text-caption tracking-wide">
             {etiquetaLenguaje}
           </span>
           {readOnly ? (
-            <span className="ml-auto font-mono text-[10px] text-[color:var(--color-syntax-comment)] uppercase tracking-wider">
+            <span className="ml-auto font-code text-[10px] text-[color:var(--color-syntax-comment)] uppercase tracking-wider">
               read-only
             </span>
           ) : null}
@@ -120,7 +120,7 @@ export function CodeEditorNexott({
             disabled={readOnly}
             style={{
               fontFamily:
-                'var(--font-mono, ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace)',
+                'var(--font-code, ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace)',
               fontSize: 13,
               lineHeight: 1.65,
               minHeight,
@@ -155,7 +155,7 @@ function NumerosLinea({ valor, padding }: NumerosLineaProps) {
   return (
     <div
       aria-hidden={true}
-      className="select-none border-[color:var(--color-code-border)] border-r font-mono text-[color:var(--color-code-line-number)]"
+      className="select-none border-[color:var(--color-code-border)] border-r font-code text-[color:var(--color-code-line-number)]"
       style={{
         fontSize: 13,
         lineHeight: 1.65,

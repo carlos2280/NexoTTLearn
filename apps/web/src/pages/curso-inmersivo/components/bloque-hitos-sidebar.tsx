@@ -39,7 +39,7 @@ export function BloqueHitosSidebar({
   }
   return (
     <section
-      className="flex flex-col gap-2 border-border border-t pt-5"
+      className="flex flex-col gap-2 border-border border-t bg-subtle px-5 pt-4 pb-4"
       aria-label="Hitos de cierre del curso"
     >
       <h3 className="px-2 font-mono text-[10px] text-text-tertiary uppercase tracking-wider">

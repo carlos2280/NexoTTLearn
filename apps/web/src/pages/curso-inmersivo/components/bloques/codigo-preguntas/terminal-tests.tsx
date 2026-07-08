@@ -41,7 +41,7 @@ export function TerminalTests({ ejecucion, isEjecutando }: TerminalTestsProps) {
   return (
     <section
       aria-label="Consola de resultados"
-      className="flex flex-col gap-1 px-4 py-3 font-mono text-[12.5px] leading-[1.55]"
+      className="flex flex-col gap-1 px-4 py-3 font-code text-[12.5px] leading-[1.55]"
       style={{
         background: "var(--color-code-bg)",
         color: "var(--color-code-text)",

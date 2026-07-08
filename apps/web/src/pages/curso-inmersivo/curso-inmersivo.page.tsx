@@ -2,15 +2,16 @@ import { useUsuarioActual } from "@/features/auth/hooks/use-usuario-actual"
 import { RUTAS } from "@/shared/constants/rutas"
 import { useCallback, useState } from "react"
 import { Navigate, useNavigate, useParams } from "react-router-dom"
-import { BotonReabrirFlotante } from "./components/boton-toggle-sidebar"
 import { CanvasHito } from "./components/canvas-hito"
 import { CanvasSeccion } from "./components/canvas-seccion"
 import { CursoInmersivoSkeleton } from "./components/curso-inmersivo-skeleton"
 import { FooterPreviewInscripcion } from "./components/footer-preview-inscripcion"
+import { IdeActivityBar } from "./components/ide/ide-activity-bar"
+import { IdeStatusbar } from "./components/ide/ide-statusbar"
+import { IdeTitlebar } from "./components/ide/ide-titlebar"
 import { PanelContexto } from "./components/panel-contexto"
 import { PantallaError } from "./components/pantalla-error"
 import { SidebarPlan } from "./components/sidebar-plan"
-import { TopbarInmersivo } from "./components/topbar-inmersivo"
 import { useAtajosCurso } from "./hooks/use-atajos-curso"
 import { useCursoInmersivo } from "./hooks/use-curso-inmersivo"
 import { useEfectoApertura } from "./hooks/use-efecto-apertura"
@@ -169,17 +170,16 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
   const muestraPanelContexto = !esPreview && avance !== undefined
   const anchoSidebar = sidebarColapsado ? "0px" : "320px"
   const gridTemplate = muestraPanelContexto
-    ? `${anchoSidebar} minmax(0,1fr) 320px`
-    : `${anchoSidebar} minmax(0,1fr)`
+    ? `48px ${anchoSidebar} minmax(0,1fr) 320px`
+    : `48px ${anchoSidebar} minmax(0,1fr)`
 
   return (
-    <div className="nx-motion-immersive flex h-screen flex-col bg-canvas">
-      <TopbarInmersivo
+    <div className="nx-ide nx-motion-immersive flex h-screen flex-col bg-canvas">
+      <IdeTitlebar
         cursoId={arbol.curso.id}
         cursoTitulo={arbol.curso.titulo}
         clienteNombre={arbol.curso.cliente.nombre}
         areaPrincipal={arbol.curso.areaPrincipal}
-        porcentajeAvance={avance?.porcentajeAvance ?? null}
         estaCerrado={avance?.estaCerrado ?? false}
         etiquetaCualitativaFinal={avance?.etiquetaCualitativaFinal ?? null}
         atenuado={modoFocus}
@@ -188,6 +188,11 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
         className="relative grid flex-1 overflow-hidden transition-[grid-template-columns] duration-base ease-default"
         style={{ gridTemplateColumns: gridTemplate }}
       >
+        <IdeActivityBar
+          sidebarColapsado={sidebarColapsado}
+          onTogglePlan={onToggleSidebar}
+          atenuado={modoFocus}
+        />
         <SidebarPlan
           modo={modo}
           arbol={arbol.modulos}
@@ -202,9 +207,7 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
           seccionesAbiertasIds={avance?.seccionesAbiertasIds ?? []}
           soloLectura={soloLectura}
           atenuado={modoFocus}
-          onColapsar={onToggleSidebar}
         />
-        <BotonReabrirFlotante visible={sidebarColapsado && !modoFocus} onToggle={onToggleSidebar} />
         {hitoActivo === null ? (
           <CanvasSeccion
             seccionActiva={seccionActiva}
@@ -234,13 +237,61 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
           />
         ) : null}
       </div>
-      {esPreview ? (
-        <FooterPreviewInscripcion
-          cursoId={arbol.curso.id}
-          cursoTitulo={arbol.curso.titulo}
-          areaCodigo={arbol.curso.areaPrincipal?.codigo ?? null}
-        />
-      ) : null}
+      <PieInmersivo
+        esPreview={esPreview}
+        cursoId={arbol.curso.id}
+        cursoTitulo={arbol.curso.titulo}
+        areaCodigo={arbol.curso.areaPrincipal?.codigo ?? null}
+        modo={modo}
+        porcentajeAvance={avance?.porcentajeAvance ?? null}
+        soloLectura={soloLectura}
+        atenuado={modoFocus}
+      />
     </div>
+  )
+}
+
+interface PieInmersivoProps {
+  readonly esPreview: boolean
+  readonly cursoId: string
+  readonly cursoTitulo: string
+  readonly areaCodigo: string | null
+  readonly modo: CursoInmersivoLayoutProps["modo"]
+  readonly porcentajeAvance: number | null
+  readonly soloLectura: boolean
+  readonly atenuado: boolean
+}
+
+/**
+ * Pie del modo inmersivo: barra de estado del IDE (asignado/voluntario) o el
+ * footer de inscripción (preview). Extraído del layout para mantener su
+ * complejidad cognitiva bajo el límite.
+ */
+function PieInmersivo({
+  esPreview,
+  cursoId,
+  cursoTitulo,
+  areaCodigo,
+  modo,
+  porcentajeAvance,
+  soloLectura,
+  atenuado,
+}: PieInmersivoProps) {
+  if (esPreview) {
+    return (
+      <FooterPreviewInscripcion
+        cursoId={cursoId}
+        cursoTitulo={cursoTitulo}
+        areaCodigo={areaCodigo}
+      />
+    )
+  }
+  return (
+    <IdeStatusbar
+      modo={modo}
+      porcentajeAvance={porcentajeAvance}
+      soloLectura={soloLectura}
+      atenuado={atenuado}
+    />
   )
 }
