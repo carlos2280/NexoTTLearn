@@ -3,6 +3,8 @@ import {
   contenidoCodigoPreguntasSchema,
   contenidoCodigoTestsSchema,
   contenidoQuizSchema,
+  contenidoSqlEjercicioSchema,
+  contenidoSqlTestsSchema,
 } from "../../../intentos-bloque"
 import type { TipoBloque } from "../listar-bloques.schema"
 import { contenidoCodigoIlustrativoSchema } from "./codigo-ilustrativo.schema"
@@ -43,6 +45,10 @@ export const contenidoBloquePorTipo = {
   CODIGO_TESTS: contenidoCodigoTestsSchema,
   // biome-ignore lint/style/useNamingConvention: clave es valor de enum Prisma `TipoBloque`.
   DIAGRAMA: contenidoDiagramaSchema,
+  // biome-ignore lint/style/useNamingConvention: clave es valor de enum Prisma `TipoBloque`.
+  SQL_EJERCICIO: contenidoSqlEjercicioSchema,
+  // biome-ignore lint/style/useNamingConvention: clave es valor de enum Prisma `TipoBloque`.
+  SQL_TESTS: contenidoSqlTestsSchema,
 } as const satisfies Record<TipoBloque, z.ZodTypeAny>
 
 /**

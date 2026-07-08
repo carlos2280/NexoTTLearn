@@ -8,6 +8,7 @@ import type { SeccionActiva } from "../hooks/use-seccion-activa"
 import { RenderBloque } from "./bloques/render-bloque"
 import { CabeceraSeccion } from "./canvas/cabecera-seccion"
 import { CargandoBloques, Centrado, ErrorBloques, SeccionVacia } from "./canvas/canvas-estados"
+import { indexarSqlTestsPorEjercicio } from "./canvas/indexar-sql-tests-por-ejercicio"
 import { indexarTestsPorPregunta } from "./canvas/indexar-tests-por-pregunta"
 import { IdeTabStrip } from "./ide/ide-tab-strip"
 import { LienzoArchivo } from "./ide/lienzo-archivo"
@@ -38,6 +39,10 @@ export function CanvasSeccion({
   const reducedMotion = useReducedMotion()
   const testsPorPreguntaId = useMemo(
     () => indexarTestsPorPregunta(bloques.data ?? []),
+    [bloques.data],
+  )
+  const sqlTestsPorEjercicioId = useMemo(
+    () => indexarSqlTestsPorEjercicio(bloques.data ?? []),
     [bloques.data],
   )
 
@@ -102,6 +107,7 @@ export function CanvasSeccion({
                         colaboradorId={colaboradorParaBloques}
                         modo={modo}
                         contenidoTests={testsPorPreguntaId.get(bloque.id) ?? null}
+                        contenidoSqlTests={sqlTestsPorEjercicioId.get(bloque.id) ?? null}
                         soloLectura={soloLectura}
                       />
                     </li>

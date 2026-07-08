@@ -23,6 +23,7 @@ import type { SesionUsuario } from "../common/types/sesion.types"
 import { NotaSkillService } from "../nota-skill/nota-skill.service"
 import { CodigoEvaluadorService } from "./codigo-evaluador.service"
 import { IntentosBloqueService } from "./intentos-bloque.service"
+import { SqlEvaluadorService } from "./sql-evaluador.service"
 
 const COLABORADOR_ID = "f0000000-0000-0000-0000-000000000001"
 const COLABORADOR_AJENO_ID = "f0000000-0000-0000-0000-000000000099"
@@ -231,6 +232,12 @@ const codigoEvaluadorStub = {
   evaluar: vi.fn(),
 }
 
+// Stub minimo del SqlEvaluadorService — analogo al de codigo; los tests del
+// QUIZ no lo invocan pero el constructor del service lo exige.
+const sqlEvaluadorStub = {
+  evaluar: vi.fn(),
+}
+
 beforeEach(async () => {
   prisma = buildPrismaMock()
   idempotency = {
@@ -245,6 +252,7 @@ beforeEach(async () => {
     recalcularConFuentes: vi.fn().mockResolvedValue({ notaActual: null }),
   }
   codigoEvaluadorStub.evaluar.mockReset()
+  sqlEvaluadorStub.evaluar.mockReset()
   moduleRef = await Test.createTestingModule({
     providers: [
       {
@@ -254,13 +262,21 @@ beforeEach(async () => {
           i: IdempotencyService,
           n: NotaSkillService,
           c: CodigoEvaluadorService,
-        ) => new IntentosBloqueService(p, i, n, c),
-        inject: [PrismaService, IdempotencyService, NotaSkillService, CodigoEvaluadorService],
+          s: SqlEvaluadorService,
+        ) => new IntentosBloqueService(p, i, n, c, s),
+        inject: [
+          PrismaService,
+          IdempotencyService,
+          NotaSkillService,
+          CodigoEvaluadorService,
+          SqlEvaluadorService,
+        ],
       },
       { provide: PrismaService, useValue: prisma },
       { provide: IdempotencyService, useValue: idempotency },
       { provide: NotaSkillService, useValue: notaSkill },
       { provide: CodigoEvaluadorService, useValue: codigoEvaluadorStub },
+      { provide: SqlEvaluadorService, useValue: sqlEvaluadorStub },
     ],
   }).compile()
   service = moduleRef.get(IntentosBloqueService)

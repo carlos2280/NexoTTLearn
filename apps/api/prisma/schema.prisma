@@ -66,6 +66,8 @@ enum TipoBloque {
   CODIGO_PREGUNTAS
   CODIGO_TESTS
   DIAGRAMA
+  SQL_EJERCICIO
+  SQL_TESTS
 
   @@map("tipo_bloque_enum")
 }

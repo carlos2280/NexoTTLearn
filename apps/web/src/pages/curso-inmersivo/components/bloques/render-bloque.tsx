@@ -1,10 +1,12 @@
 import type {
   BloqueDetalleResponse,
   ContenidoCodigoTests,
+  ContenidoSqlTests,
   ModoCursoParticipante,
 } from "@nexott-learn/shared-types"
 import { contenidoQuizSchema } from "@nexott-learn/shared-types"
-import { MARCA_CODIGO, MARCA_QUIZ } from "../ide/celda-evaluable"
+import type { ReactNode } from "react"
+import { MARCA_CODIGO, MARCA_QUIZ, MARCA_SQL, type MarcaCelda } from "../ide/celda-evaluable"
 import { BloqueCodigoIlustrativo } from "./bloque-codigo-ilustrativo"
 import { BloqueCodigoPreguntas } from "./bloque-codigo-preguntas"
 import { BloqueDiagrama } from "./bloque-diagrama"
@@ -16,8 +18,10 @@ import { BloqueTip } from "./bloque-tip"
 import { BloqueVideo } from "./bloque-video"
 import { EvaluableConIndicador } from "./evaluable-con-indicador"
 import { BloqueQuiz } from "./quiz/bloque-quiz"
+import { BloqueSqlEjercicio } from "./sql-ejercicio/bloque-sql-ejercicio"
 
 const NOTA_APROBADO_CODIGO_DEFAULT = 60
+const NOTA_APROBADO_SQL_DEFAULT = 60
 
 interface RenderBloqueProps {
   readonly bloque: BloqueDetalleResponse
@@ -36,6 +40,12 @@ interface RenderBloqueProps {
    */
   readonly contenidoTests: ContenidoCodigoTests | null
   /**
+   * Contenido del bloque `SQL_TESTS` hermano si existe. Solo aplica cuando
+   * `bloque.tipo === "SQL_EJERCICIO"`; aporta las semillas + consultas de
+   * referencia con que el navegador (PGlite) corre la suite en el cliente.
+   */
+  readonly contenidoSqlTests: ContenidoSqlTests | null
+  /**
    * Curso cerrado (`avance.estaCerrado === true`). Los bloques evaluables se
    * renderizan en modo lectura — sin inputs, sin CTA — mostrando el resultado
    * del mejor intento. Ortogonal al `modo` (un curso `asignado` se cierra,
@@ -47,12 +57,12 @@ interface RenderBloqueProps {
 /**
  * Dispatcher por `tipo` (D5.3). Los bloques de contenido (Sub-capa B) son
  * iguales en los tres modos (asignado | voluntario | preview). Los evaluables
- * (Sub-capa C) cambian en modo `preview`: muestran el enunciado pero el CTA
- * se sustituye por un mensaje sobrio invitando a inscribirse.
+ * (Sub-capa C) delegan su triple estado —cerrado / preview / activo— en
+ * `EnvolturaEvaluable`, que es idéntica para QUIZ, CODIGO_PREGUNTAS y
+ * SQL_EJERCICIO.
  *
- * `CODIGO_TESTS` se oculta al participante: vive emparejado al
- * `CODIGO_PREGUNTAS` y solo lo consume el motor de auto-correccion del
- * server (D16b §16b.6).
+ * `CODIGO_TESTS` / `SQL_TESTS` se ocultan al participante: viven emparejados a
+ * su ejercicio y solo los consume el motor de auto-correccion (D16b §16b.6).
  */
 export function RenderBloque({
   bloque,
@@ -60,8 +70,10 @@ export function RenderBloque({
   colaboradorId,
   modo,
   contenidoTests,
+  contenidoSqlTests,
   soloLectura,
 }: RenderBloqueProps) {
+  const comun = { bloqueId: bloque.id, colaboradorId, modo, soloLectura }
   switch (bloque.tipo) {
     case "PARRAFO":
       return <BloqueParrafo contenido={bloque.contenido} />
@@ -75,71 +87,113 @@ export function RenderBloque({
       return <BloqueCodigoIlustrativo contenido={bloque.contenido} />
     case "DIAGRAMA":
       return <BloqueDiagrama contenido={bloque.contenido} />
-    case "QUIZ": {
-      const notaMinima = notaMinimaQuiz(bloque.contenido)
-      if (soloLectura) {
-        return (
-          <BloqueEvaluableCerrado
-            bloqueId={bloque.id}
-            colaboradorId={colaboradorId}
-            marca={MARCA_QUIZ}
-            notaMinima={notaMinima}
-          />
-        )
-      }
-      if (modo === "preview" || !colaboradorId) {
-        return <BloqueEvaluablePreviewLock marca={MARCA_QUIZ} />
-      }
+    case "QUIZ":
       return (
-        <EvaluableConIndicador
-          bloqueId={bloque.id}
-          colaboradorId={colaboradorId}
-          notaMinima={notaMinima}
+        <EnvolturaEvaluable
+          {...comun}
+          marca={MARCA_QUIZ}
+          notaMinima={notaMinimaQuiz(bloque.contenido)}
         >
-          <BloqueQuiz
-            bloqueId={bloque.id}
-            cursoId={cursoId}
-            colaboradorId={colaboradorId}
-            contenido={bloque.contenido}
-          />
-        </EvaluableConIndicador>
+          {(colab) => (
+            <BloqueQuiz
+              bloqueId={bloque.id}
+              cursoId={cursoId}
+              colaboradorId={colab}
+              contenido={bloque.contenido}
+            />
+          )}
+        </EnvolturaEvaluable>
       )
-    }
-    case "CODIGO_PREGUNTAS": {
-      if (soloLectura) {
-        return (
-          <BloqueEvaluableCerrado
-            bloqueId={bloque.id}
-            colaboradorId={colaboradorId}
-            marca={MARCA_CODIGO}
-            notaMinima={NOTA_APROBADO_CODIGO_DEFAULT}
-          />
-        )
-      }
-      if (modo === "preview" || !colaboradorId) {
-        return <BloqueEvaluablePreviewLock marca={MARCA_CODIGO} />
-      }
+    case "CODIGO_PREGUNTAS":
       return (
-        <EvaluableConIndicador
-          bloqueId={bloque.id}
-          colaboradorId={colaboradorId}
+        <EnvolturaEvaluable
+          {...comun}
+          marca={MARCA_CODIGO}
           notaMinima={NOTA_APROBADO_CODIGO_DEFAULT}
         >
-          <BloqueCodigoPreguntas
-            bloqueId={bloque.id}
-            cursoId={cursoId}
-            colaboradorId={colaboradorId}
-            contenido={bloque.contenido}
-            contenidoTests={contenidoTests}
-          />
-        </EvaluableConIndicador>
+          {(colab) => (
+            <BloqueCodigoPreguntas
+              bloqueId={bloque.id}
+              cursoId={cursoId}
+              colaboradorId={colab}
+              contenido={bloque.contenido}
+              contenidoTests={contenidoTests}
+            />
+          )}
+        </EnvolturaEvaluable>
       )
-    }
+    case "SQL_EJERCICIO":
+      return (
+        <EnvolturaEvaluable {...comun} marca={MARCA_SQL} notaMinima={NOTA_APROBADO_SQL_DEFAULT}>
+          {(colab) => (
+            <BloqueSqlEjercicio
+              bloqueId={bloque.id}
+              cursoId={cursoId}
+              colaboradorId={colab}
+              contenido={bloque.contenido}
+              contenidoTests={contenidoSqlTests}
+            />
+          )}
+        </EnvolturaEvaluable>
+      )
     case "CODIGO_TESTS":
+      return null
+    case "SQL_TESTS":
       return null
     default:
       return null
   }
+}
+
+interface EnvolturaEvaluableProps {
+  readonly bloqueId: string
+  readonly colaboradorId: string | null
+  readonly modo: ModoCursoParticipante
+  readonly soloLectura: boolean
+  readonly marca: MarcaCelda
+  readonly notaMinima: number
+  /** Render del bloque activo; recibe el `colaboradorId` ya garantizado no-nulo. */
+  readonly children: (colaboradorId: string) => ReactNode
+}
+
+/**
+ * Triple estado de un bloque evaluable, compartido por QUIZ / CODIGO_PREGUNTAS
+ * / SQL_EJERCICIO:
+ *  - curso cerrado → resultado del mejor intento en lectura.
+ *  - preview o sin colaborador → cartel de "inscríbete".
+ *  - activo → el bloque real envuelto en su indicador de intento.
+ */
+function EnvolturaEvaluable({
+  bloqueId,
+  colaboradorId,
+  modo,
+  soloLectura,
+  marca,
+  notaMinima,
+  children,
+}: EnvolturaEvaluableProps) {
+  if (soloLectura) {
+    return (
+      <BloqueEvaluableCerrado
+        bloqueId={bloqueId}
+        colaboradorId={colaboradorId}
+        marca={marca}
+        notaMinima={notaMinima}
+      />
+    )
+  }
+  if (modo === "preview" || !colaboradorId) {
+    return <BloqueEvaluablePreviewLock marca={marca} />
+  }
+  return (
+    <EvaluableConIndicador
+      bloqueId={bloqueId}
+      colaboradorId={colaboradorId}
+      notaMinima={notaMinima}
+    >
+      {children(colaboradorId)}
+    </EvaluableConIndicador>
+  )
 }
 
 function notaMinimaQuiz(contenido: Record<string, unknown> | null): number {

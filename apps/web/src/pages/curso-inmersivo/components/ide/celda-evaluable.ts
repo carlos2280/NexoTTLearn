@@ -15,3 +15,8 @@ export const MARCA_CODIGO: MarcaCelda = {
   glifo: ">",
   etiqueta: "ejercicio de código",
 }
+
+export const MARCA_SQL: MarcaCelda = {
+  glifo: ">",
+  etiqueta: "ejercicio de SQL",
+}

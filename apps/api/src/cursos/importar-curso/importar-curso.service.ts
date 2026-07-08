@@ -51,7 +51,8 @@ export class ImportarCursoService {
   async importar(body: ImportarCursoBody): Promise<ImportarCursoResponse> {
     const parsed = this.parsearOExplotar(body.contenidoMd)
     const clienteId = await this.resolverClienteOExplotar(parsed.curso.cliente)
-    return await this.persistir(parsed, clienteId)
+    const skillPorEtiqueta = await this.resolverSkillsOExplotar(parsed)
+    return await this.persistir(parsed, clienteId, skillPorEtiqueta)
   }
 
   private parsearOExplotar(contenidoMd: string): ImportarCursoInput {
@@ -82,9 +83,46 @@ export class ImportarCursoService {
     return cliente.id
   }
 
+  /**
+   * Resuelve las skills referenciadas por los bloques evaluables del `.md`
+   * (`skill="<etiquetaVisible>"`) a un mapa `etiqueta → id`. Las skills deben
+   * existir antes de importar: si alguna etiqueta no existe, aborta con un
+   * mensaje claro (no crea skills fantasma). Un curso sin ninguna skill
+   * declarada devuelve un mapa vacío.
+   */
+  private async resolverSkillsOExplotar(parsed: ImportarCursoInput): Promise<Map<string, string>> {
+    const etiquetas = new Set<string>()
+    for (const modulo of parsed.modulos) {
+      for (const seccion of modulo.secciones) {
+        for (const bloque of seccion.bloques) {
+          if ("skillEtiqueta" in bloque && bloque.skillEtiqueta) {
+            etiquetas.add(bloque.skillEtiqueta)
+          }
+        }
+      }
+    }
+    if (etiquetas.size === 0) {
+      return new Map()
+    }
+    const skills = await this.prisma.skill.findMany({
+      where: { etiquetaVisible: { in: [...etiquetas] } },
+      select: { id: true, etiquetaVisible: true },
+    })
+    const mapa = new Map(skills.map((s) => [s.etiquetaVisible, s.id]))
+    const faltantes = [...etiquetas].filter((e) => !mapa.has(e))
+    if (faltantes.length > 0) {
+      throw new NotFoundException({
+        code: apiErrorCodes.skillNoEncontrada,
+        message: `Skills no encontradas: ${faltantes.join(", ")}. Créalas antes de importar el curso.`,
+      })
+    }
+    return mapa
+  }
+
   private async persistir(
     parsed: ImportarCursoInput,
     clienteId: string,
+    skillPorEtiqueta: ReadonlyMap<string, string>,
   ): Promise<ImportarCursoResponse> {
     let totalSecciones = 0
     let totalBloques = 0
@@ -105,7 +143,7 @@ export class ImportarCursoService {
           })
 
           for (const [idxModulo, modulo] of parsed.modulos.entries()) {
-            const moduloPersistido = await this.persistirModulo(tx, modulo)
+            const moduloPersistido = await this.persistirModulo(tx, modulo, skillPorEtiqueta)
             await tx.cursoModuloHabilitado.create({
               data: {
                 cursoId: curso.id,
@@ -159,6 +197,7 @@ export class ImportarCursoService {
   private async persistirModulo(
     tx: Prisma.TransactionClient,
     modulo: ModuloImportado,
+    skillPorEtiqueta: ReadonlyMap<string, string>,
   ): Promise<{ moduloId: string; totalSecciones: number; totalBloques: number }> {
     const moduloRow = await tx.modulo.create({
       data: {
@@ -170,7 +209,13 @@ export class ImportarCursoService {
 
     let totalBloques = 0
     for (const [idxSeccion, seccion] of modulo.secciones.entries()) {
-      const totalEnSeccion = await this.persistirSeccion(tx, moduloRow.id, seccion, idxSeccion)
+      const totalEnSeccion = await this.persistirSeccion(
+        tx,
+        moduloRow.id,
+        seccion,
+        idxSeccion,
+        skillPorEtiqueta,
+      )
       totalBloques += totalEnSeccion
     }
 
@@ -186,6 +231,7 @@ export class ImportarCursoService {
     moduloId: string,
     seccion: SeccionImportada,
     ordenSeccion: number,
+    skillPorEtiqueta: ReadonlyMap<string, string>,
   ): Promise<number> {
     const seccionRow = await tx.seccion.create({
       data: { moduloId, titulo: seccion.titulo, orden: ordenSeccion },
@@ -195,7 +241,13 @@ export class ImportarCursoService {
     let orden = 0
     let totalBloques = 0
     for (const bloqueDef of seccion.bloques) {
-      const creados = await this.persistirBloque(tx, seccionRow.id, bloqueDef, orden)
+      const creados = await this.persistirBloque(
+        tx,
+        seccionRow.id,
+        bloqueDef,
+        orden,
+        skillPorEtiqueta,
+      )
       orden += creados
       totalBloques += creados
     }
@@ -212,6 +264,7 @@ export class ImportarCursoService {
     seccionId: string,
     bloque: BloqueImportado,
     ordenBase: number,
+    skillPorEtiqueta: ReadonlyMap<string, string>,
   ): Promise<number> {
     if (bloque.tipo === "CODIGO") {
       const preguntas = await tx.bloque.create({
@@ -220,6 +273,7 @@ export class ImportarCursoService {
           orden: ordenBase,
           tipo: TipoBloque.CODIGO_PREGUNTAS,
           esEvaluable: true,
+          skillQueMideId: this.skillIdDe(skillPorEtiqueta, bloque.skillEtiqueta),
           contenido: bloque.contenidoReto as Prisma.InputJsonValue,
         },
         select: { id: true },
@@ -240,18 +294,63 @@ export class ImportarCursoService {
       return 2
     }
 
+    if (bloque.tipo === "SQL") {
+      const ejercicio = await tx.bloque.create({
+        data: {
+          seccionId,
+          orden: ordenBase,
+          tipo: TipoBloque.SQL_EJERCICIO,
+          esEvaluable: true,
+          skillQueMideId: this.skillIdDe(skillPorEtiqueta, bloque.skillEtiqueta),
+          contenido: bloque.contenidoReto as Prisma.InputJsonValue,
+        },
+        select: { id: true },
+      })
+      await tx.bloque.create({
+        data: {
+          seccionId,
+          orden: ordenBase + 1,
+          tipo: TipoBloque.SQL_TESTS,
+          esEvaluable: false,
+          contenido: {
+            sqlEjercicioId: ejercicio.id,
+            tests: bloque.tests,
+          } satisfies Prisma.InputJsonObject,
+        },
+      })
+      return 2
+    }
+
     const tipoPrisma = TipoBloque[bloque.tipo as keyof typeof TipoBloque]
     const esEvaluable = bloque.tipo === "QUIZ"
+    const skillQueMideId =
+      bloque.tipo === "QUIZ" ? this.skillIdDe(skillPorEtiqueta, bloque.skillEtiqueta) : null
     await tx.bloque.create({
       data: {
         seccionId,
         orden: ordenBase,
         tipo: tipoPrisma,
         esEvaluable,
+        skillQueMideId,
         contenido: bloque.contenido as Prisma.InputJsonValue,
       },
     })
     return 1
+  }
+
+  /**
+   * Traduce la etiqueta de skill declarada en el `.md` a su id. El mapa ya
+   * fue validado en `resolverSkillsOExplotar` (toda etiqueta presente existe),
+   * así que un `undefined` aquí solo ocurre si no se declaró skill → `null`.
+   */
+  private skillIdDe(
+    skillPorEtiqueta: ReadonlyMap<string, string>,
+    etiqueta: string | undefined,
+  ): string | null {
+    if (!etiqueta) {
+      return null
+    }
+    return skillPorEtiqueta.get(etiqueta) ?? null
   }
 
   private aFechaUtc(yyyyMmDd: string): Date {

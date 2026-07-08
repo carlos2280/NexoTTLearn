@@ -1,6 +1,7 @@
 import type { TipoBloque } from "@nexott-learn/shared-types"
 import {
   Code2,
+  Database,
   FileText,
   FlaskConical,
   HelpCircle,
@@ -75,6 +76,18 @@ const META: Record<TipoBloque, TipoBloqueMeta> = {
     icono: PencilRuler,
     descripcionCorta: "Esquema dibujado a mano con Excalidraw.",
   },
+  // biome-ignore lint/style/useNamingConvention: clave del enum TipoBloque
+  SQL_EJERCICIO: {
+    etiqueta: "Reto SQL",
+    icono: Database,
+    descripcionCorta: "Enunciado de un reto SQL ejecutable sobre PGlite.",
+  },
+  // biome-ignore lint/style/useNamingConvention: clave del enum TipoBloque
+  SQL_TESTS: {
+    etiqueta: "Tests SQL",
+    icono: FlaskConical,
+    descripcionCorta: "Consultas de referencia asociadas a un reto SQL.",
+  },
 }
 
 export function tipoBloqueMeta(tipo: TipoBloque): TipoBloqueMeta {
@@ -92,6 +105,7 @@ export function tiposBloqueOrdenados(): readonly TipoBloque[] {
     "CODIGO_ILUSTRATIVO",
     "CODIGO_PREGUNTAS",
     "CODIGO_TESTS",
+    "SQL_EJERCICIO",
   ]
 }
 
@@ -142,6 +156,15 @@ export function resumenBloque(
       const elementos = Array.isArray(contenido.elements) ? contenido.elements.length : 0
       const resumen = caption || altText
       return resumen ? resumen.slice(0, 120) : `${elementos} elemento${elementos === 1 ? "" : "s"}`
+    }
+    case "SQL_EJERCICIO":
+    case "SQL_TESTS": {
+      const enunciado = typeof contenido.enunciado === "string" ? contenido.enunciado : ""
+      const tests = Array.isArray(contenido.tests) ? contenido.tests.length : 0
+      if (enunciado) {
+        return enunciado.slice(0, 120)
+      }
+      return tests > 0 ? `${tests} test${tests === 1 ? "" : "s"}` : meta.etiqueta
     }
     default:
       return meta.etiqueta
