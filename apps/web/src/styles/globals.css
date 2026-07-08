@@ -1045,6 +1045,17 @@ select:focus-visible {
   outline: none;
 }
 
+/* Los radios y checkboxes NATIVOS "desnudos" (p. ej. el quiz del curso inmersivo,
+   con `accent-*`) quedaban sin indicador de foco tras el `outline: none` de arriba.
+   Se los devolvemos con el anillo de acento por token. WCAG 2.2 §2.4.7.
+   `:where()` mantiene la especificidad baja (0-1-1) para NO pisar el lenguaje de
+   foco propio del `Checkbox` base (`shared/components/ui/checkbox.tsx`, ring aurora
+   0-2-0), evitando el doble anillo y la mezcla de capas marca+acción. */
+input:where([type="radio"], [type="checkbox"]):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

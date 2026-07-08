@@ -42,6 +42,9 @@ export function TerminalSql({ ejecucion, isEjecutando }: TerminalSqlProps) {
         minHeight: "140px",
       }}
     >
+      {/* `<output>` (rol status implícito, live polite): anuncia el desenlace al
+          lector de pantalla UNA vez al terminar (no el stream fila a fila). WCAG 2.2 §4.1.3. */}
+      <output className="sr-only">{resumenAccesibleSql(ejecucion, isEjecutando)}</output>
       <header className="flex items-center justify-between border-white/10 border-b pb-2 text-[10px] uppercase tracking-[0.22em]">
         <span style={{ color: "var(--color-code-line-number)" }}>Terminal</span>
         <span style={{ color: "var(--color-code-line-number)" }}>{etiqueta}</span>
@@ -55,6 +58,25 @@ export function TerminalSql({ ejecucion, isEjecutando }: TerminalSqlProps) {
       </div>
     </section>
   )
+}
+
+/**
+ * Frase de desenlace para el lector de pantalla. Vacía mientras se ejecuta o si
+ * no hay ejecución previa, para que la región live solo anuncie el resultado
+ * final.
+ */
+export function resumenAccesibleSql(
+  ejecucion: ResultadoEjecucionSql | null,
+  isEjecutando: boolean,
+): string {
+  if (isEjecutando || !ejecucion) {
+    return ""
+  }
+  const fallados = ejecucion.testsTotales - ejecucion.testsPasados
+  if (fallados === 0) {
+    return `Consulta ejecutada: pasaron las ${ejecucion.testsTotales} pruebas.`
+  }
+  return `Consulta ejecutada: ${ejecucion.testsPasados} de ${ejecucion.testsTotales} pruebas pasaron; ${fallados} fallaron.`
 }
 
 interface CuerpoProps {

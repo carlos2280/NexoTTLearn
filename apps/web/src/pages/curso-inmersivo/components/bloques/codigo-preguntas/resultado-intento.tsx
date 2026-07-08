@@ -3,7 +3,9 @@ import type { IntentoBloqueResponse } from "@nexott-learn/shared-types"
 import { CheckCircle2, RotateCcw } from "lucide-react"
 
 interface ResultadoIntentoProps {
-  readonly intento: IntentoBloqueResponse
+  /** `null` mientras no se haya enviado ningún intento. El componente se monta
+   *  igual (región live persistente), solo cambia su contenido. */
+  readonly intento: IntentoBloqueResponse | null
   readonly notaAprobado: number
   /**
    * Mejor intento *previo* al actual (antes de enviar). Permite distinguir
@@ -12,14 +14,28 @@ interface ResultadoIntentoProps {
   readonly mejorPrevio: IntentoBloqueResponse | null
 }
 
+interface Veredicto {
+  readonly aprobado: boolean
+  readonly primeraVez: boolean
+  readonly mensaje: string
+}
+
 export function ResultadoIntento({ intento, notaAprobado, mejorPrevio }: ResultadoIntentoProps) {
-  const aprobado = intento.nota >= notaAprobado
-  const yaEstabaAprobado = (mejorPrevio?.nota ?? -1) >= notaAprobado
-  const primeraVez = aprobado && !yaEstabaAprobado
+  const veredicto = intento ? evaluarVeredicto(intento.nota, notaAprobado, mejorPrevio) : null
+  return (
+    <>
+      {/* Región live persistente: se monta SIEMPRE (aunque no haya intento) y su
+          texto pasa de "" al veredicto → anuncio fiable. Una región `status`
+          insertada en el DOM ya poblada suele NO anunciarse (JAWS/NVDA). WCAG 2.2 §4.1.3. */}
+      <output className="sr-only">{veredicto?.mensaje ?? ""}</output>
+      {veredicto ? <BannerVeredicto veredicto={veredicto} /> : null}
+    </>
+  )
+}
 
+function BannerVeredicto({ veredicto }: { readonly veredicto: Veredicto }) {
+  const { aprobado, primeraVez, mensaje } = veredicto
   const Icono = aprobado ? CheckCircle2 : RotateCcw
-  const mensaje = construirMensaje({ aprobado, primeraVez })
-
   return (
     <aside
       className={cn(
@@ -37,6 +53,17 @@ export function ResultadoIntento({ intento, notaAprobado, mejorPrevio }: Resulta
       </p>
     </aside>
   )
+}
+
+function evaluarVeredicto(
+  nota: number,
+  notaAprobado: number,
+  mejorPrevio: IntentoBloqueResponse | null,
+): Veredicto {
+  const aprobado = nota >= notaAprobado
+  const yaEstabaAprobado = (mejorPrevio?.nota ?? -1) >= notaAprobado
+  const primeraVez = aprobado && !yaEstabaAprobado
+  return { aprobado, primeraVez, mensaje: construirMensaje({ aprobado, primeraVez }) }
 }
 
 function construirMensaje(args: { aprobado: boolean; primeraVez: boolean }): string {

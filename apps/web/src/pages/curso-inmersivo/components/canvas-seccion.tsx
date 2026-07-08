@@ -82,7 +82,16 @@ export function CanvasSeccion({
         titulo={seccionActiva.titulo}
         bloquesTotales={seccionActiva.avance?.bloquesTotales}
       />
-      <main ref={mainRef} className="flex flex-1 flex-col overflow-y-auto">
+      {/* tabIndex + aria-label: la región de lectura es scrollable, así que debe
+          poder recorrerse solo con teclado (WCAG 2.2 §2.1.1). El offset negativo
+          mantiene el anillo de foco dentro del área con overflow, sin recortarse. */}
+      <main
+        ref={mainRef}
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: región scrollable de lectura — WCAG 2.2 §2.1.1 exige que sea recorrible por teclado; el tabIndex=0 con aria-label es el patrón estándar de scroll container y aquí es intencional.
+        tabIndex={0}
+        aria-label="Contenido de la sección"
+        className="focus-visible:-outline-offset-2 flex flex-1 flex-col overflow-y-auto"
+      >
         <LienzoArchivo>
           <AnimatePresence mode="wait">
             <motion.div

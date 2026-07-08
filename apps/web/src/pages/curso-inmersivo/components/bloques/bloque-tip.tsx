@@ -1,5 +1,5 @@
 import { cn } from "@/shared/lib/cn"
-import { sanitizarHtml } from "@/shared/lib/sanitize-html"
+import { normalizarEncabezadosLeccion, sanitizarHtml } from "@/shared/lib/sanitize-html"
 import { type VarianteTip, contenidoTipSchema } from "@nexott-learn/shared-types"
 import { CheckCircle2, Info, type LucideIcon, TriangleAlert } from "lucide-react"
 
@@ -53,7 +53,7 @@ export function BloqueTip({ contenido }: BloqueTipProps) {
   if (!parsed.success) {
     return null
   }
-  const html = sanitizarHtml(parsed.data.html)
+  const html = normalizarEncabezadosLeccion(sanitizarHtml(parsed.data.html))
   if (html.trim().length === 0) {
     return null
   }

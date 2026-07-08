@@ -124,14 +124,14 @@ function QuizActivo({ bloqueId, cursoId, colaboradorId, contenido }: QuizActivoP
           />
         ))}
       </ol>
-      {ultimoIntento ? (
-        <ResultadoIntentoQuiz
-          intento={ultimoIntento}
-          notaMinima={contenido.notaMinima}
-          totalPreguntas={total}
-          mejorPrevio={mejorPrevioAlEnviar}
-        />
-      ) : null}
+      {/* Siempre montado (aunque no haya intento) para que su región live anuncie
+          el veredicto de forma fiable al poblarse. */}
+      <ResultadoIntentoQuiz
+        intento={ultimoIntento}
+        notaMinima={contenido.notaMinima}
+        totalPreguntas={total}
+        mejorPrevio={mejorPrevioAlEnviar}
+      />
       <footer className="flex items-center justify-between gap-3 border-border border-t pt-4">
         <p className="text-caption text-text-tertiary">
           Contestadas {totalContestadas} de {total}.

@@ -193,13 +193,13 @@ function RetoActivo({
           No pudimos ejecutar los tests en el navegador: {flujo.errorEjecucion.message}
         </aside>
       ) : null}
-      {flujo.ultimoIntento ? (
-        <ResultadoIntento
-          intento={flujo.ultimoIntento}
-          notaAprobado={NOTA_APROBADO_DEFAULT}
-          mejorPrevio={mejorPrevioAlEnviar}
-        />
-      ) : null}
+      {/* Siempre montado (aunque no haya intento) para que su región live anuncie
+          el veredicto de forma fiable al poblarse. */}
+      <ResultadoIntento
+        intento={flujo.ultimoIntento}
+        notaAprobado={NOTA_APROBADO_DEFAULT}
+        mejorPrevio={mejorPrevioAlEnviar}
+      />
     </article>
   )
 }

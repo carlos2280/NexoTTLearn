@@ -3,7 +3,9 @@ import type { ContenidoQuiz, IntentoBloqueResponse } from "@nexott-learn/shared-
 import { CheckCircle2, RotateCcw } from "lucide-react"
 
 interface ResultadoIntentoQuizProps {
-  readonly intento: IntentoBloqueResponse
+  /** `null` mientras no se haya enviado ningún intento. El componente se monta
+   *  igual (región live persistente), solo cambia su contenido. */
+  readonly intento: IntentoBloqueResponse | null
   readonly notaMinima: number
   readonly totalPreguntas: number
   /**
@@ -14,22 +16,54 @@ interface ResultadoIntentoQuizProps {
   readonly mejorPrevio: IntentoBloqueResponse | null
 }
 
+interface VeredictoQuiz {
+  readonly aprobado: boolean
+  readonly primeraVez: boolean
+  readonly acertadas: number
+  readonly nota: number
+  readonly mensaje: string
+}
+
 export function ResultadoIntentoQuiz({
   intento,
   notaMinima,
   totalPreguntas,
   mejorPrevio,
 }: ResultadoIntentoQuizProps) {
-  const aprobado = intento.nota >= notaMinima
-  const yaEstabaAprobado = (mejorPrevio?.nota ?? -1) >= notaMinima
-  const primeraVez = aprobado && !yaEstabaAprobado
-  const acertadas = totalPreguntas - intento.preguntasFalladas.length
-
-  const Icono = aprobado ? CheckCircle2 : RotateCcw
-  const mensaje = construirMensaje({ aprobado, primeraVez })
-
+  const veredicto = intento
+    ? evaluarVeredictoQuiz(intento, notaMinima, totalPreguntas, mejorPrevio)
+    : null
+  const fraseAccesible = veredicto
+    ? `${veredicto.nota} por ciento. Acertaste ${veredicto.acertadas} de ${totalPreguntas}. ${veredicto.mensaje}`
+    : ""
   return (
+    <>
+      {/* Región live persistente: se monta SIEMPRE y su texto pasa de "" al
+          veredicto completo → anuncio fiable (una región `status` insertada ya
+          poblada suele NO anunciarse). WCAG 2.2 §4.1.3. */}
+      <output className="sr-only">{fraseAccesible}</output>
+      {veredicto ? (
+        <BannerQuiz veredicto={veredicto} notaMinima={notaMinima} totalPreguntas={totalPreguntas} />
+      ) : null}
+    </>
+  )
+}
+
+function BannerQuiz({
+  veredicto,
+  notaMinima,
+  totalPreguntas,
+}: {
+  readonly veredicto: VeredictoQuiz
+  readonly notaMinima: number
+  readonly totalPreguntas: number
+}) {
+  const { aprobado, primeraVez, acertadas, nota, mensaje } = veredicto
+  const Icono = aprobado ? CheckCircle2 : RotateCcw
+  return (
+    // aria-hidden: el `<output>` de arriba ya anuncia todo esto; esto es la vista.
     <aside
+      aria-hidden={true}
       className={cn(
         "flex items-start gap-3 rounded-2xl border p-4",
         aprobado ? "border-success/30 bg-success-soft" : "border-warmth/30 bg-warning-soft",
@@ -48,7 +82,7 @@ export function ResultadoIntentoQuiz({
               aprobado ? "text-success-on-soft" : "text-warning-on-soft",
             )}
           >
-            {Math.round(intento.nota)}%
+            {nota}%
           </span>
           <span className="text-caption text-text-tertiary">
             Acertaste {acertadas} de {totalPreguntas} · umbral {notaMinima}%
@@ -62,6 +96,25 @@ export function ResultadoIntentoQuiz({
       </div>
     </aside>
   )
+}
+
+function evaluarVeredictoQuiz(
+  intento: IntentoBloqueResponse,
+  notaMinima: number,
+  totalPreguntas: number,
+  mejorPrevio: IntentoBloqueResponse | null,
+): VeredictoQuiz {
+  const aprobado = intento.nota >= notaMinima
+  const yaEstabaAprobado = (mejorPrevio?.nota ?? -1) >= notaMinima
+  const primeraVez = aprobado && !yaEstabaAprobado
+  const acertadas = totalPreguntas - intento.preguntasFalladas.length
+  return {
+    aprobado,
+    primeraVez,
+    acertadas,
+    nota: Math.round(intento.nota),
+    mensaje: construirMensaje({ aprobado, primeraVez }),
+  }
 }
 
 function construirMensaje(args: { aprobado: boolean; primeraVez: boolean }): string {

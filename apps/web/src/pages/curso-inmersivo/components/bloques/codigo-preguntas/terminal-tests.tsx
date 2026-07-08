@@ -48,6 +48,10 @@ export function TerminalTests({ ejecucion, isEjecutando }: TerminalTestsProps) {
         minHeight: "140px",
       }}
     >
+      {/* `<output>` (rol status implícito, live polite): anuncia el desenlace al
+          lector de pantalla UNA vez al terminar (no el stream fila a fila, que
+          spamearía). WCAG 2.2 §4.1.3. */}
+      <output className="sr-only">{resumenAccesibleTests(ejecucion, isEjecutando)}</output>
       <CabeceraTerminal ejecucion={ejecucion} isEjecutando={isEjecutando} />
       <div ref={scrollRef} className="max-h-[260px] overflow-y-auto pr-1">
         <CuerpoTerminal
@@ -58,6 +62,25 @@ export function TerminalTests({ ejecucion, isEjecutando }: TerminalTestsProps) {
       </div>
     </section>
   )
+}
+
+/**
+ * Frase de desenlace para el lector de pantalla. Vacía mientras se ejecuta o si
+ * no hay ejecución previa, de modo que la región live solo anuncia el resultado
+ * final (no cada fila del stream).
+ */
+export function resumenAccesibleTests(
+  ejecucion: ResultadoEjecucionSuite | null,
+  isEjecutando: boolean,
+): string {
+  if (isEjecutando || !ejecucion) {
+    return ""
+  }
+  const fallados = ejecucion.testsTotales - ejecucion.testsPasados
+  if (fallados === 0) {
+    return `Ejecución completa: pasaron las ${ejecucion.testsTotales} pruebas.`
+  }
+  return `Ejecución completa: ${ejecucion.testsPasados} de ${ejecucion.testsTotales} pruebas pasaron; ${fallados} fallaron.`
 }
 
 function CabeceraTerminal({
