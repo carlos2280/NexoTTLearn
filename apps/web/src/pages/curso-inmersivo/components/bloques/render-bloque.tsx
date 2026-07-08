@@ -4,6 +4,7 @@ import type {
   ModoCursoParticipante,
 } from "@nexott-learn/shared-types"
 import { contenidoQuizSchema } from "@nexott-learn/shared-types"
+import { MARCA_CODIGO, MARCA_QUIZ } from "../ide/celda-evaluable"
 import { BloqueCodigoIlustrativo } from "./bloque-codigo-ilustrativo"
 import { BloqueCodigoPreguntas } from "./bloque-codigo-preguntas"
 import { BloqueDiagrama } from "./bloque-diagrama"
@@ -81,13 +82,13 @@ export function RenderBloque({
           <BloqueEvaluableCerrado
             bloqueId={bloque.id}
             colaboradorId={colaboradorId}
-            titulo="Quiz"
+            marca={MARCA_QUIZ}
             notaMinima={notaMinima}
           />
         )
       }
       if (modo === "preview" || !colaboradorId) {
-        return <BloqueEvaluablePreviewLock titulo="Quiz" />
+        return <BloqueEvaluablePreviewLock marca={MARCA_QUIZ} />
       }
       return (
         <EvaluableConIndicador
@@ -110,13 +111,13 @@ export function RenderBloque({
           <BloqueEvaluableCerrado
             bloqueId={bloque.id}
             colaboradorId={colaboradorId}
-            titulo="Ejercicio de código"
+            marca={MARCA_CODIGO}
             notaMinima={NOTA_APROBADO_CODIGO_DEFAULT}
           />
         )
       }
       if (modo === "preview" || !colaboradorId) {
-        return <BloqueEvaluablePreviewLock titulo="Ejercicio de código" />
+        return <BloqueEvaluablePreviewLock marca={MARCA_CODIGO} />
       }
       return (
         <EvaluableConIndicador
