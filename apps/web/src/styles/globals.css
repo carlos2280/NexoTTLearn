@@ -1760,11 +1760,14 @@ button:not(:disabled):not([aria-disabled="true"]):not([data-disabled]) {
 .nx-ide .tiptap h3,
 .nx-ide .tiptap p:has(> strong:only-child) {
   font-family: var(--font-code);
-  font-weight: 500;
+  font-weight: 400;
+  font-style: italic;
   font-size: 14px;
   line-height: 1.55;
   letter-spacing: 0;
-  color: var(--color-text-secondary);
+  /* Todo el comentario en el color-comentario (no solo el `//`): un comentario
+     real recede parejo, texto y glifo del mismo gris apagado. */
+  color: var(--color-syntax-comment);
   margin: 1.75em 0 0.6em;
 }
 .nx-ide .tiptap h2:first-child,

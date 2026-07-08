@@ -1,4 +1,3 @@
-import { IlustracionModulo } from "@/shared/components/ilustracion-modulo"
 import type { ModoCursoParticipante } from "@nexott-learn/shared-types"
 import type { SeccionActiva } from "../../hooks/use-seccion-activa"
 
@@ -7,43 +6,53 @@ interface CabeceraSeccionProps {
   readonly modo: ModoCursoParticipante
 }
 
+/**
+ * Cabecera de sección en lenguaje "archivo abierto": un breadcrumb mono con la
+ * ruta lógica (módulo, y `preview`/`opcional` si aplica) y el título como
+ * heading markdown (`#`). Sin ilustración ni display gigante — el nombre de la
+ * sección ya vive en el tab-strip y en el sidebar; aquí basta con "abrir el
+ * archivo". El subtítulo se lee como comentario (`//`), coherente con los
+ * subtítulos del cuerpo.
+ */
 export function CabeceraSeccion({ seccion, modo }: CabeceraSeccionProps) {
-  const partes = partesEyebrow(seccion, modo)
+  const sufijo = sufijoRuta(seccion, modo)
   return (
-    <header className="flex flex-col items-start gap-4 sm:flex-row sm:items-start sm:gap-5">
-      <IlustracionModulo
-        tituloModulo={seccion.moduloTitulo}
-        className="h-16 w-16 shrink-0 sm:mt-1.5"
-      />
-      <div className="flex min-w-0 flex-col gap-2">
-        <span className="nx-eyebrow text-text-secondary">
-          <span>{partes.prefijo}</span>
-          <span className="text-aurora-violet">{partes.modulo}</span>
-          {partes.sufijo ? <span className="text-text-tertiary"> · {partes.sufijo}</span> : null}
+    <header className="flex flex-col gap-3">
+      <div className="flex items-center gap-2 font-code text-caption text-text-tertiary">
+        <span className="truncate">
+          Módulo {seccion.moduloOrden} · {seccion.moduloTitulo}
         </span>
-        <h2 className="text-display-md text-text-primary leading-tight">{seccion.titulo}</h2>
-        <p className="text-body text-text-secondary">{copySubtitulo(seccion, modo)}</p>
+        {sufijo ? (
+          <>
+            <span aria-hidden={true} className="text-text-disabled">
+              /
+            </span>
+            <span className="text-text-secondary">{sufijo}</span>
+          </>
+        ) : null}
       </div>
+      <h2 className="flex items-baseline gap-2.5 leading-tight">
+        <span aria-hidden={true} className="font-code text-accent text-h3">
+          #
+        </span>
+        <span className="text-h1 text-text-primary">{seccion.titulo}</span>
+      </h2>
+      <p className="font-code text-[color:var(--color-syntax-comment)] text-body-sm italic">
+        <span aria-hidden={true}>{"// "}</span>
+        {copySubtitulo(seccion, modo)}
+      </p>
     </header>
   )
 }
 
-interface PartesEyebrow {
-  readonly prefijo: string
-  readonly modulo: string
-  readonly sufijo: string | null
-}
-
-function partesEyebrow(seccion: SeccionActiva, modo: ModoCursoParticipante): PartesEyebrow {
-  const prefijo = `Módulo ${seccion.moduloOrden} · `
-  const modulo = seccion.moduloTitulo
+function sufijoRuta(seccion: SeccionActiva, modo: ModoCursoParticipante): string | null {
   if (modo === "preview") {
-    return { prefijo, modulo, sufijo: "Vista previa" }
+    return "preview"
   }
   if (seccion.caracter === "OPCIONAL") {
-    return { prefijo, modulo, sufijo: "Opcional" }
+    return "opcional"
   }
-  return { prefijo, modulo, sufijo: null }
+  return null
 }
 
 function copySubtitulo(seccion: SeccionActiva, modo: ModoCursoParticipante): string {
