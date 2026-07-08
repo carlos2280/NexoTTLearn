@@ -10,6 +10,7 @@ import { CabeceraSeccion } from "./canvas/cabecera-seccion"
 import { CargandoBloques, Centrado, ErrorBloques, SeccionVacia } from "./canvas/canvas-estados"
 import { indexarTestsPorPregunta } from "./canvas/indexar-tests-por-pregunta"
 import { IdeTabStrip } from "./ide/ide-tab-strip"
+import { LienzoArchivo } from "./ide/lienzo-archivo"
 
 interface CanvasSeccionProps {
   readonly seccionActiva: SeccionActiva | null
@@ -76,38 +77,40 @@ export function CanvasSeccion({
         titulo={seccionActiva.titulo}
         bloquesTotales={seccionActiva.avance?.bloquesTotales}
       />
-      <main ref={mainRef} className="flex flex-1 flex-col overflow-y-auto px-8 py-10">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={seccionActiva.seccionId}
-            initial={reducedMotion ? false : { opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={reducedMotion ? undefined : { opacity: 0, y: -4 }}
-            transition={transicion}
-            className="flex flex-col gap-8"
-          >
-            <CabeceraSeccion seccion={seccionActiva} modo={modo} />
-            {bloques.isLoading ? <CargandoBloques /> : null}
-            {bloques.error ? <ErrorBloques /> : null}
-            {bloques.data && bloques.data.length === 0 ? <SeccionVacia /> : null}
-            {bloques.data && bloques.data.length > 0 ? (
-              <ol className="flex flex-col gap-6">
-                {bloques.data.map((bloque) => (
-                  <li key={bloque.id}>
-                    <RenderBloque
-                      bloque={bloque}
-                      cursoId={cursoId}
-                      colaboradorId={colaboradorParaBloques}
-                      modo={modo}
-                      contenidoTests={testsPorPreguntaId.get(bloque.id) ?? null}
-                      soloLectura={soloLectura}
-                    />
-                  </li>
-                ))}
-              </ol>
-            ) : null}
-          </motion.div>
-        </AnimatePresence>
+      <main ref={mainRef} className="flex flex-1 flex-col overflow-y-auto">
+        <LienzoArchivo>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={seccionActiva.seccionId}
+              initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reducedMotion ? undefined : { opacity: 0, y: -4 }}
+              transition={transicion}
+              className="flex flex-col gap-8"
+            >
+              <CabeceraSeccion seccion={seccionActiva} modo={modo} />
+              {bloques.isLoading ? <CargandoBloques /> : null}
+              {bloques.error ? <ErrorBloques /> : null}
+              {bloques.data && bloques.data.length === 0 ? <SeccionVacia /> : null}
+              {bloques.data && bloques.data.length > 0 ? (
+                <ol className="flex flex-col gap-6">
+                  {bloques.data.map((bloque) => (
+                    <li key={bloque.id}>
+                      <RenderBloque
+                        bloque={bloque}
+                        cursoId={cursoId}
+                        colaboradorId={colaboradorParaBloques}
+                        modo={modo}
+                        contenidoTests={testsPorPreguntaId.get(bloque.id) ?? null}
+                        soloLectura={soloLectura}
+                      />
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
+            </motion.div>
+          </AnimatePresence>
+        </LienzoArchivo>
       </main>
     </div>
   )

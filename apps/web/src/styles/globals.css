@@ -1749,3 +1749,36 @@ button:not(:disabled):not([aria-disabled="true"]):not([data-disabled]) {
 [data-theme="dark"] .nx-ide .tiptap pre code .hljs-function {
   color: var(--color-syntax-function);
 }
+
+/* Subtítulos de la lección como comentarios del "archivo" — SCOPED a `.nx-ide`
+ * (el lector del curso, en claro y oscuro). Un subtítulo de prosa —sea un
+ * `h2/h3` o un párrafo cuyo único hijo es un `<strong>` (patrón real del
+ * contenido)— se vuelve un banner mono tipo comentario (`// ...`). La prosa
+ * normal sigue en sans; los `<strong>` inline (con texto después) NO se tocan.
+ * Fuera del curso, el editor del admin conserva sus headings editoriales. */
+.nx-ide .tiptap h2,
+.nx-ide .tiptap h3,
+.nx-ide .tiptap p:has(> strong:only-child) {
+  font-family: var(--font-code);
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 1.55;
+  letter-spacing: 0;
+  color: var(--color-text-secondary);
+  margin: 1.75em 0 0.6em;
+}
+.nx-ide .tiptap h2:first-child,
+.nx-ide .tiptap h3:first-child,
+.nx-ide .tiptap p:has(> strong:only-child):first-child {
+  margin-top: 0;
+}
+.nx-ide .tiptap h2::before,
+.nx-ide .tiptap h3::before,
+.nx-ide .tiptap p:has(> strong:only-child)::before {
+  content: "// ";
+  color: var(--color-syntax-comment);
+}
+.nx-ide .tiptap p:has(> strong:only-child) > strong {
+  font-weight: inherit;
+  color: inherit;
+}

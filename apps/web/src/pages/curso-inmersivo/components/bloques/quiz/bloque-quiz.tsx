@@ -7,7 +7,7 @@ import {
   contenidoQuizSchema,
 } from "@nexott-learn/shared-types"
 import { useState } from "react"
-import { CabeceraQuiz } from "./cabecera-quiz"
+import { CeldaBloque } from "../../ide/celda-bloque"
 import { PreguntaItem } from "./pregunta-item"
 import { ResultadoIntentoQuiz, decidirMostrarSolucion } from "./resultado-intento-quiz"
 import { useQuizRespuestas } from "./use-quiz-respuestas"
@@ -105,11 +105,12 @@ function QuizActivo({ bloqueId, cursoId, colaboradorId, contenido }: QuizActivoP
   }
 
   return (
-    <article
-      className="relative flex flex-col gap-5 overflow-hidden rounded-2xl border border-border bg-surface p-6"
-      style={{ boxShadow: "var(--shadow-card-resting)" }}
+    <CeldaBloque
+      glifo="?"
+      etiqueta={`quiz · ${total} pregunta${total === 1 ? "" : "s"}`}
+      tonoGlifo="text-accent"
+      bodyClassName="flex flex-col gap-5"
     >
-      <CabeceraQuiz totalPreguntas={total} />
       <ol className="flex flex-col gap-6">
         {contenido.preguntas.map((pregunta, idx) => (
           <PreguntaItem
@@ -146,6 +147,6 @@ function QuizActivo({ bloqueId, cursoId, colaboradorId, contenido }: QuizActivoP
           </Button>
         </div>
       </footer>
-    </article>
+    </CeldaBloque>
   )
 }
