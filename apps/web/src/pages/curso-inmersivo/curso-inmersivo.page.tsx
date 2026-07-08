@@ -9,12 +9,13 @@ import { FooterPreviewInscripcion } from "./components/footer-preview-inscripcio
 import { IdeActivityBar } from "./components/ide/ide-activity-bar"
 import { IdeStatusbar } from "./components/ide/ide-statusbar"
 import { IdeTitlebar } from "./components/ide/ide-titlebar"
-import { PanelContexto } from "./components/panel-contexto"
+import { PanelAvance } from "./components/panel-avance"
 import { PantallaError } from "./components/pantalla-error"
 import { SidebarPlan } from "./components/sidebar-plan"
 import { useAtajosCurso } from "./hooks/use-atajos-curso"
 import { useCursoInmersivo } from "./hooks/use-curso-inmersivo"
 import { useEfectoApertura } from "./hooks/use-efecto-apertura"
+import { usePanelAvance } from "./hooks/use-panel-avance"
 import { useSeccionActiva } from "./hooks/use-seccion-activa"
 import { useSidebarColapsado } from "./hooks/use-sidebar-colapsado"
 
@@ -48,6 +49,7 @@ export function CursoInmersivoPage() {
   const [hitoActivo, setHitoActivo] = useState<HitoTipo | null>(null)
   const [chatEntrevistaIaActivo, setChatEntrevistaIaActivo] = useState(false)
   const { colapsado: sidebarColapsado, toggle: toggleSidebar } = useSidebarColapsado()
+  const { abierto: panelAvanceAbierto, toggle: togglePanelAvance } = usePanelAvance()
 
   const seleccionarSeccion = useCallback(
     (seccionId: string) => {
@@ -119,6 +121,8 @@ export function CursoInmersivoPage() {
       onChatEntrevistaIaActivo={setChatEntrevistaIaActivo}
       sidebarColapsado={sidebarColapsado}
       onToggleSidebar={toggleSidebar}
+      panelAvanceAbierto={panelAvanceAbierto}
+      onTogglePanelAvance={togglePanelAvance}
     />
   )
 }
@@ -142,6 +146,8 @@ interface CursoInmersivoLayoutProps {
   readonly onChatEntrevistaIaActivo: (activo: boolean) => void
   readonly sidebarColapsado: boolean
   readonly onToggleSidebar: () => void
+  readonly panelAvanceAbierto: boolean
+  readonly onTogglePanelAvance: () => void
 }
 
 function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
@@ -164,14 +170,14 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
     onChatEntrevistaIaActivo,
     sidebarColapsado,
     onToggleSidebar,
+    panelAvanceAbierto,
+    onTogglePanelAvance,
   } = props
   const seccionActivaId = hitoActivo === null ? (seccionActiva?.seccionId ?? null) : null
   const esPreview = modo === "preview"
-  const muestraPanelContexto = !esPreview && avance !== undefined
+  const muestraAvance = !esPreview && avance !== undefined
   const anchoSidebar = sidebarColapsado ? "0px" : "320px"
-  const gridTemplate = muestraPanelContexto
-    ? `48px ${anchoSidebar} minmax(0,1fr) 320px`
-    : `48px ${anchoSidebar} minmax(0,1fr)`
+  const gridTemplate = `48px ${anchoSidebar} minmax(0,1fr)`
 
   return (
     <div className="nx-ide nx-motion-immersive flex h-screen flex-col bg-canvas">
@@ -225,18 +231,16 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
             onChatEntrevistaIaActivo={onChatEntrevistaIaActivo}
           />
         )}
-        {muestraPanelContexto && avance ? (
-          <PanelContexto
-            avance={avance}
-            transversal={transversal}
-            entrevistaIa={entrevistaIa}
-            seccionActivaId={seccionActivaId}
-            onIrASiguiente={onSeleccionarSeccion}
-            onAbrirHito={onAbrirHito}
-            atenuado={modoFocus}
-          />
-        ) : null}
       </div>
+      {muestraAvance && avance && panelAvanceAbierto ? (
+        <PanelAvance
+          avance={avance}
+          seccionActivaId={seccionActivaId}
+          onIrASiguiente={onSeleccionarSeccion}
+          onCerrar={onTogglePanelAvance}
+          atenuado={modoFocus}
+        />
+      ) : null}
       <PieInmersivo
         esPreview={esPreview}
         cursoId={arbol.curso.id}
@@ -246,6 +250,9 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
         porcentajeAvance={avance?.porcentajeAvance ?? null}
         soloLectura={soloLectura}
         atenuado={modoFocus}
+        panelAvance={
+          muestraAvance ? { abierto: panelAvanceAbierto, onToggle: onTogglePanelAvance } : undefined
+        }
       />
     </div>
   )
@@ -260,6 +267,7 @@ interface PieInmersivoProps {
   readonly porcentajeAvance: number | null
   readonly soloLectura: boolean
   readonly atenuado: boolean
+  readonly panelAvance?: { readonly abierto: boolean; readonly onToggle: () => void }
 }
 
 /**
@@ -276,6 +284,7 @@ function PieInmersivo({
   porcentajeAvance,
   soloLectura,
   atenuado,
+  panelAvance,
 }: PieInmersivoProps) {
   if (esPreview) {
     return (
@@ -292,6 +301,7 @@ function PieInmersivo({
       porcentajeAvance={porcentajeAvance}
       soloLectura={soloLectura}
       atenuado={atenuado}
+      panelAvance={panelAvance}
     />
   )
 }
