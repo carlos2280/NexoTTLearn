@@ -120,6 +120,7 @@ describe("contenidoBloquePorTipo — cobertura completa de tipos", () => {
       "DIAGRAMA",
       "SQL_EJERCICIO",
       "SQL_TESTS",
+      "GIT_EJERCICIO",
     ]
     for (const t of tipos) {
       expect(contenidoBloquePorTipo[t]).toBeDefined()

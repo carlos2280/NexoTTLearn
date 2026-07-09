@@ -339,6 +339,40 @@ x
     })
   })
 
+  describe("bloque GIT_EJERCICIO", () => {
+    it("parsea un ejercicio de git con enunciado, objetivo declarativo y pista", () => {
+      const out = parsearCursoMd(
+        md(
+          "# M",
+          "## S",
+          "::: git",
+          "enunciado: Crea una rama, commitea el arreglo y hazle merge a main.",
+          "objetivo:",
+          "  ramaActiva: main",
+          "  hayMergeEnMain: true",
+          "  commitsMinimos: 1",
+          "pista: git checkout -b fix/correa → git commit -m ... → git merge",
+          ":::",
+        ),
+      )
+      const bloque = primerBloque(out)
+      expect(bloque.tipo).toBe("GIT_EJERCICIO")
+      if (bloque.tipo === "GIT_EJERCICIO") {
+        expect(bloque.contenido.enunciado).toContain("merge a main")
+        expect(bloque.contenido.objetivo.ramaActiva).toBe("main")
+        expect(bloque.contenido.objetivo.hayMergeEnMain).toBe(true)
+        expect(bloque.contenido.objetivo.commitsMinimos).toBe(1)
+        expect(bloque.contenido.pista).toContain("checkout -b")
+      }
+    })
+
+    it("rechaza bloque git sin objetivo", () => {
+      expect(() => parsearCursoMd(md("# M", "## S", "::: git", "enunciado: x", ":::"))).toThrow(
+        /objetivo/u,
+      )
+    })
+  })
+
   describe("otros bloques", () => {
     it("parsea CODIGO_ILUSTRATIVO", () => {
       const out = parsearCursoMd(

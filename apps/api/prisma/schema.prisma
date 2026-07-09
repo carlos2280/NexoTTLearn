@@ -68,6 +68,7 @@ enum TipoBloque {
   DIAGRAMA
   SQL_EJERCICIO
   SQL_TESTS
+  GIT_EJERCICIO
 
   @@map("tipo_bloque_enum")
 }

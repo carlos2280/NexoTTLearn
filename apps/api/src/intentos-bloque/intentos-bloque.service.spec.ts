@@ -1143,6 +1143,7 @@ describe("IntentosBloqueService.obtenerDetalleBloqueParaAdmin", () => {
   })
 })
 
-// Silenciar warning "noUnusedVars" para OTRO_BLOQUE_ID si solo se usara
-// en futuras iteraciones; lo mantenemos para fixtures de drawer multi-bloque.
+// Mantenemos OTRO_BLOQUE_ID como fixture reservado para tests de drawer
+// multi-bloque; la referencia evita que tsc lo marque como no usado.
+// biome-ignore lint/complexity/noVoid: referencia intencional a un fixture reservado (equivale a "usar" la constante para tsc).
 void OTRO_BLOQUE_ID

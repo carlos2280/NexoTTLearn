@@ -17,6 +17,7 @@ export const tipoBloqueSchema = z.enum([
   "DIAGRAMA",
   "SQL_EJERCICIO",
   "SQL_TESTS",
+  "GIT_EJERCICIO",
 ])
 export type TipoBloque = z.infer<typeof tipoBloqueSchema>
 

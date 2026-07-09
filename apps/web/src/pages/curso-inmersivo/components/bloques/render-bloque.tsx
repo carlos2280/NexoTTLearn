@@ -17,6 +17,7 @@ import { BloqueRecurso } from "./bloque-recurso"
 import { BloqueTip } from "./bloque-tip"
 import { BloqueVideo } from "./bloque-video"
 import { EvaluableConIndicador } from "./evaluable-con-indicador"
+import { BloqueGitEjercicio } from "./git-ejercicio/bloque-git-ejercicio"
 import { BloqueQuiz } from "./quiz/bloque-quiz"
 import { BloqueSqlEjercicio } from "./sql-ejercicio/bloque-sql-ejercicio"
 
@@ -136,6 +137,10 @@ export function RenderBloque({
           )}
         </EnvolturaEvaluable>
       )
+    case "GIT_EJERCICIO":
+      // Autocontenido: no registra intento (por ahora). El `objetivo` declarativo
+      // del contenido habilita el futuro modo evaluable sin cambiar el modelo.
+      return <BloqueGitEjercicio contenido={bloque.contenido} />
     case "CODIGO_TESTS":
       return null
     case "SQL_TESTS":

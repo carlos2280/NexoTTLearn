@@ -40,6 +40,7 @@ const TIPOS_FENCE = new Set([
   "quiz",
   "codigo",
   "sql",
+  "git",
   "codigo_ilustrativo",
   "recurso",
   "video",
@@ -319,6 +320,8 @@ function delegarBuilder(fence: FenceCrudo): unknown {
       return construirCodigo(fence.params, fence.body)
     case "sql":
       return construirSql(fence.params, fence.body)
+    case "git":
+      return construirGit(fence.body)
     case "codigo_ilustrativo":
       return construirCodigoIlustrativo(fence.body)
     case "recurso":
@@ -560,6 +563,46 @@ function normalizarTestSql(raw: unknown, idx: number): Record<string, unknown> {
     consultaReferencia: String(t.referencia ?? t.consultaReferencia ?? ""),
     ordenImporta: Boolean(t.ordenImporta ?? false),
   }
+}
+
+/**
+ * Bloque `::: git` — terminal de git sobre un repo simulado en memoria. Es
+ * autocontenido (no lleva tests hermanos ni skill): el service lo persiste por
+ * el camino genérico como `GIT_EJERCICIO` con `esEvaluable=false`. El `objetivo`
+ * declarativo define cuándo se marca "logrado" en el cliente.
+ */
+function construirGit(body: string): unknown {
+  const datos = parsearYamlObjeto(body, "git")
+  const objetivoRaw = datos.objetivo
+  if (!objetivoRaw || typeof objetivoRaw !== "object" || Array.isArray(objetivoRaw)) {
+    throw new ParserCursoMdError("Bloque git: falta `objetivo` (objeto con la condición de éxito).")
+  }
+  return {
+    tipo: "GIT_EJERCICIO",
+    contenido: {
+      enunciado: String(datos.enunciado ?? ""),
+      objetivo: normalizarObjetivoGit(objetivoRaw as Record<string, unknown>),
+      pista: String(datos.pista ?? ""),
+    },
+  }
+}
+
+/** Whitelistea las claves conocidas del objetivo (el schema Zod es `.strict()`). */
+function normalizarObjetivoGit(raw: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  if (typeof raw.ramaActiva === "string") {
+    out.ramaActiva = raw.ramaActiva
+  }
+  if (Array.isArray(raw.ramasExisten)) {
+    out.ramasExisten = raw.ramasExisten.map(String)
+  }
+  if (typeof raw.hayMergeEnMain === "boolean") {
+    out.hayMergeEnMain = raw.hayMergeEnMain
+  }
+  if (typeof raw.commitsMinimos === "number") {
+    out.commitsMinimos = raw.commitsMinimos
+  }
+  return out
 }
 
 function construirCodigoIlustrativo(body: string): unknown {

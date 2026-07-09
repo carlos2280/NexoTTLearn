@@ -122,6 +122,8 @@ export {
   contenidoRecursoSchema,
   subtipoRecursoSchema,
   contenidoDiagramaSchema,
+  contenidoGitEjercicioSchema,
+  objetivoGitSchema,
   contenidoBloquePorTipo,
   schemaContenidoBloquePorTipo,
   validarContenidoBloque,
@@ -136,6 +138,8 @@ export type {
   ContenidoRecurso,
   SubtipoRecurso,
   ContenidoDiagrama,
+  ContenidoGitEjercicio,
+  ObjetivoGit,
 } from "./catalogo/bloques/contenido"
 export { listarClientesQuerySchema } from "./catalogo/clientes/listar-clientes.schema"
 export type { ListarClientesQuery } from "./catalogo/clientes/listar-clientes.schema"

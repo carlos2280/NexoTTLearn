@@ -4,6 +4,7 @@ import {
   Database,
   FileText,
   FlaskConical,
+  GitBranch,
   HelpCircle,
   Lightbulb,
   type LucideIcon,
@@ -88,6 +89,12 @@ const META: Record<TipoBloque, TipoBloqueMeta> = {
     icono: FlaskConical,
     descripcionCorta: "Consultas de referencia asociadas a un reto SQL.",
   },
+  // biome-ignore lint/style/useNamingConvention: clave del enum TipoBloque
+  GIT_EJERCICIO: {
+    etiqueta: "Ejercicio git",
+    icono: GitBranch,
+    descripcionCorta: "Terminal de git sobre un repo simulado, con objetivo declarativo.",
+  },
 }
 
 export function tipoBloqueMeta(tipo: TipoBloque): TipoBloqueMeta {
@@ -95,6 +102,10 @@ export function tipoBloqueMeta(tipo: TipoBloque): TipoBloqueMeta {
 }
 
 export function tiposBloqueOrdenados(): readonly TipoBloque[] {
+  // GIT_EJERCICIO se excluye a propósito: hoy es un bloque import-only (se crea
+  // desde el importador `.md`, no desde el builder visual, que aún no tiene un
+  // editor para su `enunciado`/`objetivo`). Cuando exista ese editor, se añade
+  // aquí. Los *_TESTS se excluyen por ser bloques auxiliares pareados.
   return [
     "PARRAFO",
     "TIP",
@@ -165,6 +176,11 @@ export function resumenBloque(
         return enunciado.slice(0, 120)
       }
       return tests > 0 ? `${tests} test${tests === 1 ? "" : "s"}` : meta.etiqueta
+    }
+    case "GIT_EJERCICIO": {
+      const enunciado = typeof contenido.enunciado === "string" ? contenido.enunciado : ""
+      const txt = enunciado.replace(/<[^>]+>/g, " ").trim()
+      return txt.slice(0, 120) || meta.etiqueta
     }
     default:
       return meta.etiqueta

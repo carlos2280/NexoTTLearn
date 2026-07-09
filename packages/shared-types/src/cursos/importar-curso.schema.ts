@@ -2,6 +2,7 @@ import { z } from "zod"
 import {
   contenidoCodigoIlustrativoSchema,
   contenidoDiagramaSchema,
+  contenidoGitEjercicioSchema,
   contenidoParrafoSchema,
   contenidoRecursoSchema,
   contenidoTipSchema,
@@ -69,6 +70,15 @@ const bloqueImportadoSchema = z.discriminatedUnion("tipo", [
     .object({
       tipo: z.literal("DIAGRAMA"),
       contenido: contenidoDiagramaSchema,
+    })
+    .strict(),
+  z
+    .object({
+      // Bloque de terminal de git (repo simulado en memoria). Autocontenido: se
+      // persiste con `esEvaluable=false` por el camino generico del service. El
+      // `objetivo` declarativo del contenido habilita el futuro modo evaluable.
+      tipo: z.literal("GIT_EJERCICIO"),
+      contenido: contenidoGitEjercicioSchema,
     })
     .strict(),
   z
