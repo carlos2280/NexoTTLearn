@@ -92,9 +92,35 @@ async function ejecutarPython(
       stderr += `${chunk}\n`
     },
   })
-  pyodide.setStdin({ stdin: () => solicitud.stdin })
+  // stdin como lector de bytes de un solo recorrido. NO usar `{ stdin: () => str }`:
+  // Pyodide llama esa funcion repetidamente y `sys.stdin.read()` acumularia el
+  // input muchas veces (y lo truncaria). El API `read(buffer)` copia los bytes una
+  // sola vez y devuelve 0 en EOF, que es la semantica correcta de un stdin acotado.
+  const stdinBytes = new TextEncoder().encode(solicitud.stdin)
+  let stdinPos = 0
+  pyodide.setStdin({
+    read: (buffer: Uint8Array) => {
+      if (stdinPos >= stdinBytes.length) return 0
+      const n = Math.min(buffer.length, stdinBytes.length - stdinPos)
+      buffer.set(stdinBytes.subarray(stdinPos, stdinPos + n))
+      stdinPos += n
+      return n
+    },
+  })
 
   try {
+    // Carga on-demand los paquetes que el codigo importa (pandas, numpy, ...).
+    // Pyodide no trae paquetes de terceros por defecto: sin esto, `import pandas`
+    // lanza ModuleNotFoundError. Es idempotente: una vez cargado en la instancia,
+    // los tests siguientes del mismo run no re-descargan (salvo que un timeout
+    // recree el worker). La 1a carga es lenta (~varios segundos): los bloques que
+    // usan pandas deben fijar un `tiempoLimiteSeg` generoso.
+    // messageCallback vacio: los avisos de carga ("Loading pandas...") NO deben
+    // contaminar el stdout que se compara con la salida esperada del ejercicio.
+    await pyodide.loadPackagesFromImports(solicitud.codigo, {
+      messageCallback: () => {},
+      errorCallback: () => {},
+    })
     await pyodide.runPythonAsync(solicitud.codigo)
     return {
       id: solicitud.id,
@@ -112,8 +138,8 @@ async function ejecutarPython(
       duracionMs: performance.now() - inicio,
     }
   } finally {
-    // Restablecer stdin para que la siguiente solicitud no herede esta.
-    pyodide.setStdin({ stdin: () => "" })
+    // Restablecer stdin para que la siguiente solicitud no herede esta (EOF inmediato).
+    pyodide.setStdin({ read: () => 0 })
   }
 }
 
