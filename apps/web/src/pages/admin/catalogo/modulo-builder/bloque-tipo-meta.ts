@@ -115,7 +115,6 @@ export function tiposBloqueOrdenados(): readonly TipoBloque[] {
     "QUIZ",
     "CODIGO_ILUSTRATIVO",
     "CODIGO_PREGUNTAS",
-    "CODIGO_TESTS",
     "SQL_EJERCICIO",
   ]
 }

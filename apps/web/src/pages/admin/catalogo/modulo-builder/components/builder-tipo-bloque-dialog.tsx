@@ -9,10 +9,6 @@ interface BuilderTipoBloqueDialogProps {
   readonly abierto: boolean
   readonly onCambiarAbierto: (abierto: boolean) => void
   readonly enviando: boolean
-  /** IDs de bloques CODIGO_PREGUNTAS hermanos en la sección activa. Se usa
-   * para habilitar/inhabilitar CODIGO_TESTS y para sembrar `codigoPreguntasId`
-   * en el contenido inicial. */
-  readonly hermanosCodigoPreguntasIds: readonly string[]
   readonly onElegir: (tipo: TipoBloque, contexto?: ContextoContenidoDefecto) => Promise<void> | void
 }
 
@@ -38,7 +34,9 @@ const FAMILIAS: readonly Familia[] = [
   {
     id: "codigo",
     etiqueta: "Código",
-    tipos: ["CODIGO_ILUSTRATIVO", "CODIGO_PREGUNTAS", "CODIGO_TESTS"],
+    // CODIGO_TESTS no se ofrece: los tests se crean y editan dentro del
+    // "Reto de código", no como bloque suelto.
+    tipos: ["CODIGO_ILUSTRATIVO", "CODIGO_PREGUNTAS"],
   },
 ]
 
@@ -48,14 +46,10 @@ const TINTE_ICONO: Record<FamiliaId, string> = {
   codigo: "bg-[rgb(var(--color-aurora-cyan-rgb)/0.12)] text-aurora-cyan",
 }
 
-const RAZON_DESHABILITADO_TESTS =
-  "Crea antes un bloque «Reto de código» en esta sección — los tests necesitan apuntar a uno."
-
 export function BuilderTipoBloqueDialog({
   abierto,
   onCambiarAbierto,
   enviando,
-  hermanosCodigoPreguntasIds,
   onElegir,
 }: BuilderTipoBloqueDialogProps) {
   const primerBotonRef = useRef<HTMLButtonElement>(null)
@@ -67,28 +61,6 @@ export function BuilderTipoBloqueDialog({
     const id = window.setTimeout(() => primerBotonRef.current?.focus(), 80)
     return () => window.clearTimeout(id)
   }, [abierto])
-
-  function manejarClick(tipo: TipoBloque) {
-    if (tipo === "CODIGO_TESTS") {
-      const hermano = hermanosCodigoPreguntasIds[0]
-      if (!hermano) {
-        return
-      }
-      onElegir(tipo, { codigoPreguntasHermanoId: hermano })
-      return
-    }
-    onElegir(tipo)
-  }
-
-  function estaDeshabilitado(tipo: TipoBloque): boolean {
-    if (enviando) {
-      return true
-    }
-    if (tipo === "CODIGO_TESTS") {
-      return hermanosCodigoPreguntasIds.length === 0
-    }
-    return false
-  }
 
   return (
     <Dialog
@@ -107,20 +79,14 @@ export function BuilderTipoBloqueDialog({
                 const meta = tipoBloqueMeta(tipo)
                 const Icono = meta.icono
                 const esPrimero = indiceFamilia === 0 && indiceTipo === 0
-                const deshabilitado = estaDeshabilitado(tipo)
-                const razonDeshabilitado =
-                  tipo === "CODIGO_TESTS" && hermanosCodigoPreguntasIds.length === 0
-                    ? RAZON_DESHABILITADO_TESTS
-                    : undefined
                 return (
                   <li key={tipo}>
                     <button
                       ref={esPrimero ? primerBotonRef : undefined}
                       type="button"
-                      disabled={deshabilitado}
-                      onClick={() => manejarClick(tipo)}
-                      title={razonDeshabilitado}
-                      aria-disabled={deshabilitado}
+                      disabled={enviando}
+                      onClick={() => onElegir(tipo)}
+                      aria-disabled={enviando}
                       className={cn(
                         "group flex h-full w-full flex-col items-start gap-2 rounded-lg border border-border bg-surface p-3.5 text-left",
                         "shadow-xs transition-[border-color,box-shadow,transform] duration-base ease-default",
@@ -141,7 +107,7 @@ export function BuilderTipoBloqueDialog({
                         {meta.etiqueta}
                       </span>
                       <span className="text-caption text-text-tertiary leading-snug">
-                        {razonDeshabilitado ?? meta.descripcionCorta}
+                        {meta.descripcionCorta}
                       </span>
                     </button>
                   </li>

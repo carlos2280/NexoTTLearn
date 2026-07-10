@@ -3,6 +3,7 @@ import { Field } from "@/shared/components/ui/field"
 import { Input } from "@/shared/components/ui/input"
 import type { BloqueDetalleResponse } from "@nexott-learn/shared-types"
 import { useRef, useState } from "react"
+import { SeccionTestsDelReto } from "./codigo-preguntas/seccion-tests-del-reto"
 import { CodeEditor } from "./shared/code-editor"
 import { EditorBloqueShell } from "./shared/editor-bloque-shell"
 import { SelectLenguaje } from "./shared/select-lenguaje"
@@ -54,20 +55,14 @@ export function EditorCodigoPreguntas({ bloque }: EditorCodigoPreguntasProps) {
   return (
     <EditorBloqueShell
       bloque={bloque}
-      titulo="Reto de código — enunciado"
-      descripcion={
-        <>
-          Define el problema y el código inicial que verá el participante. Añade a continuación un
-          bloque <em>Tests del reto</em> en la misma sección para que el sandbox del navegador
-          auto-corrija con tus pares stdin → stdout.
-        </>
-      }
+      titulo="Reto de código"
+      descripcion="Define el problema, el código inicial y sus tests. El participante escribe código y el sandbox del navegador lo auto-corrige con tus pares stdin → salida esperada."
       estadoGuardado={auto.estado}
     >
       <Banner tone="info">
-        Todo reto de código se evalúa automáticamente. Si tu evaluación es conceptual (arquitectura,
-        diseño, decisiones) modélala como <strong>Quiz</strong>; este tipo es solo para retos con
-        tests stdin/stdout.
+        Todo reto de código se evalúa automáticamente con sus tests (abajo). Si tu evaluación es
+        conceptual (arquitectura, diseño, decisiones) modélala como <strong>Quiz</strong>; este tipo
+        es solo para retos con tests stdin/stdout.
       </Banner>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -133,10 +128,7 @@ export function EditorCodigoPreguntas({ bloque }: EditorCodigoPreguntasProps) {
         )}
       </Field>
 
-      <Banner tone="info">
-        Añade un bloque <strong>Tests del reto</strong> en esta sección. Sin él los participantes no
-        pueden ejecutar nada y el módulo no puede publicarse.
-      </Banner>
+      <SeccionTestsDelReto key={bloque.id} reto={bloque} />
     </EditorBloqueShell>
   )
 }
