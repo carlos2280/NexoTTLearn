@@ -112,8 +112,35 @@ export function useBuilderAcciones({ moduloId, seleccion }: UseBuilderAccionesAr
         contenido: contenidoPorDefecto(tipo, contexto),
       },
     })
+
+    // Un "Reto de código" casi siempre necesita sus tests. Creamos el bloque
+    // CODIGO_TESTS ya enlazado al reto para entregar el par en un solo paso,
+    // en vez de obligar al admin a crear el reto y luego el test apuntándolo.
+    if (tipo === "CODIGO_PREGUNTAS") {
+      await crearTestsDelReto(seccionId, nuevo.id)
+      seleccion.seleccionarBloque(nuevo.id)
+      return
+    }
+
     seleccion.seleccionarBloque(nuevo.id)
     toast.success("Bloque creado")
+  }
+
+  async function crearTestsDelReto(seccionId: string, retoId: string) {
+    try {
+      await crearBloque.mutateAsync({
+        seccionId,
+        input: {
+          tipo: "CODIGO_TESTS",
+          esEvaluable: false,
+          skillQueMideId: null,
+          contenido: contenidoPorDefecto("CODIGO_TESTS", { codigoPreguntasHermanoId: retoId }),
+        },
+      })
+      toast.success("Reto y Tests creados")
+    } catch {
+      toast.error("Reto creado, pero no se pudo crear su bloque de Tests. Añádelo manualmente.")
+    }
   }
 
   async function ejecutarEliminarBloque(motivo: string) {
