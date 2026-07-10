@@ -13,7 +13,7 @@ import { z } from "zod"
 export const actualizarTransversalCursoSchema = z
   .object({
     activo: z.boolean(),
-    descripcion: z.string().trim().min(1).max(2000).optional(),
+    descripcion: z.string().trim().min(1).max(20000).optional(),
     umbralAprobacion: z.number().min(0).max(100).optional(),
     pesoCapaTests: z.number().min(0).max(100).optional(),
     pesoCapaCualitativa: z.number().min(0).max(100).optional(),
