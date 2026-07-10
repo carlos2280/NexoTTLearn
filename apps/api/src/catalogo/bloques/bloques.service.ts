@@ -97,12 +97,18 @@ export class BloquesService {
   ) {}
 
   async listar(query: ListarBloquesQuery): Promise<Paginated<BloqueResponse>> {
-    const { seccionId, tipo, estado } = query
+    const { seccionId, tipo, estado, codigoPreguntasId } = query
     const { skip, take, page, pageSize } = resolvePaginacion(query)
     const where: Prisma.BloqueWhereInput = {
       ...(seccionId ? { seccionId } : {}),
       ...(tipo ? { tipo } : {}),
       ...(estado ? { estado } : {}),
+    }
+    if (codigoPreguntasId) {
+      // JSONB: bloques cuyo `contenido.codigoPreguntasId` apunta al reto dado
+      // (usado por el editor del Reto para hallar su CODIGO_TESTS pareado).
+      // biome-ignore lint/nursery/noSecrets: "codigoPreguntasId" es el nombre de un campo JSONB, no un secreto.
+      where.contenido = { path: ["codigoPreguntasId"], equals: codigoPreguntasId }
     }
 
     const [filas, total] = await this.prisma.$transaction([

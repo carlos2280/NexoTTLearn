@@ -28,6 +28,9 @@ export const listarBloquesQuerySchema = paginacionQuerySchema.extend({
   seccionId: z.string().uuid().optional(),
   tipo: tipoBloqueSchema.optional(),
   estado: estadoBloqueSchema.optional(),
+  // Filtra por `contenido.codigoPreguntasId` (JSONB). Lo usa el editor del Reto
+  // para encontrar su bloque CODIGO_TESTS pareado sin traer todo el contenido.
+  codigoPreguntasId: z.string().uuid().optional(),
 })
 
 export type ListarBloquesQuery = z.infer<typeof listarBloquesQuerySchema>
