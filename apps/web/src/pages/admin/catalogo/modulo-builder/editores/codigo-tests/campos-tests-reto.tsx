@@ -4,6 +4,7 @@ import { Field } from "@/shared/components/ui/field"
 import { FlaskConical, Plus } from "lucide-react"
 import { useState } from "react"
 import { CodeEditor } from "../shared/code-editor"
+import { comentarioLinea } from "../shared/comentario-lenguaje"
 import { CodigoTestFila, type TestUnit, testVacio } from "./codigo-test-fila"
 
 export interface BorradorTests {
@@ -14,15 +15,17 @@ export interface BorradorTests {
 interface CamposTestsRetoProps {
   readonly valor: BorradorTests
   readonly onCambio: (valor: BorradorTests) => void
+  /** Lenguaje del reto pareado, para resaltar la solución de referencia. */
+  readonly lenguaje: string
 }
 
 /**
  * Campos de edición de los tests de un reto: solución de referencia + casos
  * stdin → salida esperada. Presentacional (no persiste): el padre le pasa el
- * borrador y recibe los cambios. Lo usan el editor de Tests standalone y el
- * editor del Reto (sección embebida), así ambos comparten exactamente la UI.
+ * borrador y recibe los cambios. Se usa desde el editor del Reto (sección
+ * embebida `EditorTestsEmbebido`), que le pasa el lenguaje del reto.
  */
-export function CamposTestsReto({ valor, onCambio }: CamposTestsRetoProps) {
+export function CamposTestsReto({ valor, onCambio, lenguaje }: CamposTestsRetoProps) {
   const [expandidoId, setExpandidoId] = useState<string | null>(valor.tests[0]?.id ?? null)
 
   function cambiarTest(siguiente: TestUnit) {
@@ -56,9 +59,9 @@ export function CamposTestsReto({ valor, onCambio }: CamposTestsRetoProps) {
             id={attrs.id}
             value={valor.solucionReferencia}
             onValueChange={(v) => onCambio({ ...valor, solucionReferencia: v })}
-            lenguaje="typescript"
+            lenguaje={lenguaje}
             rows={10}
-            placeholder="// Tu solución de referencia…"
+            placeholder={`${comentarioLinea(lenguaje)} Tu solución de referencia…`}
           />
         )}
       </Field>

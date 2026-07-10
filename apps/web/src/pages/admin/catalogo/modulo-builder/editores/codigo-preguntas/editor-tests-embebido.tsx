@@ -7,6 +7,8 @@ import { useAutoGuardarBloque } from "../shared/use-auto-guardar-bloque"
 
 interface EditorTestsEmbebidoProps {
   readonly bloque: BloqueDetalleResponse
+  /** Lenguaje del reto pareado, para resaltar la "Solución de referencia". */
+  readonly lenguaje: string
 }
 
 function leerInicial(contenido: Record<string, unknown> | null): {
@@ -29,7 +31,7 @@ function leerInicial(contenido: Record<string, unknown> | null): {
  * propio auto-guardado sobre el bloque CODIGO_TESTS pareado; preserva el
  * `codigoPreguntasId` (el enlace al reto) que ya no se edita a mano.
  */
-export function EditorTestsEmbebido({ bloque }: EditorTestsEmbebidoProps) {
+export function EditorTestsEmbebido({ bloque, lenguaje }: EditorTestsEmbebidoProps) {
   const inicial = useMemo(() => leerInicial(bloque.contenido), [bloque.contenido])
   const [datos, setDatos] = useState<BorradorTests>(inicial.borrador)
   const datosRef = useRef<BorradorTests>(inicial.borrador)
@@ -57,7 +59,7 @@ export function EditorTestsEmbebido({ bloque }: EditorTestsEmbebidoProps) {
       <div className="flex justify-end">
         <IndicadorGuardado estado={auto.estado} />
       </div>
-      <CamposTestsReto valor={datos} onCambio={actualizar} />
+      <CamposTestsReto valor={datos} onCambio={actualizar} lenguaje={lenguaje} />
     </div>
   )
 }

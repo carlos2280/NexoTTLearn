@@ -5,8 +5,9 @@ import type { BloqueDetalleResponse } from "@nexott-learn/shared-types"
 import { useRef, useState } from "react"
 import { SeccionTestsDelReto } from "./codigo-preguntas/seccion-tests-del-reto"
 import { CodeEditor } from "./shared/code-editor"
+import { comentarioLinea } from "./shared/comentario-lenguaje"
 import { EditorBloqueShell } from "./shared/editor-bloque-shell"
-import { SelectLenguaje } from "./shared/select-lenguaje"
+import { LENGUAJES_EJECUTABLES, SelectLenguaje } from "./shared/select-lenguaje"
 import { TiptapEditor } from "./shared/tiptap-editor"
 import { extensionesMinimas } from "./shared/tiptap-extensiones"
 import { useAutoGuardarBloque } from "./shared/use-auto-guardar-bloque"
@@ -72,6 +73,7 @@ export function EditorCodigoPreguntas({ bloque }: EditorCodigoPreguntasProps) {
               id={attrs.id}
               value={datos.lenguaje}
               onChange={(v) => actualizar({ lenguaje: v })}
+              lenguajes={LENGUAJES_EJECUTABLES}
             />
           )}
         </Field>
@@ -123,12 +125,12 @@ export function EditorCodigoPreguntas({ bloque }: EditorCodigoPreguntasProps) {
             onValueChange={(v) => actualizar({ esqueletoInicial: v })}
             lenguaje={datos.lenguaje}
             rows={8}
-            placeholder="// Firma del método aquí…"
+            placeholder={`${comentarioLinea(datos.lenguaje)} Firma del método aquí…`}
           />
         )}
       </Field>
 
-      <SeccionTestsDelReto key={bloque.id} reto={bloque} />
+      <SeccionTestsDelReto key={bloque.id} reto={bloque} lenguaje={datos.lenguaje} />
     </EditorBloqueShell>
   )
 }

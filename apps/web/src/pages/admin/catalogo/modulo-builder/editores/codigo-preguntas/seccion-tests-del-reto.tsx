@@ -13,6 +13,8 @@ import { EditorTestsEmbebido } from "./editor-tests-embebido"
 
 interface SeccionTestsDelRetoProps {
   readonly reto: BloqueDetalleResponse
+  /** Lenguaje del reto, para que la "Solución de referencia" resalte igual. */
+  readonly lenguaje: string
 }
 
 /**
@@ -21,7 +23,7 @@ interface SeccionTestsDelRetoProps {
  * lo edita ahí mismo. Si el reto aún no tiene tests (import antiguo), ofrece
  * crearlos. Así el autor edita reto + tests en un solo lugar.
  */
-export function SeccionTestsDelReto({ reto }: SeccionTestsDelRetoProps) {
+export function SeccionTestsDelReto({ reto, lenguaje }: SeccionTestsDelRetoProps) {
   const lista = useListarBloques({
     page: 1,
     pageSize: 1,
@@ -60,7 +62,7 @@ export function SeccionTestsDelReto({ reto }: SeccionTestsDelRetoProps) {
   } else if (detalle.isError || !detalle.data) {
     cuerpo = <AvisoError onReintentar={() => detalle.refetch()} />
   } else {
-    cuerpo = <EditorTestsEmbebido key={detalle.data.id} bloque={detalle.data} />
+    cuerpo = <EditorTestsEmbebido key={detalle.data.id} bloque={detalle.data} lenguaje={lenguaje} />
   }
 
   return (
