@@ -95,6 +95,9 @@ export function contenidoPorDefecto(
           },
         ],
       }
+    case "DIAGRAMA":
+      // `altText` es obligatorio (a11y); el admin lo ajusta en el editor.
+      return { elements: [], altText: "Diagrama nuevo — describe su contenido" }
     default:
       return {}
   }

@@ -28,7 +28,7 @@ const FAMILIAS: readonly Familia[] = [
   {
     id: "contenido",
     etiqueta: "Contenido",
-    tipos: ["PARRAFO", "TIP", "VIDEO", "RECURSO"],
+    tipos: ["PARRAFO", "TIP", "VIDEO", "RECURSO", "DIAGRAMA"],
   },
   {
     id: "evaluacion",
