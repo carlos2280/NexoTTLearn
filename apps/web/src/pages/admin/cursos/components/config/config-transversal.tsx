@@ -3,8 +3,8 @@ import { Switch } from "@/shared/components/ui/switch"
 import type { CursoDetalle } from "@nexott-learn/shared-types"
 import { useState } from "react"
 import { AYUDAS_CONFIG_CURSO } from "./ayudas"
-import { BarraSumaSegmentos } from "./barra-suma-segmentos"
 import { CampoNumero } from "./campo-numero"
+import { CapasTransversal } from "./capas-transversal"
 import { ConfigCard } from "./config-card"
 import { EditorBriefTransversal } from "./editor-brief-transversal"
 import { SelectorSkillsTransversal } from "./selector-skills-transversal"
@@ -45,6 +45,7 @@ export function ConfigTransversal({ curso, bloqueado }: ConfigTransversalProps) 
       solicitudGuardar={solicitudGuardar}
     >
       <Switch
+        id="transversal-activo"
         checked={form.activo}
         onCambio={(v) => {
           setForm((f) => ({ ...f, activo: v }))
@@ -82,29 +83,9 @@ export function ConfigTransversal({ curso, bloqueado }: ConfigTransversalProps) 
               valor={form.umbralAprobacion}
               onCambio={(v) => setForm((f) => ({ ...f, umbralAprobacion: v }))}
             />
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <CampoNumero
-                label="Peso capa tests (%)"
-                valor={form.pesoCapaTests}
-                onCambio={(v) => setForm((f) => ({ ...f, pesoCapaTests: v }))}
-              />
-              <CampoNumero
-                label="Peso cualitativa (%)"
-                valor={form.pesoCapaCualitativa}
-                onCambio={(v) => setForm((f) => ({ ...f, pesoCapaCualitativa: v }))}
-              />
-              <CampoNumero
-                label="Peso comprensión (%)"
-                valor={form.pesoCapaComprension}
-                onCambio={(v) => setForm((f) => ({ ...f, pesoCapaComprension: v }))}
-              />
-            </div>
-            <BarraSumaSegmentos
-              tramos={[
-                { id: "tests", valor: form.pesoCapaTests, etiqueta: "Tests" },
-                { id: "cualitativa", valor: form.pesoCapaCualitativa, etiqueta: "Cualitativa" },
-                { id: "comprension", valor: form.pesoCapaComprension, etiqueta: "Comprensión" },
-              ]}
+            <CapasTransversal
+              form={form}
+              onCambio={(parcial) => setForm((f) => ({ ...f, ...parcial }))}
             />
             {valido ? null : (
               <p className="text-caption text-warning">
