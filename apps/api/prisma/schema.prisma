@@ -1028,12 +1028,15 @@ model ProyectoTransversal {
   descripcion           String
   umbralAprobacion      Decimal  @default(70.00) @map("umbral_aprobacion") @db.Decimal(5, 2)
   capas                 Json     @default("{}") @db.JsonB
-  pesoCapaTests         Decimal  @default(40.00) @map("peso_capa_tests") @db.Decimal(5, 2)
-  pesoCapaCualitativa   Decimal  @default(30.00) @map("peso_capa_cualitativa") @db.Decimal(5, 2)
-  pesoCapaComprension   Decimal  @default(30.00) @map("peso_capa_comprension") @db.Decimal(5, 2)
-  capaTestsActiva       Boolean  @default(true) @map("capa_tests_activa")
+  // Colapso a una sola capa (revisión con IA = cualitativa): tests y comprensión
+  // nacen apagadas y el peso va todo a cualitativa. Ver migración
+  // 20260711150000_colapso_transversal_una_capa.
+  pesoCapaTests         Decimal  @default(0.00) @map("peso_capa_tests") @db.Decimal(5, 2)
+  pesoCapaCualitativa   Decimal  @default(100.00) @map("peso_capa_cualitativa") @db.Decimal(5, 2)
+  pesoCapaComprension   Decimal  @default(0.00) @map("peso_capa_comprension") @db.Decimal(5, 2)
+  capaTestsActiva       Boolean  @default(false) @map("capa_tests_activa")
   capaCualitativaActiva Boolean  @default(true) @map("capa_cualitativa_activa")
-  capaComprensionActiva Boolean  @default(true) @map("capa_comprension_activa")
+  capaComprensionActiva Boolean  @default(false) @map("capa_comprension_activa")
   createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 

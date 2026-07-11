@@ -3,39 +3,34 @@ import { Injectable, Logger } from "@nestjs/common"
 import { RolUsuario } from "@prisma/client"
 import { AiService } from "../common/ai/ai.service"
 import { PrismaService } from "../common/prisma/prisma.service"
+import { RepoFetchService } from "../common/repo-fetch/repo-fetch.service"
 import { SesionUsuario } from "../common/types/sesion.types"
 import { TransversalCapasService } from "./transversal-capas.service"
 
 /**
- * `JobEvaluacionTransversalService` — esqueleto P8a + integracion real P8b
- * (D-S8-B5, R-S8-4).
+ * `JobEvaluacionTransversalService` — evalúa el intento transversal con UNA sola
+ * capa: "Revisión con IA" (la cualitativa). Descarga el repo entregado
+ * (`RepoFetchService`), lo empaqueta y se lo pasa al `AiService` (mock o Claude
+ * según env). Las capas viejas (tests con nota fija, comprensión auto-entrevista)
+ * ya NO se corren: colapso a una capa (2026-07-11).
  *
- * Cola en memoria (Set + FIFO) que despacha jobs de evaluacion del intento
- * transversal hacia el `AiService` (mock o Claude segun env). En P8b el job
- * persiste las capas via los endpoints internos del propio service
- * (`cargarCapaCualitativa` / `cargarCapaComprension`) con
- * `Idempotency-Key` UUID v5 derivada del par `(intentoId, capa)`. Esto cierra
- * §5.111 (worker IA real).
- *
- * Diseno deliberado:
- *  - `dispatch(intentoId)` es sincrono y fire-and-forget. La TX del POST no
- *    debe bloquearse esperando IA.
- *  - Concurrencia maxima `CONCURRENCIA_MAX` (§15.10): si supera, encola en
- *    array FIFO y libera un slot al terminar cada job.
- *  - **Nunca** loggea contenido del repo, transcripcion ni payload de IA.
- *    Solo metadatos: intentoId, duracion, capa calculada (R-S8-10).
- *  - Si Claude falla aguas abajo (R-S8-2, R-S8-6), el job loggea el error
- *    pero NO transitiona el intento: el admin puede reintentar manualmente o
- *    cargar la capa via endpoint admin con override.
+ * Diseño:
+ *  - `dispatch(intentoId)` es síncrono y fire-and-forget: la TX del POST no se
+ *    bloquea esperando IA.
+ *  - Concurrencia máxima `CONCURRENCIA_MAX` (§15.10); el resto encola FIFO.
+ *  - **Nunca** loggea contenido del repo ni payload de IA. Solo metadatos.
+ *  - Si la descarga o Claude fallan, el job loggea el error pero NO transiciona
+ *    el intento: el admin puede reintentar o cargar la capa a mano.
  */
 const JOB_DELAY_MS = 2000
 const CONCURRENCIA_MAX = 10
-const PROFUNDIDAD_MOCK = "SEMI_SENIOR" as const
-const NOTA_CAPA_TESTS_MOCK = 70
-const TURNOS_COMPRENSION_MAX = 5
-// Namespace estable UUID v5 para derivar Idempotency-Key del par
-// `(intentoId, capa)`. Cualquier UUID v4 constante sirve; este es generado
-// una vez y no rota.
+// El transversal no tiene un campo de profundidad propio, así que la evaluación
+// cualitativa usa SEMI_SENIOR como default deliberado: elige el modelo Claude
+// intermedio y calibra el prompt en ese nivel. Si algún día el curso/transversal
+// define su profundidad, léela en `cargarIntentoParaJob` y propágala aquí.
+const PROFUNDIDAD_POR_DEFECTO = "SEMI_SENIOR" as const
+// Namespace estable UUID v5 para derivar la Idempotency-Key del par
+// `(intentoId, capa)`. Cualquier UUID v4 constante sirve; este no rota.
 const IDEMPOTENCY_NAMESPACE = "3e7a4f1e-cb52-4b1e-9c5f-7f0b8e2d4a01"
 
 @Injectable()
@@ -48,6 +43,7 @@ export class JobEvaluacionTransversalService {
     private readonly prisma: PrismaService,
     private readonly ai: AiService,
     private readonly capas: TransversalCapasService,
+    private readonly repoFetch: RepoFetchService,
   ) {}
 
   dispatch(intentoId: string): void {
@@ -78,16 +74,21 @@ export class JobEvaluacionTransversalService {
         return
       }
       const sesionInterna = this.sesionWorker(intento.colaboradorId)
-
-      if (intento.transversal.capaTestsActiva) {
-        await this.cargarCapaTestsSeguro(intentoId, sesionInterna)
-      }
-      await this.cargarCapaCualitativaSeguro(intentoId, intento.repoUrl, sesionInterna)
-      await this.cargarCapaComprensionSeguro(intentoId, intento.repoUrl, sesionInterna)
-
-      this.logger.log(
-        `Intento ${intentoId} evaluado en ${Date.now() - inicio}ms (provider=${this.ai.providerName}).`,
+      const evaluado = await this.cargarCapaCualitativaSeguro(
+        intentoId,
+        intento.repoUrl,
+        sesionInterna,
       )
+      const duracion = Date.now() - inicio
+      if (evaluado) {
+        this.logger.log(
+          `Intento ${intentoId} evaluado en ${duracion}ms (provider=${this.ai.providerName}).`,
+        )
+      } else {
+        this.logger.warn(
+          `Intento ${intentoId} NO evaluado (capa cualitativa falló) en ${duracion}ms.`,
+        )
+      }
     } catch (error) {
       const detalle = error instanceof Error ? error.message : String(error)
       this.logger.error(`Fallo job para intento ${intentoId}: ${detalle}`)
@@ -100,7 +101,6 @@ export class JobEvaluacionTransversalService {
   private async cargarIntentoParaJob(intentoId: string): Promise<{
     readonly repoUrl: string
     readonly colaboradorId: string
-    readonly transversal: { readonly capaTestsActiva: boolean }
   } | null> {
     const intento = await this.prisma.intentoTransversal.findUnique({
       where: { id: intentoId },
@@ -108,7 +108,6 @@ export class JobEvaluacionTransversalService {
         repoUrl: true,
         estado: true,
         colaboradorId: true,
-        transversal: { select: { capaTestsActiva: true } },
       },
     })
     if (!intento || intento.repoUrl === null) {
@@ -124,32 +123,20 @@ export class JobEvaluacionTransversalService {
     return {
       repoUrl: intento.repoUrl,
       colaboradorId: intento.colaboradorId,
-      transversal: intento.transversal,
     }
   }
 
-  private async cargarCapaTestsSeguro(intentoId: string, sesion: SesionUsuario): Promise<void> {
-    try {
-      await this.capas.cargarCapaTests({
-        intentoId,
-        body: { nota: NOTA_CAPA_TESTS_MOCK, detalle: { fuente: "worker-mvp" } },
-        idempotencyKey: this.derivarKey(intentoId, "tests"),
-        usuario: sesion,
-      })
-    } catch (error) {
-      this.logCapaFallo("tests", intentoId, error)
-    }
-  }
-
+  /** Devuelve `true` si la capa se cargó; `false` si la descarga o la IA fallaron. */
   private async cargarCapaCualitativaSeguro(
     intentoId: string,
     repoUrl: string,
     sesion: SesionUsuario,
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
+      const repo = await this.repoFetch.descargarYEmpaquetar(repoUrl)
       const cualitativa = await this.ai.evaluarRepoCualitativo({
-        repoUrl,
-        profundidad: PROFUNDIDAD_MOCK,
+        contenidoRepo: repo.contenido,
+        profundidad: PROFUNDIDAD_POR_DEFECTO,
       })
       await this.capas.cargarCapaCualitativa({
         intentoId,
@@ -163,53 +150,10 @@ export class JobEvaluacionTransversalService {
         idempotencyKey: this.derivarKey(intentoId, "cualitativa"),
         usuario: sesion,
       })
+      return true
     } catch (error) {
       this.logCapaFallo("cualitativa", intentoId, error)
-    }
-  }
-
-  private async cargarCapaComprensionSeguro(
-    intentoId: string,
-    repoUrl: string,
-    sesion: SesionUsuario,
-  ): Promise<void> {
-    try {
-      const transcripcion: Array<{ rol: "asistente" | "colaborador"; texto: string }> = []
-      let comprensionNota: number | null = null
-      for (let turno = 0; turno < TURNOS_COMPRENSION_MAX; turno += 1) {
-        const respuesta = await this.ai.mantenerTurnoComprension({
-          repoUrl,
-          profundidad: PROFUNDIDAD_MOCK,
-          turnoIndex: turno,
-          transcripcionPrevia: transcripcion,
-        })
-        if (respuesta.finalizado) {
-          comprensionNota = respuesta.nota
-          break
-        }
-        if (respuesta.siguientePregunta !== null) {
-          transcripcion.push({ rol: "asistente", texto: respuesta.siguientePregunta })
-        }
-      }
-      if (comprensionNota === null) {
-        return
-      }
-      await this.capas.cargarCapaComprension({
-        intentoId,
-        body: {
-          nota: comprensionNota,
-          detalle: {
-            transcripcion: transcripcion.map((t) => ({
-              rol: t.rol === "asistente" ? ("ASISTENTE" as const) : ("COLABORADOR" as const),
-              mensaje: t.texto.slice(0, 4000),
-            })),
-          },
-        },
-        idempotencyKey: this.derivarKey(intentoId, "comprension"),
-        usuario: sesion,
-      })
-    } catch (error) {
-      this.logCapaFallo("comprension", intentoId, error)
+      return false
     }
   }
 
@@ -222,22 +166,20 @@ export class JobEvaluacionTransversalService {
   }
 
   /**
-   * Sesion sintetica del worker — el `usuarioId` apunta al colaborador para
-   * que las idempotency keys queden trazables por intento. El service de
-   * carga no usa `usuario.rol` para autorizar (los guards del controller lo
-   * resuelven); el worker llama metodos del service directamente.
+   * Sesion sintetica del worker — el `usuarioId` apunta al colaborador para que
+   * las idempotency keys queden trazables por intento. El service de carga no
+   * usa `usuario.rol` para autorizar (los guards del controller lo resuelven).
    */
   private sesionWorker(colaboradorId: string): SesionUsuario {
     return { usuarioId: colaboradorId, rol: RolUsuario.ADMIN }
   }
 
   /**
-   * Deriva una `Idempotency-Key` UUID-shape determinista a partir del par
-   * `(intentoId, capa)` usando SHA-1 + el namespace fijo (algoritmo simil
-   * UUID v5). Sin dep externa: cumplimos `z.string().uuid()` produciendo el
+   * Deriva una `Idempotency-Key` UUID-shape determinista del par `(intentoId,
+   * capa)` con SHA-1 + namespace fijo (algoritmo símil UUID v5). Produce el
    * shape `xxxxxxxx-xxxx-5xxx-Nxxx-xxxxxxxxxxxx` con `N in [89ab]`.
    */
-  private derivarKey(intentoId: string, capa: "tests" | "cualitativa" | "comprension"): string {
+  private derivarKey(intentoId: string, capa: "cualitativa"): string {
     const hash = createHash("sha1")
       .update(IDEMPOTENCY_NAMESPACE.replace(/-/g, ""), "hex")
       .update(`${intentoId}:${capa}`)

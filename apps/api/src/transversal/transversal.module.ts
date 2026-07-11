@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common"
 import { PrismaModule } from "../common/prisma/prisma.module"
+import { RepoFetchModule } from "../common/repo-fetch/repo-fetch.module"
 import { NotaSkillModule } from "../nota-skill/nota-skill.module"
 import { NotificacionesModule } from "../notificaciones/notificaciones.module"
 import { JobEvaluacionTransversalService } from "./job-evaluacion-transversal.service"
@@ -20,7 +21,7 @@ import { TransversalService } from "./transversal.service"
  * `NotificacionesService` en el trigger `crearIntento` (TRANSVERSAL_DISPONIBLE).
  */
 @Module({
-  imports: [PrismaModule, NotaSkillModule, NotificacionesModule],
+  imports: [PrismaModule, RepoFetchModule, NotaSkillModule, NotificacionesModule],
   controllers: [TransversalController],
   providers: [TransversalCapasService, TransversalService, JobEvaluacionTransversalService],
   exports: [TransversalService, JobEvaluacionTransversalService],

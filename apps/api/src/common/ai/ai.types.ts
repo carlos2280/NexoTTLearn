@@ -55,7 +55,12 @@ export const aiRespuestaEstructuradaSchema = z
 export type AiRespuestaEstructurada = z.infer<typeof aiRespuestaEstructuradaSchema>
 
 export interface EvaluarRepoCualitativoInput {
-  readonly repoUrl: string
+  /**
+   * Contenido del repositorio ya descargado y empaquetado (RepoFetchService).
+   * Se pasa el texto, no la URL: la IA razona sobre el código real, no sobre un
+   * enlace que no puede abrir.
+   */
+  readonly contenidoRepo: string
   readonly profundidad: ProfundidadEntrevistaIa
 }
 
