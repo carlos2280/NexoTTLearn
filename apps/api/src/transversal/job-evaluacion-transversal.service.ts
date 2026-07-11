@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { Injectable, Logger } from "@nestjs/common"
+import { Injectable, Logger, type OnModuleInit } from "@nestjs/common"
 import { RolUsuario } from "@prisma/client"
 import { AiService } from "../common/ai/ai.service"
 import { PrismaService } from "../common/prisma/prisma.service"
@@ -21,9 +21,17 @@ import { TransversalCapasService } from "./transversal-capas.service"
  *  - **Nunca** loggea contenido del repo ni payload de IA. Solo metadatos.
  *  - Si la descarga o Claude fallan, el job loggea el error pero NO transiciona
  *    el intento: el admin puede reintentar o cargar la capa a mano.
+ *  - `onModuleInit` reencola al arranque los intentos `EN_EVALUACION` con repo:
+ *    la cola vive en memoria, así que un reinicio/deploy la perdería y el intento
+ *    quedaría colgado. El barrido los rescata vía `dispatch` (NO SQL crudo) para
+ *    que la finalización siga replicando a skills (D33) y disparando notificaciones.
  */
 const JOB_DELAY_MS = 2000
 const CONCURRENCIA_MAX = 10
+// Tope de intentos a reencolar en un solo arranque. Los transversales son escasos
+// (decenas, no miles); 100 deja margen holgado sobre el uso real. Si alguna vez se
+// superara, el barrido loguea cuántos quedaron y el resto se recoge al próximo boot.
+const MAX_REDISPATCH_BOOT = 100
 // El transversal no tiene un campo de profundidad propio, así que la evaluación
 // cualitativa usa SEMI_SENIOR como default deliberado: elige el modelo Claude
 // intermedio y calibra el prompt en ese nivel. Si algún día el curso/transversal
@@ -34,7 +42,7 @@ const PROFUNDIDAD_POR_DEFECTO = "SEMI_SENIOR" as const
 const IDEMPOTENCY_NAMESPACE = "3e7a4f1e-cb52-4b1e-9c5f-7f0b8e2d4a01"
 
 @Injectable()
-export class JobEvaluacionTransversalService {
+export class JobEvaluacionTransversalService implements OnModuleInit {
   private readonly logger = new Logger(JobEvaluacionTransversalService.name)
   private readonly enCurso = new Set<string>()
   private readonly pendientes: string[] = []
@@ -45,6 +53,48 @@ export class JobEvaluacionTransversalService {
     private readonly capas: TransversalCapasService,
     private readonly repoFetch: RepoFetchService,
   ) {}
+
+  /**
+   * Rescata al arranque los intentos que quedaron `EN_EVALUACION` con repo: un
+   * reinicio/deploy borra la cola en memoria y los dejaría colgados. Se reencolan
+   * los más viejos primero, con tope `MAX_REDISPATCH_BOOT`. Toda la operación va
+   * en `try/catch`: un fallo de BD no debe tumbar el bootstrap de la app.
+   *
+   * Asunción **single-instance**: el dedupe de la cola (`enCurso`/`pendientes`) es
+   * per-proceso. Con varios pods, cada uno reencolaría los mismos intentos; la
+   * escritura final está protegida por la Idempotency-Key, pero `descargarYEmpaquetar`
+   * y la IA correrían N veces (coste duplicado). Si se escala horizontal, añadir un
+   * lock (p. ej. `FOR UPDATE SKIP LOCKED` o un estado intermedio `ENCOLADO`).
+   */
+  async onModuleInit(): Promise<void> {
+    try {
+      // take + 1 para distinguir "justo el tope" de "hay más" sin un count extra.
+      const colgados = await this.prisma.intentoTransversal.findMany({
+        where: { estado: "EN_EVALUACION", anulado: false, repoUrl: { not: null } },
+        select: { id: true },
+        orderBy: { fecha: "asc" },
+        take: MAX_REDISPATCH_BOOT + 1,
+      })
+      if (colgados.length === 0) {
+        return
+      }
+      const hayMas = colgados.length > MAX_REDISPATCH_BOOT
+      const aReencolar = hayMas ? colgados.slice(0, MAX_REDISPATCH_BOOT) : colgados
+      for (const { id } of aReencolar) {
+        this.dispatch(id)
+      }
+      if (hayMas) {
+        this.logger.warn(
+          `Reencolados ${aReencolar.length} intentos EN_EVALUACION (tope alcanzado); hay más pendientes que se recogerán en el próximo arranque.`,
+        )
+      } else {
+        this.logger.log(`Reencolados ${aReencolar.length} intentos EN_EVALUACION al arranque.`)
+      }
+    } catch (error) {
+      const detalle = error instanceof Error ? error.message : String(error)
+      this.logger.error(`Fallo el barrido de reencolado al arranque: ${detalle}`)
+    }
+  }
 
   dispatch(intentoId: string): void {
     if (this.enCurso.has(intentoId) || this.pendientes.includes(intentoId)) {

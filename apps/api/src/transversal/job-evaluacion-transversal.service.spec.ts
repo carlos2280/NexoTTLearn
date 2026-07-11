@@ -12,6 +12,7 @@ const CONTENIDO_REPO = "===== index.ts =====\nconst a = 1"
 interface PrismaMock {
   readonly intentoTransversal: {
     readonly findUnique: ReturnType<typeof vi.fn>
+    readonly findMany: ReturnType<typeof vi.fn>
   }
 }
 
@@ -23,6 +24,7 @@ function buildPrismaMock(): PrismaMock {
         estado: "EN_EVALUACION",
         colaboradorId: "f0000000-0000-0000-0000-000000000001",
       }),
+      findMany: vi.fn().mockResolvedValue([]),
     },
   }
 }
@@ -143,5 +145,51 @@ describe("JobEvaluacionTransversalService (una capa: revisión con IA)", () => {
     await flushHasta(2100)
     await flushHasta(2100)
     expect(capas.cargarCapaCualitativa).toHaveBeenCalledTimes(12)
+  })
+
+  it("onModuleInit reencola los intentos EN_EVALUACION con repo al arranque", async () => {
+    prisma.intentoTransversal.findMany.mockResolvedValueOnce([
+      { id: `${INTENTO_ID_BASE}5` },
+      { id: `${INTENTO_ID_BASE}6` },
+    ])
+
+    await job.onModuleInit()
+
+    // Consulta solo los colgados no anulados con repo, más viejos primero, con
+    // take = tope + 1 (para distinguir "justo el tope" de "hay más").
+    expect(prisma.intentoTransversal.findMany).toHaveBeenCalledWith({
+      where: { estado: "EN_EVALUACION", anulado: false, repoUrl: { not: null } },
+      select: { id: true },
+      orderBy: { fecha: "asc" },
+      take: 101,
+    })
+    expect(job.estadoCola.enCurso).toBe(2)
+
+    await flushHasta(2100)
+    expect(capas.cargarCapaCualitativa).toHaveBeenCalledTimes(2)
+  })
+
+  it("onModuleInit respeta el tope: reencola 100 aunque la BD devuelva 101", async () => {
+    const cientoUno = Array.from({ length: 101 }, (_v, i) => ({
+      id: `20000000-0000-0000-0000-${i.toString().padStart(12, "0")}`,
+    }))
+    prisma.intentoTransversal.findMany.mockResolvedValueOnce(cientoUno)
+
+    await job.onModuleInit()
+
+    // 100 en juego (10 en curso + 90 pendientes); el 101 queda para el próximo arranque.
+    expect(job.estadoCola.enCurso + job.estadoCola.pendientes).toBe(100)
+  })
+
+  it("onModuleInit no hace nada si no hay intentos colgados", async () => {
+    await job.onModuleInit()
+    expect(job.estadoCola.enCurso).toBe(0)
+    expect(job.estadoCola.pendientes).toBe(0)
+  })
+
+  it("onModuleInit no propaga si la consulta de BD falla", async () => {
+    prisma.intentoTransversal.findMany.mockRejectedValueOnce(new Error("db caída"))
+    await expect(job.onModuleInit()).resolves.toBeUndefined()
+    expect(job.estadoCola.enCurso).toBe(0)
   })
 })
