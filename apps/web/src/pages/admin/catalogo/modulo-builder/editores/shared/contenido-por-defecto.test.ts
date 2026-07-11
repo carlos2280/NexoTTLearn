@@ -11,6 +11,8 @@ import { type ContextoContenidoDefecto, contenidoPorDefecto } from "./contenido-
 const CONTEXTO_POR_TIPO: Partial<Record<TipoBloque, ContextoContenidoDefecto>> = {
   // biome-ignore lint/style/useNamingConvention: clave del enum TipoBloque de Prisma.
   CODIGO_TESTS: { codigoPreguntasHermanoId: "00000000-0000-4000-8000-000000000001" },
+  // biome-ignore lint/style/useNamingConvention: clave del enum TipoBloque de Prisma.
+  SQL_TESTS: { sqlEjercicioHermanoId: "00000000-0000-4000-8000-000000000002" },
 }
 
 const TIPOS_CREABLES: readonly TipoBloque[] = [
@@ -23,6 +25,8 @@ const TIPOS_CREABLES: readonly TipoBloque[] = [
   "CODIGO_PREGUNTAS",
   "CODIGO_TESTS",
   "DIAGRAMA",
+  "SQL_EJERCICIO",
+  "SQL_TESTS",
   "GIT_EJERCICIO",
 ]
 

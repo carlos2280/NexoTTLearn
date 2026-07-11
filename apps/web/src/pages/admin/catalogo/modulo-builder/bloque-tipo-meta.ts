@@ -104,11 +104,6 @@ export function tipoBloqueMeta(tipo: TipoBloque): TipoBloqueMeta {
 export function tiposBloqueOrdenados(): readonly TipoBloque[] {
   // Los *_TESTS se excluyen por ser bloques auxiliares pareados (se editan
   // dentro de su ejercicio, no como bloque suelto).
-  //
-  // SQL_EJERCICIO se excluye a propósito HASTA la Fase 2: hoy no tiene editor
-  // ni `contenidoPorDefecto` válido, así que crearlo desde el slash produciría
-  // `{}` (inválido para su contrato) y caería en el placeholder. Cuando exista
-  // su editor + default, se añade aquí (y a la familia del modal).
   return [
     "PARRAFO",
     "TIP",
@@ -118,6 +113,7 @@ export function tiposBloqueOrdenados(): readonly TipoBloque[] {
     "QUIZ",
     "CODIGO_ILUSTRATIVO",
     "CODIGO_PREGUNTAS",
+    "SQL_EJERCICIO",
     "GIT_EJERCICIO",
   ]
 }

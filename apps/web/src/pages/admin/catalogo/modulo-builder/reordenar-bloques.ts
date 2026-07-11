@@ -2,17 +2,12 @@ import type { BloqueResponse, TipoBloque } from "@nexott-learn/shared-types"
 
 /**
  * Tipos de bloque que NO se muestran sueltos en el arbol del builder: se editan
- * anidados dentro de otro bloque. Hoy solo `CODIGO_TESTS`, que se edita dentro
- * de su Reto de codigo (seccion "Tests automaticos"). Siguen existiendo como
- * bloques propios en la BD; solo se ocultan de la vista.
- *
- * `SQL_TESTS` es su espejo estructural (bloque auxiliar pareado a su ejercicio,
- * oculto al participante junto con `CODIGO_TESTS`). NO se incluye aun porque su
- * editor todavia no esta embebido en el canvas del admin (cae al placeholder
- * "proximamente"); ocultarlo lo dejaria ineditable. Añadir `"SQL_TESTS"` aqui
- * cuando exista el editor SQL embebido (pendiente de los editores SQL).
+ * anidados dentro de otro bloque. `CODIGO_TESTS` se edita dentro de su Reto de
+ * codigo y `SQL_TESTS` dentro de su Reto SQL (ambos en la seccion "Tests
+ * automaticos"). Siguen existiendo como bloques propios en la BD; solo se
+ * ocultan de la vista.
  */
-const TIPOS_OCULTOS: ReadonlySet<TipoBloque> = new Set<TipoBloque>(["CODIGO_TESTS"])
+const TIPOS_OCULTOS: ReadonlySet<TipoBloque> = new Set<TipoBloque>(["CODIGO_TESTS", "SQL_TESTS"])
 
 /** Un bloque se oculta del arbol si su tipo se edita anidado en otro bloque. */
 export function esBloqueOculto(bloque: BloqueResponse): boolean {

@@ -9,6 +9,7 @@ import { EditorGitEjercicio } from "../editores/editor-git-ejercicio"
 import { EditorParrafo } from "../editores/editor-parrafo"
 import { EditorQuiz } from "../editores/editor-quiz"
 import { EditorRecurso } from "../editores/editor-recurso"
+import { EditorSqlEjercicio } from "../editores/editor-sql-ejercicio"
 import { EditorTip } from "../editores/editor-tip"
 import { EditorVideo } from "../editores/editor-video"
 import type { Seleccion } from "../types"
@@ -110,13 +111,15 @@ function ContextoBloque({
   if (bloque.tipo === "GIT_EJERCICIO") {
     return <EditorGitEjercicio bloque={bloque} />
   }
-  if (bloque.tipo === "CODIGO_TESTS") {
-    // Ya no se muestra suelto en el arbol (se edita dentro de su Reto). Este
+  if (bloque.tipo === "SQL_EJERCICIO") {
+    return <EditorSqlEjercicio bloque={bloque} />
+  }
+  if (bloque.tipo === "CODIGO_TESTS" || bloque.tipo === "SQL_TESTS") {
+    // Ya no se muestran sueltos en el arbol (se editan dentro de su Reto). Este
     // caso solo cubre una seleccion residual: no es el placeholder "proximamente".
     return (
       <Banner tone="info">
-        Los tests automaticos se editan dentro de su Reto de codigo, en la seccion "Tests
-        automaticos".
+        Los tests automaticos se editan dentro de su Reto, en la seccion "Tests automaticos".
       </Banner>
     )
   }

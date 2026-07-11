@@ -36,7 +36,7 @@ const FAMILIAS: readonly Familia[] = [
     etiqueta: "Código",
     // CODIGO_TESTS y SQL_TESTS no se ofrecen: los tests se crean y editan
     // dentro de su ejercicio, no como bloque suelto.
-    tipos: ["CODIGO_ILUSTRATIVO", "CODIGO_PREGUNTAS", "GIT_EJERCICIO"],
+    tipos: ["CODIGO_ILUSTRATIVO", "CODIGO_PREGUNTAS", "SQL_EJERCICIO", "GIT_EJERCICIO"],
   },
 ]
 

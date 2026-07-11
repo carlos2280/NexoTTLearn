@@ -13,6 +13,7 @@ function nuevoId(): string {
  */
 export interface ContextoContenidoDefecto {
   readonly codigoPreguntasHermanoId?: string
+  readonly sqlEjercicioHermanoId?: string
 }
 
 /**
@@ -92,6 +93,32 @@ export function contenidoPorDefecto(
             entrada: "",
             salidaEsperada: "",
             visible: true,
+          },
+        ],
+      }
+    case "SQL_EJERCICIO":
+      // `enunciado` exige min(1); el resto tiene defaults en el contrato pero
+      // los sembramos explícitos para no depender del coalesce del schema.
+      return {
+        enunciado:
+          "Describe el reto SQL: qué debe devolver la consulta sobre las tablas de la semilla.",
+        esquemaSemilla: "",
+        consultaInicial: "",
+        tiempoLimiteSeg: 30,
+      }
+    case "SQL_TESTS":
+      // `sqlEjercicioId` exige uuid y `tests` min(1) con `consultaReferencia`
+      // no vacía: sembramos un caso con una consulta placeholder que el admin edita.
+      return {
+        sqlEjercicioId: contexto?.sqlEjercicioHermanoId ?? "",
+        tests: [
+          {
+            id: nuevoId(),
+            descripcion: "Caso de ejemplo",
+            visible: true,
+            esquemaSemilla: "",
+            consultaReferencia: "SELECT 1;",
+            ordenImporta: false,
           },
         ],
       }

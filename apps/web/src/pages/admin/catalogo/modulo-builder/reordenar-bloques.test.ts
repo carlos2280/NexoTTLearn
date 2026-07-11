@@ -22,9 +22,11 @@ function bloque(id: string, tipo: TipoBloque, orden: number): BloqueResponse {
 }
 
 describe("esBloqueOculto", () => {
-  it("oculta CODIGO_TESTS y muestra el resto", () => {
+  it("oculta CODIGO_TESTS y SQL_TESTS, y muestra el resto", () => {
     expect(esBloqueOculto(bloque("t", "CODIGO_TESTS", 1))).toBe(true)
+    expect(esBloqueOculto(bloque("ts", "SQL_TESTS", 1))).toBe(true)
     expect(esBloqueOculto(bloque("r", "CODIGO_PREGUNTAS", 1))).toBe(false)
+    expect(esBloqueOculto(bloque("rs", "SQL_EJERCICIO", 1))).toBe(false)
     expect(esBloqueOculto(bloque("p", "PARRAFO", 1))).toBe(false)
   })
 })
@@ -73,6 +75,24 @@ describe("construirPermutacionConOcultos", () => {
     expect(ids).toEqual(["rA", "rB", "tA", "tB"])
     // ordenes 1..N sin huecos ni repetidos
     expect(permutacion.map((p) => p.orden)).toEqual([1, 2, 3, 4])
+  })
+
+  it("mantiene el SQL_TESTS pegado a su SQL_EJERCICIO junto a un par CODIGO", () => {
+    // Reto de código (+ su test) y Reto SQL (+ su test) en la misma sección.
+    const bloques = [
+      bloque("rCod", "CODIGO_PREGUNTAS", 1),
+      bloque("tCod", "CODIGO_TESTS", 2),
+      bloque("rSql", "SQL_EJERCICIO", 3),
+      bloque("tSql", "SQL_TESTS", 4),
+    ]
+    // El admin sube el Reto SQL delante del de código: visibles -> [rSql, rCod]
+    const permutacion = construirPermutacionConOcultos(bloques, ["rSql", "rCod"])
+    expect(permutacion).toEqual([
+      { bloqueId: "rSql", orden: 1 },
+      { bloqueId: "tSql", orden: 2 },
+      { bloqueId: "rCod", orden: 3 },
+      { bloqueId: "tCod", orden: 4 },
+    ])
   })
 
   it("preserva al inicio los ocultos sin ancla previa (legacy)", () => {

@@ -113,11 +113,16 @@ export function useBuilderAcciones({ moduloId, seleccion }: UseBuilderAccionesAr
       },
     })
 
-    // Un "Reto de código" casi siempre necesita sus tests. Creamos el bloque
-    // CODIGO_TESTS ya enlazado al reto para entregar el par en un solo paso,
-    // en vez de obligar al admin a crear el reto y luego el test apuntándolo.
+    // Un reto (código o SQL) casi siempre necesita sus tests. Creamos el bloque
+    // *_TESTS ya enlazado al reto para entregar el par en un solo paso, en vez de
+    // obligar al admin a crear el reto y luego el test apuntándolo.
     if (tipo === "CODIGO_PREGUNTAS") {
-      await crearTestsDelReto(seccionId, nuevo.id)
+      await crearTestsDelReto(seccionId, "CODIGO_TESTS", { codigoPreguntasHermanoId: nuevo.id })
+      seleccion.seleccionarBloque(nuevo.id)
+      return
+    }
+    if (tipo === "SQL_EJERCICIO") {
+      await crearTestsDelReto(seccionId, "SQL_TESTS", { sqlEjercicioHermanoId: nuevo.id })
       seleccion.seleccionarBloque(nuevo.id)
       return
     }
@@ -126,15 +131,19 @@ export function useBuilderAcciones({ moduloId, seleccion }: UseBuilderAccionesAr
     toast.success("Bloque creado")
   }
 
-  async function crearTestsDelReto(seccionId: string, retoId: string) {
+  async function crearTestsDelReto(
+    seccionId: string,
+    tipoTests: "CODIGO_TESTS" | "SQL_TESTS",
+    contexto: ContextoContenidoDefecto,
+  ) {
     try {
       await crearBloque.mutateAsync({
         seccionId,
         input: {
-          tipo: "CODIGO_TESTS",
+          tipo: tipoTests,
           esEvaluable: false,
           skillQueMideId: null,
-          contenido: contenidoPorDefecto("CODIGO_TESTS", { codigoPreguntasHermanoId: retoId }),
+          contenido: contenidoPorDefecto(tipoTests, contexto),
         },
       })
       toast.success("Reto y Tests creados")
