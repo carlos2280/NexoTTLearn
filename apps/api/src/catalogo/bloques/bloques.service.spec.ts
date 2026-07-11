@@ -172,6 +172,21 @@ describe("BloquesService.listar", () => {
       expect.objectContaining({ where: expect.objectContaining(filtroEsperado) }),
     )
   })
+
+  it("filtra por `contenido.sqlEjercicioId` (JSONB) cuando se pasa el filtro", async () => {
+    prisma.bloque.findMany.mockResolvedValue([])
+    prisma.bloque.count.mockResolvedValue(0)
+    await service.listar({ page: 1, pageSize: 20, sqlEjercicioId: BLO_ID })
+    const filtroEsperado = {
+      contenido: { path: ["sqlEjercicioId"], equals: BLO_ID },
+    }
+    const llamada = prisma.bloque.findMany.mock.calls[0]?.[0] as { where: Record<string, unknown> }
+    expect(llamada.where).toMatchObject(filtroEsperado)
+    // El count debe aplicar el mismo filtro (misma variable `where`).
+    expect(prisma.bloque.count).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining(filtroEsperado) }),
+    )
+  })
 })
 
 describe("BloquesService.obtenerPorIdOrThrow", () => {

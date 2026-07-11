@@ -97,18 +97,24 @@ export class BloquesService {
   ) {}
 
   async listar(query: ListarBloquesQuery): Promise<Paginated<BloqueResponse>> {
-    const { seccionId, tipo, estado, codigoPreguntasId } = query
+    const { seccionId, tipo, estado, codigoPreguntasId, sqlEjercicioId } = query
     const { skip, take, page, pageSize } = resolvePaginacion(query)
     const where: Prisma.BloqueWhereInput = {
       ...(seccionId ? { seccionId } : {}),
       ...(tipo ? { tipo } : {}),
       ...(estado ? { estado } : {}),
     }
+    // `else if`: un bloque nunca es CODIGO y SQL a la vez, y ambos apuntan al
+    // mismo campo `where.contenido` — encadenarlos deja explicita la exclusion.
     if (codigoPreguntasId) {
       // JSONB: bloques cuyo `contenido.codigoPreguntasId` apunta al reto dado
       // (usado por el editor del Reto para hallar su CODIGO_TESTS pareado).
       // biome-ignore lint/nursery/noSecrets: "codigoPreguntasId" es el nombre de un campo JSONB, no un secreto.
       where.contenido = { path: ["codigoPreguntasId"], equals: codigoPreguntasId }
+    } else if (sqlEjercicioId) {
+      // JSONB espejo del anterior para SQL: bloques cuyo `contenido.sqlEjercicioId`
+      // apunta al Reto SQL dado (usado por el editor para hallar su SQL_TESTS pareado).
+      where.contenido = { path: ["sqlEjercicioId"], equals: sqlEjercicioId }
     }
 
     const [filas, total] = await this.prisma.$transaction([
