@@ -162,6 +162,7 @@ export const apiErrorCodes = {
   iaCredencialesInvalidas: "IA_CREDENCIALES_INVALIDAS",
   iaRespuestaMalformada: "IA_RESPUESTA_MALFORMADA",
   repoNoAccesible: "REPO_NO_ACCESIBLE",
+  repoUrlInvalida: "REPO_URL_INVALIDA",
   // Entrevista IA P8c (D-S8-D1..D6, D89).
   entrevistaIaNoEncontrada: "ENTREVISTA_IA_NO_ENCONTRADA",
   intentoEntrevistaNoEncontrado: "INTENTO_ENTREVISTA_NO_ENCONTRADO",
