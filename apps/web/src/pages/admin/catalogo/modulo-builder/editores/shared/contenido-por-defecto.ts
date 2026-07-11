@@ -98,6 +98,15 @@ export function contenidoPorDefecto(
     case "DIAGRAMA":
       // `altText` es obligatorio (a11y); el admin lo ajusta en el editor.
       return { elements: [], altText: "Diagrama nuevo — describe su contenido" }
+    case "GIT_EJERCICIO":
+      // `enunciado` exige min(1); `objetivo` vacío es válido (todos sus campos
+      // son opcionales) y el admin lo define en el editor.
+      return {
+        enunciado:
+          "Describe el ejercicio: qué debe lograr el participante con git (crear una rama, commitear, mergear…).",
+        objetivo: {},
+        pista: "",
+      }
     default:
       return {}
   }

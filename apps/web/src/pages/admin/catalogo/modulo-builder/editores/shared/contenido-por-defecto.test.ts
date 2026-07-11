@@ -23,6 +23,7 @@ const TIPOS_CREABLES: readonly TipoBloque[] = [
   "CODIGO_PREGUNTAS",
   "CODIGO_TESTS",
   "DIAGRAMA",
+  "GIT_EJERCICIO",
 ]
 
 describe("contenidoPorDefecto", () => {

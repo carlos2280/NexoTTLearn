@@ -5,6 +5,7 @@ import { tipoBloqueMeta } from "../bloque-tipo-meta"
 import { EditorCodigoIlustrativo } from "../editores/editor-codigo-ilustrativo"
 import { EditorCodigoPreguntas } from "../editores/editor-codigo-preguntas"
 import { EditorDiagrama } from "../editores/editor-diagrama"
+import { EditorGitEjercicio } from "../editores/editor-git-ejercicio"
 import { EditorParrafo } from "../editores/editor-parrafo"
 import { EditorQuiz } from "../editores/editor-quiz"
 import { EditorRecurso } from "../editores/editor-recurso"
@@ -105,6 +106,9 @@ function ContextoBloque({
   }
   if (bloque.tipo === "DIAGRAMA") {
     return <EditorDiagrama bloque={bloque} />
+  }
+  if (bloque.tipo === "GIT_EJERCICIO") {
+    return <EditorGitEjercicio bloque={bloque} />
   }
   if (bloque.tipo === "CODIGO_TESTS") {
     // Ya no se muestra suelto en el arbol (se edita dentro de su Reto). Este
