@@ -360,6 +360,7 @@ enum EstadoIntentoTransversal {
 
 enum ArchivoTipo {
   EVALUACION_INICIAL_EXCEL
+  IMAGEN_CONTENIDO
 
   @@map("archivo_tipo_enum")
 }

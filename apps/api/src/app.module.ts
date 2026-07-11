@@ -27,6 +27,7 @@ import { ImportarCursoModule } from "./cursos/importar-curso/importar-curso.modu
 import { EntrevistaIaModule } from "./entrevista-ia/entrevista-ia.module"
 import { EvaluacionInicialModule } from "./evaluacion-inicial/evaluacion-inicial.module"
 import { HealthModule } from "./health/health.module"
+import { ImagenesModule } from "./imagenes/imagenes.module"
 import { IntentosBloqueModule } from "./intentos-bloque/intentos-bloque.module"
 import { LogsModule } from "./logs/logs.module"
 import { NotificacionesModule } from "./notificaciones/notificaciones.module"
@@ -83,6 +84,7 @@ import { TransversalModule } from "./transversal/transversal.module"
     CursosModule,
     ImportarCursoModule,
     EvaluacionInicialModule,
+    ImagenesModule,
     PlanPersonalModule,
     IntentosBloqueModule,
     NotificacionesModule,

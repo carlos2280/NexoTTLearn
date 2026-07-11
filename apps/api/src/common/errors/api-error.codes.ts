@@ -95,6 +95,9 @@ export const apiErrorCodes = {
   // Storage P5a (D-EVI-1).
   archivoNoEncontrado: "ARCHIVO_NO_ENCONTRADO",
   archivoPathInvalido: "ARCHIVO_PATH_INVALIDO",
+  // Imagenes de contenido (subida desde editores TipTap).
+  imagenTipoNoSoportado: "IMAGEN_TIPO_NO_SOPORTADO",
+  imagenDemasiadoGrande: "IMAGEN_DEMASIADO_GRANDE",
   // Idempotency transversal P5a (D-EVI-3). Reservado para P5c.
   conflictIdempotencyKeyReusadaConBodyDistinto:
     "CONFLICT_IDEMPOTENCY_KEY_REUSADA_CON_BODY_DISTINTO",

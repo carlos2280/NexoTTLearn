@@ -785,3 +785,9 @@ export type {
   ExportarLogsAjustesPlanQuery,
   ExportarLogsConsultasQuery,
 } from "./admin"
+export {
+  subirImagenResponseSchema,
+  MIME_IMAGEN_PERMITIDOS,
+  MAX_IMAGEN_BYTES,
+} from "./imagenes/subir-imagen.schema"
+export type { SubirImagenResponse } from "./imagenes/subir-imagen.schema"
