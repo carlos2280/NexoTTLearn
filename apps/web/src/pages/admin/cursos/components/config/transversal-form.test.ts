@@ -56,15 +56,11 @@ describe("esFormValido", () => {
     expect(esFormValido(FORM_TRANSVERSAL_DEFECTO)).toBe(true)
   })
 
-  it("activo con pesos que no suman 100 es inválido", () => {
-    expect(esFormValido(activo({ pesoCapaComprension: 10 }))).toBe(false)
-  })
-
   it("activo con brief vacío (o solo espacios) es inválido", () => {
     expect(esFormValido(activo({ descripcion: "   " }))).toBe(false)
   })
 
-  it("activo con pesos que suman 100 y brief presente es válido", () => {
+  it("activo con brief presente es válido (los pesos ya no los edita el admin)", () => {
     expect(esFormValido(activo())).toBe(true)
   })
 })
@@ -97,13 +93,20 @@ describe("construirInputTransversal", () => {
     expect(construirInputTransversal(activo({ activo: false }))).toEqual({ activo: false })
   })
 
-  it("al activar envía brief, umbral, pesos, capas y skills", () => {
+  it("al activar envía brief, umbral, skills y colapsa a una sola capa IA", () => {
+    // El form entra con el modelo viejo de 3 capas (40/40/20, todas activas);
+    // construirInput debe normalizarlo a una capa (cualitativa 100/activa).
     const input = construirInputTransversal(activo({ skillsQueMideIds: ["s1", "s2"] }))
     expect(input).toMatchObject({
       activo: true,
       descripcion: "<p>x</p>",
       umbralAprobacion: 70,
-      pesoCapaTests: 40,
+      pesoCapaTests: 0,
+      pesoCapaCualitativa: 100,
+      pesoCapaComprension: 0,
+      capaTestsActiva: false,
+      capaCualitativaActiva: true,
+      capaComprensionActiva: false,
       skillsQueMideIds: ["s1", "s2"],
     })
   })

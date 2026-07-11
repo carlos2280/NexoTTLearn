@@ -21,17 +21,28 @@ export interface FormTransversal {
   readonly skillsQueMideIds: readonly string[]
 }
 
+/**
+ * Pesos y flags de capa fijos: el transversal se evalúa con UNA sola capa
+ * (revisión con IA = cualitativa). Tests y comprensión quedan apagadas y su
+ * peso en 0. El contrato PATCH sigue exigiendo las 3 (schema de 3 capas), así
+ * que enviamos estos valores fijos; la suma da 100 y el cálculo de nota (D35)
+ * usa solo la capa viva. Ver `construirInputTransversal`.
+ */
+const CAPAS_UNA_SOLA_IA = {
+  pesoCapaTests: 0,
+  pesoCapaCualitativa: 100,
+  pesoCapaComprension: 0,
+  capaTestsActiva: false,
+  capaCualitativaActiva: true,
+  capaComprensionActiva: false,
+} as const
+
 /** Baseline por defecto para un curso que aún no tiene transversal. */
 export const FORM_TRANSVERSAL_DEFECTO: FormTransversal = {
   activo: false,
   descripcion: "",
   umbralAprobacion: 70,
-  pesoCapaTests: 40,
-  pesoCapaCualitativa: 40,
-  pesoCapaComprension: 20,
-  capaTestsActiva: true,
-  capaCualitativaActiva: true,
-  capaComprensionActiva: true,
+  ...CAPAS_UNA_SOLA_IA,
   skillsQueMideIds: [],
 }
 
@@ -51,15 +62,15 @@ export function baselineDesdeRespuesta(resp: TransversalResponse): FormTransvers
   }
 }
 
-/** La suma de pesos debe ser 100 y el brief no puede ir vacío al activar. */
+/**
+ * Al activar, el brief no puede ir vacío. Los pesos ya no los edita el admin
+ * (evaluación de una sola capa IA), así que no se validan aquí.
+ */
 export function esFormValido(form: FormTransversal): boolean {
   if (!form.activo) {
     return true
   }
-  const suma = form.pesoCapaTests + form.pesoCapaCualitativa + form.pesoCapaComprension
-  const sumaOk = Math.round(suma * 100) === 10000
-  const briefOk = form.descripcion.trim().length > 0
-  return sumaOk && briefOk
+  return form.descripcion.trim().length > 0
 }
 
 /** True si el formulario difiere del baseline cargado (habilita "Guardar"). */
@@ -96,16 +107,13 @@ export function construirInputTransversal(form: FormTransversal): ActualizarTran
   if (!form.activo) {
     return { activo: false }
   }
+  // Normaliza SIEMPRE a una sola capa (revisión con IA). Aunque el curso
+  // tenga guardado el modelo viejo de 3 capas, al guardar se colapsa a IA.
   return {
     activo: true,
     descripcion: form.descripcion,
     umbralAprobacion: form.umbralAprobacion,
-    pesoCapaTests: form.pesoCapaTests,
-    pesoCapaCualitativa: form.pesoCapaCualitativa,
-    pesoCapaComprension: form.pesoCapaComprension,
-    capaTestsActiva: form.capaTestsActiva,
-    capaCualitativaActiva: form.capaCualitativaActiva,
-    capaComprensionActiva: form.capaComprensionActiva,
+    ...CAPAS_UNA_SOLA_IA,
     skillsQueMideIds: [...form.skillsQueMideIds],
   }
 }

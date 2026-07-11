@@ -4,9 +4,9 @@ import type { CursoDetalle } from "@nexott-learn/shared-types"
 import { useState } from "react"
 import { AYUDAS_CONFIG_CURSO } from "./ayudas"
 import { CampoNumero } from "./campo-numero"
-import { CapasTransversal } from "./capas-transversal"
 import { ConfigCard } from "./config-card"
 import { EditorBriefTransversal } from "./editor-brief-transversal"
+import { EvaluacionIaInfo } from "./evaluacion-ia-info"
 import { SelectorSkillsTransversal } from "./selector-skills-transversal"
 import { useFormTransversal } from "./use-form-transversal"
 
@@ -34,7 +34,7 @@ export function ConfigTransversal({ curso, bloqueado }: ConfigTransversalProps) 
     <ConfigCard
       id="config-transversal"
       titulo="Proyecto transversal"
-      descripcion="Activa el proyecto transversal, redacta sus instrucciones y reparte 100% entre capas (tests / cualitativa / comprensión)."
+      descripcion="Activa el proyecto transversal y redacta sus instrucciones. La entrega la revisa la IA sobre el repositorio del participante."
       ayuda={AYUDAS_CONFIG_CURSO.transversal}
       exigeMotivo={curso.estado !== "BORRADOR"}
       modificado={modificado}
@@ -54,7 +54,7 @@ export function ConfigTransversal({ curso, bloqueado }: ConfigTransversalProps) 
           }
         }}
         label="Activar proyecto transversal"
-        descripcion="Se evalúa en 3 capas: tests automáticos, análisis cualitativo y comprensión."
+        descripcion="La IA revisa el repositorio entregado y le pone una nota."
       />
       {form.activo && errorBrief ? (
         <Banner tone="danger" title="No pudimos cargar la configuración del transversal">
@@ -83,13 +83,10 @@ export function ConfigTransversal({ curso, bloqueado }: ConfigTransversalProps) 
               valor={form.umbralAprobacion}
               onCambio={(v) => setForm((f) => ({ ...f, umbralAprobacion: v }))}
             />
-            <CapasTransversal
-              form={form}
-              onCambio={(parcial) => setForm((f) => ({ ...f, ...parcial }))}
-            />
+            <EvaluacionIaInfo />
             {valido ? null : (
               <p className="text-caption text-warning">
-                Para guardar: redacta las instrucciones y asegúrate de que los pesos sumen 100%.
+                Para guardar: redacta las instrucciones del proyecto.
               </p>
             )}
           </>
