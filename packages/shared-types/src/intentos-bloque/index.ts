@@ -28,16 +28,28 @@ export type {
   LenguajeEjecutable,
 } from "./contenido-codigo.schema"
 export {
+  contenidoSqlEjercicioSchema,
+  contenidoSqlTestsSchema,
+  testSqlSchema,
+} from "./contenido-sql.schema"
+export type {
+  ContenidoSqlEjercicio,
+  ContenidoSqlTests,
+  TestSql,
+} from "./contenido-sql.schema"
+export {
   crearIntentoBloqueSchema,
   respuestaPreguntaSchema,
   respuestasIntentoSchema,
   resultadoTestReportadoSchema,
+  resultadoTestSqlReportadoSchema,
 } from "./crear-intento.schema"
 export type {
   CrearIntentoBloqueInput,
   RespuestaPregunta,
   RespuestasIntento,
   ResultadoTestReportado,
+  ResultadoTestSqlReportado,
 } from "./crear-intento.schema"
 export {
   intentoBloqueResponseSchema,

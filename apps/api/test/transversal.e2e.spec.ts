@@ -596,16 +596,18 @@ describe.runIf(RUN_E2E)("transversal e2e (Slice 8 P8a)", () => {
     return (res.body as { intentoId: string }).intentoId
   }
 
-  it("E7 POST capa tests — admin carga nota con Idempotency-Key OK", async () => {
+  it("E7 POST capa tests (inactiva tras colapso a 1 capa) -> 409 CONFLICT_CAPA_INACTIVA", async () => {
     const intentoId = await crearIntentoEnEvaluacion()
     const res = await agenteAdmin
       .post(`/api/v1/intentos-transversal/${intentoId}/capas/tests`)
       .set("X-XSRF-TOKEN", csrfAdmin)
       .set("Idempotency-Key", randomUUID())
       .send({ nota: 75, detalle: { fuente: "ci-externo", suite: "vitest" } })
-    expect(res.status).toBe(200)
-    const body = res.body as { notaCapaTests: number }
-    expect(body.notaCapaTests).toBe(75)
+    // El transversal colapso a una sola capa activa (cualitativa); la capa tests
+    // nace inactiva por defecto, por lo que cargar su nota se rechaza (D-S8-C3).
+    expect(res.status).toBe(409)
+    const body = res.body as { code?: string }
+    expect(body.code).toBe("CONFLICT_CAPA_INACTIVA")
   })
 
   it("E8 POST capa cualitativa — body con shape estricto", async () => {
@@ -618,26 +620,15 @@ describe.runIf(RUN_E2E)("transversal e2e (Slice 8 P8a)", () => {
     expect(res.status).toBe(200)
   })
 
-  it("E9 POST capa comprension — y tras 3 capas el intento transita a EVALUADO", async () => {
+  it("E9 POST capa cualitativa (unica activa) -> el intento transita a EVALUADO", async () => {
     const intentoId = await crearIntentoEnEvaluacion()
-    await agenteAdmin
-      .post(`/api/v1/intentos-transversal/${intentoId}/capas/tests`)
-      .set("X-XSRF-TOKEN", csrfAdmin)
-      .set("Idempotency-Key", randomUUID())
-      .send({ nota: 70, detalle: {} })
-    await agenteAdmin
+    // Con una sola capa activa, cargar su nota completa las capas activas con
+    // nota y gatilla la transicion automatica a EVALUADO (D-S8-C3).
+    const r = await agenteAdmin
       .post(`/api/v1/intentos-transversal/${intentoId}/capas/cualitativa`)
       .set("X-XSRF-TOKEN", csrfAdmin)
       .set("Idempotency-Key", randomUUID())
       .send({ nota: 80, detalle: { comentario: "x", confianza: "MEDIA" } })
-    const r = await agenteAdmin
-      .post(`/api/v1/intentos-transversal/${intentoId}/capas/comprension`)
-      .set("X-XSRF-TOKEN", csrfAdmin)
-      .set("Idempotency-Key", randomUUID())
-      .send({
-        nota: 90,
-        detalle: { transcripcion: [{ rol: "ASISTENTE", mensaje: "Q?" }] },
-      })
     expect(r.status).toBe(200)
     const intentoActualizado = await prisma.intentoTransversal.findUnique({
       where: { id: intentoId },
@@ -648,22 +639,13 @@ describe.runIf(RUN_E2E)("transversal e2e (Slice 8 P8a)", () => {
 
   it("E10 POST finalizar -> 200 con notaGlobal, aprobado, skills + audit", async () => {
     const intentoId = await crearIntentoEnEvaluacion()
-    // Cargar las 3 capas para llegar a EVALUADO.
-    await agenteAdmin
-      .post(`/api/v1/intentos-transversal/${intentoId}/capas/tests`)
-      .set("X-XSRF-TOKEN", csrfAdmin)
-      .set("Idempotency-Key", randomUUID())
-      .send({ nota: 80, detalle: {} })
+    // Tras el colapso a una sola capa activa (cualitativa), cargar su nota deja
+    // el intento en EVALUADO y la nota global = la de esa capa (reescalada al 100%).
     await agenteAdmin
       .post(`/api/v1/intentos-transversal/${intentoId}/capas/cualitativa`)
       .set("X-XSRF-TOKEN", csrfAdmin)
       .set("Idempotency-Key", randomUUID())
       .send({ nota: 70, detalle: { comentario: "x", confianza: "ALTA" } })
-    await agenteAdmin
-      .post(`/api/v1/intentos-transversal/${intentoId}/capas/comprension`)
-      .set("X-XSRF-TOKEN", csrfAdmin)
-      .set("Idempotency-Key", randomUUID())
-      .send({ nota: 90, detalle: { transcripcion: [] } })
 
     const res = await agenteAdmin
       .post(`/api/v1/intentos-transversal/${intentoId}/finalizar`)
@@ -671,8 +653,8 @@ describe.runIf(RUN_E2E)("transversal e2e (Slice 8 P8a)", () => {
       .send({})
     expect(res.status).toBe(200)
     const body = res.body as { notaGlobal: number; aprobado: boolean }
-    expect(body.notaGlobal).toBe(80) // 0.4*80 + 0.3*70 + 0.3*90 = 80
-    expect(body.aprobado).toBe(true)
+    expect(body.notaGlobal).toBe(70) // unica capa activa (cualitativa) = 70
+    expect(body.aprobado).toBe(true) // umbral 70; 70 >= 70
     const audit = await prisma.activityLog.findFirst({
       where: { accion: "INTENTO_TRANSVERSAL_FINALIZADO", recursoId: intentoId },
       select: { id: true },

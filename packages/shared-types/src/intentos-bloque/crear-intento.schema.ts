@@ -96,11 +96,40 @@ const respuestasCodigoPreguntasSchema = z
   })
   .strict()
 
+// --- SQL_EJERCICIO ------------------------------------------------------
+
+/**
+ * Resultado por test que reporta el cliente tras ejecutar la consulta del
+ * participante en PGlite (navegador). El backend valida estructura y recalcula
+ * la nota; nunca confia en una nota agregada enviada por el cliente. Las filas
+ * obtenidas viajan serializadas (JSON) solo para mostrar/auditar el intento.
+ */
+export const resultadoTestSqlReportadoSchema = z
+  .object({
+    testId: z.string().min(1),
+    paso: z.boolean(),
+    estado: z.enum(["ok", "timeout", "fallo"]),
+    filasObtenidas: z.string().max(50_000).default(""),
+    error: z.string().max(20_000).default(""),
+    duracionMs: z.number().int().min(0).max(120_000),
+  })
+  .strict()
+export type ResultadoTestSqlReportado = z.infer<typeof resultadoTestSqlReportadoSchema>
+
+const respuestasSqlEjercicioSchema = z
+  .object({
+    tipo: z.literal("SQL_EJERCICIO"),
+    consultaEnviada: z.string().min(1).max(100_000),
+    resultadosTests: z.array(resultadoTestSqlReportadoSchema).min(1).max(20),
+  })
+  .strict()
+
 // --- Union --------------------------------------------------------------
 
 export const respuestasIntentoSchema = z.discriminatedUnion("tipo", [
   respuestasQuizSchema,
   respuestasCodigoPreguntasSchema,
+  respuestasSqlEjercicioSchema,
 ])
 export type RespuestasIntento = z.infer<typeof respuestasIntentoSchema>
 

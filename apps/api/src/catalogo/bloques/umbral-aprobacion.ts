@@ -2,6 +2,7 @@ import {
   type TipoBloque,
   contenidoCodigoPreguntasSchema,
   contenidoQuizSchema,
+  contenidoSqlEjercicioSchema,
 } from "@nexott-learn/shared-types"
 
 /**
@@ -42,8 +43,18 @@ export function umbralAprobacionBloque(tipo: TipoBloque, contenido: unknown): nu
     }
     return UMBRAL_FALLBACK
   }
+  if (tipo === "SQL_EJERCICIO") {
+    // Espejo de CODIGO_PREGUNTAS: se evalua via consultas de referencia sobre
+    // PGlite y el "aprobado" coincide con el chip del bloque.
+    const parsed = contenidoSqlEjercicioSchema.safeParse(contenido)
+    if (parsed.success) {
+      return UMBRAL_SQL_EJERCICIO
+    }
+    return UMBRAL_FALLBACK
+  }
   return UMBRAL_FALLBACK
 }
 
 const UMBRAL_CODIGO_PREGUNTAS = 60
+const UMBRAL_SQL_EJERCICIO = 60
 const UMBRAL_FALLBACK = 60

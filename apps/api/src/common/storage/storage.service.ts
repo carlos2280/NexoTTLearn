@@ -31,6 +31,10 @@ const MIME_EXTENSION_MAP: Record<string, string> = {
   "application/pdf": "pdf",
   "text/csv": "csv",
   "application/octet-stream": "bin",
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
 }
 
 /**
@@ -107,12 +111,21 @@ export class StorageService {
     return await this.prisma.$transaction(ejecutor)
   }
 
-  async leer(archivoId: string): Promise<LeerArchivoResult> {
+  /**
+   * Lee un archivo del storage. `tiposPermitidos` acota qué tipos puede devolver
+   * este llamado: si el archivo existe pero su `tipo` no está en la lista, se
+   * responde 404 SIN leer el fichero del disco (defensa en profundidad — evita
+   * que un endpoint de imágenes cargue en memoria un Excel que comparte tabla).
+   */
+  async leer(
+    archivoId: string,
+    tiposPermitidos?: readonly ArchivoTipo[],
+  ): Promise<LeerArchivoResult> {
     const archivo = await this.prisma.archivo.findUnique({
       where: { id: archivoId },
       select: SELECT_ARCHIVO_FIELDS,
     })
-    if (!archivo) {
+    if (!archivo || (tiposPermitidos && !tiposPermitidos.includes(archivo.tipo))) {
       throw new NotFoundException({
         code: apiErrorCodes.archivoNoEncontrado,
         message: "Archivo no encontrado.",

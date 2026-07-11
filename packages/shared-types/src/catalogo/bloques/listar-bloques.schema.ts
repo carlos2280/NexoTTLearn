@@ -15,6 +15,9 @@ export const tipoBloqueSchema = z.enum([
   "CODIGO_PREGUNTAS",
   "CODIGO_TESTS",
   "DIAGRAMA",
+  "SQL_EJERCICIO",
+  "SQL_TESTS",
+  "GIT_EJERCICIO",
 ])
 export type TipoBloque = z.infer<typeof tipoBloqueSchema>
 
@@ -25,6 +28,12 @@ export const listarBloquesQuerySchema = paginacionQuerySchema.extend({
   seccionId: z.string().uuid().optional(),
   tipo: tipoBloqueSchema.optional(),
   estado: estadoBloqueSchema.optional(),
+  // Filtra por `contenido.codigoPreguntasId` (JSONB). Lo usa el editor del Reto
+  // para encontrar su bloque CODIGO_TESTS pareado sin traer todo el contenido.
+  codigoPreguntasId: z.string().uuid().optional(),
+  // Espejo del anterior para SQL: filtra por `contenido.sqlEjercicioId` (JSONB).
+  // Lo usa el editor del Reto SQL para hallar su bloque SQL_TESTS pareado.
+  sqlEjercicioId: z.string().uuid().optional(),
 })
 
 export type ListarBloquesQuery = z.infer<typeof listarBloquesQuerySchema>

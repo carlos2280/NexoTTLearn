@@ -38,7 +38,8 @@ import { IAiProvider } from "./ai-provider.interface"
  * ClaudeProvider — implementacion real via `@anthropic-ai/sdk` (D-S8-B1/B4/B7).
  *
  * - Activa prompt caching via header `anthropic-beta` (D-S8-B4).
- * - Verifica accesibilidad del repo con HEAD antes de gastar tokens (R-S8-6).
+ * - Solo el flujo de comprension valida accesibilidad con HEAD (R-S8-6); la
+ *   cualitativa recibe el contenido ya descargado por el RepoFetchService.
  * - Mapea errores Anthropic.APIError a HTTPException segun D-S8-B7.
  * - Logging: solo metadatos (model, tokens, latencyMs). NUNCA prompt ni
  *   respuesta (R-S8-10).
@@ -83,9 +84,10 @@ export class ClaudeProvider implements IAiProvider {
   async evaluarRepoCualitativo(
     input: EvaluarRepoCualitativoInput,
   ): Promise<EvaluarRepoCualitativoOutput> {
-    await this.verificarRepoAccesible(input.repoUrl)
+    // Sin HEAD de accesibilidad: el RepoFetchService ya validó, clonó y
+    // empaquetó el repo; aquí solo evaluamos su contenido.
     const mensajes = construirMensajesCualitativa({
-      repoUrl: input.repoUrl,
+      contenidoRepo: input.contenidoRepo,
       profundidad: input.profundidad,
     })
     const modelo = this.resolverModelo(input.profundidad)

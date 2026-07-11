@@ -6,7 +6,7 @@ describe("MockAiProvider", () => {
 
   it("evaluarRepoCualitativo devuelve respuesta determinista con confianza alta", async () => {
     const result = await provider.evaluarRepoCualitativo({
-      repoUrl: "https://github.com/foo/bar",
+      contenidoRepo: "===== a.ts =====\nconst a = 1",
       profundidad: "SEMI_SENIOR",
     })
     expect(result.nota).toBe(80)

@@ -13,6 +13,12 @@ interface UseAutoGuardarBloqueArgs {
    * Devuelve null si no hay cambios reales (skip).
    */
   readonly construirContenido: () => Record<string, unknown> | null
+  /**
+   * Si reporta su estado al indicador global del topbar. Por defecto `true`.
+   * Los editores embebidos (tests dentro del Reto) lo ponen en `false` para no
+   * pisar el estado del editor de nivel superior; conservan su indicador local.
+   */
+  readonly reportarGlobal?: boolean
 }
 
 /**
@@ -20,7 +26,11 @@ interface UseAutoGuardarBloqueArgs {
  * COSMETICO/CAMBIA_EVALUACION explicita llega en B5; por ahora todos los
  * editores que NO afectan a la evaluacion (PARRAFO, TIP) son cosmeticos.
  */
-export function useAutoGuardarBloque({ bloqueId, construirContenido }: UseAutoGuardarBloqueArgs) {
+export function useAutoGuardarBloque({
+  bloqueId,
+  construirContenido,
+  reportarGlobal = true,
+}: UseAutoGuardarBloqueArgs) {
   const patch = usePatchBloque()
   const guardadoBuilder = useGuardadoBuilder()
   const [estado, setEstadoLocal] = useState<EstadoGuardado>("limpio")
@@ -29,14 +39,18 @@ export function useAutoGuardarBloque({ bloqueId, construirContenido }: UseAutoGu
 
   function setEstado(siguiente: EstadoGuardado) {
     setEstadoLocal(siguiente)
-    guardadoBuilder.reportar(siguiente)
+    if (reportarGlobal) {
+      guardadoBuilder.reportar(siguiente)
+    }
   }
 
   // Reset estado global al desmontar (cambiar de bloque)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: bloqueId dispara el reset; guardadoBuilder.reset es estable y se omite del array intencionalmente
+  // biome-ignore lint/correctness/useExhaustiveDependencies: bloqueId dispara el reset; guardadoBuilder.reset y reportarGlobal son estables por instancia y se omiten intencionalmente
   useEffect(() => {
     return () => {
-      guardadoBuilder.reset()
+      if (reportarGlobal) {
+        guardadoBuilder.reset()
+      }
     }
   }, [bloqueId])
 

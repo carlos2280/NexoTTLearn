@@ -425,12 +425,13 @@ export async function seedCursoSoporteReact(
     update: {
       descripcion: descripcionProyecto,
       umbralAprobacion: 70,
-      pesoCapaTests: 20,
-      pesoCapaCualitativa: 50,
-      pesoCapaComprension: 30,
-      capaTestsActiva: true,
+      // Una sola capa: revisión con IA (cualitativa). Ver colapso 2026-07-11.
+      pesoCapaTests: 0,
+      pesoCapaCualitativa: 100,
+      pesoCapaComprension: 0,
+      capaTestsActiva: false,
       capaCualitativaActiva: true,
-      capaComprensionActiva: true,
+      capaComprensionActiva: false,
     },
     create: {
       id: ID_TRANSVERSAL_SOPORTE,
@@ -438,16 +439,14 @@ export async function seedCursoSoporteReact(
       descripcion: descripcionProyecto,
       umbralAprobacion: 70,
       capas: {
-        tests: { activa: true, peso: 20 },
-        cualitativa: { activa: true, peso: 50 },
-        comprension: { activa: true, peso: 30 },
+        cualitativa: { activa: true, peso: 100 },
       } satisfies Prisma.InputJsonValue,
-      pesoCapaTests: 20,
-      pesoCapaCualitativa: 50,
-      pesoCapaComprension: 30,
-      capaTestsActiva: true,
+      pesoCapaTests: 0,
+      pesoCapaCualitativa: 100,
+      pesoCapaComprension: 0,
+      capaTestsActiva: false,
       capaCualitativaActiva: true,
-      capaComprensionActiva: true,
+      capaComprensionActiva: false,
     },
   })
 

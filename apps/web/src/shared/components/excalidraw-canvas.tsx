@@ -3,6 +3,7 @@ import "@excalidraw/excalidraw/index.css"
 import { Excalidraw } from "@excalidraw/excalidraw"
 
 import { useExcalidrawTheme } from "@/pages/admin/catalogo/modulo-builder/editores/shared/use-excalidraw-theme"
+import { sanitizarAppStateExcalidraw } from "./excalidraw-app-state"
 
 interface ExcalidrawCanvasProps {
   /** Datos iniciales serializados de Excalidraw. */
@@ -33,11 +34,16 @@ export default function ExcalidrawCanvas({
   onChange,
 }: ExcalidrawCanvasProps) {
   const theme = useExcalidrawTheme()
+  // `collaborators` serializado como `{}` rompe Excalidraw al montar; se limpia
+  // aquí para cubrir editor y visor en un único punto (ver excalidraw-app-state).
+  const initialDataSaneado = initialData
+    ? { ...initialData, appState: sanitizarAppStateExcalidraw(initialData.appState) }
+    : undefined
   return (
     <Excalidraw
       theme={theme}
       viewModeEnabled={viewMode}
-      initialData={initialData as Parameters<typeof Excalidraw>[0]["initialData"]}
+      initialData={initialDataSaneado as Parameters<typeof Excalidraw>[0]["initialData"]}
       onChange={onChange as Parameters<typeof Excalidraw>[0]["onChange"]}
       UIOptions={{
         canvasActions: {

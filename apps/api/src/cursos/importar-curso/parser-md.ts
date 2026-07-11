@@ -39,6 +39,8 @@ const TIPOS_FENCE = new Set([
   "tip",
   "quiz",
   "codigo",
+  "sql",
+  "git",
   "codigo_ilustrativo",
   "recurso",
   "video",
@@ -315,7 +317,11 @@ function delegarBuilder(fence: FenceCrudo): unknown {
     case "quiz":
       return construirQuiz(fence.params, fence.body)
     case "codigo":
-      return construirCodigo(fence.body)
+      return construirCodigo(fence.params, fence.body)
+    case "sql":
+      return construirSql(fence.params, fence.body)
+    case "git":
+      return construirGit(fence.body)
     case "codigo_ilustrativo":
       return construirCodigoIlustrativo(fence.body)
     case "recurso":
@@ -375,11 +381,22 @@ function numParamNullable(params: Record<string, string>, key: string): number |
   return Number.isFinite(n) ? n : null
 }
 
+/**
+ * Extrae el parámetro `skill="…"` de un fence evaluable como el fragmento
+ * `{ skillEtiqueta }` listo para esparcir en el bloque. Devuelve `{}` cuando
+ * no se declaró skill (bloque queda sin skill, compatible con lo previo).
+ */
+function skillEtiquetaParam(params: Record<string, string>): Record<string, string> {
+  const skill = params.skill?.trim()
+  return skill ? { skillEtiqueta: skill } : {}
+}
+
 function construirQuiz(params: Record<string, string>, body: string): unknown {
   const { preguntasRaw, solucionVisible } = extraerPreguntasYConfig(body)
   const preguntas = preguntasRaw.map((p, idx) => normalizarPregunta(p, idx))
   return {
     tipo: "QUIZ",
+    ...skillEtiquetaParam(params),
     contenido: {
       intentosMax: numParamNullable(params, "intentosMax"),
       solucionVisible,
@@ -480,7 +497,7 @@ function normalizarOpcion(raw: unknown, idx: number): Record<string, unknown> {
   }
 }
 
-function construirCodigo(body: string): unknown {
+function construirCodigo(params: Record<string, string>, body: string): unknown {
   const datos = parsearYamlObjeto(body, "codigo")
   const tests = datos.tests
   if (!Array.isArray(tests)) {
@@ -488,6 +505,7 @@ function construirCodigo(body: string): unknown {
   }
   return {
     tipo: "CODIGO",
+    ...skillEtiquetaParam(params),
     contenidoReto: {
       lenguaje: String(datos.lenguaje ?? ""),
       enunciado: String(datos.enunciado ?? ""),
@@ -511,6 +529,80 @@ function normalizarTest(raw: unknown, idx: number): Record<string, unknown> {
     salidaEsperada: String(t.esperada ?? t.salidaEsperada ?? ""),
     visible: t.visible === undefined ? true : Boolean(t.visible),
   }
+}
+
+function construirSql(params: Record<string, string>, body: string): unknown {
+  const datos = parsearYamlObjeto(body, "sql")
+  const tests = datos.tests
+  if (!Array.isArray(tests)) {
+    throw new ParserCursoMdError("Bloque sql: `tests` debe ser un array.")
+  }
+  return {
+    tipo: "SQL",
+    ...skillEtiquetaParam(params),
+    contenidoReto: {
+      enunciado: String(datos.enunciado ?? ""),
+      esquemaSemilla: String(datos.esquema ?? datos.esquemaSemilla ?? ""),
+      consultaInicial: String(datos.consultaInicial ?? datos.esqueleto ?? ""),
+      tiempoLimiteSeg: typeof datos.tiempoLimiteSeg === "number" ? datos.tiempoLimiteSeg : 30,
+    },
+    tests: tests.map((t, idx) => normalizarTestSql(t, idx)),
+  }
+}
+
+function normalizarTestSql(raw: unknown, idx: number): Record<string, unknown> {
+  if (!raw || typeof raw !== "object") {
+    throw new ParserCursoMdError(`Test SQL #${idx + 1} inválido: no es un objeto.`)
+  }
+  const t = raw as Record<string, unknown>
+  return {
+    id: String(t.id ?? `t${idx + 1}`),
+    descripcion: String(t.descripcion ?? ""),
+    visible: t.visible === undefined ? true : Boolean(t.visible),
+    esquemaSemilla: String(t.esquema ?? t.esquemaSemilla ?? ""),
+    consultaReferencia: String(t.referencia ?? t.consultaReferencia ?? ""),
+    ordenImporta: Boolean(t.ordenImporta ?? false),
+  }
+}
+
+/**
+ * Bloque `::: git` — terminal de git sobre un repo simulado en memoria. Es
+ * autocontenido (no lleva tests hermanos ni skill): el service lo persiste por
+ * el camino genérico como `GIT_EJERCICIO` con `esEvaluable=false`. El `objetivo`
+ * declarativo define cuándo se marca "logrado" en el cliente.
+ */
+function construirGit(body: string): unknown {
+  const datos = parsearYamlObjeto(body, "git")
+  const objetivoRaw = datos.objetivo
+  if (!objetivoRaw || typeof objetivoRaw !== "object" || Array.isArray(objetivoRaw)) {
+    throw new ParserCursoMdError("Bloque git: falta `objetivo` (objeto con la condición de éxito).")
+  }
+  return {
+    tipo: "GIT_EJERCICIO",
+    contenido: {
+      enunciado: String(datos.enunciado ?? ""),
+      objetivo: normalizarObjetivoGit(objetivoRaw as Record<string, unknown>),
+      pista: String(datos.pista ?? ""),
+    },
+  }
+}
+
+/** Whitelistea las claves conocidas del objetivo (el schema Zod es `.strict()`). */
+function normalizarObjetivoGit(raw: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  if (typeof raw.ramaActiva === "string") {
+    out.ramaActiva = raw.ramaActiva
+  }
+  if (Array.isArray(raw.ramasExisten)) {
+    out.ramasExisten = raw.ramasExisten.map(String)
+  }
+  if (typeof raw.hayMergeEnMain === "boolean") {
+    out.hayMergeEnMain = raw.hayMergeEnMain
+  }
+  if (typeof raw.commitsMinimos === "number") {
+    out.commitsMinimos = raw.commitsMinimos
+  }
+  return out
 }
 
 function construirCodigoIlustrativo(body: string): unknown {

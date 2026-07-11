@@ -2,6 +2,7 @@ import { z } from "zod"
 import {
   contenidoCodigoIlustrativoSchema,
   contenidoDiagramaSchema,
+  contenidoGitEjercicioSchema,
   contenidoParrafoSchema,
   contenidoRecursoSchema,
   contenidoTipSchema,
@@ -10,6 +11,8 @@ import {
 import {
   contenidoCodigoPreguntasSchema,
   contenidoQuizSchema,
+  contenidoSqlEjercicioSchema,
+  testSqlSchema,
   testStdinStdoutSchema,
 } from "../intentos-bloque"
 import { desbloqueoCursoSchema } from "./curso.types"
@@ -71,8 +74,23 @@ const bloqueImportadoSchema = z.discriminatedUnion("tipo", [
     .strict(),
   z
     .object({
+      // Bloque de terminal de git (repo simulado en memoria). Autocontenido: se
+      // persiste con `esEvaluable=false` por el camino generico del service. El
+      // `objetivo` declarativo del contenido habilita el futuro modo evaluable.
+      tipo: z.literal("GIT_EJERCICIO"),
+      contenido: contenidoGitEjercicioSchema,
+    })
+    .strict(),
+  z
+    .object({
       tipo: z.literal("QUIZ"),
       contenido: contenidoQuizSchema,
+      /**
+       * Etiqueta visible (única) de la skill que este bloque evaluable mide.
+       * El importador la resuelve a `skillQueMideId`. Opcional por
+       * compatibilidad: si se omite, el bloque queda sin skill (como antes).
+       */
+      skillEtiqueta: z.string().trim().min(1).max(200).optional(),
     })
     .strict(),
   z
@@ -81,6 +99,25 @@ const bloqueImportadoSchema = z.discriminatedUnion("tipo", [
       contenidoReto: contenidoCodigoPreguntasSchema,
       solucionReferencia: z.string().max(50_000).default(""),
       tests: z.array(testStdinStdoutSchema).min(1).max(40),
+      /**
+       * Etiqueta visible (única) de la skill que mide el reto. El importador
+       * la resuelve a `skillQueMideId` en el bloque `CODIGO_PREGUNTAS`.
+       * Opcional por compatibilidad.
+       */
+      skillEtiqueta: z.string().trim().min(1).max(200).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      tipo: z.literal("SQL"),
+      contenidoReto: contenidoSqlEjercicioSchema,
+      tests: z.array(testSqlSchema).min(1).max(20),
+      /**
+       * Etiqueta visible (única) de la skill que mide el reto SQL. El importador
+       * la resuelve a `skillQueMideId` en el bloque `SQL_EJERCICIO`.
+       * Opcional por compatibilidad.
+       */
+      skillEtiqueta: z.string().trim().min(1).max(200).optional(),
     })
     .strict(),
 ])

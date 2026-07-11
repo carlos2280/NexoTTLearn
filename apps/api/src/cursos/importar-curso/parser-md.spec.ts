@@ -247,6 +247,45 @@ x
       }
     })
 
+    it("captura el parámetro skill del fence en skillEtiqueta", () => {
+      const out = parsearCursoMd(
+        md(
+          "# M",
+          "## S",
+          '::: codigo skill="TypeScript · narrowing"',
+          "lenguaje: typescript",
+          "enunciado: x",
+          "tests:",
+          '  - { esperada: "1" }',
+          ":::",
+        ),
+      )
+      const bloque = primerBloque(out)
+      expect(bloque.tipo).toBe("CODIGO")
+      if (bloque.tipo === "CODIGO") {
+        expect(bloque.skillEtiqueta).toBe("TypeScript · narrowing")
+      }
+    })
+
+    it("sin parámetro skill, skillEtiqueta queda indefinido", () => {
+      const out = parsearCursoMd(
+        md(
+          "# M",
+          "## S",
+          "::: codigo",
+          "lenguaje: typescript",
+          "enunciado: x",
+          "tests:",
+          '  - { esperada: "1" }',
+          ":::",
+        ),
+      )
+      const bloque = primerBloque(out)
+      if (bloque.tipo === "CODIGO") {
+        expect(bloque.skillEtiqueta).toBeUndefined()
+      }
+    })
+
     it("rechaza bloque codigo sin tests", () => {
       expect(() =>
         parsearCursoMd(
@@ -261,6 +300,76 @@ x
           ),
         ),
       ).toThrow(/Validación final fallida/u)
+    })
+  })
+
+  describe("bloque SQL (reto + tests)", () => {
+    it("parsea un reto SQL con esquema, consulta inicial, skill y tests", () => {
+      const out = parsearCursoMd(
+        md(
+          "# M",
+          "## S",
+          '::: sql skill="Postgres · SELECT"',
+          "enunciado: Lista los usuarios activos.",
+          "esquema: |",
+          "  CREATE TABLE usuarios (id int, activo boolean);",
+          "  INSERT INTO usuarios VALUES (1, true), (2, false);",
+          "consultaInicial: SELECT * FROM usuarios;",
+          "tests:",
+          '  - { id: t1, referencia: "SELECT id FROM usuarios WHERE activo", ordenImporta: false }',
+          ":::",
+        ),
+      )
+      const bloque = primerBloque(out)
+      expect(bloque.tipo).toBe("SQL")
+      if (bloque.tipo === "SQL") {
+        expect(bloque.skillEtiqueta).toBe("Postgres · SELECT")
+        expect(bloque.contenidoReto.enunciado).toContain("usuarios activos")
+        expect(bloque.contenidoReto.esquemaSemilla).toContain("CREATE TABLE")
+        expect(bloque.contenidoReto.consultaInicial).toContain("SELECT")
+        expect(bloque.tests).toHaveLength(1)
+        expect(bloque.tests[0]!.consultaReferencia).toContain("WHERE activo")
+      }
+    })
+
+    it("rechaza bloque sql sin tests", () => {
+      expect(() =>
+        parsearCursoMd(md("# M", "## S", "::: sql", "enunciado: x", "tests: []", ":::")),
+      ).toThrow(/Validación final fallida/u)
+    })
+  })
+
+  describe("bloque GIT_EJERCICIO", () => {
+    it("parsea un ejercicio de git con enunciado, objetivo declarativo y pista", () => {
+      const out = parsearCursoMd(
+        md(
+          "# M",
+          "## S",
+          "::: git",
+          "enunciado: Crea una rama, commitea el arreglo y hazle merge a main.",
+          "objetivo:",
+          "  ramaActiva: main",
+          "  hayMergeEnMain: true",
+          "  commitsMinimos: 1",
+          "pista: git checkout -b fix/correa → git commit -m ... → git merge",
+          ":::",
+        ),
+      )
+      const bloque = primerBloque(out)
+      expect(bloque.tipo).toBe("GIT_EJERCICIO")
+      if (bloque.tipo === "GIT_EJERCICIO") {
+        expect(bloque.contenido.enunciado).toContain("merge a main")
+        expect(bloque.contenido.objetivo.ramaActiva).toBe("main")
+        expect(bloque.contenido.objetivo.hayMergeEnMain).toBe(true)
+        expect(bloque.contenido.objetivo.commitsMinimos).toBe(1)
+        expect(bloque.contenido.pista).toContain("checkout -b")
+      }
+    })
+
+    it("rechaza bloque git sin objetivo", () => {
+      expect(() => parsearCursoMd(md("# M", "## S", "::: git", "enunciado: x", ":::"))).toThrow(
+        /objetivo/u,
+      )
     })
   })
 

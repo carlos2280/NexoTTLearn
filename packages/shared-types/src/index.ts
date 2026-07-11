@@ -122,6 +122,8 @@ export {
   contenidoRecursoSchema,
   subtipoRecursoSchema,
   contenidoDiagramaSchema,
+  contenidoGitEjercicioSchema,
+  objetivoGitSchema,
   contenidoBloquePorTipo,
   schemaContenidoBloquePorTipo,
   validarContenidoBloque,
@@ -136,6 +138,8 @@ export type {
   ContenidoRecurso,
   SubtipoRecurso,
   ContenidoDiagrama,
+  ContenidoGitEjercicio,
+  ObjetivoGit,
 } from "./catalogo/bloques/contenido"
 export { listarClientesQuerySchema } from "./catalogo/clientes/listar-clientes.schema"
 export type { ListarClientesQuery } from "./catalogo/clientes/listar-clientes.schema"
@@ -384,10 +388,14 @@ export {
   contenidoCodigoTestsSchema,
   testStdinStdoutSchema,
   lenguajeEjecutableSchema,
+  contenidoSqlEjercicioSchema,
+  contenidoSqlTestsSchema,
+  testSqlSchema,
   crearIntentoBloqueSchema,
   respuestaPreguntaSchema,
   respuestasIntentoSchema,
   resultadoTestReportadoSchema,
+  resultadoTestSqlReportadoSchema,
   intentoBloqueResponseSchema,
   listarIntentosBloqueQuerySchema,
   listarIntentosCursoBloqueQuerySchema,
@@ -407,10 +415,14 @@ export type {
   ContenidoCodigoTests,
   TestStdinStdout,
   LenguajeEjecutable,
+  ContenidoSqlEjercicio,
+  ContenidoSqlTests,
+  TestSql,
   CrearIntentoBloqueInput,
   RespuestaPregunta,
   RespuestasIntento,
   ResultadoTestReportado,
+  ResultadoTestSqlReportado,
   IntentoBloqueResponse,
   ListarIntentosBloqueQuery,
   ListarIntentosCursoBloqueQuery,
@@ -773,3 +785,9 @@ export type {
   ExportarLogsAjustesPlanQuery,
   ExportarLogsConsultasQuery,
 } from "./admin"
+export {
+  subirImagenResponseSchema,
+  MIME_IMAGEN_PERMITIDOS,
+  MAX_IMAGEN_BYTES,
+} from "./imagenes/subir-imagen.schema"
+export type { SubirImagenResponse } from "./imagenes/subir-imagen.schema"

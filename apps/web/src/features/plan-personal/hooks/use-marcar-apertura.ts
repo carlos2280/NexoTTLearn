@@ -2,6 +2,7 @@ import { marcarAperturaSeccion } from "@/features/plan-personal/api/marcar-apert
 import type { ApiError } from "@/shared/api/api-error"
 import type { AperturaSeccionResponse } from "@nexott-learn/shared-types"
 import { type UseMutationResult, useMutation, useQueryClient } from "@tanstack/react-query"
+import { invalidarQueriesTrasApertura } from "./invalidar-tras-apertura"
 
 interface MarcarAperturaInput {
   readonly asignacionId: string
@@ -10,8 +11,9 @@ interface MarcarAperturaInput {
 
 /**
  * Mutación de "marcar sección abierta" (D94). Al éxito invalida las queries
- * de plan y avance del curso para que el porcentaje se actualice si la
- * sección era de lectura pura (sin bloques evaluables).
+ * de plan y avance del curso para que el porcentaje y el check verde del
+ * sidebar se actualicen si la sección era de lectura pura (sin bloques
+ * evaluables).
  */
 export function useMarcarApertura(): UseMutationResult<
   AperturaSeccionResponse,
@@ -21,10 +23,6 @@ export function useMarcarApertura(): UseMutationResult<
   const queryClient = useQueryClient()
   return useMutation<AperturaSeccionResponse, ApiError, MarcarAperturaInput>({
     mutationFn: marcarAperturaSeccion,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["asignaciones"] })
-      queryClient.invalidateQueries({ queryKey: ["me", "avance"] })
-      queryClient.invalidateQueries({ queryKey: ["me", "bandeja"] })
-    },
+    onSuccess: () => invalidarQueriesTrasApertura(queryClient),
   })
 }
