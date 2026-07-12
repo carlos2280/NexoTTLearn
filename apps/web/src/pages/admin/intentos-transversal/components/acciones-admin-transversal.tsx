@@ -13,31 +13,23 @@ interface AccionesAdminTransversalProps {
   readonly intento: IntentoTransversalAdminResponse
 }
 
-function capasCargadas(intento: IntentoTransversalAdminResponse): number {
-  return (
-    (intento.notaCapaTests !== null ? 1 : 0) +
-    (intento.notaCapaCualitativa !== null ? 1 : 0) +
-    (intento.notaCapaComprension !== null ? 1 : 0)
-  )
-}
-
-function copyFinalizar(estado: EstadoIntentoTransversal, falta: number): string {
+function copyFinalizar(estado: EstadoIntentoTransversal, revisionCargada: boolean): string {
   if (estado === "FINALIZADO") {
     return "El intento ya está finalizado"
   }
   if (estado === "ANULADO") {
     return "Intento anulado"
   }
-  if (falta > 0) {
-    return `Faltan ${falta} ${falta === 1 ? "capa" : "capas"} por cargar`
+  if (!revisionCargada) {
+    return "Falta la revisión con IA"
   }
   return ""
 }
 
 /**
- * Acciones admin del intento transversal: Finalizar (deshabilitado si faltan
- * capas) y Anular (con motivo). Tras éxito ambas mutations invalidan la query
- * del intento + listas dependientes.
+ * Acciones admin del intento transversal: Finalizar (deshabilitado hasta que la
+ * revisión con IA tenga nota) y Anular (con motivo). Tras éxito ambas mutations
+ * invalidan la query del intento + listas dependientes.
  */
 export function AccionesAdminTransversal({ intento }: AccionesAdminTransversalProps) {
   const [finalizarAbierto, setFinalizarAbierto] = useState(false)
@@ -45,11 +37,10 @@ export function AccionesAdminTransversal({ intento }: AccionesAdminTransversalPr
   const finalizarMutation = useFinalizarIntentoTransversal()
   const anularMutation = useAnularIntentoTransversal()
 
-  const cargadas = capasCargadas(intento)
-  const faltantes = 3 - cargadas
+  const revisionCargada = intento.notaCapaCualitativa !== null
   const editable = intento.estado === "EN_EVALUACION" || intento.estado === "EVALUADO"
-  const puedeFinalizar = editable && faltantes === 0
-  const tooltipFinalizar = copyFinalizar(intento.estado, faltantes)
+  const puedeFinalizar = editable && revisionCargada
+  const tooltipFinalizar = copyFinalizar(intento.estado, revisionCargada)
 
   async function confirmarFinalizar() {
     await finalizarMutation.mutateAsync({ intentoId: intento.intentoId })
@@ -66,8 +57,8 @@ export function AccionesAdminTransversal({ intento }: AccionesAdminTransversalPr
         <span className="nx-eyebrow text-text-tertiary">Acciones</span>
         <h2 className="text-h3 text-text-primary">Finalizar o anular</h2>
         <p className="text-body-sm text-text-secondary">
-          Al finalizar se calcula la nota global desde las 3 capas y se actualizan las skills del
-          colaborador. Anular deja el intento sin efecto en las skills.
+          Al finalizar se calcula la nota global desde la revisión con IA y se actualizan las skills
+          del colaborador. Anular deja el intento sin efecto en las skills.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">

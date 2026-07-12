@@ -2,16 +2,16 @@ import { useObtenerIntentoTransversalAdmin } from "@/features/transversal/hooks/
 import { AlertCircle, Loader2 } from "lucide-react"
 import { useParams } from "react-router-dom"
 import { AccionesAdminTransversal } from "./components/acciones-admin-transversal"
-import { CapasCard } from "./components/capas-card"
 import { EntregaCard } from "./components/entrega-card"
 import { HeaderIntentoTransversal } from "./components/header-intento-transversal"
+import { RevisionIaCard } from "./components/revision-ia-card"
 import { VeredictoCard } from "./components/veredicto-card"
 
 /**
  * `/admin/intentos-transversal/:intentoId` — vista admin del intento del
  * proyecto transversal. Reune contexto (colaborador + curso + proyecto), lo
- * entregado (repo + comentario), veredicto (estado + nota global), las 3
- * capas de evaluacion (con sus dialogs) y las acciones (finalizar / anular).
+ * entregado (repo + comentario), veredicto (estado + nota global), el informe
+ * de la Revisión con IA (capa única) y las acciones (finalizar / anular).
  */
 export function IntentoTransversalDetallePage() {
   const { intentoId } = useParams<{ intentoId: string }>()
@@ -28,7 +28,7 @@ export function IntentoTransversalDetallePage() {
       <HeaderIntentoTransversal intento={intento.data} />
       <EntregaCard intento={intento.data} />
       <VeredictoCard intento={intento.data} />
-      <CapasCard intento={intento.data} />
+      <RevisionIaCard intento={intento.data} />
       <AccionesAdminTransversal intento={intento.data} />
     </main>
   )

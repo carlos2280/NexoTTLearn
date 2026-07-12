@@ -1,6 +1,7 @@
 import { tiempoRelativo } from "@/shared/lib/tiempo-relativo"
 import type { IntentoTransversalParticipanteResponse } from "@nexott-learn/shared-types"
 import { ExternalLink } from "lucide-react"
+import { type TonoHistorialIntento, etiquetaHistorialIntento } from "./etiqueta-historial-intento"
 
 const RGX_HTTPS_PREFIJO = /^https:\/\//
 
@@ -47,14 +48,15 @@ interface FilaIntentoProps {
 }
 
 function FilaIntento({ intento, esMejor, numero }: FilaIntentoProps) {
-  const etiqueta = etiquetaIntento(intento)
-  const colorEtiqueta = colorEtiquetaIntento(intento)
+  const etiqueta = etiquetaHistorialIntento(intento)
   return (
     <article className="flex items-start gap-4 rounded-xl border border-border bg-surface px-4 py-3">
       <span className="mt-1 font-mono text-caption text-text-tertiary">v{numero}</span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-baseline gap-2">
-          <span className={`font-medium text-body-sm ${colorEtiqueta}`}>{etiqueta}</span>
+          <span className={`font-medium text-body-sm ${claseTono(etiqueta.tono)}`}>
+            {etiqueta.texto}
+          </span>
           {esMejor ? (
             <span className="text-caption text-text-tertiary">· el mejor cuenta</span>
           ) : null}
@@ -76,19 +78,12 @@ function FilaIntento({ intento, esMejor, numero }: FilaIntentoProps) {
   )
 }
 
-function etiquetaIntento(intento: IntentoTransversalParticipanteResponse): string {
-  if (intento.estado === "EN_EVALUACION") {
-    return "En evaluacion"
-  }
-  if (intento.aprobado === true) {
-    return "Aprobado"
-  }
-  return "Aun no"
-}
-
-function colorEtiquetaIntento(intento: IntentoTransversalParticipanteResponse): string {
-  if (intento.aprobado === true) {
+function claseTono(tono: TonoHistorialIntento): string {
+  if (tono === "aprobado") {
     return "text-state-solido-on-soft"
+  }
+  if (tono === "anulado") {
+    return "text-text-tertiary"
   }
   return "text-text-secondary"
 }
