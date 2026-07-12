@@ -242,7 +242,18 @@ describe("etiquetaCualitativaPorNota", () => {
     [50, "enDesarrollo"],
     [49, "noCumple"],
     [0, "noCumple"],
-  ])("nota %d -> %s", (nota, esperada) => {
+  ])("nota %d -> %s (canon del sistema)", (nota, esperada) => {
     expect(etiquetaCualitativaPorNota(nota)).toBe(esperada)
+  })
+
+  it("respeta los umbrales configurados del curso, no el canon fijo", () => {
+    // Curso mas exigente: excelencia=90, solido=75, enDesarrollo=55.
+    const umbrales = { excelencia: 90, solido: 75, enDesarrollo: 55 }
+    // 87 seria "excelencia" con el canon (>=85), pero aqui NO llega a 90.
+    expect(etiquetaCualitativaPorNota(87, umbrales)).toBe("solido")
+    expect(etiquetaCualitativaPorNota(90, umbrales)).toBe("excelencia")
+    // 72 seria "solido" con el canon (>=70), pero aqui NO llega a 75.
+    expect(etiquetaCualitativaPorNota(72, umbrales)).toBe("enDesarrollo")
+    expect(etiquetaCualitativaPorNota(54, umbrales)).toBe("noCumple")
   })
 })

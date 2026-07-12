@@ -14,6 +14,7 @@ import {
   parseCierreSnapshot,
   resolverNotaGlobalFinal,
 } from "./cierre-snapshot.helpers"
+import { parseUmbralesLogro } from "./umbrales-logro.helpers"
 
 /**
  * `MeResumenCierreService` — B-26. Devuelve la "ceremonia" del veredicto para
@@ -140,7 +141,10 @@ export class MeResumenCierreService {
       cursoTitulo: snapshot.curso.titulo,
       fechaCierre: fotografia.fechaCierre.toISOString(),
       resultado,
-      etiquetaCualitativaFinal: etiquetaCualitativaPorNota(notaGlobalFinal),
+      etiquetaCualitativaFinal: etiquetaCualitativaPorNota(
+        notaGlobalFinal,
+        parseUmbralesLogro(snapshot.curso.configuracion.umbralesLogro),
+      ),
       notaGlobalFinal,
       skillsDemostradasNuevas,
       areasPorTrabajar,

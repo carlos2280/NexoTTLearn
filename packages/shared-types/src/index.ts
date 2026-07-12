@@ -225,7 +225,10 @@ export { reordenarModulosHabilitadosCursoSchema } from "./cursos/reordenar-modul
 export type { ReordenarModulosHabilitadosCursoInput } from "./cursos/reordenar-modulos-habilitados-curso.schema"
 export { actualizarPesosCursoSchema } from "./cursos/actualizar-pesos-curso.schema"
 export type { ActualizarPesosCursoInput } from "./cursos/actualizar-pesos-curso.schema"
-export { actualizarUmbralesLogroCursoSchema } from "./cursos/actualizar-umbrales-logro-curso.schema"
+export {
+  actualizarUmbralesLogroCursoSchema,
+  umbralesLogroValoresSchema,
+} from "./cursos/actualizar-umbrales-logro-curso.schema"
 export type {
   ActualizarUmbralesLogroCursoInput,
   UmbralesLogroValores,
