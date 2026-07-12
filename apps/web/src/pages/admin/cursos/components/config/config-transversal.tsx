@@ -83,6 +83,14 @@ export function ConfigTransversal({ curso, bloqueado }: ConfigTransversalProps) 
               valor={form.umbralAprobacion}
               onCambio={(v) => setForm((f) => ({ ...f, umbralAprobacion: v }))}
             />
+            <CampoNumero
+              label="Máximo de intentos por participante"
+              valor={form.intentosMax}
+              onCambio={(v) => setForm((f) => ({ ...f, intentosMax: v }))}
+              min={1}
+              max={50}
+              step={1}
+            />
             <EvaluacionIaInfo />
             {valido ? null : (
               <p className="text-caption text-warning">

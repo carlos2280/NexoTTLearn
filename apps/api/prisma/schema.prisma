@@ -884,6 +884,9 @@ model AsignacionCurso {
   resultadoEntrevistaCliente ResultadoEntrevistaCliente? @default(PENDIENTE) @map("resultado_entrevista_cliente")
   observacionesCliente       String?                     @map("observaciones_cliente")
   fechaEntrevistaCliente     DateTime?                   @map("fecha_entrevista_cliente") @db.Date
+  // Intentos extra del transversal concedidos a ESTE participante puntual, sin
+  // subir el tope global del transversal. Cupo efectivo = ProyectoTransversal.intentosMax + este.
+  intentosExtraTransversal   Int                         @default(0) @map("intentos_extra_transversal")
   createdAt                  DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                  DateTime                    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -1027,6 +1030,10 @@ model ProyectoTransversal {
   cursoId               String   @unique @map("curso_id") @db.Uuid
   descripcion           String
   umbralAprobacion      Decimal  @default(70.00) @map("umbral_aprobacion") @db.Decimal(5, 2)
+  // Tope global de intentos por participante en este transversal. El admin lo
+  // sube para todos aqui; el extra por alumno vive en AsignacionCurso. Cupo
+  // efectivo = intentosMax + AsignacionCurso.intentosExtraTransversal.
+  intentosMax           Int      @default(3) @map("intentos_max")
   capas                 Json     @default("{}") @db.JsonB
   // Colapso a una sola capa (revisión con IA = cualitativa): tests y comprensión
   // nacen apagadas y el peso va todo a cualitativa. Ver migración

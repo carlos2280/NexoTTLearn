@@ -15,6 +15,9 @@ export const actualizarTransversalCursoSchema = z
     activo: z.boolean(),
     descripcion: z.string().trim().min(1).max(20000).optional(),
     umbralAprobacion: z.number().min(0).max(100).optional(),
+    // Tope de intentos por participante (default 3). El admin puede subirlo para
+    // todo el transversal; el extra por alumno vive en la asignacion.
+    intentosMax: z.number().int().min(1).max(50).optional(),
     pesoCapaTests: z.number().min(0).max(100).optional(),
     pesoCapaCualitativa: z.number().min(0).max(100).optional(),
     pesoCapaComprension: z.number().min(0).max(100).optional(),

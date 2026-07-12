@@ -1989,6 +1989,7 @@ export class CursosService {
         cursoId,
         descripcion: input.descripcion ?? "",
         umbralAprobacion: input.umbralAprobacion ?? 70,
+        intentosMax: input.intentosMax ?? 3,
         pesoCapaTests: input.pesoCapaTests ?? 40,
         pesoCapaCualitativa: input.pesoCapaCualitativa ?? 30,
         pesoCapaComprension: input.pesoCapaComprension ?? 30,
@@ -2489,6 +2490,9 @@ function construirDataUpdateTransversal(
   }
   if (input.umbralAprobacion !== undefined) {
     data.umbralAprobacion = input.umbralAprobacion
+  }
+  if (input.intentosMax !== undefined) {
+    data.intentosMax = input.intentosMax
   }
   if (input.pesoCapaTests !== undefined) {
     data.pesoCapaTests = input.pesoCapaTests

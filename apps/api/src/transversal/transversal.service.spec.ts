@@ -34,7 +34,10 @@ const PARTICIPANTE: SesionUsuario = { usuarioId: USUARIO_ID, rol: RolUsuario.PAR
 
 interface PrismaMock {
   curso: { findUnique: ReturnType<typeof vi.fn> }
-  proyectoTransversal: { findUniqueOrThrow: ReturnType<typeof vi.fn> }
+  proyectoTransversal: {
+    findUniqueOrThrow: ReturnType<typeof vi.fn>
+    findUnique: ReturnType<typeof vi.fn>
+  }
   asignacionCurso: { findUnique: ReturnType<typeof vi.fn> }
   intentoTransversal: {
     findUnique: ReturnType<typeof vi.fn>
@@ -60,7 +63,10 @@ interface PrismaMock {
 function buildPrismaMock(): PrismaMock {
   const mock: PrismaMock = {
     curso: { findUnique: vi.fn() },
-    proyectoTransversal: { findUniqueOrThrow: vi.fn() },
+    proyectoTransversal: {
+      findUniqueOrThrow: vi.fn(),
+      findUnique: vi.fn().mockResolvedValue({ intentosMax: 3 }),
+    },
     asignacionCurso: { findUnique: vi.fn() },
     intentoTransversal: {
       findUnique: vi.fn(),
@@ -103,6 +109,7 @@ function configurarAsignacion(
     transversalId: string | null
     entrevistaIaId: string | null
     colaboradorId: string
+    intentosExtra: number
   }> = {},
 ): void {
   prisma.asignacionCurso.findUnique.mockResolvedValue({
@@ -112,6 +119,7 @@ function configurarAsignacion(
     rol: RolAsignacion.ASIGNADO,
     estadoAsignado: overrides.estadoAsignado ?? EstadoAsignado.EN_PROGRESO,
     estadoVoluntario: null,
+    intentosExtraTransversal: overrides.intentosExtra ?? 0,
     curso: {
       id: CURSO_ID,
       estado: overrides.cursoEstado ?? EstadoCurso.ACTIVO,
@@ -194,6 +202,7 @@ describe("E1. GET /cursos/:cursoId/transversal", () => {
       cursoId: CURSO_ID,
       descripcion: "proyecto",
       umbralAprobacion: new Prisma.Decimal(70),
+      intentosMax: 3,
       pesoCapaTests: new Prisma.Decimal(40),
       pesoCapaCualitativa: new Prisma.Decimal(30),
       pesoCapaComprension: new Prisma.Decimal(30),
@@ -322,6 +331,69 @@ describe("E4. POST intento", () => {
     expect(r.estado).toBe("EN_EVALUACION")
     expect(r.evaluacionAsincronaEsperada).toMatch(/2026-05-11T10:00:02/)
     expect(job.dispatch).toHaveBeenCalledWith(INTENTO_ID)
+  })
+
+  it("409 cuando alcanzo el tope de intentos (intentosMax) y no crea intento", async () => {
+    configurarAsignacion(prisma, { desbloqueo: DesbloqueoCurso.SIEMPRE })
+    prisma.proyectoTransversal.findUnique.mockResolvedValue({ intentosMax: 3 })
+    prisma.intentoTransversal.count.mockResolvedValue(3) // ya uso 3 no anulados
+
+    await expect(
+      service.crearIntento({
+        asignacionId: ASIGNACION_ID,
+        body: { repoOArtefacto: { tipo: "URL_GIT", url: REPO_URL } },
+        idempotencyKey: IDEMPOTENCY_KEY,
+        usuario: ADMIN,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException)
+    expect(prisma.intentoTransversal.create).not.toHaveBeenCalled()
+    expect(job.dispatch).not.toHaveBeenCalled()
+  })
+
+  it("permite el intento cuando el extra por participante sube el cupo", async () => {
+    configurarAsignacion(prisma, { desbloqueo: DesbloqueoCurso.SIEMPRE, intentosExtra: 1 })
+    prisma.proyectoTransversal.findUnique.mockResolvedValue({ intentosMax: 3 })
+    prisma.intentoTransversal.count.mockResolvedValue(3) // 3 usados, pero cupo = 3 + 1
+    prisma.intentoTransversal.create.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      fecha: new Date("2026-05-11T10:00:00Z"),
+    })
+
+    const r = await service.crearIntento({
+      asignacionId: ASIGNACION_ID,
+      body: { repoOArtefacto: { tipo: "URL_GIT", url: REPO_URL } },
+      idempotencyKey: IDEMPOTENCY_KEY,
+      usuario: ADMIN,
+    })
+
+    expect(r.intentoId).toBe(INTENTO_ID)
+    expect(job.dispatch).toHaveBeenCalledWith(INTENTO_ID)
+  })
+
+  it("el conteo de cupo excluye anulados (where completo) y crea el intento", async () => {
+    configurarAsignacion(prisma, { desbloqueo: DesbloqueoCurso.SIEMPRE })
+    prisma.intentoTransversal.create.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      fecha: new Date("2026-05-11T10:00:00Z"),
+    })
+
+    await service.crearIntento({
+      asignacionId: ASIGNACION_ID,
+      body: { repoOArtefacto: { tipo: "URL_GIT", url: REPO_URL } },
+      idempotencyKey: IDEMPOTENCY_KEY,
+      usuario: ADMIN,
+    })
+
+    expect(prisma.intentoTransversal.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          transversalId: TRANSVERSAL_ID,
+          colaboradorId: COLABORADOR_ID,
+          anulado: false,
+        }),
+      }),
+    )
+    expect(prisma.intentoTransversal.create).toHaveBeenCalledOnce()
   })
 })
 
@@ -839,7 +911,8 @@ describe("TransversalService P11.5a — TRANSVERSAL_DISPONIBLE en crearIntento",
 
   it("NO emite TRANSVERSAL_DISPONIBLE en intentos posteriores (intentosPrevios>0)", async () => {
     configurarFindUniqueCombinado()
-    prisma.intentoTransversal.count.mockResolvedValueOnce(2)
+    // Persistente (no Once): count se consulta 2 veces por request (cupo + previos).
+    prisma.intentoTransversal.count.mockResolvedValue(2)
     prisma.intentoTransversal.create.mockResolvedValueOnce({
       id: INTENTO_ID,
       fecha: new Date("2026-05-11T10:00:00Z"),

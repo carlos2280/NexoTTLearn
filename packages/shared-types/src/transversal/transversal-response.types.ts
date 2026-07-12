@@ -33,6 +33,7 @@ export const transversalResponseSchema = z
     cursoId: z.string().uuid(),
     descripcion: z.string(),
     umbralAprobacion: z.number().min(0).max(100),
+    intentosMax: z.number().int().min(1).max(50),
     pesosCapas: z
       .object({
         tests: z.number().min(0).max(100),

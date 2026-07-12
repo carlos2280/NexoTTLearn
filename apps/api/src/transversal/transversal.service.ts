@@ -64,6 +64,7 @@ interface AsignacionResuelta {
   readonly rol: RolAsignacion
   readonly estadoAsignado: EstadoAsignado | null
   readonly estadoVoluntario: EstadoVoluntario | null
+  readonly intentosExtraTransversal: number
   readonly curso: {
     readonly id: string
     readonly estado: EstadoCurso
@@ -144,6 +145,7 @@ export class TransversalService {
       cursoId: transversal.cursoId,
       descripcion: transversal.descripcion,
       umbralAprobacion: Number(transversal.umbralAprobacion.toString()),
+      intentosMax: transversal.intentosMax,
       pesosCapas: {
         tests: Number(transversal.pesoCapaTests.toString()),
         cualitativa: Number(transversal.pesoCapaCualitativa.toString()),
@@ -359,6 +361,12 @@ export class TransversalService {
         details: { razon: disponibilidad.razon },
       })
     }
+
+    await this.verificarCupoIntentos({
+      transversalId,
+      colaboradorId: asignacion.colaboradorId,
+      intentosExtra: asignacion.intentosExtraTransversal,
+    })
 
     const repoUrl = input.body.repoOArtefacto.url
     const comentario = input.body.comentarioColaborador ?? null
@@ -895,6 +903,7 @@ export class TransversalService {
         rol: true,
         estadoAsignado: true,
         estadoVoluntario: true,
+        intentosExtraTransversal: true,
         curso: {
           select: {
             id: true,
@@ -954,6 +963,56 @@ export class TransversalService {
    * se invoca FUERA del `runOnce` y solo cuando era el primer intento del
    * colaborador en este transversal (R-S11.5-1).
    */
+  /**
+   * Enforcement del tope de intentos (Fase 1a). Cupo efectivo = tope global del
+   * transversal (`ProyectoTransversal.intentosMax`) + extra por participante
+   * (`AsignacionCurso.intentosExtraTransversal`). Los intentos anulados NO
+   * consumen cupo.
+   *
+   * Nota de carrera: el conteo no toma lock, asi que dos envios concurrentes
+   * podrian pasar el chequeo y exceder el cupo en 1. Es aceptable para un
+   * control de costo MVP; la Idempotency-Key ya dedup requests identicos.
+   */
+  private async verificarCupoIntentos(input: {
+    readonly transversalId: string
+    readonly colaboradorId: string
+    readonly intentosExtra: number
+  }): Promise<void> {
+    const transversal = await this.prisma.proyectoTransversal.findUnique({
+      where: { id: input.transversalId },
+      select: { intentosMax: true },
+    })
+    if (!transversal) {
+      // Rama muerta (el transversalId salio de la asignacion, la FK garantiza
+      // que existe), pero una compuerta de costo debe fallar cerrada, no abierta.
+      throw new NotFoundException({
+        code: apiErrorCodes.transversalNoEncontrado,
+        message: "El proyecto transversal no existe.",
+      })
+    }
+
+    const usados = await this.prisma.intentoTransversal.count({
+      where: {
+        transversalId: input.transversalId,
+        colaboradorId: input.colaboradorId,
+        anulado: false,
+      },
+    })
+
+    const cupo = transversal.intentosMax + input.intentosExtra
+    if (usados >= cupo) {
+      throw new ConflictException({
+        code: apiErrorCodes.transversalIntentosAgotados,
+        message: `Alcanzaste el maximo de intentos (${cupo}). Tu administrador revisara tu caso.`,
+        details: {
+          intentosMax: transversal.intentosMax,
+          intentosExtra: input.intentosExtra,
+          usados,
+        },
+      })
+    }
+  }
+
   private async notificarTransversalDisponible(
     intentoTransversalId: string,
     asignacionId: string,

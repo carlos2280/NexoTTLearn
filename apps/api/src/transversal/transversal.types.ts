@@ -9,6 +9,7 @@ export const SELECT_TRANSVERSAL_FIELDS = {
   cursoId: true,
   descripcion: true,
   umbralAprobacion: true,
+  intentosMax: true,
   pesoCapaTests: true,
   pesoCapaCualitativa: true,
   pesoCapaComprension: true,

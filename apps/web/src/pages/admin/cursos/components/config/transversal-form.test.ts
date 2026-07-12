@@ -14,6 +14,7 @@ const RESP: TransversalResponse = {
   cursoId: "22222222-2222-4222-8222-222222222222",
   descripcion: "<p>Construye un panel.</p>",
   umbralAprobacion: 75,
+  intentosMax: 5,
   pesosCapas: { tests: 50, cualitativa: 30, comprension: 20 },
   capasActivas: { tests: true, cualitativa: true, comprension: false },
   skillsQueMide: [
@@ -26,6 +27,7 @@ const activo = (over: Partial<FormTransversal> = {}): FormTransversal => ({
   activo: true,
   descripcion: "<p>x</p>",
   umbralAprobacion: 70,
+  intentosMax: 3,
   pesoCapaTests: 40,
   pesoCapaCualitativa: 40,
   pesoCapaComprension: 20,
@@ -42,6 +44,7 @@ describe("baselineDesdeRespuesta", () => {
     expect(base.activo).toBe(true)
     expect(base.descripcion).toBe("<p>Construye un panel.</p>")
     expect(base.umbralAprobacion).toBe(75)
+    expect(base.intentosMax).toBe(5)
     expect(base.pesoCapaTests).toBe(50)
     expect(base.capaComprensionActiva).toBe(false)
     expect(base.skillsQueMideIds).toEqual([
@@ -54,6 +57,10 @@ describe("baselineDesdeRespuesta", () => {
 describe("esFormValido", () => {
   it("un transversal inactivo siempre es válido", () => {
     expect(esFormValido(FORM_TRANSVERSAL_DEFECTO)).toBe(true)
+  })
+
+  it("el default de un curso nuevo trae máximo de intentos 3", () => {
+    expect(FORM_TRANSVERSAL_DEFECTO.intentosMax).toBe(3)
   })
 
   it("activo con brief vacío (o solo espacios) es inválido", () => {
@@ -76,6 +83,11 @@ describe("esFormModificado", () => {
     expect(esFormModificado(activo({ descripcion: "<p>otro</p>" }), base)).toBe(true)
   })
 
+  it("detecta cambio en el máximo de intentos", () => {
+    const base = activo({ intentosMax: 3 })
+    expect(esFormModificado(activo({ intentosMax: 5 }), base)).toBe(true)
+  })
+
   it("detecta cambio en el conjunto de skills sin importar el orden", () => {
     const base = activo({ skillsQueMideIds: ["s1", "s2"] })
     expect(esFormModificado(activo({ skillsQueMideIds: ["s2", "s1"] }), base)).toBe(false)
@@ -96,11 +108,14 @@ describe("construirInputTransversal", () => {
   it("al activar envía brief, umbral, skills y colapsa a una sola capa IA", () => {
     // El form entra con el modelo viejo de 3 capas (40/40/20, todas activas);
     // construirInput debe normalizarlo a una capa (cualitativa 100/activa).
-    const input = construirInputTransversal(activo({ skillsQueMideIds: ["s1", "s2"] }))
+    const input = construirInputTransversal(
+      activo({ skillsQueMideIds: ["s1", "s2"], intentosMax: 4 }),
+    )
     expect(input).toMatchObject({
       activo: true,
       descripcion: "<p>x</p>",
       umbralAprobacion: 70,
+      intentosMax: 4,
       pesoCapaTests: 0,
       pesoCapaCualitativa: 100,
       pesoCapaComprension: 0,

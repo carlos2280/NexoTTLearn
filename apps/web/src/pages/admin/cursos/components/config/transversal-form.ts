@@ -12,6 +12,7 @@ export interface FormTransversal {
   readonly activo: boolean
   readonly descripcion: string
   readonly umbralAprobacion: number
+  readonly intentosMax: number
   readonly pesoCapaTests: number
   readonly pesoCapaCualitativa: number
   readonly pesoCapaComprension: number
@@ -42,6 +43,7 @@ export const FORM_TRANSVERSAL_DEFECTO: FormTransversal = {
   activo: false,
   descripcion: "",
   umbralAprobacion: 70,
+  intentosMax: 3,
   ...CAPAS_UNA_SOLA_IA,
   skillsQueMideIds: [],
 }
@@ -52,6 +54,7 @@ export function baselineDesdeRespuesta(resp: TransversalResponse): FormTransvers
     activo: true,
     descripcion: resp.descripcion,
     umbralAprobacion: resp.umbralAprobacion,
+    intentosMax: resp.intentosMax,
     pesoCapaTests: resp.pesosCapas.tests,
     pesoCapaCualitativa: resp.pesosCapas.cualitativa,
     pesoCapaComprension: resp.pesosCapas.comprension,
@@ -84,6 +87,7 @@ export function esFormModificado(form: FormTransversal, base: FormTransversal): 
   return (
     form.descripcion !== base.descripcion ||
     form.umbralAprobacion !== base.umbralAprobacion ||
+    form.intentosMax !== base.intentosMax ||
     form.pesoCapaTests !== base.pesoCapaTests ||
     form.pesoCapaCualitativa !== base.pesoCapaCualitativa ||
     form.pesoCapaComprension !== base.pesoCapaComprension ||
@@ -113,6 +117,7 @@ export function construirInputTransversal(form: FormTransversal): ActualizarTran
     activo: true,
     descripcion: form.descripcion,
     umbralAprobacion: form.umbralAprobacion,
+    intentosMax: form.intentosMax,
     ...CAPAS_UNA_SOLA_IA,
     skillsQueMideIds: [...form.skillsQueMideIds],
   }
