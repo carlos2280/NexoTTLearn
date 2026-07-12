@@ -8,6 +8,8 @@ import type { TransversalCapasService } from "./transversal-capas.service"
 const INTENTO_ID_BASE = "10000000-0000-0000-0000-00000000000"
 const REPO_URL = "https://github.com/foo/bar"
 const CONTENIDO_REPO = "===== index.ts =====\nconst a = 1"
+// `Usuario.id` real del participante dueño del intento (distinto de `Colaborador.id`).
+const USUARIO_ID = "c0000000-0000-0000-0000-000000000009"
 
 interface PrismaMock {
   readonly intentoTransversal: {
@@ -22,7 +24,7 @@ function buildPrismaMock(): PrismaMock {
       findUnique: vi.fn().mockResolvedValue({
         repoUrl: REPO_URL,
         estado: "EN_EVALUACION",
-        colaboradorId: "f0000000-0000-0000-0000-000000000001",
+        colaborador: { usuario: { id: USUARIO_ID } },
       }),
       findMany: vi.fn().mockResolvedValue([]),
     },
@@ -120,12 +122,30 @@ describe("JobEvaluacionTransversalService (una capa: revisión con IA)", () => {
     const args = capas.cargarCapaCualitativa.mock.calls[0]?.[0] as {
       body: { nota: number; detalle: { confianza: string } }
       idempotencyKey: string
+      usuario: { usuarioId: string }
     }
     expect(args.body.nota).toBe(80)
     expect(args.body.detalle.confianza).toBe("ALTA")
     expect(args.idempotencyKey).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
     )
+    // Regresión FK idempotencia: la capa se persiste con el Usuario.id real del
+    // colaborador, NO con el Colaborador.id (que no existe en `usuarios`).
+    expect(args.usuario.usuarioId).toBe(USUARIO_ID)
+  })
+
+  it("omite el job si el colaborador del intento no tiene usuario asociado", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
+      repoUrl: REPO_URL,
+      estado: "EN_EVALUACION",
+      colaborador: { usuario: null },
+    })
+
+    job.dispatch(`${INTENTO_ID_BASE}3`)
+    await flushHasta(2100)
+
+    expect(repoFetch.descargarYEmpaquetar).not.toHaveBeenCalled()
+    expect(capas.cargarCapaCualitativa).not.toHaveBeenCalled()
   })
 
   it("dispatch del mismo intentoId varias veces solo procesa una vez", async () => {

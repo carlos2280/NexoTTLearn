@@ -123,7 +123,7 @@ export class JobEvaluacionTransversalService implements OnModuleInit {
       if (!intento) {
         return
       }
-      const sesionInterna = this.sesionWorker(intento.colaboradorId)
+      const sesionInterna = this.sesionWorker(intento.usuarioId)
       const evaluado = await this.cargarCapaCualitativaSeguro(
         intentoId,
         intento.repoUrl,
@@ -150,14 +150,17 @@ export class JobEvaluacionTransversalService implements OnModuleInit {
 
   private async cargarIntentoParaJob(intentoId: string): Promise<{
     readonly repoUrl: string
-    readonly colaboradorId: string
+    readonly usuarioId: string
   } | null> {
     const intento = await this.prisma.intentoTransversal.findUnique({
       where: { id: intentoId },
       select: {
         repoUrl: true,
         estado: true,
-        colaboradorId: true,
+        // La sesión sintética del worker escribe la Idempotency-Key, cuya FK
+        // apunta a `Usuario.id` (NO a `Colaborador.id`). Traemos el usuario real
+        // del colaborador para no violar la FK al persistir la capa.
+        colaborador: { select: { usuario: { select: { id: true } } } },
       },
     })
     if (!intento || intento.repoUrl === null) {
@@ -170,9 +173,18 @@ export class JobEvaluacionTransversalService implements OnModuleInit {
       )
       return null
     }
+    const usuarioId = intento.colaborador.usuario?.id
+    if (usuarioId == null) {
+      // Defensivo: en la práctica siempre existe (solo un participante logueado
+      // crea intentos). Si faltara, persistir la capa violaría la FK de idempotencia.
+      this.logger.warn(
+        `Intento ${intentoId}: el colaborador no tiene usuario asociado; se omite job.`,
+      )
+      return null
+    }
     return {
       repoUrl: intento.repoUrl,
-      colaboradorId: intento.colaboradorId,
+      usuarioId,
     }
   }
 
@@ -216,12 +228,14 @@ export class JobEvaluacionTransversalService implements OnModuleInit {
   }
 
   /**
-   * Sesion sintetica del worker — el `usuarioId` apunta al colaborador para que
-   * las idempotency keys queden trazables por intento. El service de carga no
-   * usa `usuario.rol` para autorizar (los guards del controller lo resuelven).
+   * Sesion sintetica del worker — `usuarioId` es el `Usuario.id` real del
+   * participante dueño del intento (resuelto en `cargarIntentoParaJob`), no el
+   * `Colaborador.id`: la Idempotency-Key que escribe la capa tiene FK a
+   * `Usuario.id`. El service de carga no usa `usuario.rol` para autorizar (los
+   * guards del controller lo resuelven).
    */
-  private sesionWorker(colaboradorId: string): SesionUsuario {
-    return { usuarioId: colaboradorId, rol: RolUsuario.ADMIN }
+  private sesionWorker(usuarioId: string): SesionUsuario {
+    return { usuarioId, rol: RolUsuario.ADMIN }
   }
 
   /**
