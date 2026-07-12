@@ -6,6 +6,7 @@ import { AYUDAS_CONFIG_CURSO } from "./ayudas"
 import { CampoNumero } from "./campo-numero"
 import { ConfigCard } from "./config-card"
 import { EditorBriefTransversal } from "./editor-brief-transversal"
+import { EditorCriteriosTransversal } from "./editor-criterios-transversal"
 import { EvaluacionIaInfo } from "./evaluacion-ia-info"
 import { SelectorSkillsTransversal } from "./selector-skills-transversal"
 import { useFormTransversal } from "./use-form-transversal"
@@ -73,6 +74,10 @@ export function ConfigTransversal({ curso, bloqueado }: ConfigTransversalProps) 
             <EditorBriefTransversal
               html={form.descripcion}
               onCambio={(html) => setForm((f) => ({ ...f, descripcion: html }))}
+            />
+            <EditorCriteriosTransversal
+              criterios={form.criteriosEvaluacion}
+              onCambio={(criterios) => setForm((f) => ({ ...f, criteriosEvaluacion: criterios }))}
             />
             <SelectorSkillsTransversal
               skillsIds={form.skillsQueMideIds}

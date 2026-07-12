@@ -33,6 +33,7 @@ const TRANSVERSAL_POR_CURSO: ReadonlyMap<string, TransversalResponse> = new Map(
       pesosCapas: { tests: 60, cualitativa: 40, comprension: 0 },
       capasActivas: { tests: true, cualitativa: true, comprension: false },
       skillsQueMide: [],
+      criteriosEvaluacion: [],
     },
   ],
   [
@@ -47,6 +48,7 @@ const TRANSVERSAL_POR_CURSO: ReadonlyMap<string, TransversalResponse> = new Map(
       pesosCapas: { tests: 60, cualitativa: 40, comprension: 0 },
       capasActivas: { tests: true, cualitativa: true, comprension: false },
       skillsQueMide: [],
+      criteriosEvaluacion: [],
     },
   ],
   [
@@ -61,6 +63,7 @@ const TRANSVERSAL_POR_CURSO: ReadonlyMap<string, TransversalResponse> = new Map(
       pesosCapas: { tests: 50, cualitativa: 50, comprension: 0 },
       capasActivas: { tests: true, cualitativa: true, comprension: false },
       skillsQueMide: [],
+      criteriosEvaluacion: [],
     },
   ],
 ])
@@ -76,6 +79,7 @@ function fallbackTransversal(cursoId: string): TransversalResponse {
     pesosCapas: { tests: 60, cualitativa: 40, comprension: 0 },
     capasActivas: { tests: true, cualitativa: true, comprension: false },
     skillsQueMide: [],
+    criteriosEvaluacion: [],
   }
 }
 

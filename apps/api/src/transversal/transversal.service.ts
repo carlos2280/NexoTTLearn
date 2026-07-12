@@ -46,7 +46,11 @@ import { PUNTAJES_FALTANTES_ERROR, calcularNotaTransversal } from "./calcular-no
 import { motivoTransversal } from "./disponibilidad-motivo.helpers"
 import { JobEvaluacionTransversalService } from "./job-evaluacion-transversal.service"
 import { type CargarCapaResult, TransversalCapasService } from "./transversal-capas.service"
-import { toIntentoAdmin, toIntentoParticipante } from "./transversal.helpers"
+import {
+  parsearCriteriosEvaluacion,
+  toIntentoAdmin,
+  toIntentoParticipante,
+} from "./transversal.helpers"
 import { SELECT_INTENTO_TRANSVERSAL_FIELDS, SELECT_TRANSVERSAL_FIELDS } from "./transversal.types"
 
 export type { CargarCapaResult } from "./transversal-capas.service"
@@ -161,6 +165,7 @@ export class TransversalService {
         nombre: s.skill.etiquetaVisible,
         areaId: s.skill.areaId,
       })),
+      criteriosEvaluacion: parsearCriteriosEvaluacion(transversal.criteriosEvaluacion),
     }
   }
 

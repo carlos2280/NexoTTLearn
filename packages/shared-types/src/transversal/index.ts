@@ -39,6 +39,9 @@ export {
   dimensionInformeSchema,
   puntoAReforzarSchema,
   revisionIaSchema,
+  criterioEvaluacionSchema,
+  criteriosEvaluacionSchema,
+  cumplimientoCriterioSchema,
 } from "./capas.schema"
 export type {
   CargarCapaTestsInput,
@@ -47,6 +50,8 @@ export type {
   DimensionInforme,
   PuntoAReforzar,
   RevisionIa,
+  CriteriosEvaluacion,
+  CumplimientoCriterio,
 } from "./capas.schema"
 export {
   finalizarTransversalBodySchema,

@@ -1,6 +1,7 @@
 import { Badge } from "@/shared/components/ui/badge"
 import type { RevisionIa } from "@nexott-learn/shared-types"
 import type { ReactNode } from "react"
+import { CumplimientoCriterios } from "./cumplimiento-criterios"
 import { DimensionesRevisionIa } from "./dimensiones-revision-ia"
 import { ListasRevisionIa } from "./listas-revision-ia"
 
@@ -49,6 +50,8 @@ export function InformeRevisionIa({ revision, nota, umbral }: InformeRevisionIaP
       {resumen ? <p className="text-body-sm text-text-secondary">{resumen}</p> : null}
 
       {dimensiones.length > 0 ? <DimensionesRevisionIa dimensiones={dimensiones} /> : null}
+
+      <CumplimientoCriterios criterios={revision.cumplimientoCriterios ?? []} />
 
       <ListasRevisionIa
         fortalezas={revision.fortalezas ?? []}

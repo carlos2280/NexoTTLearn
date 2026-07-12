@@ -33,6 +33,7 @@ import {
 import { construirMensajesComprension } from "../prompts/comprension.prompt"
 import { construirMensajesCualitativa } from "../prompts/cualitativa.prompt"
 import { construirMensajesEntrevista } from "../prompts/entrevista-ia.prompt"
+import { reconciliarCriterios } from "../reconciliar-criterios"
 import { reconciliarDimensiones } from "../reconciliar-dimensiones"
 import { IAiProvider } from "./ai-provider.interface"
 
@@ -92,6 +93,7 @@ export class ClaudeProvider implements IAiProvider {
       contenidoRepo: input.contenidoRepo,
       profundidad: input.profundidad,
       dimensiones: input.dimensiones,
+      criterios: input.criterios,
     })
     const modelo = this.resolverModelo(input.profundidad)
     const respuesta = await this.invocarClaudeRaw(modelo, mensajes.system, mensajes.user)
@@ -106,7 +108,13 @@ export class ClaudeProvider implements IAiProvider {
     // siempre exactamente las skills del transversal, sin importar lo que la IA
     // omitiera o inventara.
     const porDimension = reconciliarDimensiones(parsed.data.porDimension, input.dimensiones)
-    return { ...parsed.data, porDimension }
+    // Igual con la lista "a evaluar": el checklist cubre exactamente los
+    // criterios del admin (rellena omitidos, descarta inventados, orden canónico).
+    const cumplimientoCriterios = reconciliarCriterios(
+      parsed.data.cumplimientoCriterios ?? [],
+      input.criterios ?? [],
+    )
+    return { ...parsed.data, porDimension, cumplimientoCriterios }
   }
 
   async mantenerTurnoComprension(

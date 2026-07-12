@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { criteriosEvaluacionSchema } from "../transversal/capas.schema"
 
 /**
  * PATCH /api/v1/cursos/:id/transversal — D-CUR-8 (sub-recurso lazy):
@@ -32,6 +33,8 @@ export const actualizarTransversalCursoSchema = z
         (ids) => ids === undefined || new Set(ids).size === ids.length,
         "skillId duplicado en skillsQueMideIds.",
       ),
+    // Lista "a evaluar" opcional (aparte del brief). `[]` limpia la lista.
+    criteriosEvaluacion: criteriosEvaluacionSchema.optional(),
   })
   .strict()
 

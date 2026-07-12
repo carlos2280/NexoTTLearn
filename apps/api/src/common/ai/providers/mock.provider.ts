@@ -46,6 +46,13 @@ export class MockAiProvider implements IAiProvider {
       nota,
       comentario: `mock: ${dimension} evaluada`,
     }))
+    // Una entrada por cada criterio "a evaluar" declarado (vacío si no hay lista),
+    // igual que el proveedor real tras reconciliar.
+    const cumplimientoCriterios = (input.criterios ?? []).map((criterio) => ({
+      criterio,
+      cumple: "cumple" as const,
+      evidencia: `mock: ${criterio} verificado`,
+    }))
     return Promise.resolve({
       nota,
       confianza: "alta",
@@ -55,6 +62,7 @@ export class MockAiProvider implements IAiProvider {
       porDimension,
       fortalezas: ["mock: estructura clara del repositorio"],
       aReforzar: [{ que: "mock: cobertura de tests", sugerencia: "mock: añadir casos borde" }],
+      cumplimientoCriterios,
     })
   }
 

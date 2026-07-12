@@ -6,6 +6,7 @@ import { PrismaService } from "../common/prisma/prisma.service"
 import { RepoFetchService } from "../common/repo-fetch/repo-fetch.service"
 import { SesionUsuario } from "../common/types/sesion.types"
 import { TransversalCapasService } from "./transversal-capas.service"
+import { parsearCriteriosEvaluacion } from "./transversal.helpers"
 
 /**
  * `JobEvaluacionTransversalService` — evalúa el intento transversal con UNA sola
@@ -45,6 +46,7 @@ interface IntentoParaJob {
   readonly repoUrl: string
   readonly usuarioId: string
   readonly dimensiones: readonly string[]
+  readonly criterios: readonly string[]
   readonly umbral: number
 }
 
@@ -166,6 +168,9 @@ export class JobEvaluacionTransversalService implements OnModuleInit {
         transversal: {
           select: {
             umbralAprobacion: true,
+            // Lista "a evaluar" que redactó el admin (JSONB `string[]`). Se pasa
+            // al motor como criterios a verificar; el orden lo fija el admin.
+            criteriosEvaluacion: true,
             // `orderBy` estable: las dimensiones del informe deben salir en el mismo
             // orden entre corridas (la comparabilidad entre repos es el objetivo).
             skills: {
@@ -199,6 +204,9 @@ export class JobEvaluacionTransversalService implements OnModuleInit {
       repoUrl: intento.repoUrl,
       usuarioId,
       dimensiones: intento.transversal.skills.map((s) => s.skill.etiquetaVisible),
+      // JSONB no confiable → validar con el contrato; si es null/legacy/corrupto,
+      // se trata como "sin lista" (no se evalúa checklist).
+      criterios: parsearCriteriosEvaluacion(intento.transversal.criteriosEvaluacion),
       umbral: intento.transversal.umbralAprobacion.toNumber(),
     }
   }
@@ -215,6 +223,7 @@ export class JobEvaluacionTransversalService implements OnModuleInit {
         contenidoRepo: repo.contenido,
         profundidad: PROFUNDIDAD_POR_DEFECTO,
         dimensiones: intento.dimensiones,
+        criterios: intento.criterios,
       })
       if (informe.nota === null) {
         // La IA no pudo puntuar el repo: no transicionamos. El admin lo revisa a mano.
@@ -239,6 +248,11 @@ export class JobEvaluacionTransversalService implements OnModuleInit {
             porDimension: informe.porDimension.map((d) => ({ ...d })),
             fortalezas: [...informe.fortalezas],
             aReforzar: informe.aReforzar.map((r) => ({ ...r })),
+            // Checklist de la "Lista a evaluar" del admin (aditivo/opcional): solo
+            // se persiste si el transversal declaró criterios.
+            ...(informe.cumplimientoCriterios && informe.cumplimientoCriterios.length > 0
+              ? { cumplimientoCriterios: informe.cumplimientoCriterios.map((c) => ({ ...c })) }
+              : {}),
           },
         },
         idempotencyKey: this.derivarKey(intentoId, "cualitativa"),

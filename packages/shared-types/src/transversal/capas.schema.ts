@@ -49,6 +49,50 @@ export const puntoAReforzarSchema = z
 export type PuntoAReforzar = z.infer<typeof puntoAReforzarSchema>
 
 /**
+ * Un ítem de la "Lista a evaluar" que el admin redacta al configurar el
+ * transversal (aparte del brief en prosa). Texto libre y corto: cada ítem es
+ * una cosa concreta que la IA verifica sobre el repo.
+ */
+export const criterioEvaluacionSchema = z.string().trim().min(1).max(200)
+
+/**
+ * Lista completa de criterios "a evaluar" (fuente única write+read). Opcional:
+ * un transversal sin lista se comporta como antes (la IA solo puntúa skills).
+ * Rechaza duplicados (comparación tolerante a mayúsculas/espacios), en paridad
+ * con `skillsQueMideIds`: dos ítems que normalizan igual romperían el checklist
+ * (la reconciliación asignaría el mismo veredicto a ambos).
+ */
+export const criteriosEvaluacionSchema = z
+  .array(criterioEvaluacionSchema)
+  .max(15)
+  .refine((items) => {
+    const claves = items.map((c) => c.trim().toLowerCase())
+    return new Set(claves).size === claves.length
+  }, "Hay criterios duplicados en la lista a evaluar.")
+
+export type CriteriosEvaluacion = z.infer<typeof criteriosEvaluacionSchema>
+
+/**
+ * Resultado de verificar UN criterio de la lista contra el repo (Slice 8, lista
+ * a evaluar). `cumple` es un veredicto honesto de 3 estados; `null` = la IA no
+ * pudo verificarlo (no ejecuta el código, evidencia ausente). Se reconcilia
+ * aguas arriba contra la lista declarada (cubre exactamente esos ítems).
+ *
+ * Gemelo de `aiCumplimientoCriterioSchema` en apps/api (ai.types.ts): ese valida
+ * el output crudo de la IA, este el contrato write+read. Misma forma: si cambia
+ * el enum o los límites de uno, actualiza el otro.
+ */
+export const cumplimientoCriterioSchema = z
+  .object({
+    criterio: z.string().min(1).max(200),
+    cumple: z.enum(["cumple", "parcial", "no"]).nullable(),
+    evidencia: z.string().max(500),
+  })
+  .strict()
+
+export type CumplimientoCriterio = z.infer<typeof cumplimientoCriterioSchema>
+
+/**
  * Informe de la "Revisión con IA" = `detalle` de la capa cualitativa.
  * `comentario` + `confianza` son el contrato original (D-S8-C2). Los campos del
  * informe estructurado (Fase 2) son **opcionales y aditivos**: los emite el
@@ -70,6 +114,12 @@ export const revisionIaSchema = z
     porDimension: z.array(dimensionInformeSchema).max(30).optional(),
     fortalezas: z.array(z.string().min(1).max(300)).max(5).optional(),
     aReforzar: z.array(puntoAReforzarSchema).max(5).optional(),
+    /**
+     * Verificación ítem por ítem de la "Lista a evaluar" del admin. Aditivo y
+     * opcional: sólo aparece si el transversal declaró criterios y la IA nueva
+     * los evaluó; un detalle legacy o sin lista sigue siendo válido.
+     */
+    cumplimientoCriterios: z.array(cumplimientoCriterioSchema).max(15).optional(),
   })
   .strict()
 

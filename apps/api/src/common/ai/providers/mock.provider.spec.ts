@@ -28,6 +28,30 @@ describe("MockAiProvider", () => {
     expect(result.porDimension).toEqual([])
   })
 
+  it("evaluarRepoCualitativo devuelve un cumplimiento por cada criterio de la lista", async () => {
+    const result = await provider.evaluarRepoCualitativo({
+      contenidoRepo: "const a = 1",
+      profundidad: "SEMI_SENIOR",
+      dimensiones: [],
+      criterios: ["README claro", "Estructura ordenada"],
+    })
+    expect(result.cumplimientoCriterios).toHaveLength(2)
+    expect(result.cumplimientoCriterios?.map((c) => c.criterio)).toEqual([
+      "README claro",
+      "Estructura ordenada",
+    ])
+    expect(result.cumplimientoCriterios?.every((c) => c.cumple === "cumple")).toBe(true)
+  })
+
+  it("evaluarRepoCualitativo sin lista a evaluar devuelve cumplimientoCriterios vacio", async () => {
+    const result = await provider.evaluarRepoCualitativo({
+      contenidoRepo: "const a = 1",
+      profundidad: "JUNIOR",
+      dimensiones: [],
+    })
+    expect(result.cumplimientoCriterios).toEqual([])
+  })
+
   it("mantenerTurnoComprension turnos < 3 entrega siguientePregunta sin finalizar", async () => {
     const result = await provider.mantenerTurnoComprension({
       repoUrl: "https://github.com/foo/bar",

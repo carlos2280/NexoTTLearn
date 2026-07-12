@@ -1034,6 +1034,13 @@ model ProyectoTransversal {
   // sube para todos aqui; el extra por alumno vive en AsignacionCurso. Cupo
   // efectivo = intentosMax + AsignacionCurso.intentosExtraTransversal.
   intentosMax           Int      @default(3) @map("intentos_max")
+  // Lista opcional de criterios explícitos "a evaluar" que el admin redacta,
+  // aparte del brief en prosa (`descripcion`). Es un `string[]` en JSONB: se
+  // pasa al prompt de la IA como criterios a verificar (además de las skills,
+  // que son los ejes fijos comparables) y se muestra al participante antes de
+  // entregar. `null`/ausente = el transversal no declara lista (comportamiento
+  // previo intacto).
+  criteriosEvaluacion   Json?    @map("criterios_evaluacion") @db.JsonB
   capas                 Json     @default("{}") @db.JsonB
   // Colapso a una sola capa (revisión con IA = cualitativa): tests y comprensión
   // nacen apagadas y el peso va todo a cualitativa. Ver migración

@@ -16,6 +16,7 @@ export const SELECT_TRANSVERSAL_FIELDS = {
   capaTestsActiva: true,
   capaCualitativaActiva: true,
   capaComprensionActiva: true,
+  criteriosEvaluacion: true,
 } as const satisfies Prisma.ProyectoTransversalSelect
 
 export const SELECT_INTENTO_TRANSVERSAL_FIELDS = {

@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { revisionIaSchema } from "./capas.schema"
+import { criteriosEvaluacionSchema, revisionIaSchema } from "./capas.schema"
 
 /**
  * Shapes de respuesta del dominio transversal (Slice 8 P8a — D-S8-C3, D86).
@@ -58,6 +58,12 @@ export const transversalResponseSchema = z
         })
         .strict(),
     ),
+    /**
+     * Lista "a evaluar" que redactó el admin (D-S8, lista a evaluar). Siempre
+     * presente como array; vacío cuando el transversal no declara criterios. El
+     * participante la ve antes de entregar; el admin la edita en la config.
+     */
+    criteriosEvaluacion: criteriosEvaluacionSchema,
   })
   .strict()
 

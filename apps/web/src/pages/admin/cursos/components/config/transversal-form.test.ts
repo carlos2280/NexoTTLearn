@@ -21,6 +21,7 @@ const RESP: TransversalResponse = {
     { skillId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", nombre: "NestJS", areaId: "area-1" },
     { skillId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", nombre: "React", areaId: "area-2" },
   ],
+  criteriosEvaluacion: ["README claro", "Estructura ordenada"],
 }
 
 const activo = (over: Partial<FormTransversal> = {}): FormTransversal => ({
@@ -35,6 +36,7 @@ const activo = (over: Partial<FormTransversal> = {}): FormTransversal => ({
   capaCualitativaActiva: true,
   capaComprensionActiva: true,
   skillsQueMideIds: [],
+  criteriosEvaluacion: [],
   ...over,
 })
 
@@ -51,6 +53,7 @@ describe("baselineDesdeRespuesta", () => {
       "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
     ])
+    expect(base.criteriosEvaluacion).toEqual(["README claro", "Estructura ordenada"])
   })
 })
 
@@ -98,6 +101,19 @@ describe("esFormModificado", () => {
     const base = activo()
     expect(esFormModificado(activo({ activo: false }), base)).toBe(true)
   })
+
+  it("detecta cambio en la lista a evaluar, respetando el orden", () => {
+    const base = activo({ criteriosEvaluacion: ["a", "b"] })
+    expect(esFormModificado(activo({ criteriosEvaluacion: ["a", "b"] }), base)).toBe(false)
+    expect(esFormModificado(activo({ criteriosEvaluacion: ["b", "a"] }), base)).toBe(true)
+    expect(esFormModificado(activo({ criteriosEvaluacion: ["a"] }), base)).toBe(true)
+  })
+
+  it("un ítem vacío o en blanco no marca la lista como modificada", () => {
+    const base = activo({ criteriosEvaluacion: ["a"] })
+    expect(esFormModificado(activo({ criteriosEvaluacion: ["a", "  "] }), base)).toBe(false)
+    expect(esFormModificado(activo({ criteriosEvaluacion: ["a", ""] }), base)).toBe(false)
+  })
 })
 
 describe("construirInputTransversal", () => {
@@ -124,5 +140,12 @@ describe("construirInputTransversal", () => {
       capaComprensionActiva: false,
       skillsQueMideIds: ["s1", "s2"],
     })
+  })
+
+  it("descarta ítems vacíos/en blanco de la lista a evaluar al construir el input", () => {
+    const input = construirInputTransversal(
+      activo({ criteriosEvaluacion: ["  README claro ", "", "   ", "Tests"] }),
+    )
+    expect(input).toMatchObject({ criteriosEvaluacion: ["README claro", "Tests"] })
   })
 })

@@ -73,6 +73,23 @@ export const aiDimensionEvaluadaSchema = z
   })
   .strict()
 
+/**
+ * Verificación de un criterio de la "Lista a evaluar" del admin. `cumple` en 3
+ * estados honestos; `null` cuando la IA no pudo verificarlo. Se reconcilia
+ * contra la lista declarada (`reconciliarCriterios`).
+ *
+ * Gemelo de `cumplimientoCriterioSchema` en shared-types (capas.schema.ts): ese
+ * es el contrato write+read; este valida el output crudo de la IA. Deben tener
+ * la misma forma — si cambias el enum o los límites de uno, actualiza el otro.
+ */
+export const aiCumplimientoCriterioSchema = z
+  .object({
+    criterio: z.string().min(1).max(200),
+    cumple: z.enum(["cumple", "parcial", "no"]).nullable(),
+    evidencia: z.string().max(500),
+  })
+  .strict()
+
 export const aiInformeCualitativoSchema = z
   .object({
     nota: z.number().min(0).max(100).nullable(),
@@ -92,6 +109,8 @@ export const aiInformeCualitativoSchema = z
           .strict(),
       )
       .max(5),
+    // La IA puede omitirlo (transversal sin lista); se reconcilia aguas arriba.
+    cumplimientoCriterios: z.array(aiCumplimientoCriterioSchema).max(15).optional(),
   })
   .strict()
 
@@ -111,6 +130,12 @@ export interface EvaluarRepoCualitativoInput {
    * esta lista para que el informe cubra siempre exactamente estos ejes.
    */
   readonly dimensiones: readonly string[]
+  /**
+   * Lista "a evaluar" que redactó el admin (`ProyectoTransversal.criteriosEvaluacion`).
+   * A diferencia de las skills (ejes con nota), son criterios concretos que la
+   * IA verifica ítem por ítem (`cumplimientoCriterios`). Vacío = sin lista.
+   */
+  readonly criterios?: readonly string[]
 }
 
 /**

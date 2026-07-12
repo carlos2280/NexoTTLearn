@@ -4,6 +4,7 @@ import {
   IntentoTransversalParticipanteResponse,
   RepoOArtefacto,
   RevisionIa,
+  criteriosEvaluacionSchema,
   repoOArtefactoSchema,
   revisionIaSchema,
 } from "@nexott-learn/shared-types"
@@ -13,6 +14,17 @@ import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { IntentoTransversalSeleccionado } from "./transversal.types"
 
 const idempotencyKeyUuidSchema = z.string().uuid()
+
+/**
+ * Valida el JSONB `criteriosEvaluacion` (la "Lista a evaluar" del admin) contra
+ * el contrato compartido. Null/legacy/corrupto → `[]`: el transversal se trata
+ * como sin lista (comportamiento previo). Fuente única de parseo, reutilizada
+ * por el GET del transversal y por el job de evaluación.
+ */
+export function parsearCriteriosEvaluacion(raw: Prisma.JsonValue | null | undefined): string[] {
+  const parsed = criteriosEvaluacionSchema.safeParse(raw)
+  return parsed.success ? parsed.data : []
+}
 
 /**
  * Valida que `Idempotency-Key` venga presente y con shape UUID v4. Patron
