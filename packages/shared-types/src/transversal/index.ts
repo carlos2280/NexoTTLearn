@@ -36,11 +36,17 @@ export {
   cargarCapaTestsSchema,
   cargarCapaCualitativaSchema,
   cargarCapaComprensionSchema,
+  dimensionInformeSchema,
+  puntoAReforzarSchema,
+  revisionIaSchema,
 } from "./capas.schema"
 export type {
   CargarCapaTestsInput,
   CargarCapaCualitativaInput,
   CargarCapaComprensionInput,
+  DimensionInforme,
+  PuntoAReforzar,
+  RevisionIa,
 } from "./capas.schema"
 export {
   finalizarTransversalBodySchema,

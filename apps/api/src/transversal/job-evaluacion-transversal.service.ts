@@ -41,6 +41,13 @@ const PROFUNDIDAD_POR_DEFECTO = "SEMI_SENIOR" as const
 // `(intentoId, capa)`. Cualquier UUID v4 constante sirve; este no rota.
 const IDEMPOTENCY_NAMESPACE = "3e7a4f1e-cb52-4b1e-9c5f-7f0b8e2d4a01"
 
+interface IntentoParaJob {
+  readonly repoUrl: string
+  readonly usuarioId: string
+  readonly dimensiones: readonly string[]
+  readonly umbral: number
+}
+
 @Injectable()
 export class JobEvaluacionTransversalService implements OnModuleInit {
   private readonly logger = new Logger(JobEvaluacionTransversalService.name)
@@ -124,11 +131,7 @@ export class JobEvaluacionTransversalService implements OnModuleInit {
         return
       }
       const sesionInterna = this.sesionWorker(intento.usuarioId)
-      const evaluado = await this.cargarCapaCualitativaSeguro(
-        intentoId,
-        intento.repoUrl,
-        sesionInterna,
-      )
+      const evaluado = await this.cargarCapaCualitativaSeguro(intentoId, intento, sesionInterna)
       const duracion = Date.now() - inicio
       if (evaluado) {
         this.logger.log(
@@ -148,10 +151,7 @@ export class JobEvaluacionTransversalService implements OnModuleInit {
     }
   }
 
-  private async cargarIntentoParaJob(intentoId: string): Promise<{
-    readonly repoUrl: string
-    readonly usuarioId: string
-  } | null> {
+  private async cargarIntentoParaJob(intentoId: string): Promise<IntentoParaJob | null> {
     const intento = await this.prisma.intentoTransversal.findUnique({
       where: { id: intentoId },
       select: {
@@ -161,6 +161,19 @@ export class JobEvaluacionTransversalService implements OnModuleInit {
         // apunta a `Usuario.id` (NO a `Colaborador.id`). Traemos el usuario real
         // del colaborador para no violar la FK al persistir la capa.
         colaborador: { select: { usuario: { select: { id: true } } } },
+        // Ejes del informe = skills que el transversal declara + umbral para
+        // derivar el veredicto (apto / necesita_ajustes) sin preguntárselo a la IA.
+        transversal: {
+          select: {
+            umbralAprobacion: true,
+            // `orderBy` estable: las dimensiones del informe deben salir en el mismo
+            // orden entre corridas (la comparabilidad entre repos es el objetivo).
+            skills: {
+              select: { skill: { select: { etiquetaVisible: true } } },
+              orderBy: { skill: { etiquetaVisible: "asc" } },
+            },
+          },
+        },
       },
     })
     if (!intento || intento.repoUrl === null) {
@@ -185,28 +198,47 @@ export class JobEvaluacionTransversalService implements OnModuleInit {
     return {
       repoUrl: intento.repoUrl,
       usuarioId,
+      dimensiones: intento.transversal.skills.map((s) => s.skill.etiquetaVisible),
+      umbral: intento.transversal.umbralAprobacion.toNumber(),
     }
   }
 
-  /** Devuelve `true` si la capa se cargó; `false` si la descarga o la IA fallaron. */
+  /** Devuelve `true` si la capa se cargó; `false` si la descarga, la IA o una nota nula lo impidieron. */
   private async cargarCapaCualitativaSeguro(
     intentoId: string,
-    repoUrl: string,
+    intento: IntentoParaJob,
     sesion: SesionUsuario,
   ): Promise<boolean> {
     try {
-      const repo = await this.repoFetch.descargarYEmpaquetar(repoUrl)
-      const cualitativa = await this.ai.evaluarRepoCualitativo({
+      const repo = await this.repoFetch.descargarYEmpaquetar(intento.repoUrl)
+      const informe = await this.ai.evaluarRepoCualitativo({
         contenidoRepo: repo.contenido,
         profundidad: PROFUNDIDAD_POR_DEFECTO,
+        dimensiones: intento.dimensiones,
       })
+      if (informe.nota === null) {
+        // La IA no pudo puntuar el repo: no transicionamos. El admin lo revisa a mano.
+        this.logger.warn(`Intento ${intentoId}: la IA no pudo evaluar el repo (nota null); skip.`)
+        return false
+      }
+      const veredicto = informe.nota >= intento.umbral ? "apto" : "necesita_ajustes"
       await this.capas.cargarCapaCualitativa({
         intentoId,
         body: {
-          nota: cualitativa.nota,
+          nota: informe.nota,
           detalle: {
-            comentario: cualitativa.comentario.slice(0, 4000),
-            confianza: confianzaAUpper(cualitativa.confianza),
+            // `comentario` se conserva por compat con la UI actual (= resumen).
+            // El worker no pasa por el pipe Zod, así que aplicamos el trim del
+            // contrato aquí; `resumen` ya viene acotado a 2000 por el schema.
+            comentario: informe.resumen.trim(),
+            confianza: confianzaAUpper(informe.confianza),
+            veredicto,
+            resumen: informe.resumen,
+            queReviso: informe.queReviso,
+            queNoReviso: informe.queNoReviso,
+            porDimension: informe.porDimension.map((d) => ({ ...d })),
+            fortalezas: [...informe.fortalezas],
+            aReforzar: informe.aReforzar.map((r) => ({ ...r })),
           },
         },
         idempotencyKey: this.derivarKey(intentoId, "cualitativa"),

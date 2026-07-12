@@ -3,7 +3,9 @@ import {
   IntentoTransversalAdminResponse,
   IntentoTransversalParticipanteResponse,
   RepoOArtefacto,
+  RevisionIa,
   repoOArtefactoSchema,
+  revisionIaSchema,
 } from "@nexott-learn/shared-types"
 import { Prisma } from "@prisma/client"
 import { z } from "zod"
@@ -65,6 +67,25 @@ function decimalAnumero(value: Prisma.Decimal | null): number | null {
   return Number(value.toString())
 }
 
+/**
+ * Extrae el informe de la "Revisión con IA" del JSONB `evaluacionesCapas`
+ * (clave `cualitativa`). Devuelve `null` si la capa aún no se cargó o si el JSON
+ * no cumple el shape esperado (defensa ante datos legacy/corruptos): la pantalla
+ * admin trata el `null` como "sin revisión todavía".
+ */
+function extraerRevisionIa(evaluacionesCapas: Prisma.JsonValue): RevisionIa | null {
+  if (
+    evaluacionesCapas === null ||
+    typeof evaluacionesCapas !== "object" ||
+    Array.isArray(evaluacionesCapas)
+  ) {
+    return null
+  }
+  const cualitativa = (evaluacionesCapas as Record<string, unknown>).cualitativa
+  const parsed = revisionIaSchema.safeParse(cualitativa)
+  return parsed.success ? parsed.data : null
+}
+
 export function toIntentoAdmin(
   intento: IntentoTransversalSeleccionado,
 ): IntentoTransversalAdminResponse {
@@ -90,6 +111,7 @@ export function toIntentoAdmin(
     aprobado: intento.aprobado,
     anulado: intento.anulado,
     motivoAnulacion: intento.motivoAnulacion,
+    revisionIa: extraerRevisionIa(intento.evaluacionesCapas),
     colaborador: intento.colaborador,
     curso: intento.transversal.curso,
     transversal: {

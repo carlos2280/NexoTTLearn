@@ -34,6 +34,9 @@ export const SELECT_INTENTO_TRANSVERSAL_FIELDS = {
   notaCapaComprension: true,
   notaGlobal: true,
   aprobado: true,
+  // Informe estructurado de la capa cualitativa (JSONB). El mapper ADMIN extrae
+  // `evaluacionesCapas.cualitativa` como `revisionIa`; el participante lo ignora.
+  evaluacionesCapas: true,
   // Joins para el shape ADMIN del response (D-S8 / pantalla admin del intento).
   // El mapper `toIntentoParticipante` los ignora — visibilidad campo-a-campo.
   colaborador: {

@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { revisionIaSchema } from "./capas.schema"
 
 /**
  * Shapes de respuesta del dominio transversal (Slice 8 P8a — D-S8-C3, D86).
@@ -146,6 +147,12 @@ export const intentoTransversalAdminResponseSchema = intentoTransversalBaseSchem
     aprobado: z.boolean().nullable(),
     anulado: z.boolean(),
     motivoAnulacion: z.string().nullable(),
+    /**
+     * Informe estructurado de la "Revisión con IA" (capa cualitativa), extraído
+     * de `evaluacionesCapas`. `null` mientras la capa aún no se cargó. Solo
+     * admin: alimenta la pantalla de revisión del intento (Fase 4).
+     */
+    revisionIa: revisionIaSchema.nullable(),
     /**
      * Contexto del intento para que la pantalla admin no tenga que hacer
      * lookups adicionales por colaborador/curso/transversal. Solo admin

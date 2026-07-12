@@ -9,8 +9,8 @@
  * Convenciones:
  *  - Los providers nunca lanzan errores tipados de la nube directamente; los
  *    envuelven en `BadRequestException` / `ServiceUnavailableException`
- *    (D-S8-B7). En P8a solo MockProvider esta activo, ClaudeProvider lanza
- *    `NotImplementedException` con TODO(P8b).
+ *    (D-S8-B7). Mock y Claude estan ambos plenamente implementados; el switch
+ *    lo resuelve la factory del `AiModule` segun `AI_PROVIDER`.
  *  - Nunca se incluye PII ni transcripciones en los tipos: viajan en los
  *    payloads de entrada/salida y los services aguas arriba deciden si
  *    persistirlas.
@@ -54,6 +54,49 @@ export const aiRespuestaEstructuradaSchema = z
 
 export type AiRespuestaEstructurada = z.infer<typeof aiRespuestaEstructuradaSchema>
 
+/**
+ * Schema del informe cualitativo estructurado que Claude devuelve al evaluar un
+ * repo (Slice 8 Fase 2). Espeja el precedente `reporteEvaluadorIaSchema` de la
+ * entrevista IA, pero orientado al repo entregado.
+ *
+ * La clave de consistencia es `porDimension`: la IA puntua las **skills que el
+ * transversal declara** (ejes fijos), no una nota al aire — asi dos repos son
+ * comparables. El `veredicto` (apto / necesita_ajustes) NO viaja aqui: se deriva
+ * aguas arriba de `nota >= umbralAprobacion` para evitar que la IA se
+ * autocontradiga (nota alta con veredicto negativo).
+ */
+export const aiDimensionEvaluadaSchema = z
+  .object({
+    dimension: z.string().min(1).max(200),
+    nota: z.number().min(0).max(100).nullable(),
+    comentario: z.string().max(1000),
+  })
+  .strict()
+
+export const aiInformeCualitativoSchema = z
+  .object({
+    nota: z.number().min(0).max(100).nullable(),
+    confianza: z.enum(["alta", "media", "baja"]),
+    resumen: z.string().min(1).max(2000),
+    queReviso: z.string().min(1).max(500),
+    queNoReviso: z.string().min(1).max(500),
+    porDimension: z.array(aiDimensionEvaluadaSchema).max(30),
+    fortalezas: z.array(z.string().min(1).max(300)).max(5),
+    aReforzar: z
+      .array(
+        z
+          .object({
+            que: z.string().min(1).max(300),
+            sugerencia: z.string().min(1).max(500),
+          })
+          .strict(),
+      )
+      .max(5),
+  })
+  .strict()
+
+export type AiInformeCualitativo = z.infer<typeof aiInformeCualitativoSchema>
+
 export interface EvaluarRepoCualitativoInput {
   /**
    * Contenido del repositorio ya descargado y empaquetado (RepoFetchService).
@@ -62,13 +105,22 @@ export interface EvaluarRepoCualitativoInput {
    */
   readonly contenidoRepo: string
   readonly profundidad: ProfundidadEntrevistaIa
+  /**
+   * Ejes a puntuar = skills que el transversal declara (`TransversalSkill` →
+   * `Skill.etiquetaVisible`). El motor reconcilia la respuesta de la IA contra
+   * esta lista para que el informe cubra siempre exactamente estos ejes.
+   */
+  readonly dimensiones: readonly string[]
 }
 
-export interface EvaluarRepoCualitativoOutput {
-  readonly nota: number
-  readonly comentario: string
-  readonly confianza: ConfianzaAi
-}
+/**
+ * Informe cualitativo estructurado que el motor entrega al job. Es exactamente
+ * el shape validado por `aiInformeCualitativoSchema` (fuente única): `nota` es
+ * `null` cuando la IA no pudo evaluar el repo (el job trata ese caso como no
+ * evaluado y deja el intento para el admin) y `porDimension` ya viene
+ * reconciliado contra las `dimensiones` de entrada.
+ */
+export type EvaluarRepoCualitativoOutput = AiInformeCualitativo
 
 export interface MantenerTurnoComprensionInput {
   readonly repoUrl: string

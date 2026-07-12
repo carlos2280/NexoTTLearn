@@ -35,15 +35,27 @@ export class MockAiProvider implements IAiProvider {
   private static readonly TURNOS_ENTREVISTA_MOCK = 4
   private static readonly NOTA_ENTREVISTA_MOCK = 78
 
-  // biome-ignore lint/suspicious/useAwait: cumple la interfaz async sin esperar I/O.
-  async evaluarRepoCualitativo(
-    _input: EvaluarRepoCualitativoInput,
+  evaluarRepoCualitativo(
+    input: EvaluarRepoCualitativoInput,
   ): Promise<EvaluarRepoCualitativoOutput> {
-    return {
-      nota: MockAiProvider.NOTA_CUALITATIVA_MOCK,
-      comentario: "mock cualitativa",
+    const nota = MockAiProvider.NOTA_CUALITATIVA_MOCK
+    // Una entrada por cada eje pedido: el informe mock cubre exactamente las
+    // skills del transversal, igual que el proveedor real tras reconciliar.
+    const porDimension = input.dimensiones.map((dimension) => ({
+      dimension,
+      nota,
+      comentario: `mock: ${dimension} evaluada`,
+    }))
+    return Promise.resolve({
+      nota,
       confianza: "alta",
-    }
+      resumen: "mock: informe cualitativo generado por el proveedor mock.",
+      queReviso: "estructura, nombres, tests, README, commits",
+      queNoReviso: "no ejecuto el codigo",
+      porDimension,
+      fortalezas: ["mock: estructura clara del repositorio"],
+      aReforzar: [{ que: "mock: cobertura de tests", sugerencia: "mock: añadir casos borde" }],
+    })
   }
 
   // biome-ignore lint/suspicious/useAwait: cumple la interfaz async sin esperar I/O.
