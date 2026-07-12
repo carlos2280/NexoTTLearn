@@ -51,7 +51,6 @@ export function contenidoPorDefecto(
       }
     case "QUIZ":
       return {
-        intentosMax: null,
         solucionVisible: "al_aprobar",
         ordenAleatorio: false,
         notaMinima: 60,

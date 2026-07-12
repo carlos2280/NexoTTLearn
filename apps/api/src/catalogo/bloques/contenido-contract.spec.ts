@@ -44,7 +44,6 @@ const CONTENIDO_VALIDO_POR_TIPO = new Map<TipoBloque, Record<string, unknown>>([
   [
     "QUIZ",
     {
-      intentosMax: null,
       solucionVisible: "al_aprobar",
       ordenAleatorio: false,
       notaMinima: 60,
@@ -262,7 +261,6 @@ describe("schemas individuales — invariantes especificas", () => {
 
   it("QUIZ: OPCION_UNICA exige exactamente una opcion con esCorrecta=true", () => {
     const dosCorrectas = {
-      intentosMax: null,
       solucionVisible: "al_aprobar",
       ordenAleatorio: false,
       notaMinima: 60,

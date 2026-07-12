@@ -71,7 +71,6 @@ const SKILL_ID = "33333333-3333-3333-3333-333333333333"
 // `validarContenidoBloque` (Fase 2), asi que tiene que ser real.
 const CONTENIDO_PARRAFO_VACIO = { html: "", textoPlano: "", tiempoLecturaMin: 0 }
 const CONTENIDO_QUIZ_MIN = {
-  intentosMax: null,
   solucionVisible: "al_aprobar" as const,
   ordenAleatorio: false,
   notaMinima: 60,

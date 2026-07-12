@@ -132,7 +132,6 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     3,
     "QUIZ",
     {
-      intentosMax: null,
       solucionVisible: "al_aprobar",
       ordenAleatorio: false,
       notaMinima: 60,
@@ -250,7 +249,6 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     2,
     "QUIZ",
     {
-      intentosMax: 3,
       solucionVisible: "tras_intento",
       ordenAleatorio: true,
       notaMinima: 70,
@@ -288,7 +286,6 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     3,
     "QUIZ",
     {
-      intentosMax: null,
       solucionVisible: "al_aprobar",
       ordenAleatorio: false,
       notaMinima: 60,
@@ -397,7 +394,6 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     4,
     "QUIZ",
     {
-      intentosMax: null,
       solucionVisible: "al_aprobar",
       ordenAleatorio: false,
       notaMinima: 60,
@@ -522,7 +518,6 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     4,
     "QUIZ",
     {
-      intentosMax: null,
       solucionVisible: "al_aprobar",
       ordenAleatorio: false,
       notaMinima: 60,
@@ -571,7 +566,6 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     4,
     "QUIZ",
     {
-      intentosMax: 3,
       solucionVisible: "tras_intento",
       ordenAleatorio: false,
       notaMinima: 70,
@@ -688,7 +682,6 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     4,
     "QUIZ",
     {
-      intentosMax: null,
       solucionVisible: "al_aprobar",
       ordenAleatorio: false,
       notaMinima: 60,
@@ -739,7 +732,6 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     4,
     "QUIZ",
     {
-      intentosMax: 3,
       solucionVisible: "tras_intento",
       ordenAleatorio: false,
       notaMinima: 70,
@@ -793,7 +785,6 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     4,
     "QUIZ",
     {
-      intentosMax: null,
       solucionVisible: "al_aprobar",
       ordenAleatorio: false,
       notaMinima: 60,
@@ -856,7 +847,6 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     4,
     "QUIZ",
     {
-      intentosMax: null,
       solucionVisible: "al_aprobar",
       ordenAleatorio: false,
       notaMinima: 60,
@@ -1015,7 +1005,6 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     6,
     "QUIZ",
     {
-      intentosMax: 3,
       solucionVisible: "tras_intento",
       ordenAleatorio: false,
       notaMinima: 60,
@@ -1122,7 +1111,6 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     2,
     "QUIZ",
     {
-      intentosMax: null,
       solucionVisible: "al_aprobar",
       ordenAleatorio: false,
       notaMinima: 60,
@@ -1218,7 +1206,6 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     4,
     "QUIZ",
     {
-      intentosMax: null,
       solucionVisible: "al_aprobar",
       ordenAleatorio: false,
       notaMinima: 60,
@@ -1274,7 +1261,6 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     5,
     "QUIZ",
     {
-      intentosMax: 3,
       solucionVisible: "tras_intento",
       ordenAleatorio: false,
       notaMinima: 70,
@@ -1331,7 +1317,6 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     4,
     "QUIZ",
     {
-      intentosMax: null,
       solucionVisible: "al_aprobar",
       ordenAleatorio: false,
       notaMinima: 60,
@@ -1377,7 +1362,6 @@ export const SEED_BLOQUES: BloqueDetalleResponse[] = [
     4,
     "QUIZ",
     {
-      intentosMax: 3,
       solucionVisible: "tras_intento",
       ordenAleatorio: false,
       notaMinima: 70,

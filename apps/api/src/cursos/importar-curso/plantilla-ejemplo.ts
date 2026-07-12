@@ -33,7 +33,7 @@ Este es un callout informativo. La variante puede ser \`info\`, \`warning\` o \`
 
 ## Sección 1.2: Tu primer quiz
 
-::: quiz notaMinima=70 intentosMax=3
+::: quiz notaMinima=70
 - enunciado: ¿Qué es un componente React?
   tipo: OPCION_UNICA
   opciones:
