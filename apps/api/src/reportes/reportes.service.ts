@@ -44,6 +44,7 @@ import type {
 } from "@nexott-learn/shared-types"
 import { Prisma, TipoReporteCache } from "@prisma/client"
 import { nivelDesdeNota } from "../colaboradores/nivel-cualitativo.helpers"
+import { parseUmbralesLogro } from "../colaboradores/umbrales-logro.helpers"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { type Paginated, buildPaginatedResponse, resolvePaginacion } from "../common/http/paginated"
 import { PrismaService } from "../common/prisma/prisma.service"
@@ -58,12 +59,9 @@ import {
   SELECT_INTENTO_TRANSVERSAL_RESUMEN_FIELDS,
   SELECT_ITEM_PLAN_FIELDS,
   TOPE_ULTIMOS_INTENTOS,
-  UMBRAL_APROBADO_DEFAULT,
-  UMBRAL_EXCELENCIA_DEFAULT,
   UMBRAL_INVENTARIO_EXCELENCIA,
   UMBRAL_INVENTARIO_NO_CUMPLE,
   esSnapshotFotografiaV1,
-  esUmbralesLogro,
 } from "./reportes.types"
 
 const MS_DIA = 86_400_000
@@ -573,7 +571,7 @@ export class ReportesService {
   async obtenerCoberturaCurso(query: CoberturaCursoQuery): Promise<CoberturaCursoResponse> {
     const curso = await this.prisma.curso.findUnique({
       where: { id: query.cursoId },
-      select: { id: true, titulo: true },
+      select: { id: true, titulo: true, umbralesLogro: true },
     })
     if (!curso) {
       throw new NotFoundException({
@@ -581,6 +579,10 @@ export class ReportesService {
         message: "Curso no encontrado.",
       })
     }
+
+    // Reporte POR CURSO: clasifica con la meta de logro que el admin configuro
+    // para ESTE curso (cae al canon del sistema si no hay override).
+    const umbrales = parseUmbralesLogro(curso.umbralesLogro)
 
     const skillsExigidas = await this.prisma.cursoSkillExigida.findMany({
       where: { cursoId: query.cursoId },
@@ -661,7 +663,7 @@ export class ReportesService {
         return {
           skillId: s.skillId,
           nota: valor,
-          nivel: nivelDesdeNota(valor),
+          nivel: nivelDesdeNota(valor, umbrales),
         }
       })
 
@@ -681,7 +683,7 @@ export class ReportesService {
         }
       }
 
-      const nivelAgregado = nivelDesdeNota(promedioNota)
+      const nivelAgregado = nivelDesdeNota(promedioNota, umbrales)
       conteoNiveles[nivelAgregado] += 1
 
       return {
@@ -1058,14 +1060,16 @@ export class ReportesService {
             ).toFixed(2),
           )
 
-    let umbralAprobado = UMBRAL_APROBADO_DEFAULT
-    let umbralExcelencia = UMBRAL_EXCELENCIA_DEFAULT
-    if (esUmbralesLogro(umbralesLogroRaw)) {
-      umbralAprobado = umbralesLogroRaw.solido
-      umbralExcelencia = umbralesLogroRaw.excelencia
-    }
+    // Misma fuente de validacion que `obtenerCoberturaCurso` (parseUmbralesLogro):
+    // un unico validador del JSONB de umbrales para todos los reportes por curso.
+    const umbrales = parseUmbralesLogro(umbralesLogroRaw)
 
-    return { umbralCumple, umbralNoCumple, umbralAprobado, umbralExcelencia }
+    return {
+      umbralCumple,
+      umbralNoCumple,
+      umbralAprobado: umbrales.solido,
+      umbralExcelencia: umbrales.excelencia,
+    }
   }
 
   private async ultimoIntentoBloquePorColaborador(

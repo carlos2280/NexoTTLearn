@@ -15,6 +15,7 @@ import type { BloqueResponse, SeccionResponse } from "@nexott-learn/shared-types
 import { ChevronDown, ChevronRight, GripVertical, Pencil, Plus, Trash2 } from "lucide-react"
 import { type CSSProperties, useEffect, useState } from "react"
 import { tipoBloqueMeta } from "../bloque-tipo-meta"
+import { bloquesVisibles, construirPermutacionConOcultos } from "../reordenar-bloques"
 import type { SeccionConBloques, Seleccion } from "../types"
 
 interface BuilderArbolProps {
@@ -122,7 +123,9 @@ export function BuilderArbol({
         // No permitimos cross-section por ahora.
         return
       }
-      const ids = seccionDelActive.bloques.map((b) => b.id)
+      // Solo se arrastran bloques visibles; los ocultos (CODIGO_TESTS) viajan
+      // pegados a su reto al reconstruir la permutacion completa.
+      const ids = bloquesVisibles(seccionDelActive.bloques).map((b) => b.id)
       const from = ids.indexOf(aBId)
       const to = ids.indexOf(oBId)
       if (from < 0 || to < 0 || from === to) {
@@ -134,10 +137,7 @@ export function BuilderArbol({
         return
       }
       siguiente.splice(to, 0, extraido)
-      const permutacion = siguiente.map((bloqueId, idx) => ({
-        bloqueId,
-        orden: idx + 1,
-      }))
+      const permutacion = construirPermutacionConOcultos(seccionDelActive.bloques, siguiente)
       await onReordenarBloques(seccionDelActive.seccion.id, permutacion)
     }
   }
@@ -231,6 +231,7 @@ function FilaSeccion(props: FilaSeccionProps) {
   } = props
   const sortable = useSortable({ id: `${PREFIX_SEC}${item.seccion.id}` })
   const seccionActiva = seleccion.tipo === "seccion" && seleccion.seccionId === item.seccion.id
+  const visibles = bloquesVisibles(item.bloques)
 
   const style: CSSProperties = {
     transform: CSS.Transform.toString(sortable.transform),
@@ -306,11 +307,11 @@ function FilaSeccion(props: FilaSeccionProps) {
 
       {abierta ? (
         <SortableContext
-          items={item.bloques.map((b) => `${PREFIX_BLQ}${b.id}`)}
+          items={visibles.map((b) => `${PREFIX_BLQ}${b.id}`)}
           strategy={verticalListSortingStrategy}
         >
           <div className="ml-5 flex flex-col gap-0.5 border-border border-l py-1 pl-1.5">
-            {item.bloques.map((bloque) => (
+            {visibles.map((bloque) => (
               <FilaBloque
                 key={bloque.id}
                 bloque={bloque}

@@ -1,4 +1,4 @@
-import { sanitizarHtml } from "@/shared/lib/sanitize-html"
+import { normalizarEncabezadosLeccion, sanitizarHtml } from "@/shared/lib/sanitize-html"
 import { contenidoParrafoSchema } from "@nexott-learn/shared-types"
 
 interface BloqueParrafoProps {
@@ -16,7 +16,7 @@ export function BloqueParrafo({ contenido }: BloqueParrafoProps) {
   if (!parsed.success) {
     return null
   }
-  const html = sanitizarHtml(parsed.data.html)
+  const html = normalizarEncabezadosLeccion(sanitizarHtml(parsed.data.html))
   if (html.trim().length === 0) {
     return null
   }

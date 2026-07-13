@@ -1,8 +1,10 @@
 import type { TipoBloque } from "@nexott-learn/shared-types"
 import {
   Code2,
+  Database,
   FileText,
   FlaskConical,
+  GitBranch,
   HelpCircle,
   Lightbulb,
   type LucideIcon,
@@ -75,6 +77,24 @@ const META: Record<TipoBloque, TipoBloqueMeta> = {
     icono: PencilRuler,
     descripcionCorta: "Esquema dibujado a mano con Excalidraw.",
   },
+  // biome-ignore lint/style/useNamingConvention: clave del enum TipoBloque
+  SQL_EJERCICIO: {
+    etiqueta: "Reto SQL",
+    icono: Database,
+    descripcionCorta: "Enunciado de un reto SQL ejecutable sobre PGlite.",
+  },
+  // biome-ignore lint/style/useNamingConvention: clave del enum TipoBloque
+  SQL_TESTS: {
+    etiqueta: "Tests SQL",
+    icono: FlaskConical,
+    descripcionCorta: "Consultas de referencia asociadas a un reto SQL.",
+  },
+  // biome-ignore lint/style/useNamingConvention: clave del enum TipoBloque
+  GIT_EJERCICIO: {
+    etiqueta: "Ejercicio git",
+    icono: GitBranch,
+    descripcionCorta: "Terminal de git sobre un repo simulado, con objetivo declarativo.",
+  },
 }
 
 export function tipoBloqueMeta(tipo: TipoBloque): TipoBloqueMeta {
@@ -82,6 +102,8 @@ export function tipoBloqueMeta(tipo: TipoBloque): TipoBloqueMeta {
 }
 
 export function tiposBloqueOrdenados(): readonly TipoBloque[] {
+  // Los *_TESTS se excluyen por ser bloques auxiliares pareados (se editan
+  // dentro de su ejercicio, no como bloque suelto).
   return [
     "PARRAFO",
     "TIP",
@@ -91,7 +113,8 @@ export function tiposBloqueOrdenados(): readonly TipoBloque[] {
     "QUIZ",
     "CODIGO_ILUSTRATIVO",
     "CODIGO_PREGUNTAS",
-    "CODIGO_TESTS",
+    "SQL_EJERCICIO",
+    "GIT_EJERCICIO",
   ]
 }
 
@@ -142,6 +165,20 @@ export function resumenBloque(
       const elementos = Array.isArray(contenido.elements) ? contenido.elements.length : 0
       const resumen = caption || altText
       return resumen ? resumen.slice(0, 120) : `${elementos} elemento${elementos === 1 ? "" : "s"}`
+    }
+    case "SQL_EJERCICIO":
+    case "SQL_TESTS": {
+      const enunciado = typeof contenido.enunciado === "string" ? contenido.enunciado : ""
+      const tests = Array.isArray(contenido.tests) ? contenido.tests.length : 0
+      if (enunciado) {
+        return enunciado.slice(0, 120)
+      }
+      return tests > 0 ? `${tests} test${tests === 1 ? "" : "s"}` : meta.etiqueta
+    }
+    case "GIT_EJERCICIO": {
+      const enunciado = typeof contenido.enunciado === "string" ? contenido.enunciado : ""
+      const txt = enunciado.replace(/<[^>]+>/g, " ").trim()
+      return txt.slice(0, 120) || meta.etiqueta
     }
     default:
       return meta.etiqueta

@@ -62,13 +62,6 @@ export const SELECT_INTENTO_ENTREVISTA_IA_RESUMEN_FIELDS = {
 } as const satisfies Prisma.IntentoEntrevistaIASelect
 
 /**
- * Defaults del bloque `umbralesLogro` cuando el curso no tiene override
- * (D-S11-B4 + DE-1). Mapean a los conceptos D77 "Solido" / "Excelencia".
- */
-export const UMBRAL_APROBADO_DEFAULT = 70
-export const UMBRAL_EXCELENCIA_DEFAULT = 85
-
-/**
  * Tope de items "ultimos N" por categoria en `detalle-colaborador` (D-S11-B3).
  * Se pide 1 extra (`TOPE + 1`) para detectar `hayMas` sin un `count` adicional.
  */
@@ -91,30 +84,6 @@ export const ALERTA_INTENTO_INVALIDADO_DIAS = 30
  */
 export const UMBRAL_INVENTARIO_EXCELENCIA = 85
 export const UMBRAL_INVENTARIO_NO_CUMPLE = 50
-
-/**
- * Forma minima del bloque `umbralesLogro` persistido como JSONB en
- * `Curso.umbralesLogro`. Se valida con un type guard en el service para no
- * confiar en el shape declarado en TS sobre datos no confiables (regla §3
- * "0 any sobre datos de BD libre").
- */
-export interface UmbralesLogroJson {
-  readonly excelencia: number
-  readonly solido: number
-  readonly enDesarrollo: number
-}
-
-export function esUmbralesLogro(value: unknown): value is UmbralesLogroJson {
-  if (value === null || typeof value !== "object") {
-    return false
-  }
-  const obj = value as Record<string, unknown>
-  return (
-    typeof obj.excelencia === "number" &&
-    typeof obj.solido === "number" &&
-    typeof obj.enDesarrollo === "number"
-  )
-}
 
 /**
  * Snapshot v1 de `cursos_fotografia_cierre.snapshot` (D-S11-A1).

@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { criteriosEvaluacionSchema } from "../transversal/capas.schema"
 
 /**
  * PATCH /api/v1/cursos/:id/transversal — D-CUR-8 (sub-recurso lazy):
@@ -13,8 +14,11 @@ import { z } from "zod"
 export const actualizarTransversalCursoSchema = z
   .object({
     activo: z.boolean(),
-    descripcion: z.string().trim().min(1).max(2000).optional(),
+    descripcion: z.string().trim().min(1).max(20000).optional(),
     umbralAprobacion: z.number().min(0).max(100).optional(),
+    // Tope de intentos por participante (default 3). El admin puede subirlo para
+    // todo el transversal; el extra por alumno vive en la asignacion.
+    intentosMax: z.number().int().min(1).max(50).optional(),
     pesoCapaTests: z.number().min(0).max(100).optional(),
     pesoCapaCualitativa: z.number().min(0).max(100).optional(),
     pesoCapaComprension: z.number().min(0).max(100).optional(),
@@ -29,6 +33,8 @@ export const actualizarTransversalCursoSchema = z
         (ids) => ids === undefined || new Set(ids).size === ids.length,
         "skillId duplicado en skillsQueMideIds.",
       ),
+    // Lista "a evaluar" opcional (aparte del brief). `[]` limpia la lista.
+    criteriosEvaluacion: criteriosEvaluacionSchema.optional(),
   })
   .strict()
 

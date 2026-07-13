@@ -17,6 +17,8 @@ export { contenidoRecursoSchema, subtipoRecursoSchema } from "./recurso.schema"
 export type { ContenidoRecurso, SubtipoRecurso } from "./recurso.schema"
 export { contenidoDiagramaSchema } from "./diagrama.schema"
 export type { ContenidoDiagrama } from "./diagrama.schema"
+export { contenidoGitEjercicioSchema, objetivoGitSchema } from "./git-ejercicio.schema"
+export type { ContenidoGitEjercicio, ObjetivoGit } from "./git-ejercicio.schema"
 export {
   contenidoBloquePorTipo,
   schemaContenidoBloquePorTipo,

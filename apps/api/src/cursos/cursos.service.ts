@@ -1989,12 +1989,14 @@ export class CursosService {
         cursoId,
         descripcion: input.descripcion ?? "",
         umbralAprobacion: input.umbralAprobacion ?? 70,
+        intentosMax: input.intentosMax ?? 3,
         pesoCapaTests: input.pesoCapaTests ?? 40,
         pesoCapaCualitativa: input.pesoCapaCualitativa ?? 30,
         pesoCapaComprension: input.pesoCapaComprension ?? 30,
         capaTestsActiva: input.capaTestsActiva ?? true,
         capaCualitativaActiva: input.capaCualitativaActiva ?? true,
         capaComprensionActiva: input.capaComprensionActiva ?? true,
+        criteriosEvaluacion: input.criteriosEvaluacion ?? [],
       },
       select: { id: true },
     })
@@ -2490,6 +2492,9 @@ function construirDataUpdateTransversal(
   if (input.umbralAprobacion !== undefined) {
     data.umbralAprobacion = input.umbralAprobacion
   }
+  if (input.intentosMax !== undefined) {
+    data.intentosMax = input.intentosMax
+  }
   if (input.pesoCapaTests !== undefined) {
     data.pesoCapaTests = input.pesoCapaTests
   }
@@ -2507,6 +2512,10 @@ function construirDataUpdateTransversal(
   }
   if (input.capaComprensionActiva !== undefined) {
     data.capaComprensionActiva = input.capaComprensionActiva
+  }
+  if (input.criteriosEvaluacion !== undefined) {
+    // El admin puede enviar `[]` para limpiar la lista (comportamiento explícito).
+    data.criteriosEvaluacion = [...input.criteriosEvaluacion]
   }
   return data
 }

@@ -4,6 +4,7 @@ import { NotaSkillModule } from "../nota-skill/nota-skill.module"
 import { CodigoEvaluadorService } from "./codigo-evaluador.service"
 import { IntentosBloqueController } from "./intentos-bloque.controller"
 import { IntentosBloqueService } from "./intentos-bloque.service"
+import { SqlEvaluadorService } from "./sql-evaluador.service"
 
 /**
  * Modulo `intentos-bloque` — Slice 7 P7b + auto-correccion CODIGO_PREGUNTAS.
@@ -17,7 +18,7 @@ import { IntentosBloqueService } from "./intentos-bloque.service"
 @Module({
   imports: [PrismaModule, NotaSkillModule],
   controllers: [IntentosBloqueController],
-  providers: [IntentosBloqueService, CodigoEvaluadorService],
+  providers: [IntentosBloqueService, CodigoEvaluadorService, SqlEvaluadorService],
   exports: [IntentosBloqueService],
 })
 export class IntentosBloqueModule {}

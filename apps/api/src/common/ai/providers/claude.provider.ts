@@ -24,6 +24,7 @@ import {
   MantenerTurnoEntrevistaIaOutput,
   MantenerTurnoEntrevistaInput,
   MantenerTurnoEntrevistaOutput,
+  aiInformeCualitativoSchema,
   aiRespuestaEstructuradaSchema,
   iniciarEntrevistaResponseSchema,
   notasFinalEntrevistaSchema,
@@ -32,13 +33,16 @@ import {
 import { construirMensajesComprension } from "../prompts/comprension.prompt"
 import { construirMensajesCualitativa } from "../prompts/cualitativa.prompt"
 import { construirMensajesEntrevista } from "../prompts/entrevista-ia.prompt"
+import { reconciliarCriterios } from "../reconciliar-criterios"
+import { reconciliarDimensiones } from "../reconciliar-dimensiones"
 import { IAiProvider } from "./ai-provider.interface"
 
 /**
  * ClaudeProvider — implementacion real via `@anthropic-ai/sdk` (D-S8-B1/B4/B7).
  *
  * - Activa prompt caching via header `anthropic-beta` (D-S8-B4).
- * - Verifica accesibilidad del repo con HEAD antes de gastar tokens (R-S8-6).
+ * - Solo el flujo de comprension valida accesibilidad con HEAD (R-S8-6); la
+ *   cualitativa recibe el contenido ya descargado por el RepoFetchService.
  * - Mapea errores Anthropic.APIError a HTTPException segun D-S8-B7.
  * - Logging: solo metadatos (model, tokens, latencyMs). NUNCA prompt ni
  *   respuesta (R-S8-10).
@@ -83,19 +87,34 @@ export class ClaudeProvider implements IAiProvider {
   async evaluarRepoCualitativo(
     input: EvaluarRepoCualitativoInput,
   ): Promise<EvaluarRepoCualitativoOutput> {
-    await this.verificarRepoAccesible(input.repoUrl)
+    // Sin HEAD de accesibilidad: el RepoFetchService ya validó, clonó y
+    // empaquetó el repo; aquí solo evaluamos su contenido.
     const mensajes = construirMensajesCualitativa({
-      repoUrl: input.repoUrl,
+      contenidoRepo: input.contenidoRepo,
       profundidad: input.profundidad,
+      dimensiones: input.dimensiones,
+      criterios: input.criterios,
     })
     const modelo = this.resolverModelo(input.profundidad)
-    const respuesta = await this.invocarClaude(modelo, mensajes.system, mensajes.user)
-    const nota = typeof respuesta.nota === "number" ? respuesta.nota : 0
-    return {
-      nota,
-      comentario: respuesta.comentario ?? "",
-      confianza: respuesta.confianza ?? "media",
+    const respuesta = await this.invocarClaudeRaw(modelo, mensajes.system, mensajes.user)
+    const parsed = aiInformeCualitativoSchema.safeParse(respuesta)
+    if (!parsed.success) {
+      throw new BadRequestException({
+        code: apiErrorCodes.iaRespuestaMalformada,
+        message: "IA devolvio shape inesperado en el informe cualitativo.",
+      })
     }
+    // Reconciliamos las dimensiones contra los ejes pedidos: el informe cubre
+    // siempre exactamente las skills del transversal, sin importar lo que la IA
+    // omitiera o inventara.
+    const porDimension = reconciliarDimensiones(parsed.data.porDimension, input.dimensiones)
+    // Igual con la lista "a evaluar": el checklist cubre exactamente los
+    // criterios del admin (rellena omitidos, descarta inventados, orden canónico).
+    const cumplimientoCriterios = reconciliarCriterios(
+      parsed.data.cumplimientoCriterios ?? [],
+      input.criterios ?? [],
+    )
+    return { ...parsed.data, porDimension, cumplimientoCriterios }
   }
 
   async mantenerTurnoComprension(

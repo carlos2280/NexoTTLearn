@@ -6,9 +6,11 @@ import type {
 } from "@nexott-learn/shared-types"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { useMemo, useState } from "react"
+import { decidirVistaIntentoTransversal } from "./decidir-vista-intento-transversal"
 import { VistaAprobadoTransversal } from "./vista-aprobado-transversal"
 import { VistaAunNoTransversal } from "./vista-aun-no-transversal"
 import { VistaBriefTransversal } from "./vista-brief-transversal"
+import { VistaEnRevisionTransversal } from "./vista-en-revision-transversal"
 import { VistaEvaluandoTransversal } from "./vista-evaluando-transversal"
 
 interface CanvasTransversalProps {
@@ -22,13 +24,16 @@ interface CanvasTransversalProps {
  * renderizar segun el estado del ultimo intento:
  *
  *  - `forzarBrief` activo (click "Enviar otro intento") → Vista 1.
- *  - Intento EN_EVALUACION → Vista 2 (con polling cada 10s).
+ *  - Intento EN_EVALUACION → Vista 2 (IA evaluando, con polling cada 10s).
+ *  - Intento EVALUADO → Vista "en revisión" (IA terminó, el admin revisa; acuse
+ *    honesto sin nota — evita el falso "Casi" del estado intermedio).
  *  - Intento FINALIZADO + aprobado → Vista 3a (recompensa cumbre).
  *  - Intento FINALIZADO + !aprobado → Vista 3b (sin rojo, motivadora).
  *  - Sin intentos → Vista 1 (brief).
  *
- * El polling se enciende solo si hay intento en evaluacion, asi evitamos
- * requests innecesarios cuando el participante consulta un historico.
+ * El polling se mantiene vivo mientras haya un intento EN_EVALUACION o EVALUADO
+ * (pendiente de que el admin finalice), asi la vista conmuta sola al veredicto
+ * sin que el participante recargue. Si solo consulta historicos, no sondea.
  */
 export function CanvasTransversal({
   cursoId,
@@ -41,7 +46,9 @@ export function CanvasTransversal({
   const transversal = useTransversalCurso(cursoId)
 
   const intentos = useListarIntentosTransversal(asignacionId)
-  const haySondeable = (intentos.data ?? []).some((i) => i.estado === "EN_EVALUACION")
+  const haySondeable = (intentos.data ?? []).some(
+    (i) => i.estado === "EN_EVALUACION" || i.estado === "EVALUADO",
+  )
   // Segunda lectura con polling activo si hay intento en evaluacion. Tanstack
   // dedupe por queryKey, asi que esto NO dispara dos requests.
   useListarIntentosTransversal(asignacionId, { pollingActivo: haySondeable })
@@ -131,10 +138,14 @@ function ContenidoTransversal(props: ContenidoTransversalProps) {
       />
     )
   }
-  if (intentoActivo.estado === "EN_EVALUACION") {
+  const vista = decidirVistaIntentoTransversal(intentoActivo)
+  if (vista === "evaluando") {
     return <VistaEvaluandoTransversal intento={intentoActivo} />
   }
-  if (intentoActivo.aprobado) {
+  if (vista === "en-revision") {
+    return <VistaEnRevisionTransversal intento={intentoActivo} />
+  }
+  if (vista === "aprobado") {
     return (
       <VistaAprobadoTransversal
         intento={intentoActivo}

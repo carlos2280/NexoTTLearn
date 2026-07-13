@@ -95,6 +95,9 @@ export const apiErrorCodes = {
   // Storage P5a (D-EVI-1).
   archivoNoEncontrado: "ARCHIVO_NO_ENCONTRADO",
   archivoPathInvalido: "ARCHIVO_PATH_INVALIDO",
+  // Imagenes de contenido (subida desde editores TipTap).
+  imagenTipoNoSoportado: "IMAGEN_TIPO_NO_SOPORTADO",
+  imagenDemasiadoGrande: "IMAGEN_DEMASIADO_GRANDE",
   // Idempotency transversal P5a (D-EVI-3). Reservado para P5c.
   conflictIdempotencyKeyReusadaConBodyDistinto:
     "CONFLICT_IDEMPOTENCY_KEY_REUSADA_CON_BODY_DISTINTO",
@@ -143,7 +146,9 @@ export const apiErrorCodes = {
   // Transversal P8a (D-S8-A1..F2).
   transversalNoEncontrado: "TRANSVERSAL_NO_ENCONTRADO",
   intentoTransversalNoEncontrado: "INTENTO_TRANSVERSAL_NO_ENCONTRADO",
+  evidenciaRepoNoDisponible: "EVIDENCIA_REPO_NO_DISPONIBLE",
   conflictTransversalNoDisponible: "CONFLICT_TRANSVERSAL_NO_DISPONIBLE",
+  transversalIntentosAgotados: "TRANSVERSAL_INTENTOS_AGOTADOS",
   conflictCursoEstadoInvalido: "CONFLICT_CURSO_ESTADO_INVALIDO",
   conflictAsignacionEstadoInvalido: "CONFLICT_ASIGNACION_ESTADO_INVALIDO",
   conflictSkillsTransversalInvalidas: "CONFLICT_SKILLS_TRANSVERSAL_INVALIDAS",
@@ -159,6 +164,7 @@ export const apiErrorCodes = {
   iaCredencialesInvalidas: "IA_CREDENCIALES_INVALIDAS",
   iaRespuestaMalformada: "IA_RESPUESTA_MALFORMADA",
   repoNoAccesible: "REPO_NO_ACCESIBLE",
+  repoUrlInvalida: "REPO_URL_INVALIDA",
   // Entrevista IA P8c (D-S8-D1..D6, D89).
   entrevistaIaNoEncontrada: "ENTREVISTA_IA_NO_ENCONTRADA",
   intentoEntrevistaNoEncontrado: "INTENTO_ENTREVISTA_NO_ENCONTRADO",

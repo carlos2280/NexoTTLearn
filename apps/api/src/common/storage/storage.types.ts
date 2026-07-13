@@ -16,6 +16,13 @@ export const archivoMetadataSchema = z.discriminatedUnion("tipo", [
       subidoPorUsuarioId: z.string().uuid(),
     })
     .strict(),
+  z
+    .object({
+      tipo: z.literal(ArchivoTipo.IMAGEN_CONTENIDO),
+      nombreOriginal: z.string().min(1).max(255),
+      subidoPorUsuarioId: z.string().uuid(),
+    })
+    .strict(),
 ])
 
 export type ArchivoMetadata = z.infer<typeof archivoMetadataSchema>

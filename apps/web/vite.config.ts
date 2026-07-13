@@ -17,6 +17,14 @@ export default defineConfig({
   worker: {
     format: "es",
   },
+  // PGlite (Postgres WASM del bloque SQL) trae su WASM + un bundle de
+  // filesystem (`.data`) que el optimizador de deps de Vite corrompe al
+  // pre-empaquetarlo → "Invalid FS bundle size: N !== M" en runtime. La guía
+  // oficial de PGlite es excluirlo del pre-bundling para que Vite sirva los
+  // assets del paquete tal cual.
+  optimizeDeps: {
+    exclude: ["@electric-sql/pglite"],
+  },
   server: {
     port: 5173,
     // Si 5173 esta ocupado, fallar en vez de saltar a 5174 (que rompe el CORS del API).

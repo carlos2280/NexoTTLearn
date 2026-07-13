@@ -12,7 +12,7 @@ interface VistaBriefTransversalProps {
 
 /**
  * Vista 1 del proyecto transversal (spec 05 — sin intento previo). Brief con
- * la descripcion del admin, lista de capas activas y form de envio.
+ * la descripcion del admin, qué se evalúa (revisión con IA) y form de envio.
  *
  * Cero numeros (umbral, pesos, skills). Solo lo que el participante necesita.
  */
@@ -34,7 +34,7 @@ export function VistaBriefTransversal({
         />
       </header>
 
-      <LoQueSeEvaluara capasActivas={transversal.capasActivas} />
+      <LoQueSeEvaluara criterios={transversal.criteriosEvaluacion} />
 
       <FormEnvioTransversal
         asignacionId={asignacionId}

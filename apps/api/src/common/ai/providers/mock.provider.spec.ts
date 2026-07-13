@@ -4,14 +4,52 @@ import { MockAiProvider } from "./mock.provider"
 describe("MockAiProvider", () => {
   const provider = new MockAiProvider()
 
-  it("evaluarRepoCualitativo devuelve respuesta determinista con confianza alta", async () => {
+  it("evaluarRepoCualitativo devuelve el informe rico con una dimension por eje pedido", async () => {
     const result = await provider.evaluarRepoCualitativo({
-      repoUrl: "https://github.com/foo/bar",
+      contenidoRepo: "===== a.ts =====\nconst a = 1",
       profundidad: "SEMI_SENIOR",
+      dimensiones: ["TypeScript", "Testing"],
     })
     expect(result.nota).toBe(80)
-    expect(result.comentario).toBe("mock cualitativa")
     expect(result.confianza).toBe("alta")
+    expect(result.resumen).toMatch(/mock/i)
+    expect(result.queNoReviso).toMatch(/no ejecuto el codigo/)
+    expect(result.porDimension).toHaveLength(2)
+    expect(result.porDimension.map((d) => d.dimension)).toEqual(["TypeScript", "Testing"])
+    expect(result.porDimension.every((d) => d.nota === 80)).toBe(true)
+  })
+
+  it("evaluarRepoCualitativo sin ejes declarados devuelve porDimension vacio", async () => {
+    const result = await provider.evaluarRepoCualitativo({
+      contenidoRepo: "const a = 1",
+      profundidad: "JUNIOR",
+      dimensiones: [],
+    })
+    expect(result.porDimension).toEqual([])
+  })
+
+  it("evaluarRepoCualitativo devuelve un cumplimiento por cada criterio de la lista", async () => {
+    const result = await provider.evaluarRepoCualitativo({
+      contenidoRepo: "const a = 1",
+      profundidad: "SEMI_SENIOR",
+      dimensiones: [],
+      criterios: ["README claro", "Estructura ordenada"],
+    })
+    expect(result.cumplimientoCriterios).toHaveLength(2)
+    expect(result.cumplimientoCriterios?.map((c) => c.criterio)).toEqual([
+      "README claro",
+      "Estructura ordenada",
+    ])
+    expect(result.cumplimientoCriterios?.every((c) => c.cumple === "cumple")).toBe(true)
+  })
+
+  it("evaluarRepoCualitativo sin lista a evaluar devuelve cumplimientoCriterios vacio", async () => {
+    const result = await provider.evaluarRepoCualitativo({
+      contenidoRepo: "const a = 1",
+      profundidad: "JUNIOR",
+      dimensiones: [],
+    })
+    expect(result.cumplimientoCriterios).toEqual([])
   })
 
   it("mantenerTurnoComprension turnos < 3 entrega siguientePregunta sin finalizar", async () => {

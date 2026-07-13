@@ -9,6 +9,7 @@ import { ComentarioAdminCard } from "./components/comentario-admin-card"
 import { CosechaSkills } from "./components/cosecha-skills"
 import { HeroVeredicto } from "./components/hero-veredicto"
 import { MensajeErrorCierre } from "./components/mensaje-error-cierre"
+import { SiguientePasoCierre } from "./components/siguiente-paso-cierre"
 
 export function CursoCerradoPage() {
   const { cursoId } = useParams<{ cursoId: string }>()
@@ -53,7 +54,10 @@ export function CursoCerradoPage() {
             ) : null}
             <CosechaSkills skills={data.skillsDemostradasNuevas} />
             {data.resultado === "NO_APTO" ? (
-              <AreasPorTrabajar areas={data.areasPorTrabajar} />
+              <>
+                <AreasPorTrabajar areas={data.areasPorTrabajar} />
+                <SiguientePasoCierre />
+              </>
             ) : null}
             <AccionesCierre cursoId={data.cursoId} />
           </>

@@ -15,6 +15,7 @@ import { CargarCapaResult, TransversalService } from "./transversal.service"
 const INTENTO_ID = "11111111-1111-1111-1111-111111111111"
 const USUARIO_ID = "22222222-2222-2222-2222-222222222222"
 const IDEMPOTENCY_KEY = "33333333-3333-3333-3333-333333333333"
+const ASIGNACION_ID = "44444444-4444-4444-4444-444444444444"
 const ADMIN_SESION: SesionUsuario = {
   usuarioId: USUARIO_ID,
   rol: "ADMIN" as never,
@@ -49,6 +50,7 @@ interface MockTransversal {
   cargarCapaTests: ReturnType<typeof vi.fn>
   cargarCapaCualitativa: ReturnType<typeof vi.fn>
   cargarCapaComprension: ReturnType<typeof vi.fn>
+  darIntentoExtra: ReturnType<typeof vi.fn>
 }
 
 interface MockAudit {
@@ -69,6 +71,7 @@ beforeEach(() => {
     cargarCapaTests: vi.fn(),
     cargarCapaCualitativa: vi.fn(),
     cargarCapaComprension: vi.fn(),
+    darIntentoExtra: vi.fn(),
   }
   auditLog = { record: vi.fn().mockResolvedValue(undefined) }
   controller = new TransversalController(
@@ -141,5 +144,25 @@ describe("TransversalController §5.116 — audit INTENTO_TRANSVERSAL_CAPA_CARGA
       reqFake,
     )
     expect(auditLog.record).not.toHaveBeenCalled()
+  })
+})
+
+describe("TransversalController E12 — audit INTENTO_TRANSVERSAL_EXTRA_OTORGADO", () => {
+  it("registra audit del intento extra otorgado (recurso = asignación)", async () => {
+    transversal.darIntentoExtra.mockResolvedValue({
+      asignacionId: ASIGNACION_ID,
+      intentosUsados: 3,
+      intentosCupo: 4,
+    })
+    const r = await controller.darIntentoExtra(ASIGNACION_ID, ADMIN_SESION, reqFake)
+    expect(r).toEqual({ asignacionId: ASIGNACION_ID, intentosUsados: 3, intentosCupo: 4 })
+    expect(auditLog.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accion: AccionAuditoria.INTENTO_TRANSVERSAL_EXTRA_OTORGADO,
+        recursoTipo: "asignacion_curso",
+        recursoId: ASIGNACION_ID,
+        metadata: expect.objectContaining({ intentosCupo: 4, intentosUsados: 3 }),
+      }),
+    )
   })
 })

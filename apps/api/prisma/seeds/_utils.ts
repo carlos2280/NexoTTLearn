@@ -236,7 +236,6 @@ export function buildQuiz(preguntas: readonly PreguntaQuiz[], ctx: string): Pris
   return validarOExplotar(
     TipoBloque.QUIZ,
     {
-      intentosMax: 3,
       solucionVisible: "tras_intento",
       ordenAleatorio: false,
       notaMinima: 70,
@@ -284,7 +283,6 @@ export function placeholderQuiz(skill: string, ctx: string): Prisma.InputJsonVal
   return validarOExplotar(
     TipoBloque.QUIZ,
     {
-      intentosMax: 3,
       solucionVisible: "tras_intento",
       ordenAleatorio: false,
       notaMinima: 70,

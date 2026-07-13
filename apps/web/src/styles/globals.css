@@ -3,6 +3,7 @@
 @import "@fontsource-variable/manrope/index.css";
 @import "@fontsource-variable/geist/index.css";
 @import "@fontsource-variable/geist-mono/index.css";
+@import "@fontsource-variable/fira-code/index.css";
 @import "@fontsource-variable/fraunces/index.css";
 @import "@fontsource-variable/fraunces/wght-italic.css";
 
@@ -315,6 +316,10 @@
     system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "Geist Mono Variable", "Geist Mono", "JetBrains Mono", ui-monospace, SFMono-Regular,
     monospace;
+  /* Fuente del IDE inmerso NexoTT Learn — Fira Code con ligaduras. Solo para lo
+     "técnico": código, tabs de archivo, árbol, statusbar, chrome del IDE. La
+     prosa pedagógica sigue en --font-sans (legibilidad primero). */
+  --font-code: "Fira Code Variable", "Fira Code", "Geist Mono Variable", ui-monospace, monospace;
   --font-serif: "Fraunces Variable", "Fraunces", ui-serif, Georgia, serif;
 
   /* ---------- Tipografía · escala (Tailwind v4 expone esto como `text-{name}`) ---------- */
@@ -761,6 +766,38 @@
    La paleta aurora se MANTIENE: es identidad, no superficie.
    ============================================================ */
 
+/* ============================================================
+   Superficie IDE inmerso — Monokai (SCOPED al curso, solo dark)
+   Override de tokens semánticos acotado a `.nx-ide` (el shell del
+   curso inmersivo). No toca el tema global: bandeja/admin siguen en
+   el dark neutro. En light, el curso usa el IDE claro por defecto.
+   Especificidad (0,2,0) > el bloque dark base (0,1,0) → gana.
+   ============================================================ */
+[data-theme="dark"] .nx-ide {
+  --color-canvas: #272822; /* editor "paper" — fondo Monokai clásico */
+  --color-surface: #2f302a; /* cards / superficies elevadas sobre el editor */
+  --color-surface-raised: #35362e;
+  --color-subtle: #1e1f19; /* chrome recesado: titlebar, sidebar, tabs, statusbar */
+  --color-muted: #3e3d32; /* selección/elevado Monokai */
+  --color-border: #3a3b31;
+  --color-border-strong: #49483e;
+  --color-code-bg: #1d1e18; /* bloques de código, un punto bajo el paper */
+  --color-code-text: #f8f8f2; /* foreground Monokai sobre #272822 */
+
+  /* Sintaxis Monokai real (scoped) — override de los tokens que Prism
+     (.token.*) y lowlight (.hljs-*, más abajo) consumen. Fuera de .nx-ide
+     los editores del admin conservan el esquema frío genérico. */
+  --color-syntax-keyword: #f92672; /* rosa — keyword / storage / tag */
+  --color-syntax-string: #a6e22e; /* verde — string / char / regex */
+  --color-syntax-number: #ae81ff; /* púrpura — number / literal numérico */
+  --color-syntax-function: #e6db74; /* amarillo — function / method */
+  --color-syntax-type: #66d9ef; /* cyan — class-name / builtin / type */
+  --color-syntax-operator: #66d9ef; /* cyan — operator */
+  --color-syntax-comment: #75715e; /* gris cálido Monokai */
+  --color-syntax-variable: #f8f8f2; /* foreground plano */
+  --color-syntax-punctuation: #f8f8f2; /* foreground plano */
+}
+
 [data-theme="dark"] {
   /* Superficies — del blanco editorial al carbón profundo */
   --color-canvas: #0a0a0c;
@@ -1008,6 +1045,17 @@ select:focus-visible {
   outline: none;
 }
 
+/* Los radios y checkboxes NATIVOS "desnudos" (p. ej. el quiz del curso inmersivo,
+   con `accent-*`) quedaban sin indicador de foco tras el `outline: none` de arriba.
+   Se los devolvemos con el anillo de acento por token. WCAG 2.2 §2.4.7.
+   `:where()` mantiene la especificidad baja (0-1-1) para NO pisar el lenguaje de
+   foco propio del `Checkbox` base (`shared/components/ui/checkbox.tsx`, ring aurora
+   0-2-0), evitando el doble anillo y la mezcla de capas marca+acción. */
+input:where([type="radio"], [type="checkbox"]):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1068,6 +1116,12 @@ button:not(:disabled):not([aria-disabled="true"]):not([data-disabled]) {
 
 .font-mono {
   font-family: var(--font-mono);
+}
+
+/* Fira Code del IDE inmerso — con ligaduras contextuales (=>, !==, ->, etc.). */
+.font-code {
+  font-family: var(--font-code);
+  font-variant-ligatures: common-ligatures contextual;
 }
 
 .tabular {
@@ -1537,7 +1591,7 @@ button:not(:disabled):not([aria-disabled="true"]):not([data-disabled]) {
   text-decoration-thickness: 2px;
 }
 .tiptap code {
-  font-family: var(--font-mono);
+  font-family: var(--font-code);
   font-size: 0.875em;
   font-weight: 500;
   padding: 0.15em 0.4em;
@@ -1572,7 +1626,7 @@ button:not(:disabled):not([aria-disabled="true"]):not([data-disabled]) {
   white-space: nowrap;
 }
 .tiptap pre {
-  font-family: var(--font-mono);
+  font-family: var(--font-code);
   font-size: 14px;
   line-height: 1.6;
   background: var(--color-canvas);
@@ -1672,4 +1726,73 @@ button:not(:disabled):not([aria-disabled="true"]):not([data-disabled]) {
 .tiptap pre code .hljs-name,
 .tiptap pre code .hljs-function {
   color: var(--color-aurora-violet);
+}
+
+/* Sintaxis Monokai en la prosa del curso (lowlight) — SCOPED a `.nx-ide` dark.
+ * Converge las clases `.hljs-*` a los mismos `--color-syntax-*` (ya Monokai
+ * dentro de `.nx-ide`), para que los bloques de código de la lección igualen al
+ * editor Prism. Fuera del curso, la prosa conserva la paleta sobria de arriba. */
+[data-theme="dark"] .nx-ide .tiptap pre code .hljs-keyword,
+[data-theme="dark"] .nx-ide .tiptap pre code .hljs-selector-tag {
+  color: var(--color-syntax-keyword);
+}
+[data-theme="dark"] .nx-ide .tiptap pre code .hljs-built_in,
+[data-theme="dark"] .nx-ide .tiptap pre code .hljs-tag,
+[data-theme="dark"] .nx-ide .tiptap pre code .hljs-type,
+[data-theme="dark"] .nx-ide .tiptap pre code .hljs-class {
+  color: var(--color-syntax-type);
+}
+[data-theme="dark"] .nx-ide .tiptap pre code .hljs-string,
+[data-theme="dark"] .nx-ide .tiptap pre code .hljs-attr,
+[data-theme="dark"] .nx-ide .tiptap pre code .hljs-template-variable {
+  color: var(--color-syntax-string);
+}
+[data-theme="dark"] .nx-ide .tiptap pre code .hljs-number,
+[data-theme="dark"] .nx-ide .tiptap pre code .hljs-literal {
+  color: var(--color-syntax-number);
+}
+[data-theme="dark"] .nx-ide .tiptap pre code .hljs-comment,
+[data-theme="dark"] .nx-ide .tiptap pre code .hljs-quote {
+  color: var(--color-syntax-comment);
+}
+[data-theme="dark"] .nx-ide .tiptap pre code .hljs-title,
+[data-theme="dark"] .nx-ide .tiptap pre code .hljs-name,
+[data-theme="dark"] .nx-ide .tiptap pre code .hljs-function {
+  color: var(--color-syntax-function);
+}
+
+/* Subtítulos de la lección como comentarios del "archivo" — SCOPED a `.nx-ide`
+ * (el lector del curso, en claro y oscuro). Un subtítulo de prosa —sea un
+ * `h2/h3` o un párrafo cuyo único hijo es un `<strong>` (patrón real del
+ * contenido)— se vuelve un banner mono tipo comentario (`// ...`). La prosa
+ * normal sigue en sans; los `<strong>` inline (con texto después) NO se tocan.
+ * Fuera del curso, el editor del admin conserva sus headings editoriales. */
+.nx-ide .tiptap h2,
+.nx-ide .tiptap h3,
+.nx-ide .tiptap p:has(> strong:only-child) {
+  font-family: var(--font-code);
+  font-weight: 400;
+  font-style: italic;
+  font-size: 14px;
+  line-height: 1.55;
+  letter-spacing: 0;
+  /* Todo el comentario en el color-comentario (no solo el `//`): un comentario
+     real recede parejo, texto y glifo del mismo gris apagado. */
+  color: var(--color-syntax-comment);
+  margin: 1.75em 0 0.6em;
+}
+.nx-ide .tiptap h2:first-child,
+.nx-ide .tiptap h3:first-child,
+.nx-ide .tiptap p:has(> strong:only-child):first-child {
+  margin-top: 0;
+}
+.nx-ide .tiptap h2::before,
+.nx-ide .tiptap h3::before,
+.nx-ide .tiptap p:has(> strong:only-child)::before {
+  content: "// ";
+  color: var(--color-syntax-comment);
+}
+.nx-ide .tiptap p:has(> strong:only-child) > strong {
+  font-weight: inherit;
+  color: inherit;
 }

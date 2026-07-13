@@ -110,6 +110,18 @@ export type TipoPreguntaQuiz = z.infer<typeof tipoPreguntaQuizSchema>
 
 export const contenidoQuizSchema = z
   .object({
+    /**
+     * @deprecated El tope de intentos se retiró: el quiz es autocorregido y
+     * gratuito, siempre ilimitado, y cuenta el mejor intento. Ya no se expone
+     * en el editor admin ni lo fija ningún productor (editor, importador,
+     * seeds). El campo se mantiene aquí (nullable, default null) solo para
+     * tolerar contenidos previos que lo tengan guardado en su JSON — el schema
+     * es `.strict()` y removerlo rompería el parseo de esos bloques. Ningún
+     * código lo lee. Nota: al importar, `.parse()` normaliza el campo ausente
+     * a `null` vía este default, así que un quiz importado puede persistir
+     * `intentosMax: null` (inerte); los seeds retornan el contenido crudo y no
+     * lo persisten.
+     */
     intentosMax: z.number().int().min(1).max(100).nullable().default(null),
     solucionVisible: solucionVisibleSchema.default("al_aprobar"),
     ordenAleatorio: z.boolean().default(false),

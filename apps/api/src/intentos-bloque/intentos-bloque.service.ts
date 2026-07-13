@@ -37,6 +37,7 @@ import {
   toIntentoResponse,
 } from "./intentos-bloque.helpers"
 import { type CalculoQuizResultado, SELECT_INTENTO_FIELDS } from "./intentos-bloque.types"
+import { SqlEvaluadorService } from "./sql-evaluador.service"
 
 const IDEMPOTENCY_SCOPE = "intento-bloque"
 const HTTP_CREATED = 201
@@ -88,6 +89,7 @@ export class IntentosBloqueService {
     private readonly idempotency: IdempotencyService,
     private readonly notaSkill: NotaSkillService,
     private readonly codigoEvaluador: CodigoEvaluadorService,
+    private readonly sqlEvaluador: SqlEvaluadorService,
   ) {}
 
   // =========================================================================
@@ -129,20 +131,7 @@ export class IntentosBloqueService {
         message: "El bloque no es evaluable.",
       })
     }
-    if (bloque.tipo === TipoBloque.CODIGO_TESTS) {
-      // CODIGO_TESTS es contenido auxiliar del admin; nunca recibe intentos.
-      // El participante envia codigo al CODIGO_PREGUNTAS asociado.
-      throw new ConflictException({
-        code: apiErrorCodes.bloqueNoEvaluable,
-        message: "CODIGO_TESTS no acepta intentos directos.",
-      })
-    }
-    if (bloque.tipo !== TipoBloque.QUIZ && bloque.tipo !== TipoBloque.CODIGO_PREGUNTAS) {
-      throw new ConflictException({
-        code: apiErrorCodes.bloqueNoEvaluable,
-        message: "Solo se aceptan intentos en bloques QUIZ o CODIGO_PREGUNTAS.",
-      })
-    }
+    this.assertBloqueTipoAceptaIntento(bloque.tipo)
     if (bloque.skillQueMideId === null) {
       throw new ConflictException({
         code: apiErrorCodes.bloqueSinSkillMedida,
@@ -768,12 +757,58 @@ export class IntentosBloqueService {
         notaMinima: null,
       }
     }
+    if (
+      input.bloque.tipo === TipoBloque.SQL_EJERCICIO &&
+      input.respuestas.tipo === "SQL_EJERCICIO"
+    ) {
+      const resultado = await this.sqlEvaluador.evaluar({
+        bloque: input.bloque,
+        consultaEnviada: input.respuestas.consultaEnviada,
+        resultadosReportados: input.respuestas.resultadosTests,
+      })
+      return {
+        calculo: resultado.calculo,
+        respuestasPersistidas: {
+          tipo: "SQL_EJERCICIO",
+          consultaEnviada: input.respuestas.consultaEnviada,
+          resultadosTests: resultado.resultadosTests,
+          puntosObtenidos: resultado.calculo.puntosObtenidos,
+          puntosTotales: resultado.calculo.puntosTotales,
+        },
+        notaMinima: null,
+      }
+    }
     // Combinacion imposible tras los pre-checks; el `BadRequestException`
     // previo cubre el caso (tipoBloque vs tipoRespuesta divergentes).
     throw new BadRequestException({
       code: apiErrorCodes.invalidBody,
       message: `Tipo de bloque ${input.bloque.tipo} con respuestas ${input.respuestas.tipo} no soportado.`,
     })
+  }
+
+  /**
+   * Verifica que el tipo de bloque acepta intentos directos. Los bloques de
+   * tests (CODIGO_TESTS, SQL_TESTS) son contenido auxiliar del admin y nunca
+   * reciben intentos; solo QUIZ, CODIGO_PREGUNTAS y SQL_EJERCICIO son retos.
+   */
+  private assertBloqueTipoAceptaIntento(tipo: TipoBloque): void {
+    if (tipo === TipoBloque.CODIGO_TESTS || tipo === TipoBloque.SQL_TESTS) {
+      throw new ConflictException({
+        code: apiErrorCodes.bloqueNoEvaluable,
+        message: "Los bloques de tests no aceptan intentos directos.",
+      })
+    }
+    const aceptados: readonly TipoBloque[] = [
+      TipoBloque.QUIZ,
+      TipoBloque.CODIGO_PREGUNTAS,
+      TipoBloque.SQL_EJERCICIO,
+    ]
+    if (!aceptados.includes(tipo)) {
+      throw new ConflictException({
+        code: apiErrorCodes.bloqueNoEvaluable,
+        message: "Solo se aceptan intentos en bloques QUIZ, CODIGO_PREGUNTAS o SQL_EJERCICIO.",
+      })
+    }
   }
 
   private async resolverColaboradorIdParticipante(usuario: SesionUsuario): Promise<string | null> {

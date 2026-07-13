@@ -1,66 +1,27 @@
-import { cn } from "@/shared/lib/cn"
 import type { Editor } from "@tiptap/react"
 import {
   Bold,
   Code,
   Heading2,
   Heading3,
-  Image as ImageIcon,
   Italic,
   Link as LinkIcon,
   List,
   ListOrdered,
-  type LucideIcon,
   Minus,
   Quote,
   Square,
   Table as TableIcon,
   Underline as UnderlineIcon,
 } from "lucide-react"
+import { BotonImagen } from "./boton-imagen"
+import { Boton, Separador } from "./tiptap-toolbar-boton"
 
 type Variante = "completa" | "minima"
 
 interface TiptapToolbarProps {
   readonly editor: Editor | null
   readonly variante?: Variante
-}
-
-interface BotonProps {
-  readonly icono: LucideIcon
-  readonly etiqueta: string
-  readonly activo?: boolean
-  readonly deshabilitado?: boolean
-  readonly onClick: () => void
-}
-
-function Boton({ icono: Icono, etiqueta, activo, deshabilitado, onClick }: BotonProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={deshabilitado}
-      aria-label={etiqueta}
-      title={etiqueta}
-      className={cn(
-        "inline-flex h-8 w-8 items-center justify-center rounded-md",
-        "transition-[background-color,color,box-shadow] duration-fast ease-default",
-        "disabled:cursor-not-allowed disabled:opacity-40",
-        activo
-          ? "bg-subtle text-text-primary shadow-xs"
-          : "text-text-secondary hover:bg-subtle/60 hover:text-text-primary",
-      )}
-    >
-      <Icono
-        className={cn("h-4 w-4", activo ? "text-accent" : "")}
-        strokeWidth={1.5}
-        aria-hidden={true}
-      />
-    </button>
-  )
-}
-
-function Separador() {
-  return <span aria-hidden={true} className="mx-1 h-5 w-px bg-border" />
 }
 
 export function TiptapToolbar({ editor, variante = "completa" }: TiptapToolbarProps) {
@@ -82,13 +43,6 @@ export function TiptapToolbar({ editor, variante = "completa" }: TiptapToolbarPr
       return
     }
     chain().setLink({ href: url }).run()
-  }
-
-  function insertarImagen() {
-    const url = window.prompt("URL de la imagen", "https://")
-    if (url) {
-      chain().setImage({ src: url }).run()
-    }
   }
 
   function insertarTabla() {
@@ -180,7 +134,7 @@ export function TiptapToolbar({ editor, variante = "completa" }: TiptapToolbarPr
       <Boton icono={LinkIcon} etiqueta="Enlace" activo={es("link")} onClick={insertarLink} />
       {variante === "completa" ? (
         <>
-          <Boton icono={ImageIcon} etiqueta="Imagen" onClick={insertarImagen} />
+          <BotonImagen editor={editorOk} />
           <Boton icono={TableIcon} etiqueta="Tabla" activo={es("table")} onClick={insertarTabla} />
         </>
       ) : null}

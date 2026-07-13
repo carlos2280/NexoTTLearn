@@ -66,6 +66,9 @@ enum TipoBloque {
   CODIGO_PREGUNTAS
   CODIGO_TESTS
   DIAGRAMA
+  SQL_EJERCICIO
+  SQL_TESTS
+  GIT_EJERCICIO
 
   @@map("tipo_bloque_enum")
 }
@@ -213,6 +216,7 @@ enum TipoEventoNotif {
   MODULO_HUERFANO_SKILL
   PLANES_DESACTUALIZADOS
   CENTRO_REVISION
+  TRANSVERSAL_POR_REVISAR
 
   @@map("tipo_evento_notif_enum")
 }
@@ -322,6 +326,8 @@ enum AccionAuditoria {
   INTENTO_TRANSVERSAL_FINALIZADO
   INTENTO_TRANSVERSAL_ANULADO
   INTENTO_TRANSVERSAL_CAPA_CARGADA
+  INTENTO_TRANSVERSAL_EXTRA_OTORGADO
+  INTENTO_TRANSVERSAL_REPORTE_CURADO
   TRANSVERSAL_SKILLS_ACTUALIZADAS
   INTENTO_ENTREVISTA_IA_CREADO
   INTENTO_ENTREVISTA_IA_FINALIZADO
@@ -357,6 +363,7 @@ enum EstadoIntentoTransversal {
 
 enum ArchivoTipo {
   EVALUACION_INICIAL_EXCEL
+  IMAGEN_CONTENIDO
 
   @@map("archivo_tipo_enum")
 }
@@ -732,6 +739,7 @@ model Usuario {
   previewsEvalInicial   PreviewEvaluacionInicial[]    @relation("PreviewEvalInicial_CreadoPor")
   cargasEvalInicial     CargaEvaluacionInicial[]      @relation("CargaEvalInicial_AplicadoPor")
   idempotencyKeys       IdempotencyKey[]
+  intentosTransvValidados IntentoTransversal[]        @relation("IntentoTransversal_Validador")
 
   @@index([rol])
   @@map("usuarios")
@@ -880,6 +888,9 @@ model AsignacionCurso {
   resultadoEntrevistaCliente ResultadoEntrevistaCliente? @default(PENDIENTE) @map("resultado_entrevista_cliente")
   observacionesCliente       String?                     @map("observaciones_cliente")
   fechaEntrevistaCliente     DateTime?                   @map("fecha_entrevista_cliente") @db.Date
+  // Intentos extra del transversal concedidos a ESTE participante puntual, sin
+  // subir el tope global del transversal. Cupo efectivo = ProyectoTransversal.intentosMax + este.
+  intentosExtraTransversal   Int                         @default(0) @map("intentos_extra_transversal")
   createdAt                  DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                  DateTime                    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -1023,13 +1034,27 @@ model ProyectoTransversal {
   cursoId               String   @unique @map("curso_id") @db.Uuid
   descripcion           String
   umbralAprobacion      Decimal  @default(70.00) @map("umbral_aprobacion") @db.Decimal(5, 2)
+  // Tope global de intentos por participante en este transversal. El admin lo
+  // sube para todos aqui; el extra por alumno vive en AsignacionCurso. Cupo
+  // efectivo = intentosMax + AsignacionCurso.intentosExtraTransversal.
+  intentosMax           Int      @default(3) @map("intentos_max")
+  // Lista opcional de criterios explícitos "a evaluar" que el admin redacta,
+  // aparte del brief en prosa (`descripcion`). Es un `string[]` en JSONB: se
+  // pasa al prompt de la IA como criterios a verificar (además de las skills,
+  // que son los ejes fijos comparables) y se muestra al participante antes de
+  // entregar. `null`/ausente = el transversal no declara lista (comportamiento
+  // previo intacto).
+  criteriosEvaluacion   Json?    @map("criterios_evaluacion") @db.JsonB
   capas                 Json     @default("{}") @db.JsonB
-  pesoCapaTests         Decimal  @default(40.00) @map("peso_capa_tests") @db.Decimal(5, 2)
-  pesoCapaCualitativa   Decimal  @default(30.00) @map("peso_capa_cualitativa") @db.Decimal(5, 2)
-  pesoCapaComprension   Decimal  @default(30.00) @map("peso_capa_comprension") @db.Decimal(5, 2)
-  capaTestsActiva       Boolean  @default(true) @map("capa_tests_activa")
+  // Colapso a una sola capa (revisión con IA = cualitativa): tests y comprensión
+  // nacen apagadas y el peso va todo a cualitativa. Ver migración
+  // 20260711150000_colapso_transversal_una_capa.
+  pesoCapaTests         Decimal  @default(0.00) @map("peso_capa_tests") @db.Decimal(5, 2)
+  pesoCapaCualitativa   Decimal  @default(100.00) @map("peso_capa_cualitativa") @db.Decimal(5, 2)
+  pesoCapaComprension   Decimal  @default(0.00) @map("peso_capa_comprension") @db.Decimal(5, 2)
+  capaTestsActiva       Boolean  @default(false) @map("capa_tests_activa")
   capaCualitativaActiva Boolean  @default(true) @map("capa_cualitativa_activa")
-  capaComprensionActiva Boolean  @default(true) @map("capa_comprension_activa")
+  capaComprensionActiva Boolean  @default(false) @map("capa_comprension_activa")
   createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -1070,14 +1095,24 @@ model IntentoTransversal {
   notaCapaCualitativa   Decimal?                 @map("nota_capa_cualitativa") @db.Decimal(5, 2)
   notaCapaComprension   Decimal?                 @map("nota_capa_comprension") @db.Decimal(5, 2)
   notaGlobal            Decimal?                 @map("nota_global") @db.Decimal(5, 2)
+  // Curacion del informe (Fase 4b3): pre-informe crudo de la IA (inmutable),
+  // snapshot de lo que la IA leyo del repo, informe final curado por el admin
+  // (lo unico que ve el participante), y sello de quien/cuando lo valido.
+  reporteIa             Json?                    @map("reporte_ia") @db.JsonB
+  evidenciaRepo         Json?                    @map("evidencia_repo") @db.JsonB
+  reporteFinal          Json?                    @map("reporte_final") @db.JsonB
+  validadoPor           String?                  @map("validado_por") @db.Uuid
+  fechaValidacion       DateTime?                @map("fecha_validacion") @db.Timestamptz(6)
 
   transversal ProyectoTransversal @relation(fields: [transversalId], references: [id], onDelete: Restrict)
   colaborador Colaborador         @relation(fields: [colaboradorId], references: [id], onDelete: Restrict)
+  validador   Usuario?            @relation("IntentoTransversal_Validador", fields: [validadoPor], references: [id], onDelete: SetNull)
 
   @@index([transversalId, colaboradorId, fecha(sort: Desc)], map: "idx_intentos_trans_colab")
   @@index([estado], map: "idx_intentos_transversal_estado_no_anulado")
   @@index([transversalId], map: "idx_intentos_transversal_transversal_id")
   @@index([colaboradorId], map: "idx_intentos_transversal_colaborador_id")
+  @@index([validadoPor], map: "idx_intentos_transversal_validado_por")
   @@map("intentos_transversal")
 }
 

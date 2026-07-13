@@ -44,7 +44,6 @@ const CONTENIDO_VALIDO_POR_TIPO = new Map<TipoBloque, Record<string, unknown>>([
   [
     "QUIZ",
     {
-      intentosMax: null,
       solucionVisible: "al_aprobar",
       ordenAleatorio: false,
       notaMinima: 60,
@@ -79,6 +78,31 @@ const CONTENIDO_VALIDO_POR_TIPO = new Map<TipoBloque, Record<string, unknown>>([
     },
   ],
   ["DIAGRAMA", { elements: [], altText: "Diagrama vacio listo para editar" }],
+  [
+    "SQL_EJERCICIO",
+    {
+      enunciado: "Lista los usuarios activos",
+      esquemaSemilla: "CREATE TABLE u (id int);",
+      consultaInicial: "",
+      tiempoLimiteSeg: 30,
+    },
+  ],
+  [
+    "SQL_TESTS",
+    {
+      sqlEjercicioId: "00000000-0000-0000-0000-000000000001",
+      tests: [
+        {
+          id: "t1",
+          descripcion: "ok",
+          esquemaSemilla: "",
+          consultaReferencia: "SELECT id FROM u",
+          ordenImporta: false,
+          visible: true,
+        },
+      ],
+    },
+  ],
 ])
 
 describe("contenidoBloquePorTipo — cobertura completa de tipos", () => {
@@ -93,6 +117,9 @@ describe("contenidoBloquePorTipo — cobertura completa de tipos", () => {
       "CODIGO_PREGUNTAS",
       "CODIGO_TESTS",
       "DIAGRAMA",
+      "SQL_EJERCICIO",
+      "SQL_TESTS",
+      "GIT_EJERCICIO",
     ]
     for (const t of tipos) {
       expect(contenidoBloquePorTipo[t]).toBeDefined()
@@ -114,6 +141,8 @@ describe("validarContenidoBloque — happy path por tipo", () => {
     ["CODIGO_PREGUNTAS"],
     ["CODIGO_TESTS"],
     ["DIAGRAMA"],
+    ["SQL_EJERCICIO"],
+    ["SQL_TESTS"],
   ])("acepta el contenido valido minimo para %s", (tipo) => {
     const valido = CONTENIDO_VALIDO_POR_TIPO.get(tipo)
     expect(valido).toBeDefined()
@@ -232,7 +261,6 @@ describe("schemas individuales — invariantes especificas", () => {
 
   it("QUIZ: OPCION_UNICA exige exactamente una opcion con esCorrecta=true", () => {
     const dosCorrectas = {
-      intentosMax: null,
       solucionVisible: "al_aprobar",
       ordenAleatorio: false,
       notaMinima: 60,

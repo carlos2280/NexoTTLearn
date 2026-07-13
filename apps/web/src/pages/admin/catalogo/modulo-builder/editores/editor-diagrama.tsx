@@ -1,5 +1,6 @@
 import { type BloqueDetalleResponse, contenidoDiagramaSchema } from "@nexott-learn/shared-types"
-import { type ChangeEvent, Suspense, lazy, useRef, useState } from "react"
+import { type ChangeEvent, Suspense, lazy, useState } from "react"
+import { type BorradorDiagrama, useBorradorDiagrama } from "./diagrama/use-borrador-diagrama"
 import { EditorBloqueShell } from "./shared/editor-bloque-shell"
 import { useAutoGuardarBloque } from "./shared/use-auto-guardar-bloque"
 
@@ -9,15 +10,7 @@ interface EditorDiagramaProps {
   readonly bloque: BloqueDetalleResponse
 }
 
-interface Borrador {
-  readonly elements: readonly Record<string, unknown>[]
-  readonly files?: Record<string, unknown>
-  readonly appState?: Record<string, unknown>
-  readonly altText: string
-  readonly caption: string
-}
-
-function leerInicial(contenido: Record<string, unknown> | null): Borrador {
+function leerInicial(contenido: Record<string, unknown> | null): BorradorDiagrama {
   const result = contenidoDiagramaSchema.safeParse(contenido)
   if (result.success) {
     return {
@@ -35,44 +28,29 @@ export function EditorDiagrama({ bloque }: EditorDiagramaProps) {
   const inicial = leerInicial(bloque.contenido)
   const [altText, setAltText] = useState(inicial.altText)
   const [caption, setCaption] = useState(inicial.caption)
-  const borradorRef = useRef<Borrador>(inicial)
+  const borrador = useBorradorDiagrama(inicial)
 
   const auto = useAutoGuardarBloque({
     bloqueId: bloque.id,
-    construirContenido: () => {
-      const b = borradorRef.current
-      return {
-        elements: b.elements,
-        files: b.files,
-        appState: b.appState,
-        altText: b.altText,
-        caption: b.caption || undefined,
-      }
-    },
+    construirContenido: borrador.construirContenido,
   })
 
   function cambiarAltText(event: ChangeEvent<HTMLInputElement>) {
-    const valor = event.target.value
-    setAltText(valor)
-    borradorRef.current = { ...borradorRef.current, altText: valor }
+    setAltText(event.target.value)
+    borrador.fijarTexto("altText", event.target.value)
     auto.marcarSucio()
   }
 
   function cambiarCaption(event: ChangeEvent<HTMLInputElement>) {
-    const valor = event.target.value
-    setCaption(valor)
-    borradorRef.current = { ...borradorRef.current, caption: valor }
+    setCaption(event.target.value)
+    borrador.fijarTexto("caption", event.target.value)
     auto.marcarSucio()
   }
 
   function cuandoCambiaDiagrama(elements: readonly unknown[], appState: unknown, files: unknown) {
-    borradorRef.current = {
-      ...borradorRef.current,
-      elements: elements as readonly Record<string, unknown>[],
-      appState: appState as Record<string, unknown>,
-      files: files as Record<string, unknown>,
+    if (borrador.registrarEscena(elements, appState, files)) {
+      auto.marcarSucio()
     }
-    auto.marcarSucio()
   }
 
   return (

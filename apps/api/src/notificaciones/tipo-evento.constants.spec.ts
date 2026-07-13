@@ -29,7 +29,7 @@ describe("tipo-evento.constants", () => {
     expect(esTipoCritico(TipoEventoNotif.TRANSVERSAL_DISPONIBLE)).toBe(false)
   })
 
-  it("AUDIENCIA_POR_TIPO mapea cada uno de los 13 tipos D88", () => {
+  it("AUDIENCIA_POR_TIPO mapea cada uno de los 14 tipos D88", () => {
     const valoresEnum = Object.values(TipoEventoNotif)
     for (const tipo of valoresEnum) {
       const audiencia = AUDIENCIA_POR_TIPO.get(tipo)
@@ -60,6 +60,7 @@ describe("tipo-evento.constants", () => {
       TipoEventoNotif.MODULO_HUERFANO_SKILL,
       TipoEventoNotif.RECORDATORIO_DEADLINE,
       TipoEventoNotif.CENTRO_REVISION,
+      TipoEventoNotif.TRANSVERSAL_POR_REVISAR,
     ])
     const valoresEnum = Object.values(TipoEventoNotif)
     for (const tipo of valoresEnum) {

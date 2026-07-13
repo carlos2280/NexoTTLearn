@@ -1,4 +1,5 @@
-import type { NivelCualitativoArea } from "@nexott-learn/shared-types"
+import type { NivelCualitativoArea, UmbralesLogroValores } from "@nexott-learn/shared-types"
+import { UMBRALES_LOGRO_DEFAULT } from "./umbrales-logro.helpers"
 
 /**
  * Umbrales canonicos de la escala de 5 niveles cualitativos usada por la ficha
@@ -16,21 +17,26 @@ import type { NivelCualitativoArea } from "@nexott-learn/shared-types"
  * mas compacta de 3 niveles propia, por contrato con la UI; no se reutiliza
  * aqui.
  */
-const UMBRAL_EXCELENCIA = 85
-const UMBRAL_SOLIDO = 70
-const UMBRAL_DESARROLLO = 50
-
-export function nivelDesdeNota(nota: number | null): NivelCualitativoArea {
+/**
+ * `umbrales` permite que un reporte POR CURSO clasifique con la meta que el
+ * admin configuro (`Curso.umbralesLogro`) en vez del canon fijo. En contextos
+ * cross-curso (ficha global, historial) se omite y cae al canon del sistema
+ * — ahi no existe un umbral de curso unico.
+ */
+export function nivelDesdeNota(
+  nota: number | null,
+  umbrales: UmbralesLogroValores = UMBRALES_LOGRO_DEFAULT,
+): NivelCualitativoArea {
   if (nota === null) {
     return "sinTocar"
   }
-  if (nota >= UMBRAL_EXCELENCIA) {
+  if (nota >= umbrales.excelencia) {
     return "excelencia"
   }
-  if (nota >= UMBRAL_SOLIDO) {
+  if (nota >= umbrales.solido) {
     return "solido"
   }
-  if (nota >= UMBRAL_DESARROLLO) {
+  if (nota >= umbrales.enDesarrollo) {
     return "enDesarrollo"
   }
   return "inicial"
@@ -45,9 +51,10 @@ export function nivelDesdeNota(nota: number | null): NivelCualitativoArea {
 export function nivelCualitativoAreaDesdePromedio(
   promedio: number | null,
   skillsConNota: number,
+  umbrales: UmbralesLogroValores = UMBRALES_LOGRO_DEFAULT,
 ): NivelCualitativoArea {
   if (skillsConNota === 0 || promedio === null) {
     return "sinTocar"
   }
-  return nivelDesdeNota(promedio)
+  return nivelDesdeNota(promedio, umbrales)
 }

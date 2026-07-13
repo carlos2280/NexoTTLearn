@@ -10,7 +10,7 @@ import {
 } from "@nexott-learn/shared-types"
 import { Play, RotateCcw, Send } from "lucide-react"
 import { useState } from "react"
-import { Cabecera } from "./codigo-preguntas/cabecera"
+import { EncabezadoCelda } from "../ide/encabezado-celda"
 import { PanelEnunciado } from "./codigo-preguntas/panel-enunciado"
 import { ResultadoIntento } from "./codigo-preguntas/resultado-intento"
 import { TerminalTests } from "./codigo-preguntas/terminal-tests"
@@ -143,7 +143,7 @@ function RetoActivo({
 
   return (
     <article className="flex flex-col gap-5">
-      <Cabecera lenguaje={contenido.lenguaje} />
+      <EncabezadoCelda glifo=">" etiqueta="ejercicio de código" tonoGlifo="text-accent" />
       <PanelEnunciado contenido={contenido} />
       <div
         className="overflow-hidden rounded-2xl border border-border-strong bg-surface"
@@ -193,13 +193,13 @@ function RetoActivo({
           No pudimos ejecutar los tests en el navegador: {flujo.errorEjecucion.message}
         </aside>
       ) : null}
-      {flujo.ultimoIntento ? (
-        <ResultadoIntento
-          intento={flujo.ultimoIntento}
-          notaAprobado={NOTA_APROBADO_DEFAULT}
-          mejorPrevio={mejorPrevioAlEnviar}
-        />
-      ) : null}
+      {/* Siempre montado (aunque no haya intento) para que su región live anuncie
+          el veredicto de forma fiable al poblarse. */}
+      <ResultadoIntento
+        intento={flujo.ultimoIntento}
+        notaAprobado={NOTA_APROBADO_DEFAULT}
+        mejorPrevio={mejorPrevioAlEnviar}
+      />
     </article>
   )
 }

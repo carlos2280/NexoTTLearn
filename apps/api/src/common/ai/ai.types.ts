@@ -9,8 +9,8 @@
  * Convenciones:
  *  - Los providers nunca lanzan errores tipados de la nube directamente; los
  *    envuelven en `BadRequestException` / `ServiceUnavailableException`
- *    (D-S8-B7). En P8a solo MockProvider esta activo, ClaudeProvider lanza
- *    `NotImplementedException` con TODO(P8b).
+ *    (D-S8-B7). Mock y Claude estan ambos plenamente implementados; el switch
+ *    lo resuelve la factory del `AiModule` segun `AI_PROVIDER`.
  *  - Nunca se incluye PII ni transcripciones en los tipos: viajan en los
  *    payloads de entrada/salida y los services aguas arriba deciden si
  *    persistirlas.
@@ -54,16 +54,98 @@ export const aiRespuestaEstructuradaSchema = z
 
 export type AiRespuestaEstructurada = z.infer<typeof aiRespuestaEstructuradaSchema>
 
+/**
+ * Schema del informe cualitativo estructurado que Claude devuelve al evaluar un
+ * repo (Slice 8 Fase 2). Espeja el precedente `reporteEvaluadorIaSchema` de la
+ * entrevista IA, pero orientado al repo entregado.
+ *
+ * La clave de consistencia es `porDimension`: la IA puntua las **skills que el
+ * transversal declara** (ejes fijos), no una nota al aire — asi dos repos son
+ * comparables. El `veredicto` (apto / necesita_ajustes) NO viaja aqui: se deriva
+ * aguas arriba de `nota >= umbralAprobacion` para evitar que la IA se
+ * autocontradiga (nota alta con veredicto negativo).
+ */
+export const aiDimensionEvaluadaSchema = z
+  .object({
+    dimension: z.string().min(1).max(200),
+    nota: z.number().min(0).max(100).nullable(),
+    comentario: z.string().max(1000),
+  })
+  .strict()
+
+/**
+ * Verificación de un criterio de la "Lista a evaluar" del admin. `cumple` en 3
+ * estados honestos; `null` cuando la IA no pudo verificarlo. Se reconcilia
+ * contra la lista declarada (`reconciliarCriterios`).
+ *
+ * Gemelo de `cumplimientoCriterioSchema` en shared-types (capas.schema.ts): ese
+ * es el contrato write+read; este valida el output crudo de la IA. Deben tener
+ * la misma forma — si cambias el enum o los límites de uno, actualiza el otro.
+ */
+export const aiCumplimientoCriterioSchema = z
+  .object({
+    criterio: z.string().min(1).max(200),
+    cumple: z.enum(["cumple", "parcial", "no"]).nullable(),
+    evidencia: z.string().max(500),
+  })
+  .strict()
+
+export const aiInformeCualitativoSchema = z
+  .object({
+    nota: z.number().min(0).max(100).nullable(),
+    confianza: z.enum(["alta", "media", "baja"]),
+    resumen: z.string().min(1).max(2000),
+    queReviso: z.string().min(1).max(500),
+    queNoReviso: z.string().min(1).max(500),
+    porDimension: z.array(aiDimensionEvaluadaSchema).max(30),
+    fortalezas: z.array(z.string().min(1).max(300)).max(5),
+    aReforzar: z
+      .array(
+        z
+          .object({
+            que: z.string().min(1).max(300),
+            sugerencia: z.string().min(1).max(500),
+          })
+          .strict(),
+      )
+      .max(5),
+    // La IA puede omitirlo (transversal sin lista); se reconcilia aguas arriba.
+    cumplimientoCriterios: z.array(aiCumplimientoCriterioSchema).max(15).optional(),
+  })
+  .strict()
+
+export type AiInformeCualitativo = z.infer<typeof aiInformeCualitativoSchema>
+
 export interface EvaluarRepoCualitativoInput {
-  readonly repoUrl: string
+  /**
+   * Contenido del repositorio ya descargado y empaquetado (RepoFetchService).
+   * Se pasa el texto, no la URL: la IA razona sobre el código real, no sobre un
+   * enlace que no puede abrir.
+   */
+  readonly contenidoRepo: string
   readonly profundidad: ProfundidadEntrevistaIa
+  /**
+   * Ejes a puntuar = skills que el transversal declara (`TransversalSkill` →
+   * `Skill.etiquetaVisible`). El motor reconcilia la respuesta de la IA contra
+   * esta lista para que el informe cubra siempre exactamente estos ejes.
+   */
+  readonly dimensiones: readonly string[]
+  /**
+   * Lista "a evaluar" que redactó el admin (`ProyectoTransversal.criteriosEvaluacion`).
+   * A diferencia de las skills (ejes con nota), son criterios concretos que la
+   * IA verifica ítem por ítem (`cumplimientoCriterios`). Vacío = sin lista.
+   */
+  readonly criterios?: readonly string[]
 }
 
-export interface EvaluarRepoCualitativoOutput {
-  readonly nota: number
-  readonly comentario: string
-  readonly confianza: ConfianzaAi
-}
+/**
+ * Informe cualitativo estructurado que el motor entrega al job. Es exactamente
+ * el shape validado por `aiInformeCualitativoSchema` (fuente única): `nota` es
+ * `null` cuando la IA no pudo evaluar el repo (el job trata ese caso como no
+ * evaluado y deja el intento para el admin) y `porDimension` ya viene
+ * reconciliado contra las `dimensiones` de entrada.
+ */
+export type EvaluarRepoCualitativoOutput = AiInformeCualitativo
 
 export interface MantenerTurnoComprensionInput {
   readonly repoUrl: string

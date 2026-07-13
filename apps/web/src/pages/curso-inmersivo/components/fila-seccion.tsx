@@ -43,7 +43,7 @@ export function FilaSeccion({
   const esReto = (plan?.avance?.bloquesTotales ?? 0) > 0
   const IconoTipo = esReto ? Code2 : BookOpen
   const colorIcono = activa
-    ? "text-aurora-violet"
+    ? "text-accent"
     : completada
       ? "text-success-on-soft opacity-60"
       : "text-text-tertiary"
@@ -55,7 +55,7 @@ export function FilaSeccion({
         aria-current={activa ? "true" : undefined}
         aria-label={ariaLabelSeccion(titulo, esReto, completada, esOpcional)}
         className={cn(
-          "group flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-fast ease-default",
+          "group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-fast ease-default",
           activa
             ? "bg-accent-soft text-accent-on-soft"
             : "text-text-secondary hover:bg-surface hover:text-text-primary",
@@ -64,13 +64,13 @@ export function FilaSeccion({
         <IconoTipo
           aria-hidden={true}
           strokeWidth={1.75}
-          className={cn("mt-0.5 h-4 w-4 shrink-0", colorIcono)}
+          className={cn("h-4 w-4 shrink-0", colorIcono)}
         />
         <span className="min-w-0 flex-1">
           <span
             title={titulo}
             className={cn(
-              "line-clamp-2 block text-body-sm leading-tight",
+              "block truncate font-code text-body-sm leading-tight",
               activa ? "font-semibold text-text-primary" : "",
               completada && !activa ? "text-text-tertiary" : "",
             )}

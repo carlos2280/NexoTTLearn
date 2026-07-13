@@ -1,7 +1,9 @@
 import { Lock } from "lucide-react"
+import { CeldaBloque } from "../ide/celda-bloque"
+import type { MarcaCelda } from "../ide/celda-evaluable"
 
 interface BloqueEvaluablePreviewLockProps {
-  readonly titulo: string
+  readonly marca: MarcaCelda
 }
 
 /**
@@ -10,24 +12,21 @@ interface BloqueEvaluablePreviewLockProps {
  * asignacion). No revelamos el contenido evaluable — solo el cartelito de
  * "inscribete" que apela al deseo sin gritar.
  *
- * Identidad: caja `border bg-subtle` rounded-2xl, icono Lock pequeño, tipo
- * editorial sobrio. Sin aurora (esto NO es momento de marca).
+ * Se lee como una celda del archivo (`? quiz` / `> ejercicio`) con un candado
+ * en la cabecera que comunica "bloqueado". Sin aurora (esto NO es momento de
+ * marca).
  */
-export function BloqueEvaluablePreviewLock({ titulo }: BloqueEvaluablePreviewLockProps) {
+export function BloqueEvaluablePreviewLock({ marca }: BloqueEvaluablePreviewLockProps) {
   return (
-    <article className="flex items-center gap-4 rounded-2xl border border-border border-dashed bg-subtle px-5 py-5">
-      <span
-        aria-hidden={true}
-        className="grid h-10 w-10 place-items-center rounded-xl bg-surface text-text-tertiary"
-      >
-        <Lock className="h-4 w-4" strokeWidth={1.75} />
-      </span>
-      <div className="flex flex-col gap-0.5">
-        <span className="nx-eyebrow text-text-tertiary">{titulo}</span>
-        <p className="text-body-sm text-text-secondary">
-          Inscríbete como voluntario para responder y guardar tu progreso.
-        </p>
-      </div>
-    </article>
+    <CeldaBloque
+      glifo={marca.glifo}
+      etiqueta={marca.etiqueta}
+      derecha={<Lock aria-hidden={true} className="h-3.5 w-3.5 text-text-tertiary" />}
+      bodyClassName="py-4"
+    >
+      <p className="text-body-sm text-text-secondary">
+        Inscríbete como voluntario para responder y guardar tu progreso.
+      </p>
+    </CeldaBloque>
   )
 }

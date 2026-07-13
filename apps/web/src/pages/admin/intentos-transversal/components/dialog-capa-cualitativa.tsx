@@ -14,9 +14,9 @@ interface DialogCapaCualitativaProps {
 }
 
 /**
- * Carga la capa cualitativa (E8). Inputs: nota 0-100 + comentario textual
- * + nivel de confianza (BAJA/MEDIA/ALTA). El comentario se muestra al
- * colaborador en la devolucion.
+ * Carga manual de la Revisión con IA (escape cuando el job no la dejó). Inputs:
+ * nota 0-100 + comentario textual + nivel de confianza (BAJA/MEDIA/ALTA). El
+ * comentario se muestra al colaborador en la devolucion.
  */
 export function DialogCapaCualitativa({
   abierto,
@@ -34,7 +34,7 @@ export function DialogCapaCualitativa({
     <Dialog
       abierto={abierto}
       onCambiarAbierto={onCambiarAbierto}
-      titulo="Cargar capa cualitativa"
+      titulo="Cargar revisión con IA"
       descripcion="Análisis del código: claridad, decisiones técnicas, calidad del trabajo."
     >
       <form onSubmit={form.handleSubmit} className="flex flex-col gap-4">
@@ -99,7 +99,7 @@ export function DialogCapaCualitativa({
             Cancelar
           </Button>
           <Button variant="primary" size="sm" type="submit" isLoading={form.enviando}>
-            Cargar capa
+            Cargar revisión
           </Button>
         </DialogFooter>
       </form>

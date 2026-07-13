@@ -8,6 +8,8 @@ export {
   intentoTransversalBaseSchema,
   intentoTransversalParticipanteResponseSchema,
   intentoTransversalAdminResponseSchema,
+  cupoIntentosTransversalSchema,
+  darIntentoExtraTransversalResponseSchema,
   listarIntentosTransversalQuerySchema,
 } from "./transversal-response.types"
 export type {
@@ -20,6 +22,8 @@ export type {
   IntentoTransversalBase,
   IntentoTransversalParticipanteResponse,
   IntentoTransversalAdminResponse,
+  CupoIntentosTransversal,
+  DarIntentoExtraTransversalResponse,
   ListarIntentosTransversalQuery,
 } from "./transversal-response.types"
 export { crearIntentoTransversalSchema } from "./crear-intento-transversal.schema"
@@ -36,11 +40,28 @@ export {
   cargarCapaTestsSchema,
   cargarCapaCualitativaSchema,
   cargarCapaComprensionSchema,
+  dimensionInformeSchema,
+  puntoAReforzarSchema,
+  revisionIaSchema,
+  criterioEvaluacionSchema,
+  criteriosEvaluacionSchema,
+  cumplimientoCriterioSchema,
+  evidenciaRepoSchema,
+  evidenciaRepoResumenSchema,
+  curarReporteFinalSchema,
 } from "./capas.schema"
 export type {
   CargarCapaTestsInput,
   CargarCapaCualitativaInput,
   CargarCapaComprensionInput,
+  DimensionInforme,
+  PuntoAReforzar,
+  RevisionIa,
+  CriteriosEvaluacion,
+  CumplimientoCriterio,
+  EvidenciaRepo,
+  EvidenciaRepoResumen,
+  CurarReporteFinalInput,
 } from "./capas.schema"
 export {
   finalizarTransversalBodySchema,

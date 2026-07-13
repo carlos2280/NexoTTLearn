@@ -122,6 +122,8 @@ export {
   contenidoRecursoSchema,
   subtipoRecursoSchema,
   contenidoDiagramaSchema,
+  contenidoGitEjercicioSchema,
+  objetivoGitSchema,
   contenidoBloquePorTipo,
   schemaContenidoBloquePorTipo,
   validarContenidoBloque,
@@ -136,6 +138,8 @@ export type {
   ContenidoRecurso,
   SubtipoRecurso,
   ContenidoDiagrama,
+  ContenidoGitEjercicio,
+  ObjetivoGit,
 } from "./catalogo/bloques/contenido"
 export { listarClientesQuerySchema } from "./catalogo/clientes/listar-clientes.schema"
 export type { ListarClientesQuery } from "./catalogo/clientes/listar-clientes.schema"
@@ -221,7 +225,10 @@ export { reordenarModulosHabilitadosCursoSchema } from "./cursos/reordenar-modul
 export type { ReordenarModulosHabilitadosCursoInput } from "./cursos/reordenar-modulos-habilitados-curso.schema"
 export { actualizarPesosCursoSchema } from "./cursos/actualizar-pesos-curso.schema"
 export type { ActualizarPesosCursoInput } from "./cursos/actualizar-pesos-curso.schema"
-export { actualizarUmbralesLogroCursoSchema } from "./cursos/actualizar-umbrales-logro-curso.schema"
+export {
+  actualizarUmbralesLogroCursoSchema,
+  umbralesLogroValoresSchema,
+} from "./cursos/actualizar-umbrales-logro-curso.schema"
 export type {
   ActualizarUmbralesLogroCursoInput,
   UmbralesLogroValores,
@@ -384,10 +391,14 @@ export {
   contenidoCodigoTestsSchema,
   testStdinStdoutSchema,
   lenguajeEjecutableSchema,
+  contenidoSqlEjercicioSchema,
+  contenidoSqlTestsSchema,
+  testSqlSchema,
   crearIntentoBloqueSchema,
   respuestaPreguntaSchema,
   respuestasIntentoSchema,
   resultadoTestReportadoSchema,
+  resultadoTestSqlReportadoSchema,
   intentoBloqueResponseSchema,
   listarIntentosBloqueQuerySchema,
   listarIntentosCursoBloqueQuerySchema,
@@ -407,10 +418,14 @@ export type {
   ContenidoCodigoTests,
   TestStdinStdout,
   LenguajeEjecutable,
+  ContenidoSqlEjercicio,
+  ContenidoSqlTests,
+  TestSql,
   CrearIntentoBloqueInput,
   RespuestaPregunta,
   RespuestasIntento,
   ResultadoTestReportado,
+  ResultadoTestSqlReportado,
   IntentoBloqueResponse,
   ListarIntentosBloqueQuery,
   ListarIntentosCursoBloqueQuery,
@@ -427,6 +442,8 @@ export {
   intentoTransversalBaseSchema,
   intentoTransversalParticipanteResponseSchema,
   intentoTransversalAdminResponseSchema,
+  cupoIntentosTransversalSchema,
+  darIntentoExtraTransversalResponseSchema,
   listarIntentosTransversalQuerySchema,
   crearIntentoTransversalSchema,
   editarSkillsTransversalSchema,
@@ -434,6 +451,15 @@ export {
   cargarCapaTestsSchema,
   cargarCapaCualitativaSchema,
   cargarCapaComprensionSchema,
+  dimensionInformeSchema,
+  puntoAReforzarSchema,
+  revisionIaSchema,
+  criterioEvaluacionSchema,
+  criteriosEvaluacionSchema,
+  cumplimientoCriterioSchema,
+  evidenciaRepoSchema,
+  evidenciaRepoResumenSchema,
+  curarReporteFinalSchema,
   finalizarTransversalBodySchema,
   anularTransversalBodySchema,
   finalizarTransversalResponseSchema,
@@ -451,6 +477,8 @@ export type {
   IntentoTransversalBase,
   IntentoTransversalParticipanteResponse,
   IntentoTransversalAdminResponse,
+  CupoIntentosTransversal,
+  DarIntentoExtraTransversalResponse,
   ListarIntentosTransversalQuery,
   CrearIntentoTransversalInput,
   EditarSkillsTransversalInput,
@@ -458,6 +486,14 @@ export type {
   CargarCapaTestsInput,
   CargarCapaCualitativaInput,
   CargarCapaComprensionInput,
+  DimensionInforme,
+  PuntoAReforzar,
+  RevisionIa,
+  CriteriosEvaluacion,
+  CumplimientoCriterio,
+  EvidenciaRepo,
+  EvidenciaRepoResumen,
+  CurarReporteFinalInput,
   FinalizarTransversalBodyInput,
   AnularTransversalBodyInput,
   FinalizarTransversalResponse,
@@ -773,3 +809,9 @@ export type {
   ExportarLogsAjustesPlanQuery,
   ExportarLogsConsultasQuery,
 } from "./admin"
+export {
+  subirImagenResponseSchema,
+  MIME_IMAGEN_PERMITIDOS,
+  MAX_IMAGEN_BYTES,
+} from "./imagenes/subir-imagen.schema"
+export type { SubirImagenResponse } from "./imagenes/subir-imagen.schema"

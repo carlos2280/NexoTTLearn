@@ -71,7 +71,6 @@ const SKILL_ID = "33333333-3333-3333-3333-333333333333"
 // `validarContenidoBloque` (Fase 2), asi que tiene que ser real.
 const CONTENIDO_PARRAFO_VACIO = { html: "", textoPlano: "", tiempoLecturaMin: 0 }
 const CONTENIDO_QUIZ_MIN = {
-  intentosMax: null,
   solucionVisible: "al_aprobar" as const,
   ordenAleatorio: false,
   notaMinima: 60,
@@ -156,6 +155,36 @@ describe("BloquesService.listar", () => {
     await service.listar({ page: 1, pageSize: 20 })
     const llamada = prisma.bloque.findMany.mock.calls[0]?.[0] as { select: Record<string, true> }
     expect(llamada.select).not.toHaveProperty("contenido")
+  })
+
+  it("filtra por `contenido.codigoPreguntasId` (JSONB) cuando se pasa el filtro", async () => {
+    prisma.bloque.findMany.mockResolvedValue([])
+    prisma.bloque.count.mockResolvedValue(0)
+    await service.listar({ page: 1, pageSize: 20, codigoPreguntasId: BLO_ID })
+    const filtroEsperado = {
+      contenido: { path: ["codigoPreguntasId"], equals: BLO_ID },
+    }
+    const llamada = prisma.bloque.findMany.mock.calls[0]?.[0] as { where: Record<string, unknown> }
+    expect(llamada.where).toMatchObject(filtroEsperado)
+    // El count debe aplicar el mismo filtro (misma variable `where`).
+    expect(prisma.bloque.count).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining(filtroEsperado) }),
+    )
+  })
+
+  it("filtra por `contenido.sqlEjercicioId` (JSONB) cuando se pasa el filtro", async () => {
+    prisma.bloque.findMany.mockResolvedValue([])
+    prisma.bloque.count.mockResolvedValue(0)
+    await service.listar({ page: 1, pageSize: 20, sqlEjercicioId: BLO_ID })
+    const filtroEsperado = {
+      contenido: { path: ["sqlEjercicioId"], equals: BLO_ID },
+    }
+    const llamada = prisma.bloque.findMany.mock.calls[0]?.[0] as { where: Record<string, unknown> }
+    expect(llamada.where).toMatchObject(filtroEsperado)
+    // El count debe aplicar el mismo filtro (misma variable `where`).
+    expect(prisma.bloque.count).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining(filtroEsperado) }),
+    )
   })
 })
 

@@ -1,5 +1,6 @@
-import type { EtiquetaCualitativa } from "@nexott-learn/shared-types"
+import type { EtiquetaCualitativa, UmbralesLogroValores } from "@nexott-learn/shared-types"
 import { z } from "zod"
+import { UMBRALES_LOGRO_DEFAULT } from "./umbrales-logro.helpers"
 
 /**
  * Helpers compartidos para interpretar el `CursoFotografiaCierre.snapshot`
@@ -18,12 +19,17 @@ import { z } from "zod"
  * participante veia su curso CERRADO sin nota ni etiqueta (BUG-QA-2).
  */
 
-/** Umbrales cap. 9.1 para la etiqueta cualitativa final del curso. */
-export const UMBRAL_EXCELENCIA_FINAL = 85
-export const UMBRAL_SOLIDO_FINAL = 70
-export const UMBRAL_DESARROLLO_FINAL = 50
-
 // --- Schema Zod del snapshot -------------------------------------------------
+
+/**
+ * Copia congelada de `Curso.umbralesLogro` dentro del snapshot de cierre
+ * (`snapshot.curso.configuracion.umbralesLogro`, ver `construirSnapshotCierre`).
+ * Pasarela LAXA a proposito: como el resto del lector de snapshot, no valida el
+ * shape aqui (evita que un 4o campo futuro en el JSONB congelado rompa el parse
+ * del snapshot entero). La validacion real la hace `parseUmbralesLogro` al leer,
+ * que cae al canon si el valor es null/ausente/invalido.
+ */
+const umbralesLogroSnapshotSchema = z.unknown().nullable().optional()
 
 /**
  * Una nota por skill dentro del snapshot del cierre. `caracter` es opcional
@@ -61,6 +67,7 @@ export const cierreSnapshotSchema = z
         configuracion: z
           .object({
             skillsExigidas: z.array(skillExigidaSnapshotSchema),
+            umbralesLogro: umbralesLogroSnapshotSchema,
           })
           .passthrough(),
       })
@@ -70,12 +77,19 @@ export const cierreSnapshotSchema = z
   .passthrough()
 
 /**
- * Variante minima usada por `/me/avance`: solo necesita la lista de
- * asignaciones. Asi /avance no falla si el snapshot tiene huecos en la
- * configuracion del curso (que la ceremonia de cierre si exige).
+ * Variante minima usada por `/me/avance`: la lista de asignaciones y, si
+ * existe, los umbrales de logro del curso (para etiquetar con la meta que el
+ * admin configuro). `curso` es opcional para no fallar si el snapshot tiene
+ * huecos en la configuracion (que la ceremonia de cierre si exige).
  */
 export const cierreSnapshotMinimoSchema = z
   .object({
+    curso: z
+      .object({
+        configuracion: z.object({ umbralesLogro: umbralesLogroSnapshotSchema }).passthrough(),
+      })
+      .passthrough()
+      .optional(),
     asignaciones: z.array(asignacionSnapshotSchema),
   })
   .passthrough()
@@ -125,14 +139,24 @@ export function resolverNotaGlobalFinal(fila: AsignacionSnapshotCierre): number 
   return Math.round(suma / valores.length)
 }
 
-export function etiquetaCualitativaPorNota(nota: number): EtiquetaCualitativa {
-  if (nota >= UMBRAL_EXCELENCIA_FINAL) {
+/**
+ * Mapea la nota final del curso a su etiqueta cualitativa usando los umbrales
+ * del curso. `umbrales` viene del snapshot (`snapshot.curso.configuracion.
+ * umbralesLogro`, congelado al cerrar); si el curso no configuro override, cae
+ * al canon del sistema. Asi la etiqueta que ve el alumno respeta la meta que
+ * el admin definio para ESE curso, no un valor fijo.
+ */
+export function etiquetaCualitativaPorNota(
+  nota: number,
+  umbrales: UmbralesLogroValores = UMBRALES_LOGRO_DEFAULT,
+): EtiquetaCualitativa {
+  if (nota >= umbrales.excelencia) {
     return "excelencia"
   }
-  if (nota >= UMBRAL_SOLIDO_FINAL) {
+  if (nota >= umbrales.solido) {
     return "solido"
   }
-  if (nota >= UMBRAL_DESARROLLO_FINAL) {
+  if (nota >= umbrales.enDesarrollo) {
     return "enDesarrollo"
   }
   return "noCumple"

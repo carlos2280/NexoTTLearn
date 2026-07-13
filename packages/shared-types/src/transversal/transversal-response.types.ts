@@ -1,4 +1,9 @@
 import { z } from "zod"
+import {
+  criteriosEvaluacionSchema,
+  evidenciaRepoResumenSchema,
+  revisionIaSchema,
+} from "./capas.schema"
 
 /**
  * Shapes de respuesta del dominio transversal (Slice 8 P8a — D-S8-C3, D86).
@@ -33,6 +38,7 @@ export const transversalResponseSchema = z
     cursoId: z.string().uuid(),
     descripcion: z.string(),
     umbralAprobacion: z.number().min(0).max(100),
+    intentosMax: z.number().int().min(1).max(50),
     pesosCapas: z
       .object({
         tests: z.number().min(0).max(100),
@@ -56,6 +62,12 @@ export const transversalResponseSchema = z
         })
         .strict(),
     ),
+    /**
+     * Lista "a evaluar" que redactó el admin (D-S8, lista a evaluar). Siempre
+     * presente como array; vacío cuando el transversal no declara criterios. El
+     * participante la ve antes de entregar; el admin la edita en la config.
+     */
+    criteriosEvaluacion: criteriosEvaluacionSchema,
   })
   .strict()
 
@@ -129,11 +141,41 @@ export const intentoTransversalParticipanteResponseSchema = intentoTransversalBa
   .extend({
     notaGlobal: z.number().min(0).max(100).nullable(),
     aprobado: z.boolean().nullable(),
+    /**
+     * Informe FINAL curado por el admin (Fase 4b ③). Es lo ÚNICO del informe que
+     * ve el participante, y sólo cuando `estado === 'FINALIZADO'` (antes es
+     * `null`). Nunca ve el `reporteIa` crudo ni la evidencia del repo.
+     */
+    informe: revisionIaSchema.nullable(),
   })
   .strict()
 
 export type IntentoTransversalParticipanteResponse = z.infer<
   typeof intentoTransversalParticipanteResponseSchema
+>
+
+/**
+ * Cupo de intentos del transversal para una asignación (Fase 4b ②). El cupo
+ * efectivo = `ProyectoTransversal.intentosMax` + `AsignacionCurso.intentosExtraTransversal`.
+ * `intentosUsados` cuenta los intentos NO anulados. Solo admin: alimenta el
+ * bloque "Intentos" de la pantalla del intento y es también el shape que
+ * devuelve el endpoint "dar +1 intento".
+ */
+export const cupoIntentosTransversalSchema = z
+  .object({
+    asignacionId: z.string().uuid(),
+    intentosUsados: z.number().int().min(0),
+    intentosCupo: z.number().int().min(0),
+  })
+  .strict()
+
+export type CupoIntentosTransversal = z.infer<typeof cupoIntentosTransversalSchema>
+
+/** Respuesta del endpoint `POST /asignaciones/:id/intentos-transversal/intento-extra`. */
+export const darIntentoExtraTransversalResponseSchema = cupoIntentosTransversalSchema
+
+export type DarIntentoExtraTransversalResponse = z.infer<
+  typeof darIntentoExtraTransversalResponseSchema
 >
 
 export const intentoTransversalAdminResponseSchema = intentoTransversalBaseSchema
@@ -145,6 +187,26 @@ export const intentoTransversalAdminResponseSchema = intentoTransversalBaseSchem
     aprobado: z.boolean().nullable(),
     anulado: z.boolean(),
     motivoAnulacion: z.string().nullable(),
+    /**
+     * Informe estructurado de la "Revisión con IA" (capa cualitativa), extraído
+     * de `evaluacionesCapas`. `null` mientras la capa aún no se cargó. Solo
+     * admin: alimenta la pantalla de revisión del intento (Fase 4).
+     */
+    revisionIa: revisionIaSchema.nullable(),
+    /**
+     * Curación del informe (Fase 4b ③), sólo admin:
+     *  - `reporteIa`: pre-informe CRUDO de la IA (inmutable). `null` si aún no evaluó.
+     *  - `reporteFinal`: informe curado por el admin (lo que verá el participante).
+     *    Arranca como copia del crudo; editable hasta finalizar.
+     *  - `evidenciaRepo`: metadata de "qué evaluó la IA" (commit, archivos,
+     *    truncado, bytes) SIN el contenido pesado (se pide a su endpoint aparte).
+     *  - `validadoPor` / `fechaValidacion`: sello de quién cerró la curación y cuándo.
+     */
+    reporteIa: revisionIaSchema.nullable(),
+    reporteFinal: revisionIaSchema.nullable(),
+    evidenciaRepo: evidenciaRepoResumenSchema.nullable(),
+    validadoPor: z.string().uuid().nullable(),
+    fechaValidacion: z.string().nullable(),
     /**
      * Contexto del intento para que la pantalla admin no tenga que hacer
      * lookups adicionales por colaborador/curso/transversal. Solo admin
@@ -170,6 +232,13 @@ export const intentoTransversalAdminResponseSchema = intentoTransversalBaseSchem
         umbralAprobacion: z.number().min(0).max(100),
       })
       .strict(),
+    /**
+     * Cupo de intentos de la asignación (usados / cupo efectivo). `null` cuando
+     * no se pudo resolver la asignación (p. ej. el colaborador ya no está
+     * asignado al curso). Lo puebla el endpoint de detalle; los mappers de
+     * listado/capas lo dejan en `null` (no lo necesitan).
+     */
+    cupoIntentos: cupoIntentosTransversalSchema.nullable(),
   })
   .strict()
 

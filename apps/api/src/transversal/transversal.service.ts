@@ -12,16 +12,21 @@ import {
   CargarCapaTestsInput,
   CrearIntentoTransversalInput,
   CrearIntentoTransversalResponse,
+  CupoIntentosTransversal,
+  DarIntentoExtraTransversalResponse,
   DisponibilidadTransversalResponse,
   EditarSkillsTransversalInput,
   EditarSkillsTransversalResponse,
+  EvidenciaRepo,
   FinalizarTransversalResponse,
   IntentoTransversalAdminResponse,
   IntentoTransversalListadoItem,
   IntentoTransversalParticipanteResponse,
   ListarIntentosTransversalCursoQuery,
   ListarIntentosTransversalQuery,
+  RevisionIa,
   TransversalResponse,
+  evidenciaRepoSchema,
 } from "@nexott-learn/shared-types"
 import {
   DesbloqueoCurso,
@@ -46,8 +51,16 @@ import { PUNTAJES_FALTANTES_ERROR, calcularNotaTransversal } from "./calcular-no
 import { motivoTransversal } from "./disponibilidad-motivo.helpers"
 import { JobEvaluacionTransversalService } from "./job-evaluacion-transversal.service"
 import { type CargarCapaResult, TransversalCapasService } from "./transversal-capas.service"
-import { toIntentoAdmin, toIntentoParticipante } from "./transversal.helpers"
-import { SELECT_INTENTO_TRANSVERSAL_FIELDS, SELECT_TRANSVERSAL_FIELDS } from "./transversal.types"
+import {
+  parsearCriteriosEvaluacion,
+  toIntentoAdmin,
+  toIntentoParticipante,
+} from "./transversal.helpers"
+import {
+  SELECT_INTENTO_TRANSVERSAL_FIELDS,
+  SELECT_INTENTO_TRANSVERSAL_LISTA_FIELDS,
+  SELECT_TRANSVERSAL_FIELDS,
+} from "./transversal.types"
 
 export type { CargarCapaResult } from "./transversal-capas.service"
 
@@ -64,6 +77,7 @@ interface AsignacionResuelta {
   readonly rol: RolAsignacion
   readonly estadoAsignado: EstadoAsignado | null
   readonly estadoVoluntario: EstadoVoluntario | null
+  readonly intentosExtraTransversal: number
   readonly curso: {
     readonly id: string
     readonly estado: EstadoCurso
@@ -144,6 +158,7 @@ export class TransversalService {
       cursoId: transversal.cursoId,
       descripcion: transversal.descripcion,
       umbralAprobacion: Number(transversal.umbralAprobacion.toString()),
+      intentosMax: transversal.intentosMax,
       pesosCapas: {
         tests: Number(transversal.pesoCapaTests.toString()),
         cualitativa: Number(transversal.pesoCapaCualitativa.toString()),
@@ -159,6 +174,7 @@ export class TransversalService {
         nombre: s.skill.etiquetaVisible,
         areaId: s.skill.areaId,
       })),
+      criteriosEvaluacion: parsearCriteriosEvaluacion(transversal.criteriosEvaluacion),
     }
   }
 
@@ -360,6 +376,12 @@ export class TransversalService {
       })
     }
 
+    await this.verificarCupoIntentos({
+      transversalId,
+      colaboradorId: asignacion.colaboradorId,
+      intentosExtra: asignacion.intentosExtraTransversal,
+    })
+
     const repoUrl = input.body.repoOArtefacto.url
     const comentario = input.body.comentarioColaborador ?? null
 
@@ -453,7 +475,16 @@ export class TransversalService {
       }
       return toIntentoParticipante(intento)
     }
-    return toIntentoAdmin(intento)
+    // `toIntentoAdmin` ya validó que el transversal tiene curso (lanza si no).
+    const admin = toIntentoAdmin(intento)
+    // Fase 4b ②: enriquecer con el cupo de intentos de la asignación. Solo en el
+    // detalle (una lectura puntual); los mappers de listado/capas lo dejan null.
+    const cupoIntentos = await this.calcularCupoIntentos({
+      transversalId: intento.transversalId,
+      colaboradorId: intento.colaboradorId,
+      cursoId: admin.curso.id,
+    })
+    return { ...admin, cupoIntentos }
   }
 
   // =========================================================================
@@ -482,15 +513,19 @@ export class TransversalService {
     const [data, total] = await this.prisma.$transaction([
       this.prisma.intentoTransversal.findMany({
         where,
-        select: SELECT_INTENTO_TRANSVERSAL_FIELDS,
+        // Listado: SELECT aligerado (sin el `contenido` pesado de evidenciaRepo).
+        select: SELECT_INTENTO_TRANSVERSAL_LISTA_FIELDS,
         orderBy: { fecha: "desc" },
         skip,
         take,
       }),
       this.prisma.intentoTransversal.count({ where }),
     ])
-    const mapper = input.usuario.rol === RolUsuario.ADMIN ? toIntentoAdmin : toIntentoParticipante
-    return buildPaginatedResponse(data.map(mapper), total, page, pageSize)
+    const esAdmin = input.usuario.rol === RolUsuario.ADMIN
+    const items = data.map((intento) =>
+      esAdmin ? toIntentoAdmin(intento) : toIntentoParticipante(intento),
+    )
+    return buildPaginatedResponse(items, total, page, pageSize)
   }
 
   // =========================================================================
@@ -729,6 +764,12 @@ export class TransversalService {
           notaGlobal: new Prisma.Decimal(notaGlobal),
           aprobado,
           fechaFinalizacion: new Date(),
+          // Sello de curación (Fase 4b ③): finalizar = publicar el informe final
+          // al participante. Registramos quién lo validó (Usuario.id de la sesión
+          // admin, FK válida) y cuándo. `reporteFinal` ya trae la copia del crudo,
+          // editable hasta este punto; a partir de aquí el participante lo ve.
+          validadoPor: input.usuario.usuarioId,
+          fechaValidacion: new Date(),
         },
       })
       if (r.count === 0) {
@@ -853,6 +894,84 @@ export class TransversalService {
   }
 
   // =========================================================================
+  // E13. PATCH /api/v1/intentos-transversal/:intentoId/reporte-final
+  //
+  // Curación del informe (Fase 4b ③): el admin edita el `reporteFinal` (lo que
+  // verá el participante) antes de finalizar. Solo editable mientras el intento
+  // sigue en EVALUADO; una vez FINALIZADO/ANULADO el informe queda cerrado. El
+  // `reporteIa` crudo NUNCA se toca (evidencia inmutable de lo que dijo la IA).
+  // =========================================================================
+  async curarReporteFinal(input: {
+    readonly intentoId: string
+    readonly reporteFinal: RevisionIa
+  }): Promise<IntentoTransversalAdminResponse> {
+    const intento = await this.prisma.intentoTransversal.findUnique({
+      where: { id: input.intentoId },
+      select: { id: true, estado: true, anulado: true },
+    })
+    if (!intento) {
+      throw new NotFoundException({
+        code: apiErrorCodes.intentoTransversalNoEncontrado,
+        message: `Intento transversal ${input.intentoId} no encontrado.`,
+      })
+    }
+    if (intento.anulado || intento.estado !== "EVALUADO") {
+      throw new ConflictException({
+        code: apiErrorCodes.conflictIntentoTransversalNoEditable,
+        message: "El informe solo se puede curar mientras el intento está en EVALUADO.",
+        details: { estado: intento.estado, anulado: intento.anulado },
+      })
+    }
+    try {
+      const actualizado = await this.prisma.intentoTransversal.update({
+        where: { id: input.intentoId },
+        data: { reporteFinal: input.reporteFinal as unknown as Prisma.InputJsonValue },
+        select: SELECT_INTENTO_TRANSVERSAL_FIELDS,
+      })
+      return toIntentoAdmin(actualizado)
+    } catch (error) {
+      // TOCTOU: si el intento se borró entre el SELECT y el UPDATE (P2025).
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+        throw new NotFoundException({
+          code: apiErrorCodes.intentoTransversalNoEncontrado,
+          message: `Intento transversal ${input.intentoId} no encontrado.`,
+        })
+      }
+      throw error
+    }
+  }
+
+  // =========================================================================
+  // E14. GET /api/v1/intentos-transversal/:intentoId/evidencia-repo
+  //
+  // "Qué evaluó la IA" (Fase 4b ③): devuelve el snapshot COMPLETO del repo que
+  // leyó la IA (incluye el `contenido` pesado). Endpoint aparte del detalle para
+  // no inflar cada carga. 404 si el intento no existe o aún no tiene evidencia.
+  // =========================================================================
+  async obtenerEvidenciaRepo(input: { readonly intentoId: string }): Promise<EvidenciaRepo> {
+    const intento = await this.prisma.intentoTransversal.findUnique({
+      where: { id: input.intentoId },
+      select: { id: true, evidenciaRepo: true },
+    })
+    if (!intento) {
+      throw new NotFoundException({
+        code: apiErrorCodes.intentoTransversalNoEncontrado,
+        message: `Intento transversal ${input.intentoId} no encontrado.`,
+      })
+    }
+    const parsed = evidenciaRepoSchema.safeParse(intento.evidenciaRepo)
+    if (!parsed.success) {
+      // El intento existe pero aún no tiene evidencia (o el JSON no valida): code
+      // propio para no confundir con "el intento no existe".
+      throw new NotFoundException({
+        code: apiErrorCodes.evidenciaRepoNoDisponible,
+        message: "Este intento aún no tiene evidencia del repositorio.",
+      })
+    }
+    return parsed.data
+  }
+
+  // =========================================================================
   // Helpers internos
   // =========================================================================
 
@@ -895,6 +1014,7 @@ export class TransversalService {
         rol: true,
         estadoAsignado: true,
         estadoVoluntario: true,
+        intentosExtraTransversal: true,
         curso: {
           select: {
             id: true,
@@ -954,6 +1074,171 @@ export class TransversalService {
    * se invoca FUERA del `runOnce` y solo cuando era el primer intento del
    * colaborador en este transversal (R-S11.5-1).
    */
+  /**
+   * Enforcement del tope de intentos (Fase 1a). Cupo efectivo = tope global del
+   * transversal (`ProyectoTransversal.intentosMax`) + extra por participante
+   * (`AsignacionCurso.intentosExtraTransversal`). Los intentos anulados NO
+   * consumen cupo.
+   *
+   * Nota de carrera: el conteo no toma lock, asi que dos envios concurrentes
+   * podrian pasar el chequeo y exceder el cupo en 1. Es aceptable para un
+   * control de costo MVP; la Idempotency-Key ya dedup requests identicos.
+   */
+  private async verificarCupoIntentos(input: {
+    readonly transversalId: string
+    readonly colaboradorId: string
+    readonly intentosExtra: number
+  }): Promise<void> {
+    const transversal = await this.prisma.proyectoTransversal.findUnique({
+      where: { id: input.transversalId },
+      select: { intentosMax: true },
+    })
+    if (!transversal) {
+      // Rama muerta (el transversalId salio de la asignacion, la FK garantiza
+      // que existe), pero una compuerta de costo debe fallar cerrada, no abierta.
+      throw new NotFoundException({
+        code: apiErrorCodes.transversalNoEncontrado,
+        message: "El proyecto transversal no existe.",
+      })
+    }
+
+    const usados = await this.prisma.intentoTransversal.count({
+      where: {
+        transversalId: input.transversalId,
+        colaboradorId: input.colaboradorId,
+        anulado: false,
+      },
+    })
+
+    const cupo = transversal.intentosMax + input.intentosExtra
+    if (usados >= cupo) {
+      throw new ConflictException({
+        code: apiErrorCodes.transversalIntentosAgotados,
+        message: `Alcanzaste el maximo de intentos (${cupo}). Tu administrador revisara tu caso.`,
+        details: {
+          intentosMax: transversal.intentosMax,
+          intentosExtra: input.intentosExtra,
+          usados,
+        },
+      })
+    }
+  }
+
+  /**
+   * Cupo de intentos de una asignación para la pantalla admin (Fase 4b ②).
+   * Cupo efectivo = `ProyectoTransversal.intentosMax` + extra por participante;
+   * `intentosUsados` cuenta los NO anulados (idéntico a `verificarCupoIntentos`).
+   * Devuelve `null` si no hay asignación o transversal (el intento apunta a un
+   * curso sin transversal, o el colaborador ya no está asignado).
+   */
+  private async calcularCupoIntentos(input: {
+    readonly transversalId: string
+    readonly colaboradorId: string
+    readonly cursoId: string
+  }): Promise<CupoIntentosTransversal | null> {
+    const [asignacion, transversal, usados] = await Promise.all([
+      this.prisma.asignacionCurso.findUnique({
+        where: {
+          // biome-ignore lint/style/useNamingConvention: clave compuesta generada por Prisma para @@unique([colaboradorId, cursoId]).
+          colaboradorId_cursoId: {
+            colaboradorId: input.colaboradorId,
+            cursoId: input.cursoId,
+          },
+        },
+        select: { id: true, intentosExtraTransversal: true },
+      }),
+      this.prisma.proyectoTransversal.findUnique({
+        where: { id: input.transversalId },
+        select: { intentosMax: true },
+      }),
+      this.prisma.intentoTransversal.count({
+        where: {
+          transversalId: input.transversalId,
+          colaboradorId: input.colaboradorId,
+          anulado: false,
+        },
+      }),
+    ])
+    if (!(asignacion && transversal)) {
+      return null
+    }
+    return {
+      asignacionId: asignacion.id,
+      intentosUsados: usados,
+      intentosCupo: transversal.intentosMax + asignacion.intentosExtraTransversal,
+    }
+  }
+
+  /**
+   * E12. Otorga +1 intento extra a una asignación (Fase 4b ②). Solo ADMIN
+   * (guard en el controller). Suma 1 a `AsignacionCurso.intentosExtraTransversal`
+   * de forma atómica (`increment`) y devuelve el cupo resultante. La identidad
+   * del admin no interviene en la lógica (no hay ownership del recurso: el ADMIN
+   * gestiona cualquier asignación).
+   *
+   * Idempotencia (MVP): sin Idempotency-Key. El doble-submit se evita en el
+   * front (el botón de confirmar del `ConfirmDialog` queda deshabilitado
+   * mientras la mutation corre) y las mutations no reintentan (retry 0). Un
+   * doble-grant por reintento de red es improbable y de bajo impacto (acción
+   * admin, reversible en efecto), coherente con la tolerancia de carrera ya
+   * aceptada en `verificarCupoIntentos`. Si se vuelve un problema, exigir
+   * Idempotency-Key como en E4.
+   */
+  async darIntentoExtra(input: {
+    readonly asignacionId: string
+  }): Promise<DarIntentoExtraTransversalResponse> {
+    const asignacion = await this.prisma.asignacionCurso.findUnique({
+      where: { id: input.asignacionId },
+      select: {
+        colaboradorId: true,
+        curso: { select: { id: true, transversalId: true } },
+      },
+    })
+    if (asignacion === null) {
+      throw new NotFoundException({
+        code: apiErrorCodes.asignacionNoEncontrada,
+        message: `Asignación ${input.asignacionId} no encontrada.`,
+      })
+    }
+    if (asignacion.curso.transversalId === null) {
+      throw new NotFoundException({
+        code: apiErrorCodes.transversalNoEncontrado,
+        message: "El curso no tiene proyecto transversal configurado.",
+      })
+    }
+
+    try {
+      await this.prisma.asignacionCurso.update({
+        where: { id: input.asignacionId },
+        data: { intentosExtraTransversal: { increment: 1 } },
+        select: { id: true },
+      })
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+        // Carrera: la asignación se borró entre el read y el update.
+        throw new NotFoundException({
+          code: apiErrorCodes.asignacionNoEncontrada,
+          message: `Asignación ${input.asignacionId} no encontrada.`,
+        })
+      }
+      throw error
+    }
+
+    const cupo = await this.calcularCupoIntentos({
+      transversalId: asignacion.curso.transversalId,
+      colaboradorId: asignacion.colaboradorId,
+      cursoId: asignacion.curso.id,
+    })
+    if (cupo === null) {
+      // Rama muerta: acabamos de leer la asignación y validar el transversal.
+      throw new NotFoundException({
+        code: apiErrorCodes.asignacionNoEncontrada,
+        message: `Asignación ${input.asignacionId} no encontrada.`,
+      })
+    }
+    return cupo
+  }
+
   private async notificarTransversalDisponible(
     intentoTransversalId: string,
     asignacionId: string,
