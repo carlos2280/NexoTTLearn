@@ -6,6 +6,7 @@ import { AYUDAS_CONFIG_CURSO } from "./ayudas"
 import { CampoNumero } from "./campo-numero"
 import { ConfigCard } from "./config-card"
 import { EditorBriefTransversal } from "./editor-brief-transversal"
+import { EditorCriteriosTransversal } from "./editor-criterios-transversal"
 import { EvaluacionIaInfo } from "./evaluacion-ia-info"
 import { SelectorSkillsTransversal } from "./selector-skills-transversal"
 import { useFormTransversal } from "./use-form-transversal"
@@ -74,6 +75,10 @@ export function ConfigTransversal({ curso, bloqueado }: ConfigTransversalProps) 
               html={form.descripcion}
               onCambio={(html) => setForm((f) => ({ ...f, descripcion: html }))}
             />
+            <EditorCriteriosTransversal
+              criterios={form.criteriosEvaluacion}
+              onCambio={(criterios) => setForm((f) => ({ ...f, criteriosEvaluacion: criterios }))}
+            />
             <SelectorSkillsTransversal
               skillsIds={form.skillsQueMideIds}
               onCambio={(ids) => setForm((f) => ({ ...f, skillsQueMideIds: ids }))}
@@ -82,6 +87,14 @@ export function ConfigTransversal({ curso, bloqueado }: ConfigTransversalProps) 
               label="Umbral aprobación (%)"
               valor={form.umbralAprobacion}
               onCambio={(v) => setForm((f) => ({ ...f, umbralAprobacion: v }))}
+            />
+            <CampoNumero
+              label="Máximo de intentos por participante"
+              valor={form.intentosMax}
+              onCambio={(v) => setForm((f) => ({ ...f, intentosMax: v }))}
+              min={1}
+              max={50}
+              step={1}
             />
             <EvaluacionIaInfo />
             {valido ? null : (

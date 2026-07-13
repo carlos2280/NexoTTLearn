@@ -6,6 +6,7 @@ import {
   Prisma,
   RolAsignacion,
   RolUsuario,
+  TipoEventoNotif,
 } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
@@ -34,8 +35,14 @@ const PARTICIPANTE: SesionUsuario = { usuarioId: USUARIO_ID, rol: RolUsuario.PAR
 
 interface PrismaMock {
   curso: { findUnique: ReturnType<typeof vi.fn> }
-  proyectoTransversal: { findUniqueOrThrow: ReturnType<typeof vi.fn> }
-  asignacionCurso: { findUnique: ReturnType<typeof vi.fn> }
+  proyectoTransversal: {
+    findUniqueOrThrow: ReturnType<typeof vi.fn>
+    findUnique: ReturnType<typeof vi.fn>
+  }
+  asignacionCurso: {
+    findUnique: ReturnType<typeof vi.fn>
+    update: ReturnType<typeof vi.fn>
+  }
   intentoTransversal: {
     findUnique: ReturnType<typeof vi.fn>
     findMany: ReturnType<typeof vi.fn>
@@ -50,7 +57,7 @@ interface PrismaMock {
   }
   skill: { findMany: ReturnType<typeof vi.fn> }
   cursoSkillExigida: { findMany: ReturnType<typeof vi.fn> }
-  usuario: { findUnique: ReturnType<typeof vi.fn> }
+  usuario: { findUnique: ReturnType<typeof vi.fn>; findMany: ReturnType<typeof vi.fn> }
   planEstudio: { findUnique: ReturnType<typeof vi.fn> }
   itemPlan: { findMany: ReturnType<typeof vi.fn> }
   intentoBloque: { findMany: ReturnType<typeof vi.fn> }
@@ -60,8 +67,11 @@ interface PrismaMock {
 function buildPrismaMock(): PrismaMock {
   const mock: PrismaMock = {
     curso: { findUnique: vi.fn() },
-    proyectoTransversal: { findUniqueOrThrow: vi.fn() },
-    asignacionCurso: { findUnique: vi.fn() },
+    proyectoTransversal: {
+      findUniqueOrThrow: vi.fn(),
+      findUnique: vi.fn().mockResolvedValue({ intentosMax: 3 }),
+    },
+    asignacionCurso: { findUnique: vi.fn(), update: vi.fn() },
     intentoTransversal: {
       findUnique: vi.fn(),
       findMany: vi.fn().mockResolvedValue([]),
@@ -76,7 +86,11 @@ function buildPrismaMock(): PrismaMock {
     },
     skill: { findMany: vi.fn().mockResolvedValue([]) },
     cursoSkillExigida: { findMany: vi.fn().mockResolvedValue([]) },
-    usuario: { findUnique: vi.fn() },
+    usuario: {
+      findUnique: vi.fn(),
+      // Audiencia del broadcast TRANSVERSAL_POR_REVISAR (admins activos).
+      findMany: vi.fn().mockResolvedValue([{ id: "admin-notif" }]),
+    },
     planEstudio: { findUnique: vi.fn() },
     itemPlan: { findMany: vi.fn().mockResolvedValue([]) },
     intentoBloque: { findMany: vi.fn().mockResolvedValue([]) },
@@ -103,6 +117,7 @@ function configurarAsignacion(
     transversalId: string | null
     entrevistaIaId: string | null
     colaboradorId: string
+    intentosExtra: number
   }> = {},
 ): void {
   prisma.asignacionCurso.findUnique.mockResolvedValue({
@@ -112,6 +127,7 @@ function configurarAsignacion(
     rol: RolAsignacion.ASIGNADO,
     estadoAsignado: overrides.estadoAsignado ?? EstadoAsignado.EN_PROGRESO,
     estadoVoluntario: null,
+    intentosExtraTransversal: overrides.intentosExtra ?? 0,
     curso: {
       id: CURSO_ID,
       estado: overrides.cursoEstado ?? EstadoCurso.ACTIVO,
@@ -160,7 +176,11 @@ beforeEach(() => {
       canalesEnviados: ["IN_APP"],
     }),
   }
-  capas = new TransversalCapasService(idempotency as unknown as IdempotencyService)
+  capas = new TransversalCapasService(
+    idempotency as unknown as IdempotencyService,
+    prisma as unknown as PrismaService,
+    notificaciones as unknown as NotificacionesService,
+  )
   service = new TransversalService(
     prisma as unknown as PrismaService,
     idempotency as unknown as IdempotencyService,
@@ -194,6 +214,7 @@ describe("E1. GET /cursos/:cursoId/transversal", () => {
       cursoId: CURSO_ID,
       descripcion: "proyecto",
       umbralAprobacion: new Prisma.Decimal(70),
+      intentosMax: 3,
       pesoCapaTests: new Prisma.Decimal(40),
       pesoCapaCualitativa: new Prisma.Decimal(30),
       pesoCapaComprension: new Prisma.Decimal(30),
@@ -323,6 +344,69 @@ describe("E4. POST intento", () => {
     expect(r.evaluacionAsincronaEsperada).toMatch(/2026-05-11T10:00:02/)
     expect(job.dispatch).toHaveBeenCalledWith(INTENTO_ID)
   })
+
+  it("409 cuando alcanzo el tope de intentos (intentosMax) y no crea intento", async () => {
+    configurarAsignacion(prisma, { desbloqueo: DesbloqueoCurso.SIEMPRE })
+    prisma.proyectoTransversal.findUnique.mockResolvedValue({ intentosMax: 3 })
+    prisma.intentoTransversal.count.mockResolvedValue(3) // ya uso 3 no anulados
+
+    await expect(
+      service.crearIntento({
+        asignacionId: ASIGNACION_ID,
+        body: { repoOArtefacto: { tipo: "URL_GIT", url: REPO_URL } },
+        idempotencyKey: IDEMPOTENCY_KEY,
+        usuario: ADMIN,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException)
+    expect(prisma.intentoTransversal.create).not.toHaveBeenCalled()
+    expect(job.dispatch).not.toHaveBeenCalled()
+  })
+
+  it("permite el intento cuando el extra por participante sube el cupo", async () => {
+    configurarAsignacion(prisma, { desbloqueo: DesbloqueoCurso.SIEMPRE, intentosExtra: 1 })
+    prisma.proyectoTransversal.findUnique.mockResolvedValue({ intentosMax: 3 })
+    prisma.intentoTransversal.count.mockResolvedValue(3) // 3 usados, pero cupo = 3 + 1
+    prisma.intentoTransversal.create.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      fecha: new Date("2026-05-11T10:00:00Z"),
+    })
+
+    const r = await service.crearIntento({
+      asignacionId: ASIGNACION_ID,
+      body: { repoOArtefacto: { tipo: "URL_GIT", url: REPO_URL } },
+      idempotencyKey: IDEMPOTENCY_KEY,
+      usuario: ADMIN,
+    })
+
+    expect(r.intentoId).toBe(INTENTO_ID)
+    expect(job.dispatch).toHaveBeenCalledWith(INTENTO_ID)
+  })
+
+  it("el conteo de cupo excluye anulados (where completo) y crea el intento", async () => {
+    configurarAsignacion(prisma, { desbloqueo: DesbloqueoCurso.SIEMPRE })
+    prisma.intentoTransversal.create.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      fecha: new Date("2026-05-11T10:00:00Z"),
+    })
+
+    await service.crearIntento({
+      asignacionId: ASIGNACION_ID,
+      body: { repoOArtefacto: { tipo: "URL_GIT", url: REPO_URL } },
+      idempotencyKey: IDEMPOTENCY_KEY,
+      usuario: ADMIN,
+    })
+
+    expect(prisma.intentoTransversal.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          transversalId: TRANSVERSAL_ID,
+          colaboradorId: COLABORADOR_ID,
+          anulado: false,
+        }),
+      }),
+    )
+    expect(prisma.intentoTransversal.create).toHaveBeenCalledOnce()
+  })
 })
 
 describe("E5. GET intento por id", () => {
@@ -447,6 +531,101 @@ describe("E5. GET intento por id", () => {
     expect("notaCapaTests" in r).toBe(false)
     expect(r.notaGlobal).toBe(74)
     expect(r.aprobado).toBe(true)
+  })
+})
+
+describe("E5 cupo. obtenerIntento ADMIN enriquece cupoIntentos (Fase 4b ②)", () => {
+  function mockIntentoAdmin(): void {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      transversalId: TRANSVERSAL_ID,
+      colaboradorId: COLABORADOR_ID,
+      fecha: new Date("2026-05-11T10:00:00Z"),
+      estado: "EVALUADO",
+      anulado: false,
+      motivoAnulacion: null,
+      repoUrl: REPO_URL,
+      repoOArtefacto: { tipo: "URL_GIT", url: REPO_URL },
+      comentarioColaborador: null,
+      notaCapaTests: null,
+      notaCapaCualitativa: null,
+      notaCapaComprension: null,
+      notaGlobal: null,
+      aprobado: null,
+      colaborador: { id: COLABORADOR_ID, nombre: "Colab", email: "c@nttdata.test" },
+      transversal: {
+        id: TRANSVERSAL_ID,
+        descripcion: "Mini-proyecto",
+        umbralAprobacion: new Prisma.Decimal(70),
+        curso: { id: CURSO_ID, titulo: "Curso mock" },
+      },
+    })
+  }
+
+  it("cupoIntentos = usados / (intentosMax + extra)", async () => {
+    mockIntentoAdmin()
+    prisma.asignacionCurso.findUnique.mockResolvedValueOnce({
+      id: ASIGNACION_ID,
+      intentosExtraTransversal: 2,
+    })
+    prisma.proyectoTransversal.findUnique.mockResolvedValueOnce({ intentosMax: 3 })
+    prisma.intentoTransversal.count.mockResolvedValueOnce(4)
+    const r = (await service.obtenerIntento(INTENTO_ID, ADMIN)) as Record<string, unknown>
+    expect(r.cupoIntentos).toEqual({
+      asignacionId: ASIGNACION_ID,
+      intentosUsados: 4,
+      intentosCupo: 5,
+    })
+  })
+
+  it("cupoIntentos = null si la asignación ya no existe", async () => {
+    mockIntentoAdmin()
+    prisma.asignacionCurso.findUnique.mockResolvedValueOnce(null)
+    const r = (await service.obtenerIntento(INTENTO_ID, ADMIN)) as Record<string, unknown>
+    expect(r.cupoIntentos).toBeNull()
+  })
+})
+
+describe("E12. POST /asignaciones/:id/intentos-transversal/intento-extra (dar +1)", () => {
+  it("incrementa intentosExtraTransversal y devuelve el cupo nuevo", async () => {
+    prisma.asignacionCurso.findUnique
+      .mockResolvedValueOnce({
+        colaboradorId: COLABORADOR_ID,
+        curso: { id: CURSO_ID, transversalId: TRANSVERSAL_ID },
+      })
+      .mockResolvedValueOnce({ id: ASIGNACION_ID, intentosExtraTransversal: 1 })
+    prisma.asignacionCurso.update.mockResolvedValueOnce({ id: ASIGNACION_ID })
+    prisma.proyectoTransversal.findUnique.mockResolvedValueOnce({ intentosMax: 3 })
+    prisma.intentoTransversal.count.mockResolvedValueOnce(3)
+
+    const r = await service.darIntentoExtra({ asignacionId: ASIGNACION_ID })
+
+    expect(prisma.asignacionCurso.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: ASIGNACION_ID },
+        data: { intentosExtraTransversal: { increment: 1 } },
+      }),
+    )
+    expect(r).toEqual({ asignacionId: ASIGNACION_ID, intentosUsados: 3, intentosCupo: 4 })
+  })
+
+  it("404 si la asignación no existe (no incrementa)", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValueOnce(null)
+    await expect(service.darIntentoExtra({ asignacionId: ASIGNACION_ID })).rejects.toBeInstanceOf(
+      NotFoundException,
+    )
+    expect(prisma.asignacionCurso.update).not.toHaveBeenCalled()
+  })
+
+  it("404 si el curso no tiene transversal (no incrementa)", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValueOnce({
+      colaboradorId: COLABORADOR_ID,
+      curso: { id: CURSO_ID, transversalId: null },
+    })
+    await expect(service.darIntentoExtra({ asignacionId: ASIGNACION_ID })).rejects.toBeInstanceOf(
+      NotFoundException,
+    )
+    expect(prisma.asignacionCurso.update).not.toHaveBeenCalled()
   })
 })
 
@@ -613,6 +792,192 @@ describe("E7. POST /intentos-transversal/:id/capas/tests (P8b)", () => {
     // FIX-P8-cierre §5.116: cargarCapa* devuelve `{ response, replay, capa }`.
     expect(r.capa).toBe("tests")
     expect(r.replay).toBe(false)
+    // Fase 4b: al transicionar a EVALUADO se avisa a los admins activos.
+    expect(notificaciones.crear).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usuarioId: "admin-notif",
+        tipo: TipoEventoNotif.TRANSVERSAL_POR_REVISAR,
+        payload: expect.objectContaining({ intentoTransversalId: INTENTO_ID }),
+      }),
+    )
+  })
+
+  it("NO avisa a los admins si la carga no transiciona a EVALUADO", async () => {
+    // Solo se carga tests; cualitativa/comprensión activas siguen sin nota → el
+    // intento sigue EN_EVALUACION y no debe dispararse el aviso.
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce(intentoBase({}))
+    prisma.intentoTransversal.update.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      transversalId: TRANSVERSAL_ID,
+      colaboradorId: COLABORADOR_ID,
+      fecha: new Date(),
+      estado: "EN_EVALUACION",
+      anulado: false,
+      motivoAnulacion: null,
+      repoUrl: REPO_URL,
+      repoOArtefacto: { tipo: "URL_GIT", url: REPO_URL },
+      comentarioColaborador: null,
+      notaCapaTests: new Prisma.Decimal(75),
+      notaCapaCualitativa: null,
+      notaCapaComprension: null,
+      notaGlobal: null,
+      aprobado: false,
+      colaborador: { id: COLABORADOR_ID, nombre: "Colab", email: "c@nttdata.test" },
+      transversal: {
+        id: TRANSVERSAL_ID,
+        descripcion: "Mini-proyecto",
+        umbralAprobacion: new Prisma.Decimal(70),
+        curso: { id: CURSO_ID, titulo: "Curso mock" },
+      },
+    })
+    const r = await service.cargarCapaTests({
+      intentoId: INTENTO_ID,
+      body: { nota: 75, detalle: { fuente: "ci" } },
+      idempotencyKey: IDEMPOTENCY_KEY,
+      usuario: ADMIN,
+    })
+    expect(r.response.estado).toBe("EN_EVALUACION")
+    expect(notificaciones.crear).not.toHaveBeenCalledWith(
+      expect.objectContaining({ tipo: TipoEventoNotif.TRANSVERSAL_POR_REVISAR }),
+    )
+  })
+
+  it("NO avisa a los admins en un replay idempotente aunque el estado sea EVALUADO", async () => {
+    // El replay devuelve el body cacheado (estado EVALUADO) sin re-ejecutar: el
+    // aviso ya se emitió en la ejecución original, no debe repetirse.
+    idempotency.runOnce.mockImplementationOnce(
+      async (input: {
+        ejecutor: (tx: unknown) => Promise<{ status: number; body: unknown }>
+      }) => {
+        const res = await input.ejecutor(prisma)
+        return { status: res.status, body: res.body, replay: true }
+      },
+    )
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce(
+      intentoBase({ notaCualitativa: 80, notaComprension: 70 }),
+    )
+    prisma.intentoTransversal.update.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      transversalId: TRANSVERSAL_ID,
+      colaboradorId: COLABORADOR_ID,
+      fecha: new Date(),
+      estado: "EVALUADO",
+      anulado: false,
+      motivoAnulacion: null,
+      repoUrl: REPO_URL,
+      repoOArtefacto: { tipo: "URL_GIT", url: REPO_URL },
+      comentarioColaborador: null,
+      notaCapaTests: new Prisma.Decimal(75),
+      notaCapaCualitativa: new Prisma.Decimal(80),
+      notaCapaComprension: new Prisma.Decimal(70),
+      notaGlobal: null,
+      aprobado: false,
+      colaborador: { id: COLABORADOR_ID, nombre: "Colab", email: "c@nttdata.test" },
+      transversal: {
+        id: TRANSVERSAL_ID,
+        descripcion: "Mini-proyecto",
+        umbralAprobacion: new Prisma.Decimal(70),
+        curso: { id: CURSO_ID, titulo: "Curso mock" },
+      },
+    })
+    const r = await service.cargarCapaTests({
+      intentoId: INTENTO_ID,
+      body: { nota: 75, detalle: { fuente: "ci" } },
+      idempotencyKey: IDEMPOTENCY_KEY,
+      usuario: ADMIN,
+    })
+    expect(r.replay).toBe(true)
+    expect(notificaciones.crear).not.toHaveBeenCalledWith(
+      expect.objectContaining({ tipo: TipoEventoNotif.TRANSVERSAL_POR_REVISAR }),
+    )
+  })
+})
+
+describe("E8. capa cualitativa congela reporteIa + siembra reporteFinal + evidencia (Fase 4b ③)", () => {
+  it("al cargar la cualitativa persiste reporteIa=reporteFinal=detalle y la evidencia", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      estado: "EN_EVALUACION",
+      anulado: false,
+      notaCapaTests: null,
+      notaCapaCualitativa: null,
+      notaCapaComprension: null,
+      evaluacionesCapas: {},
+      // Solo la cualitativa activa → cargarla completa las capas → EVALUADO.
+      transversal: {
+        capaTestsActiva: false,
+        capaCualitativaActiva: true,
+        capaComprensionActiva: false,
+      },
+    })
+    prisma.intentoTransversal.update.mockResolvedValueOnce(
+      intentoSeleccionadoFixture({ estado: "EVALUADO" }),
+    )
+
+    const detalle = { comentario: "informe IA", confianza: "MEDIA" as const }
+    const evidencia = {
+      commit: "abc1234",
+      archivos: ["index.js"],
+      truncado: false,
+      bytesTotales: 42,
+      contenido: "===== index.js =====\n1",
+    }
+    // El snapshot del repo solo fluye por el CapasService (lo pasa el job),
+    // no por el escape manual del admin en TransversalService.
+    await capas.cargarCapaCualitativa({
+      intentoId: INTENTO_ID,
+      body: { nota: 80, detalle },
+      idempotencyKey: IDEMPOTENCY_KEY,
+      usuario: ADMIN,
+      evidenciaRepo: evidencia,
+    })
+
+    const data = prisma.intentoTransversal.update.mock.calls[0]?.[0]?.data as Record<
+      string,
+      unknown
+    >
+    expect(data.reporteIa).toEqual(detalle)
+    expect(data.reporteFinal).toEqual(detalle)
+    expect(data.evidenciaRepo).toEqual(evidencia)
+    expect(data.estado).toBe("EVALUADO")
+  })
+
+  it("al RECARGAR la capa NO pisa el reporteFinal ya curado por el admin", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      estado: "EVALUADO",
+      anulado: false,
+      notaCapaTests: null,
+      notaCapaCualitativa: new Prisma.Decimal(80),
+      notaCapaComprension: null,
+      evaluacionesCapas: { cualitativa: { comentario: "crudo", confianza: "MEDIA" } },
+      // El admin ya curó el informe final.
+      reporteFinal: { comentario: "curado por el admin", confianza: "ALTA" },
+      transversal: {
+        capaTestsActiva: false,
+        capaCualitativaActiva: true,
+        capaComprensionActiva: false,
+      },
+    })
+    prisma.intentoTransversal.update.mockResolvedValueOnce(
+      intentoSeleccionadoFixture({ estado: "EVALUADO" }),
+    )
+
+    await capas.cargarCapaCualitativa({
+      intentoId: INTENTO_ID,
+      body: { nota: 90, detalle: { comentario: "nuevo crudo", confianza: "ALTA" as const } },
+      idempotencyKey: IDEMPOTENCY_KEY,
+      usuario: ADMIN,
+    })
+
+    const data = prisma.intentoTransversal.update.mock.calls[0]?.[0]?.data as Record<
+      string,
+      unknown
+    >
+    // El crudo se refresca...
+    expect(data.reporteIa).toEqual({ comentario: "nuevo crudo", confianza: "ALTA" })
+    // ...pero el final curado NO se toca (no está en el update).
+    expect("reporteFinal" in data).toBe(false)
   })
 })
 
@@ -684,6 +1049,16 @@ describe("E10. POST /intentos-transversal/:id/finalizar (P8b)", () => {
     expect(r.aprobado).toBe(true)
     expect(r.skillsActualizadas).toEqual([SKILL_ID, "skill-2"])
     expect(notaSkill.recalcularConFuentes).toHaveBeenCalledTimes(2)
+    // Fase 4b ③: finalizar sella la validación (quién publicó + cuándo).
+    expect(prisma.intentoTransversal.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          estado: "FINALIZADO",
+          validadoPor: ADMIN.usuarioId,
+          fechaValidacion: expect.any(Date),
+        }),
+      }),
+    )
   })
 
   it("409 conflictIntentoTransversalYaAnulado si anulado=true", async () => {
@@ -713,6 +1088,135 @@ describe("E10. POST /intentos-transversal/:id/finalizar (P8b)", () => {
     ).rejects.toMatchObject({
       response: { code: apiErrorCodes.conflictIntentoTransversalYaAnulado },
     })
+  })
+})
+
+// Fixture de un intento seleccionado completo (shape de SELECT_INTENTO_TRANSVERSAL_FIELDS)
+// para probar mappers/curación sin repetir 20 campos en cada test.
+function intentoSeleccionadoFixture(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    id: INTENTO_ID,
+    transversalId: TRANSVERSAL_ID,
+    colaboradorId: COLABORADOR_ID,
+    fecha: new Date("2026-05-11T10:00:00Z"),
+    estado: "EVALUADO",
+    anulado: false,
+    motivoAnulacion: null,
+    repoUrl: REPO_URL,
+    repoOArtefacto: { tipo: "URL_GIT", url: REPO_URL },
+    comentarioColaborador: null,
+    notaCapaTests: null,
+    notaCapaCualitativa: new Prisma.Decimal(80),
+    notaCapaComprension: null,
+    notaGlobal: null,
+    aprobado: null,
+    evaluacionesCapas: {},
+    reporteIa: { comentario: "crudo", confianza: "MEDIA" },
+    reporteFinal: { comentario: "crudo", confianza: "MEDIA" },
+    evidenciaRepo: null,
+    validadoPor: null,
+    fechaValidacion: null,
+    colaborador: { id: COLABORADOR_ID, nombre: "Colab", email: "c@nttdata.test" },
+    transversal: {
+      id: TRANSVERSAL_ID,
+      descripcion: "Mini-proyecto",
+      umbralAprobacion: new Prisma.Decimal(70),
+      curso: { id: CURSO_ID, titulo: "Curso mock" },
+    },
+    ...overrides,
+  }
+}
+
+const REPORTE_CURADO = {
+  comentario: "Informe curado por el admin",
+  confianza: "ALTA" as const,
+  resumen: "Buen trabajo con matices",
+  aReforzar: [{ que: "Cobertura de tests", sugerencia: "Añade casos borde" }],
+}
+
+describe("E13. PATCH /intentos-transversal/:id/reporte-final (curación, Fase 4b ③)", () => {
+  it("404 si el intento no existe", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce(null)
+    await expect(
+      service.curarReporteFinal({ intentoId: INTENTO_ID, reporteFinal: REPORTE_CURADO }),
+    ).rejects.toBeInstanceOf(NotFoundException)
+  })
+
+  it("409 no editable si el intento no está en EVALUADO", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      estado: "FINALIZADO",
+      anulado: false,
+    })
+    await expect(
+      service.curarReporteFinal({ intentoId: INTENTO_ID, reporteFinal: REPORTE_CURADO }),
+    ).rejects.toMatchObject({
+      response: { code: apiErrorCodes.conflictIntentoTransversalNoEditable },
+    })
+  })
+
+  it("EVALUADO: persiste reporteFinal (sin tocar reporteIa) y devuelve el detalle admin", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      estado: "EVALUADO",
+      anulado: false,
+    })
+    prisma.intentoTransversal.update.mockResolvedValueOnce(
+      intentoSeleccionadoFixture({ reporteFinal: REPORTE_CURADO }),
+    )
+
+    const r = (await service.curarReporteFinal({
+      intentoId: INTENTO_ID,
+      reporteFinal: REPORTE_CURADO,
+    })) as Record<string, unknown>
+
+    expect(prisma.intentoTransversal.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: INTENTO_ID },
+        data: { reporteFinal: REPORTE_CURADO },
+      }),
+    )
+    expect(r.reporteFinal).toMatchObject({ comentario: "Informe curado por el admin" })
+    // El crudo de la IA nunca se toca al curar.
+    expect(r.reporteIa).toMatchObject({ comentario: "crudo" })
+  })
+})
+
+const EVIDENCIA = {
+  commit: "abc1234",
+  archivos: ["index.js", "README.md"],
+  truncado: false,
+  bytesTotales: 1200,
+  contenido: "===== index.js =====\nexport const x = 1",
+}
+
+describe("E14. GET /intentos-transversal/:id/evidencia-repo (Fase 4b ③)", () => {
+  it("404 si el intento no existe", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce(null)
+    await expect(service.obtenerEvidenciaRepo({ intentoId: INTENTO_ID })).rejects.toBeInstanceOf(
+      NotFoundException,
+    )
+  })
+
+  it("404 si el intento aún no tiene evidencia", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      evidenciaRepo: null,
+    })
+    await expect(service.obtenerEvidenciaRepo({ intentoId: INTENTO_ID })).rejects.toBeInstanceOf(
+      NotFoundException,
+    )
+  })
+
+  it("devuelve el snapshot completo (incluye contenido)", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      evidenciaRepo: EVIDENCIA,
+    })
+    const r = await service.obtenerEvidenciaRepo({ intentoId: INTENTO_ID })
+    expect(r).toEqual(EVIDENCIA)
   })
 })
 
@@ -839,7 +1343,8 @@ describe("TransversalService P11.5a — TRANSVERSAL_DISPONIBLE en crearIntento",
 
   it("NO emite TRANSVERSAL_DISPONIBLE en intentos posteriores (intentosPrevios>0)", async () => {
     configurarFindUniqueCombinado()
-    prisma.intentoTransversal.count.mockResolvedValueOnce(2)
+    // Persistente (no Once): count se consulta 2 veces por request (cupo + previos).
+    prisma.intentoTransversal.count.mockResolvedValue(2)
     prisma.intentoTransversal.create.mockResolvedValueOnce({
       id: INTENTO_ID,
       fecha: new Date("2026-05-11T10:00:00Z"),

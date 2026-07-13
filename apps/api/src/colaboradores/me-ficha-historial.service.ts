@@ -1,12 +1,11 @@
 import { Injectable, NotFoundException } from "@nestjs/common"
-import type { EventoHistorialFicha, NivelCualitativoArea } from "@nexott-learn/shared-types"
+import type { EventoHistorialFicha } from "@nexott-learn/shared-types"
 import { EstadoAsignado, EstadoVoluntario, OrigenNotaSkill, RolAsignacion } from "@prisma/client"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
-
-const UMBRAL_EXCELENCIA = 85
-const UMBRAL_SOLIDO = 70
-const UMBRAL_DESARROLLO = 50
+// El historial es cross-curso (agrega skills de varios cursos) -> no hay un
+// umbral de curso unico: se clasifica con el canon del sistema (default).
+import { nivelDesdeNota } from "./nivel-cualitativo.helpers"
 
 /**
  * `MeFichaHistorialService` — B-24. UNION cronologico de hitos del colaborador
@@ -297,22 +296,6 @@ function esCompletadoVisible(asig: AsignacionRow): boolean {
     )
   }
   return asig.estadoVoluntario === EstadoVoluntario.COMPLETADO
-}
-
-function nivelDesdeNota(nota: number | null): NivelCualitativoArea {
-  if (nota === null) {
-    return "sinTocar"
-  }
-  if (nota >= UMBRAL_EXCELENCIA) {
-    return "excelencia"
-  }
-  if (nota >= UMBRAL_SOLIDO) {
-    return "solido"
-  }
-  if (nota >= UMBRAL_DESARROLLO) {
-    return "enDesarrollo"
-  }
-  return "inicial"
 }
 
 /**

@@ -124,7 +124,6 @@ describe.runIf(RUN_E2E)("intentos-bloque e2e (P7b — FIX-P7-cierre)", () => {
 
   // Contenido de bloque QUIZ — 1 pregunta de opcion unica, "b" correcta, peso 1.
   const contenidoQuiz = {
-    intentosMax: null,
     solucionVisible: "al_aprobar",
     ordenAleatorio: false,
     notaMinima: 60,

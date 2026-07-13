@@ -37,6 +37,12 @@ function subtituloCurso(payload: Record<string, unknown>): string | null {
   return titulo ? `Curso: ${titulo}` : null
 }
 
+function rutaIntentoTransversal(payload: Record<string, unknown>): string | null {
+  // biome-ignore lint/nursery/noSecrets: "intentoTransversalId" es el nombre de un campo del payload, no un secreto.
+  const intentoId = leerString(payload, "intentoTransversalId")
+  return intentoId ? RUTAS.admin.intentoTransversal(intentoId) : null
+}
+
 /**
  * Catalogo D88 — copy + cta + tono por tipo de evento. `ReadonlyMap` (no
  * `Record`) porque las keys son SCREAMING_SNAKE y Biome flag-ea naming
@@ -157,6 +163,15 @@ export const COPY_NOTIFICACION: ReadonlyMap<TipoEventoNotif, CopyNotif> = new Ma
       titulo: "Hay items pendientes de revisión",
       cta: { texto: "Ir al centro", ruta: () => RUTAS.admin.inicio },
       tono: "neutral",
+    },
+  ],
+  [
+    "TRANSVERSAL_POR_REVISAR",
+    {
+      titulo: "Un proyecto está listo para revisar",
+      subtitulo: subtituloCurso,
+      cta: { texto: "Revisar intento", ruta: rutaIntentoTransversal },
+      tono: "info",
     },
   ],
 ])

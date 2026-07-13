@@ -45,7 +45,6 @@ const CONTENIDO_PARRAFO_COSMETICO = {
 
 function buildContenidoQuiz(enunciado: string): Record<string, unknown> {
   return {
-    intentosMax: null,
     solucionVisible: "al_aprobar",
     ordenAleatorio: false,
     notaMinima: 60,

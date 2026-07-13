@@ -225,7 +225,10 @@ export { reordenarModulosHabilitadosCursoSchema } from "./cursos/reordenar-modul
 export type { ReordenarModulosHabilitadosCursoInput } from "./cursos/reordenar-modulos-habilitados-curso.schema"
 export { actualizarPesosCursoSchema } from "./cursos/actualizar-pesos-curso.schema"
 export type { ActualizarPesosCursoInput } from "./cursos/actualizar-pesos-curso.schema"
-export { actualizarUmbralesLogroCursoSchema } from "./cursos/actualizar-umbrales-logro-curso.schema"
+export {
+  actualizarUmbralesLogroCursoSchema,
+  umbralesLogroValoresSchema,
+} from "./cursos/actualizar-umbrales-logro-curso.schema"
 export type {
   ActualizarUmbralesLogroCursoInput,
   UmbralesLogroValores,
@@ -439,6 +442,8 @@ export {
   intentoTransversalBaseSchema,
   intentoTransversalParticipanteResponseSchema,
   intentoTransversalAdminResponseSchema,
+  cupoIntentosTransversalSchema,
+  darIntentoExtraTransversalResponseSchema,
   listarIntentosTransversalQuerySchema,
   crearIntentoTransversalSchema,
   editarSkillsTransversalSchema,
@@ -446,6 +451,15 @@ export {
   cargarCapaTestsSchema,
   cargarCapaCualitativaSchema,
   cargarCapaComprensionSchema,
+  dimensionInformeSchema,
+  puntoAReforzarSchema,
+  revisionIaSchema,
+  criterioEvaluacionSchema,
+  criteriosEvaluacionSchema,
+  cumplimientoCriterioSchema,
+  evidenciaRepoSchema,
+  evidenciaRepoResumenSchema,
+  curarReporteFinalSchema,
   finalizarTransversalBodySchema,
   anularTransversalBodySchema,
   finalizarTransversalResponseSchema,
@@ -463,6 +477,8 @@ export type {
   IntentoTransversalBase,
   IntentoTransversalParticipanteResponse,
   IntentoTransversalAdminResponse,
+  CupoIntentosTransversal,
+  DarIntentoExtraTransversalResponse,
   ListarIntentosTransversalQuery,
   CrearIntentoTransversalInput,
   EditarSkillsTransversalInput,
@@ -470,6 +486,14 @@ export type {
   CargarCapaTestsInput,
   CargarCapaCualitativaInput,
   CargarCapaComprensionInput,
+  DimensionInforme,
+  PuntoAReforzar,
+  RevisionIa,
+  CriteriosEvaluacion,
+  CumplimientoCriterio,
+  EvidenciaRepo,
+  EvidenciaRepoResumen,
+  CurarReporteFinalInput,
   FinalizarTransversalBodyInput,
   AnularTransversalBodyInput,
   FinalizarTransversalResponse,

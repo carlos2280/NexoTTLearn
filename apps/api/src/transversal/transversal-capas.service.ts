@@ -1,14 +1,18 @@
-import { ConflictException, Injectable, NotFoundException } from "@nestjs/common"
+import { ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import {
   CargarCapaComprensionInput,
   CargarCapaCualitativaInput,
   CargarCapaTestsInput,
+  EvidenciaRepo,
   IntentoTransversalAdminResponse,
 } from "@nexott-learn/shared-types"
-import { Prisma } from "@prisma/client"
+import { Prisma, TipoEventoNotif } from "@prisma/client"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { IdempotencyService } from "../common/idempotency/idempotency.service"
+import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
+import { broadcastAdminsActivos } from "../notificaciones/notificaciones.helpers"
+import { NotificacionesService } from "../notificaciones/notificaciones.service"
 import { toIntentoAdmin } from "./transversal.helpers"
 import { SELECT_INTENTO_TRANSVERSAL_FIELDS } from "./transversal.types"
 
@@ -38,7 +42,13 @@ export interface CargarCapaResult {
  */
 @Injectable()
 export class TransversalCapasService {
-  constructor(private readonly idempotency: IdempotencyService) {}
+  private readonly logger = new Logger(TransversalCapasService.name)
+
+  constructor(
+    private readonly idempotency: IdempotencyService,
+    private readonly prisma: PrismaService,
+    private readonly notificaciones: NotificacionesService,
+  ) {}
 
   cargarCapaTests(input: {
     readonly intentoId: string
@@ -62,6 +72,12 @@ export class TransversalCapasService {
     readonly body: CargarCapaCualitativaInput
     readonly idempotencyKey: string
     readonly usuario: SesionUsuario
+    /**
+     * Snapshot de lo que la IA leyó del repo (Fase 4b ③). Solo lo pasa el job de
+     * evaluación automática; la carga manual del admin (escape) lo deja sin
+     * evidencia. Cuando llega, se persiste inmutable en el intento.
+     */
+    readonly evidenciaRepo?: EvidenciaRepo
   }): Promise<CargarCapaResult> {
     return this.cargarCapaGenerico({
       capa: "cualitativa",
@@ -71,6 +87,7 @@ export class TransversalCapasService {
       detalle: input.body.detalle as unknown as Record<string, unknown>,
       idempotencyKey: input.idempotencyKey,
       usuario: input.usuario,
+      evidenciaRepo: input.evidenciaRepo,
     })
   }
 
@@ -99,6 +116,7 @@ export class TransversalCapasService {
     readonly detalle: Record<string, unknown>
     readonly idempotencyKey: string
     readonly usuario: SesionUsuario
+    readonly evidenciaRepo?: EvidenciaRepo
   }): Promise<CargarCapaResult> {
     const ejecucion = await this.idempotency.runOnce<IntentoTransversalAdminResponse>({
       scope: input.scope,
@@ -119,6 +137,7 @@ export class TransversalCapasService {
           nota: input.nota,
           detalle: input.detalle,
           intento,
+          evidenciaRepo: input.evidenciaRepo,
         })
         const actualizado = await tx.intentoTransversal.update({
           where: { id: input.intentoId },
@@ -128,7 +147,39 @@ export class TransversalCapasService {
         return { status: HTTP_OK, body: toIntentoAdmin(actualizado) }
       },
     })
+    // La carga que completa las capas activas transiciona el intento a EVALUADO:
+    // avisar a los admins que hay un proyecto por revisar/finalizar. Solo en la
+    // transición real (no en replays idempotentes) y fire-and-forget: un fallo de
+    // notificación jamás debe tumbar la carga de la capa.
+    if (!ejecucion.replay && ejecucion.body.estado === "EVALUADO") {
+      await this.notificarPorRevisar(ejecucion.body)
+    }
     return { response: ejecucion.body, replay: ejecucion.replay, capa: input.capa }
+  }
+
+  /** Broadcast `TRANSVERSAL_POR_REVISAR` a los admins activos. Nunca propaga. */
+  private async notificarPorRevisar(intento: IntentoTransversalAdminResponse): Promise<void> {
+    try {
+      // Literal inline (como el resto de triggers): el shape lo garantiza el
+      // type-guard `esTransversalPorRevisarPayload` al leer/renderizar la notif.
+      await broadcastAdminsActivos(
+        this.prisma,
+        this.notificaciones,
+        this.logger,
+        TipoEventoNotif.TRANSVERSAL_POR_REVISAR,
+        {
+          intentoTransversalId: intento.intentoId,
+          cursoId: intento.curso.id,
+          cursoTitulo: intento.curso.titulo,
+          colaboradorNombre: intento.colaborador.nombre,
+        },
+      )
+    } catch (error) {
+      const detalle = error instanceof Error ? error.message : String(error)
+      this.logger.warn(
+        `notif | fallo | tipo=TRANSVERSAL_POR_REVISAR | intento=${intento.intentoId} | error=${detalle}`,
+      )
+    }
   }
 
   private cargarIntentoParaCarga(
@@ -146,6 +197,7 @@ export class TransversalCapasService {
           notaCapaCualitativa: true,
           notaCapaComprension: true,
           evaluacionesCapas: true,
+          reporteFinal: true,
           transversal: {
             select: {
               capaTestsActiva: true,
@@ -175,6 +227,7 @@ interface IntentoConCapasYActivas {
   readonly notaCapaCualitativa: Prisma.Decimal | null
   readonly notaCapaComprension: Prisma.Decimal | null
   readonly evaluacionesCapas: Prisma.JsonValue
+  readonly reporteFinal: Prisma.JsonValue
   readonly transversal: {
     readonly capaTestsActiva: boolean
     readonly capaCualitativaActiva: boolean
@@ -212,6 +265,7 @@ function construirDataCargaCapa(input: {
   readonly nota: number
   readonly detalle: Record<string, unknown>
   readonly intento: IntentoConCapasYActivas
+  readonly evidenciaRepo?: EvidenciaRepo
 }): Prisma.IntentoTransversalUpdateInput {
   const detalleActualizado: Record<string, unknown> = {
     ...parseDetalleCapas(input.intento.evaluacionesCapas),
@@ -224,6 +278,16 @@ function construirDataCargaCapa(input: {
     data.notaCapaTests = new Prisma.Decimal(input.nota)
   } else if (input.capa === "cualitativa") {
     data.notaCapaCualitativa = new Prisma.Decimal(input.nota)
+    // Curación (Fase 4b ③): al cargar la cualitativa se (re)congela el pre-informe
+    // crudo (`reporteIa`). El editable (`reporteFinal`) SOLO se siembra si aún no
+    // existe: si el admin ya curó y se recarga la capa, no se pisa su edición.
+    data.reporteIa = input.detalle as unknown as Prisma.InputJsonValue
+    if (input.intento.reporteFinal == null) {
+      data.reporteFinal = input.detalle as unknown as Prisma.InputJsonValue
+    }
+    if (input.evidenciaRepo) {
+      data.evidenciaRepo = input.evidenciaRepo as unknown as Prisma.InputJsonValue
+    }
   } else {
     data.notaCapaComprension = new Prisma.Decimal(input.nota)
   }

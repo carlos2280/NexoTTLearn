@@ -34,7 +34,7 @@ export function VistaBriefTransversal({
         />
       </header>
 
-      <LoQueSeEvaluara />
+      <LoQueSeEvaluara criterios={transversal.criteriosEvaluacion} />
 
       <FormEnvioTransversal
         asignacionId={asignacionId}

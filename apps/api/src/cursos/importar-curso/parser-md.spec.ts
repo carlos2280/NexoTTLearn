@@ -146,7 +146,7 @@ x
         md(
           "# M",
           "## S",
-          "::: quiz notaMinima=70 intentosMax=3",
+          "::: quiz notaMinima=70",
           "- enunciado: ¿1+1?",
           "  tipo: OPCION_UNICA",
           "  opciones:",
@@ -160,7 +160,6 @@ x
       expect(bloque.tipo).toBe("QUIZ")
       if (bloque.tipo === "QUIZ") {
         expect(bloque.contenido.notaMinima).toBe(70)
-        expect(bloque.contenido.intentosMax).toBe(3)
         expect(bloque.contenido.preguntas).toHaveLength(1)
         const p = bloque.contenido.preguntas[0]!
         expect(p.tipo).toBe("OPCION_UNICA")

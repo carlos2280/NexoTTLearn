@@ -50,8 +50,7 @@ export function VeredictoCard({ intento }: VeredictoCardProps) {
       </div>
       {!finalizado && intento.estado !== "ANULADO" ? (
         <p className="text-body-sm text-text-tertiary">
-          La nota global se calcula al finalizar la evaluación, ponderando las 3 capas con los pesos
-          del proyecto.
+          La nota global se calcula al finalizar la evaluación, a partir de la revisión con IA.
         </p>
       ) : null}
       {intento.anulado && intento.motivoAnulacion ? (

@@ -14,12 +14,6 @@ export interface BorradorQuiz {
  * `contenidoQuizSchema`.
  */
 export function leerInicial(contenido: Record<string, unknown> | null): BorradorQuiz {
-  const intentosMax =
-    contenido?.intentosMax === null
-      ? null
-      : typeof contenido?.intentosMax === "number"
-        ? contenido.intentosMax
-        : null
   const solucion: SolucionVisible =
     contenido?.solucionVisible === "tras_intento" ||
     contenido?.solucionVisible === "al_aprobar" ||
@@ -35,7 +29,7 @@ export function leerInicial(contenido: Record<string, unknown> | null): Borrador
         .filter((p): p is PreguntaQuiz => p !== null)
     : []
   return {
-    config: { intentosMax, solucionVisible: solucion, ordenAleatorio, notaMinima },
+    config: { solucionVisible: solucion, ordenAleatorio, notaMinima },
     preguntas,
   }
 }

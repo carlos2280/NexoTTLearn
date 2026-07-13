@@ -6,6 +6,7 @@ import type {
   CargarCapaTestsInput,
   CrearIntentoTransversalInput,
   CrearIntentoTransversalResponse,
+  DarIntentoExtraTransversalResponse,
   FinalizarTransversalResponse,
   IntentoTransversalAdminResponse,
   IntentoTransversalParticipanteResponse,
@@ -111,6 +112,20 @@ export function finalizarIntentoTransversal(input: {
 }): Promise<FinalizarTransversalResponse> {
   return httpClient.post<FinalizarTransversalResponse>(
     `/intentos-transversal/${input.intentoId}/finalizar`,
+    {},
+  )
+}
+
+/**
+ * `POST /api/v1/asignaciones/:asignacionId/intentos-transversal/intento-extra`
+ * (E12, admin). Otorga +1 intento del transversal a la asignación y devuelve el
+ * cupo resultante (usados / cupo efectivo). Fase 4b ②.
+ */
+export function darIntentoExtraTransversal(input: {
+  readonly asignacionId: string
+}): Promise<DarIntentoExtraTransversalResponse> {
+  return httpClient.post<DarIntentoExtraTransversalResponse>(
+    `/asignaciones/${input.asignacionId}/intentos-transversal/intento-extra`,
     {},
   )
 }

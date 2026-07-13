@@ -1037,6 +1037,38 @@ describe("ReportesService.obtenerCoberturaCurso", () => {
     expect(carla?.notas[0]?.nivel).toBe("sinTocar")
   })
 
+  it("clasifica los niveles con los umbralesLogro del curso, no con el canon fijo", async () => {
+    // Curso mas exigente que el canon: excelencia=95 (vs 85 del sistema).
+    prisma.curso.findUnique.mockResolvedValueOnce({
+      id: CURSO_ID,
+      titulo: "Curso exigente",
+      umbralesLogro: { excelencia: 95, solido: 75, enDesarrollo: 55 },
+    })
+    prisma.cursoSkillExigida.findMany.mockResolvedValueOnce([
+      { skillId: SKILL_ID, notaMinima: dec(70), skill: { id: SKILL_ID, etiquetaVisible: "Git" } },
+    ])
+    prisma.asignacionCurso.findMany.mockResolvedValueOnce([
+      {
+        id: ASIG_ID,
+        colaboradorId: COLAB_ID,
+        estadoAsignado: "EN_PROGRESO",
+        estadoVoluntario: null,
+        colaborador: { id: COLAB_ID, nombre: "Ana", email: "ana@nttdata.com" },
+      },
+    ])
+    prisma.notaSkill.findMany.mockResolvedValueOnce([
+      { skillId: SKILL_ID, colaboradorId: COLAB_ID, notaActual: dec(90) },
+    ])
+    planService.obtenerPorcentajeAvance.mockResolvedValueOnce(80)
+
+    const result = await service.obtenerCoberturaCurso({ cursoId: CURSO_ID })
+
+    const ana = result.colaboradores.find((c) => c.nombre === "Ana")
+    // 90 seria "excelencia" con el canon (>=85); con umbral 95 del curso es "solido".
+    expect(ana?.notas[0]?.nivel).toBe("solido")
+    expect(result.resumen.conteoNiveles).toMatchObject({ solido: 1, excelencia: 0 })
+  })
+
   it("404 cuando el curso no existe", async () => {
     prisma.curso.findUnique.mockResolvedValueOnce(null)
     await expect(service.obtenerCoberturaCurso({ cursoId: CURSO_ID })).rejects.toThrow(

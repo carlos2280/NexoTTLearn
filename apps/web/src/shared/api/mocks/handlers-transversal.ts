@@ -29,9 +29,11 @@ const TRANSVERSAL_POR_CURSO: ReadonlyMap<string, TransversalResponse> = new Map(
       descripcion:
         "Demuestra que puedes integrar todo lo del curso: arma un servicio REST con Spring Boot, persistencia con JPA y tests unitarios. Subes el repositorio y nuestro evaluador revisa funcionalidad y calidad del codigo.",
       umbralAprobacion: 70,
+      intentosMax: 3,
       pesosCapas: { tests: 60, cualitativa: 40, comprension: 0 },
       capasActivas: { tests: true, cualitativa: true, comprension: false },
       skillsQueMide: [],
+      criteriosEvaluacion: [],
     },
   ],
   [
@@ -42,9 +44,11 @@ const TRANSVERSAL_POR_CURSO: ReadonlyMap<string, TransversalResponse> = new Map(
       descripcion:
         "Integra todo lo del bootcamp en una aplicacion full-stack desplegable: frontend React, backend Express con base de datos, dockerizada y desplegada en un registry publico. Subes el repositorio y revisamos el conjunto.",
       umbralAprobacion: 70,
+      intentosMax: 3,
       pesosCapas: { tests: 60, cualitativa: 40, comprension: 0 },
       capasActivas: { tests: true, cualitativa: true, comprension: false },
       skillsQueMide: [],
+      criteriosEvaluacion: [],
     },
   ],
   [
@@ -55,9 +59,11 @@ const TRANSVERSAL_POR_CURSO: ReadonlyMap<string, TransversalResponse> = new Map(
       descripcion:
         "Construye un SPA con React + Tanstack Query consumiendo una API publica. Foco en arquitectura de componentes, hooks reutilizables y tests con Testing Library.",
       umbralAprobacion: 70,
+      intentosMax: 3,
       pesosCapas: { tests: 50, cualitativa: 50, comprension: 0 },
       capasActivas: { tests: true, cualitativa: true, comprension: false },
       skillsQueMide: [],
+      criteriosEvaluacion: [],
     },
   ],
 ])
@@ -69,9 +75,11 @@ function fallbackTransversal(cursoId: string): TransversalResponse {
     descripcion:
       "Demuestra que sabes integrar todo lo del curso en un proyecto real. Sube el repositorio y nuestro evaluador revisa tu trabajo.",
     umbralAprobacion: 70,
+    intentosMax: 3,
     pesosCapas: { tests: 60, cualitativa: 40, comprension: 0 },
     capasActivas: { tests: true, cualitativa: true, comprension: false },
     skillsQueMide: [],
+    criteriosEvaluacion: [],
   }
 }
 
@@ -178,6 +186,9 @@ function handlerCrearIntento(req: MockRequest): CrearIntentoTransversalResponse 
     comentarioColaborador: req.body.comentarioColaborador?.trim() || null,
     notaGlobal: null,
     aprobado: null,
+    // Fase 4b ③: informe final curado; el mock lo deja null (el participante solo
+    // lo ve al FINALIZADO, y este mock no cura informes).
+    informe: null,
     asignacionId,
     resolvedAt,
   }

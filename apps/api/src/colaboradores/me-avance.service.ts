@@ -19,6 +19,7 @@ import {
   parseCierreSnapshotMinimo,
   resolverNotaGlobalFinal,
 } from "./cierre-snapshot.helpers"
+import { parseUmbralesLogro } from "./umbrales-logro.helpers"
 
 /**
  * Fallback de `umbralNoCumple` (cap. 9.1) cuando el curso no lo define
@@ -606,6 +607,9 @@ function extraerNotaFinal(
   }
   return {
     notaGlobalFinal: nota,
-    etiquetaCualitativaFinal: etiquetaCualitativaPorNota(nota),
+    etiquetaCualitativaFinal: etiquetaCualitativaPorNota(
+      nota,
+      parseUmbralesLogro(parsed.curso?.configuracion?.umbralesLogro),
+    ),
   }
 }

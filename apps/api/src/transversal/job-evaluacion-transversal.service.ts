@@ -6,6 +6,7 @@ import { PrismaService } from "../common/prisma/prisma.service"
 import { RepoFetchService } from "../common/repo-fetch/repo-fetch.service"
 import { SesionUsuario } from "../common/types/sesion.types"
 import { TransversalCapasService } from "./transversal-capas.service"
+import { parsearCriteriosEvaluacion } from "./transversal.helpers"
 
 /**
  * `JobEvaluacionTransversalService` — evalúa el intento transversal con UNA sola
@@ -40,6 +41,14 @@ const PROFUNDIDAD_POR_DEFECTO = "SEMI_SENIOR" as const
 // Namespace estable UUID v5 para derivar la Idempotency-Key del par
 // `(intentoId, capa)`. Cualquier UUID v4 constante sirve; este no rota.
 const IDEMPOTENCY_NAMESPACE = "3e7a4f1e-cb52-4b1e-9c5f-7f0b8e2d4a01"
+
+interface IntentoParaJob {
+  readonly repoUrl: string
+  readonly usuarioId: string
+  readonly dimensiones: readonly string[]
+  readonly criterios: readonly string[]
+  readonly umbral: number
+}
 
 @Injectable()
 export class JobEvaluacionTransversalService implements OnModuleInit {
@@ -123,12 +132,8 @@ export class JobEvaluacionTransversalService implements OnModuleInit {
       if (!intento) {
         return
       }
-      const sesionInterna = this.sesionWorker(intento.colaboradorId)
-      const evaluado = await this.cargarCapaCualitativaSeguro(
-        intentoId,
-        intento.repoUrl,
-        sesionInterna,
-      )
+      const sesionInterna = this.sesionWorker(intento.usuarioId)
+      const evaluado = await this.cargarCapaCualitativaSeguro(intentoId, intento, sesionInterna)
       const duracion = Date.now() - inicio
       if (evaluado) {
         this.logger.log(
@@ -148,16 +153,32 @@ export class JobEvaluacionTransversalService implements OnModuleInit {
     }
   }
 
-  private async cargarIntentoParaJob(intentoId: string): Promise<{
-    readonly repoUrl: string
-    readonly colaboradorId: string
-  } | null> {
+  private async cargarIntentoParaJob(intentoId: string): Promise<IntentoParaJob | null> {
     const intento = await this.prisma.intentoTransversal.findUnique({
       where: { id: intentoId },
       select: {
         repoUrl: true,
         estado: true,
-        colaboradorId: true,
+        // La sesión sintética del worker escribe la Idempotency-Key, cuya FK
+        // apunta a `Usuario.id` (NO a `Colaborador.id`). Traemos el usuario real
+        // del colaborador para no violar la FK al persistir la capa.
+        colaborador: { select: { usuario: { select: { id: true } } } },
+        // Ejes del informe = skills que el transversal declara + umbral para
+        // derivar el veredicto (apto / necesita_ajustes) sin preguntárselo a la IA.
+        transversal: {
+          select: {
+            umbralAprobacion: true,
+            // Lista "a evaluar" que redactó el admin (JSONB `string[]`). Se pasa
+            // al motor como criterios a verificar; el orden lo fija el admin.
+            criteriosEvaluacion: true,
+            // `orderBy` estable: las dimensiones del informe deben salir en el mismo
+            // orden entre corridas (la comparabilidad entre repos es el objetivo).
+            skills: {
+              select: { skill: { select: { etiquetaVisible: true } } },
+              orderBy: { skill: { etiquetaVisible: "asc" } },
+            },
+          },
+        },
       },
     })
     if (!intento || intento.repoUrl === null) {
@@ -170,35 +191,81 @@ export class JobEvaluacionTransversalService implements OnModuleInit {
       )
       return null
     }
+    const usuarioId = intento.colaborador.usuario?.id
+    if (usuarioId == null) {
+      // Defensivo: en la práctica siempre existe (solo un participante logueado
+      // crea intentos). Si faltara, persistir la capa violaría la FK de idempotencia.
+      this.logger.warn(
+        `Intento ${intentoId}: el colaborador no tiene usuario asociado; se omite job.`,
+      )
+      return null
+    }
     return {
       repoUrl: intento.repoUrl,
-      colaboradorId: intento.colaboradorId,
+      usuarioId,
+      dimensiones: intento.transversal.skills.map((s) => s.skill.etiquetaVisible),
+      // JSONB no confiable → validar con el contrato; si es null/legacy/corrupto,
+      // se trata como "sin lista" (no se evalúa checklist).
+      criterios: parsearCriteriosEvaluacion(intento.transversal.criteriosEvaluacion),
+      umbral: intento.transversal.umbralAprobacion.toNumber(),
     }
   }
 
-  /** Devuelve `true` si la capa se cargó; `false` si la descarga o la IA fallaron. */
+  /** Devuelve `true` si la capa se cargó; `false` si la descarga, la IA o una nota nula lo impidieron. */
   private async cargarCapaCualitativaSeguro(
     intentoId: string,
-    repoUrl: string,
+    intento: IntentoParaJob,
     sesion: SesionUsuario,
   ): Promise<boolean> {
     try {
-      const repo = await this.repoFetch.descargarYEmpaquetar(repoUrl)
-      const cualitativa = await this.ai.evaluarRepoCualitativo({
+      const repo = await this.repoFetch.descargarYEmpaquetar(intento.repoUrl)
+      const informe = await this.ai.evaluarRepoCualitativo({
         contenidoRepo: repo.contenido,
         profundidad: PROFUNDIDAD_POR_DEFECTO,
+        dimensiones: intento.dimensiones,
+        criterios: intento.criterios,
       })
+      if (informe.nota === null) {
+        // La IA no pudo puntuar el repo: no transicionamos. El admin lo revisa a mano.
+        this.logger.warn(`Intento ${intentoId}: la IA no pudo evaluar el repo (nota null); skip.`)
+        return false
+      }
+      const veredicto = informe.nota >= intento.umbral ? "apto" : "necesita_ajustes"
       await this.capas.cargarCapaCualitativa({
         intentoId,
         body: {
-          nota: cualitativa.nota,
+          nota: informe.nota,
           detalle: {
-            comentario: cualitativa.comentario.slice(0, 4000),
-            confianza: confianzaAUpper(cualitativa.confianza),
+            // `comentario` se conserva por compat con la UI actual (= resumen).
+            // El worker no pasa por el pipe Zod, así que aplicamos el trim del
+            // contrato aquí; `resumen` ya viene acotado a 2000 por el schema.
+            comentario: informe.resumen.trim(),
+            confianza: confianzaAUpper(informe.confianza),
+            veredicto,
+            resumen: informe.resumen,
+            queReviso: informe.queReviso,
+            queNoReviso: informe.queNoReviso,
+            porDimension: informe.porDimension.map((d) => ({ ...d })),
+            fortalezas: [...informe.fortalezas],
+            aReforzar: informe.aReforzar.map((r) => ({ ...r })),
+            // Checklist de la "Lista a evaluar" del admin (aditivo/opcional): solo
+            // se persiste si el transversal declaró criterios.
+            ...(informe.cumplimientoCriterios && informe.cumplimientoCriterios.length > 0
+              ? { cumplimientoCriterios: informe.cumplimientoCriterios.map((c) => ({ ...c })) }
+              : {}),
           },
         },
         idempotencyKey: this.derivarKey(intentoId, "cualitativa"),
         usuario: sesion,
+        // Evidencia inmutable de "qué evaluó la IA" (Fase 4b ③): sobrevive aunque
+        // el participante borre o cambie el repo. `contenido` = texto exacto leído.
+        evidenciaRepo: {
+          commit: repo.commit,
+          archivos: [...repo.archivos],
+          truncado: repo.truncado,
+          bytesTotales: repo.bytesTotales,
+          contenido: repo.contenido,
+        },
       })
       return true
     } catch (error) {
@@ -216,12 +283,14 @@ export class JobEvaluacionTransversalService implements OnModuleInit {
   }
 
   /**
-   * Sesion sintetica del worker — el `usuarioId` apunta al colaborador para que
-   * las idempotency keys queden trazables por intento. El service de carga no
-   * usa `usuario.rol` para autorizar (los guards del controller lo resuelven).
+   * Sesion sintetica del worker — `usuarioId` es el `Usuario.id` real del
+   * participante dueño del intento (resuelto en `cargarIntentoParaJob`), no el
+   * `Colaborador.id`: la Idempotency-Key que escribe la capa tiene FK a
+   * `Usuario.id`. El service de carga no usa `usuario.rol` para autorizar (los
+   * guards del controller lo resuelven).
    */
-  private sesionWorker(colaboradorId: string): SesionUsuario {
-    return { usuarioId: colaboradorId, rol: RolUsuario.ADMIN }
+  private sesionWorker(usuarioId: string): SesionUsuario {
+    return { usuarioId, rol: RolUsuario.ADMIN }
   }
 
   /**

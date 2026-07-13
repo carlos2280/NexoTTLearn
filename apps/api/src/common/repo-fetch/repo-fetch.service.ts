@@ -3,7 +3,7 @@ import { mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Injectable, Logger, UnprocessableEntityException } from "@nestjs/common"
-import { clone } from "isomorphic-git"
+import { clone, resolveRef } from "isomorphic-git"
 import http from "isomorphic-git/http/node"
 import { apiErrorCodes } from "../errors/api-error.codes"
 import {
@@ -64,8 +64,9 @@ export class RepoFetchService {
       await this.esperarClone(clon)
       const archivos = await this.leerArchivos(dir, limites)
       const empaquetado = empaquetarArchivos(archivos, limites)
+      const commit = await this.resolverCommit(dir)
       this.logger.log(
-        `Repo empaquetado archivos=${empaquetado.archivosIncluidos} bytes=${empaquetado.bytesTotales} truncado=${empaquetado.truncado}`,
+        `Repo empaquetado archivos=${empaquetado.archivosIncluidos} bytes=${empaquetado.bytesTotales} truncado=${empaquetado.truncado} commit=${commit ?? "?"}`,
       )
       if (empaquetado.archivosIncluidos === 0) {
         throw new UnprocessableEntityException({
@@ -74,7 +75,7 @@ export class RepoFetchService {
         })
       }
       lecturaCompleta = true
-      return empaquetado
+      return { ...empaquetado, commit }
     } finally {
       await this.limpiar(dir, clon, lecturaCompleta)
     }
@@ -96,6 +97,21 @@ export class RepoFetchService {
       depth: 1,
       noTags: true,
     })
+  }
+
+  /**
+   * Resuelve el SHA del HEAD clonado para dejar constancia de qué commit evaluó
+   * la IA (evidencia). No es crítico: si falla, se registra null y se sigue.
+   */
+  private async resolverCommit(dir: string): Promise<string | null> {
+    try {
+      return await resolveRef({ fs: nodeFs, dir, ref: "HEAD" })
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo resolver el commit del repo: ${error instanceof Error ? error.message : "?"}`,
+      )
+      return null
+    }
   }
 
   /** Espera el clone con un tope de tiempo; mapea fallo/timeout a repoNoAccesible. */

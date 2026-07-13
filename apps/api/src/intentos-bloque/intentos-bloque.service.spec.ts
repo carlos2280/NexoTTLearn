@@ -41,7 +41,6 @@ const PARTICIPANTE: SesionUsuario = { usuarioId: USUARIO_ID, rol: RolUsuario.PAR
 const ADMIN: SesionUsuario = { usuarioId: USUARIO_ID, rol: RolUsuario.ADMIN }
 
 const CONTENIDO_QUIZ_OK = {
-  intentosMax: null,
   solucionVisible: "al_aprobar",
   ordenAleatorio: false,
   notaMinima: 60,

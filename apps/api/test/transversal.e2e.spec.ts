@@ -246,6 +246,10 @@ describe.runIf(RUN_E2E)("transversal e2e (Slice 8 P8a)", () => {
         cursoId,
         descripcion: "Transversal P8a e2e",
         umbralAprobacion: 70,
+        // Holgado: esta suite crea varios intentos sobre la misma asignacion
+        // para probar capas/finalizar/anular; el tope de intentos no es lo que
+        // se prueba aqui (su enforcement tiene tests unitarios propios).
+        intentosMax: 50,
         pesoCapaTests: 40,
         pesoCapaCualitativa: 30,
         pesoCapaComprension: 30,

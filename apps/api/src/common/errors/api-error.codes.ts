@@ -146,7 +146,9 @@ export const apiErrorCodes = {
   // Transversal P8a (D-S8-A1..F2).
   transversalNoEncontrado: "TRANSVERSAL_NO_ENCONTRADO",
   intentoTransversalNoEncontrado: "INTENTO_TRANSVERSAL_NO_ENCONTRADO",
+  evidenciaRepoNoDisponible: "EVIDENCIA_REPO_NO_DISPONIBLE",
   conflictTransversalNoDisponible: "CONFLICT_TRANSVERSAL_NO_DISPONIBLE",
+  transversalIntentosAgotados: "TRANSVERSAL_INTENTOS_AGOTADOS",
   conflictCursoEstadoInvalido: "CONFLICT_CURSO_ESTADO_INVALIDO",
   conflictAsignacionEstadoInvalido: "CONFLICT_ASIGNACION_ESTADO_INVALIDO",
   conflictSkillsTransversalInvalidas: "CONFLICT_SKILLS_TRANSVERSAL_INVALIDAS",

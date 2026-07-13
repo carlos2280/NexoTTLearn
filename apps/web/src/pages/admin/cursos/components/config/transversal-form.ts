@@ -12,6 +12,7 @@ export interface FormTransversal {
   readonly activo: boolean
   readonly descripcion: string
   readonly umbralAprobacion: number
+  readonly intentosMax: number
   readonly pesoCapaTests: number
   readonly pesoCapaCualitativa: number
   readonly pesoCapaComprension: number
@@ -19,6 +20,7 @@ export interface FormTransversal {
   readonly capaCualitativaActiva: boolean
   readonly capaComprensionActiva: boolean
   readonly skillsQueMideIds: readonly string[]
+  readonly criteriosEvaluacion: readonly string[]
 }
 
 /**
@@ -42,8 +44,10 @@ export const FORM_TRANSVERSAL_DEFECTO: FormTransversal = {
   activo: false,
   descripcion: "",
   umbralAprobacion: 70,
+  intentosMax: 3,
   ...CAPAS_UNA_SOLA_IA,
   skillsQueMideIds: [],
+  criteriosEvaluacion: [],
 }
 
 /** Mapea la respuesta del GET admin al baseline del formulario (edición). */
@@ -52,6 +56,7 @@ export function baselineDesdeRespuesta(resp: TransversalResponse): FormTransvers
     activo: true,
     descripcion: resp.descripcion,
     umbralAprobacion: resp.umbralAprobacion,
+    intentosMax: resp.intentosMax,
     pesoCapaTests: resp.pesosCapas.tests,
     pesoCapaCualitativa: resp.pesosCapas.cualitativa,
     pesoCapaComprension: resp.pesosCapas.comprension,
@@ -59,6 +64,7 @@ export function baselineDesdeRespuesta(resp: TransversalResponse): FormTransvers
     capaCualitativaActiva: resp.capasActivas.cualitativa,
     capaComprensionActiva: resp.capasActivas.comprension,
     skillsQueMideIds: resp.skillsQueMide.map((s) => s.skillId),
+    criteriosEvaluacion: [...resp.criteriosEvaluacion],
   }
 }
 
@@ -84,14 +90,31 @@ export function esFormModificado(form: FormTransversal, base: FormTransversal): 
   return (
     form.descripcion !== base.descripcion ||
     form.umbralAprobacion !== base.umbralAprobacion ||
+    form.intentosMax !== base.intentosMax ||
     form.pesoCapaTests !== base.pesoCapaTests ||
     form.pesoCapaCualitativa !== base.pesoCapaCualitativa ||
     form.pesoCapaComprension !== base.pesoCapaComprension ||
     form.capaTestsActiva !== base.capaTestsActiva ||
     form.capaCualitativaActiva !== base.capaCualitativaActiva ||
     form.capaComprensionActiva !== base.capaComprensionActiva ||
-    !mismasSkills(form.skillsQueMideIds, base.skillsQueMideIds)
+    !mismasSkills(form.skillsQueMideIds, base.skillsQueMideIds) ||
+    !mismosCriterios(form.criteriosEvaluacion, base.criteriosEvaluacion)
   )
+}
+
+/**
+ * Compara las listas "a evaluar" ignorando ítems vacíos y espacios: escribir
+ * un ítem en blanco no debe marcar el form como modificado (se descarta al
+ * guardar). El orden sí importa (la lista es ordenada por el admin).
+ */
+function mismosCriterios(a: readonly string[], b: readonly string[]): boolean {
+  const na = normalizarCriterios(a)
+  const nb = normalizarCriterios(b)
+  return na.length === nb.length && na.every((c, i) => c === nb[i])
+}
+
+function normalizarCriterios(criterios: readonly string[]): string[] {
+  return criterios.map((c) => c.trim()).filter((c) => c.length > 0)
 }
 
 function mismasSkills(a: readonly string[], b: readonly string[]): boolean {
@@ -113,7 +136,10 @@ export function construirInputTransversal(form: FormTransversal): ActualizarTran
     activo: true,
     descripcion: form.descripcion,
     umbralAprobacion: form.umbralAprobacion,
+    intentosMax: form.intentosMax,
     ...CAPAS_UNA_SOLA_IA,
     skillsQueMideIds: [...form.skillsQueMideIds],
+    // Descarta ítems vacíos/en blanco: el contrato exige min(1) por ítem.
+    criteriosEvaluacion: normalizarCriterios(form.criteriosEvaluacion),
   }
 }

@@ -372,15 +372,6 @@ function numParam(params: Record<string, string>, key: string, fallback: number)
   return Number.isFinite(n) ? n : fallback
 }
 
-function numParamNullable(params: Record<string, string>, key: string): number | null {
-  const raw = params[key]
-  if (raw === undefined) {
-    return null
-  }
-  const n = Number(raw)
-  return Number.isFinite(n) ? n : null
-}
-
 /**
  * Extrae el parámetro `skill="…"` de un fence evaluable como el fragmento
  * `{ skillEtiqueta }` listo para esparcir en el bloque. Devuelve `{}` cuando
@@ -398,7 +389,6 @@ function construirQuiz(params: Record<string, string>, body: string): unknown {
     tipo: "QUIZ",
     ...skillEtiquetaParam(params),
     contenido: {
-      intentosMax: numParamNullable(params, "intentosMax"),
       solucionVisible,
       ordenAleatorio: false,
       notaMinima: numParam(params, "notaMinima", 60),

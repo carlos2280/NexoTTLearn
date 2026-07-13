@@ -24,6 +24,7 @@ import {
   MantenerTurnoEntrevistaIaOutput,
   MantenerTurnoEntrevistaInput,
   MantenerTurnoEntrevistaOutput,
+  aiInformeCualitativoSchema,
   aiRespuestaEstructuradaSchema,
   iniciarEntrevistaResponseSchema,
   notasFinalEntrevistaSchema,
@@ -32,6 +33,8 @@ import {
 import { construirMensajesComprension } from "../prompts/comprension.prompt"
 import { construirMensajesCualitativa } from "../prompts/cualitativa.prompt"
 import { construirMensajesEntrevista } from "../prompts/entrevista-ia.prompt"
+import { reconciliarCriterios } from "../reconciliar-criterios"
+import { reconciliarDimensiones } from "../reconciliar-dimensiones"
 import { IAiProvider } from "./ai-provider.interface"
 
 /**
@@ -89,15 +92,29 @@ export class ClaudeProvider implements IAiProvider {
     const mensajes = construirMensajesCualitativa({
       contenidoRepo: input.contenidoRepo,
       profundidad: input.profundidad,
+      dimensiones: input.dimensiones,
+      criterios: input.criterios,
     })
     const modelo = this.resolverModelo(input.profundidad)
-    const respuesta = await this.invocarClaude(modelo, mensajes.system, mensajes.user)
-    const nota = typeof respuesta.nota === "number" ? respuesta.nota : 0
-    return {
-      nota,
-      comentario: respuesta.comentario ?? "",
-      confianza: respuesta.confianza ?? "media",
+    const respuesta = await this.invocarClaudeRaw(modelo, mensajes.system, mensajes.user)
+    const parsed = aiInformeCualitativoSchema.safeParse(respuesta)
+    if (!parsed.success) {
+      throw new BadRequestException({
+        code: apiErrorCodes.iaRespuestaMalformada,
+        message: "IA devolvio shape inesperado en el informe cualitativo.",
+      })
     }
+    // Reconciliamos las dimensiones contra los ejes pedidos: el informe cubre
+    // siempre exactamente las skills del transversal, sin importar lo que la IA
+    // omitiera o inventara.
+    const porDimension = reconciliarDimensiones(parsed.data.porDimension, input.dimensiones)
+    // Igual con la lista "a evaluar": el checklist cubre exactamente los
+    // criterios del admin (rellena omitidos, descarta inventados, orden canónico).
+    const cumplimientoCriterios = reconciliarCriterios(
+      parsed.data.cumplimientoCriterios ?? [],
+      input.criterios ?? [],
+    )
+    return { ...parsed.data, porDimension, cumplimientoCriterios }
   }
 
   async mantenerTurnoComprension(
