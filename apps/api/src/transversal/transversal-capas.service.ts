@@ -1,14 +1,17 @@
-import { ConflictException, Injectable, NotFoundException } from "@nestjs/common"
+import { ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import {
   CargarCapaComprensionInput,
   CargarCapaCualitativaInput,
   CargarCapaTestsInput,
   IntentoTransversalAdminResponse,
 } from "@nexott-learn/shared-types"
-import { Prisma } from "@prisma/client"
+import { Prisma, TipoEventoNotif } from "@prisma/client"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { IdempotencyService } from "../common/idempotency/idempotency.service"
+import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
+import { broadcastAdminsActivos } from "../notificaciones/notificaciones.helpers"
+import { NotificacionesService } from "../notificaciones/notificaciones.service"
 import { toIntentoAdmin } from "./transversal.helpers"
 import { SELECT_INTENTO_TRANSVERSAL_FIELDS } from "./transversal.types"
 
@@ -38,7 +41,13 @@ export interface CargarCapaResult {
  */
 @Injectable()
 export class TransversalCapasService {
-  constructor(private readonly idempotency: IdempotencyService) {}
+  private readonly logger = new Logger(TransversalCapasService.name)
+
+  constructor(
+    private readonly idempotency: IdempotencyService,
+    private readonly prisma: PrismaService,
+    private readonly notificaciones: NotificacionesService,
+  ) {}
 
   cargarCapaTests(input: {
     readonly intentoId: string
@@ -128,7 +137,39 @@ export class TransversalCapasService {
         return { status: HTTP_OK, body: toIntentoAdmin(actualizado) }
       },
     })
+    // La carga que completa las capas activas transiciona el intento a EVALUADO:
+    // avisar a los admins que hay un proyecto por revisar/finalizar. Solo en la
+    // transición real (no en replays idempotentes) y fire-and-forget: un fallo de
+    // notificación jamás debe tumbar la carga de la capa.
+    if (!ejecucion.replay && ejecucion.body.estado === "EVALUADO") {
+      await this.notificarPorRevisar(ejecucion.body)
+    }
     return { response: ejecucion.body, replay: ejecucion.replay, capa: input.capa }
+  }
+
+  /** Broadcast `TRANSVERSAL_POR_REVISAR` a los admins activos. Nunca propaga. */
+  private async notificarPorRevisar(intento: IntentoTransversalAdminResponse): Promise<void> {
+    try {
+      // Literal inline (como el resto de triggers): el shape lo garantiza el
+      // type-guard `esTransversalPorRevisarPayload` al leer/renderizar la notif.
+      await broadcastAdminsActivos(
+        this.prisma,
+        this.notificaciones,
+        this.logger,
+        TipoEventoNotif.TRANSVERSAL_POR_REVISAR,
+        {
+          intentoTransversalId: intento.intentoId,
+          cursoId: intento.curso.id,
+          cursoTitulo: intento.curso.titulo,
+          colaboradorNombre: intento.colaborador.nombre,
+        },
+      )
+    } catch (error) {
+      const detalle = error instanceof Error ? error.message : String(error)
+      this.logger.warn(
+        `notif | fallo | tipo=TRANSVERSAL_POR_REVISAR | intento=${intento.intentoId} | error=${detalle}`,
+      )
+    }
   }
 
   private cargarIntentoParaCarga(

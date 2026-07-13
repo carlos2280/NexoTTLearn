@@ -42,6 +42,10 @@ import {
   TransversalDisponiblePayload,
   esTransversalDisponiblePayload,
 } from "../../payload/transversal-disponible.payload"
+import {
+  TransversalPorRevisarPayload,
+  esTransversalPorRevisarPayload,
+} from "../../payload/transversal-por-revisar.payload"
 import { construirAsignacionCurso } from "./asignacion-curso.template"
 import { construirCasoReabierto } from "./caso-reabierto.template"
 import { construirCentroRevision } from "./centro-revision.template"
@@ -59,6 +63,7 @@ import { construirPlanesDesactualizados } from "./planes-desactualizados.templat
 import { construirRecordatorioDeadline } from "./recordatorio-deadline.template"
 import { construirResultadoCierre } from "./resultado-cierre.template"
 import { construirTransversalDisponible } from "./transversal-disponible.template"
+import { construirTransversalPorRevisar } from "./transversal-por-revisar.template"
 
 /**
  * Registro central de plantillas activas en P10c (D-S10-C9).
@@ -144,6 +149,11 @@ const ENTRY_CENTRO_REVISION: PlantillaEntry<CentroRevisionPayload> = {
   construir: construirCentroRevision,
 }
 
+const ENTRY_TRANSVERSAL_POR_REVISAR: PlantillaEntry<TransversalPorRevisarPayload> = {
+  esPayloadValido: esTransversalPorRevisarPayload,
+  construir: construirTransversalPorRevisar,
+}
+
 export const PLANTILLAS: ReadonlyMap<TipoEventoNotif, PlantillaEntry<unknown>> = new Map<
   TipoEventoNotif,
   PlantillaEntry<unknown>
@@ -164,6 +174,10 @@ export const PLANTILLAS: ReadonlyMap<TipoEventoNotif, PlantillaEntry<unknown>> =
   [TipoEventoNotif.MODULO_HUERFANO_SKILL, ENTRY_MODULO_HUERFANO_SKILL as PlantillaEntry<unknown>],
   [TipoEventoNotif.RECORDATORIO_DEADLINE, ENTRY_RECORDATORIO_DEADLINE as PlantillaEntry<unknown>],
   [TipoEventoNotif.CENTRO_REVISION, ENTRY_CENTRO_REVISION as PlantillaEntry<unknown>],
+  [
+    TipoEventoNotif.TRANSVERSAL_POR_REVISAR,
+    ENTRY_TRANSVERSAL_POR_REVISAR as PlantillaEntry<unknown>,
+  ],
 ])
 
 /**

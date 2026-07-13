@@ -56,6 +56,7 @@ export const AUDIENCIA_POR_TIPO: ReadonlyMap<TipoEventoNotif, AudienciaTipo> = n
   [TipoEventoNotif.MODULO_HUERFANO_SKILL, "admin"],
   [TipoEventoNotif.PLANES_DESACTUALIZADOS, "admin"],
   [TipoEventoNotif.CENTRO_REVISION, "admin"],
+  [TipoEventoNotif.TRANSVERSAL_POR_REVISAR, "admin"],
 ])
 
 /**

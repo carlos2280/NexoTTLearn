@@ -6,6 +6,7 @@ import {
   Prisma,
   RolAsignacion,
   RolUsuario,
+  TipoEventoNotif,
 } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
@@ -53,7 +54,7 @@ interface PrismaMock {
   }
   skill: { findMany: ReturnType<typeof vi.fn> }
   cursoSkillExigida: { findMany: ReturnType<typeof vi.fn> }
-  usuario: { findUnique: ReturnType<typeof vi.fn> }
+  usuario: { findUnique: ReturnType<typeof vi.fn>; findMany: ReturnType<typeof vi.fn> }
   planEstudio: { findUnique: ReturnType<typeof vi.fn> }
   itemPlan: { findMany: ReturnType<typeof vi.fn> }
   intentoBloque: { findMany: ReturnType<typeof vi.fn> }
@@ -82,7 +83,11 @@ function buildPrismaMock(): PrismaMock {
     },
     skill: { findMany: vi.fn().mockResolvedValue([]) },
     cursoSkillExigida: { findMany: vi.fn().mockResolvedValue([]) },
-    usuario: { findUnique: vi.fn() },
+    usuario: {
+      findUnique: vi.fn(),
+      // Audiencia del broadcast TRANSVERSAL_POR_REVISAR (admins activos).
+      findMany: vi.fn().mockResolvedValue([{ id: "admin-notif" }]),
+    },
     planEstudio: { findUnique: vi.fn() },
     itemPlan: { findMany: vi.fn().mockResolvedValue([]) },
     intentoBloque: { findMany: vi.fn().mockResolvedValue([]) },
@@ -168,7 +173,11 @@ beforeEach(() => {
       canalesEnviados: ["IN_APP"],
     }),
   }
-  capas = new TransversalCapasService(idempotency as unknown as IdempotencyService)
+  capas = new TransversalCapasService(
+    idempotency as unknown as IdempotencyService,
+    prisma as unknown as PrismaService,
+    notificaciones as unknown as NotificacionesService,
+  )
   service = new TransversalService(
     prisma as unknown as PrismaService,
     idempotency as unknown as IdempotencyService,
@@ -685,6 +694,104 @@ describe("E7. POST /intentos-transversal/:id/capas/tests (P8b)", () => {
     // FIX-P8-cierre §5.116: cargarCapa* devuelve `{ response, replay, capa }`.
     expect(r.capa).toBe("tests")
     expect(r.replay).toBe(false)
+    // Fase 4b: al transicionar a EVALUADO se avisa a los admins activos.
+    expect(notificaciones.crear).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usuarioId: "admin-notif",
+        tipo: TipoEventoNotif.TRANSVERSAL_POR_REVISAR,
+        payload: expect.objectContaining({ intentoTransversalId: INTENTO_ID }),
+      }),
+    )
+  })
+
+  it("NO avisa a los admins si la carga no transiciona a EVALUADO", async () => {
+    // Solo se carga tests; cualitativa/comprensión activas siguen sin nota → el
+    // intento sigue EN_EVALUACION y no debe dispararse el aviso.
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce(intentoBase({}))
+    prisma.intentoTransversal.update.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      transversalId: TRANSVERSAL_ID,
+      colaboradorId: COLABORADOR_ID,
+      fecha: new Date(),
+      estado: "EN_EVALUACION",
+      anulado: false,
+      motivoAnulacion: null,
+      repoUrl: REPO_URL,
+      repoOArtefacto: { tipo: "URL_GIT", url: REPO_URL },
+      comentarioColaborador: null,
+      notaCapaTests: new Prisma.Decimal(75),
+      notaCapaCualitativa: null,
+      notaCapaComprension: null,
+      notaGlobal: null,
+      aprobado: false,
+      colaborador: { id: COLABORADOR_ID, nombre: "Colab", email: "c@nttdata.test" },
+      transversal: {
+        id: TRANSVERSAL_ID,
+        descripcion: "Mini-proyecto",
+        umbralAprobacion: new Prisma.Decimal(70),
+        curso: { id: CURSO_ID, titulo: "Curso mock" },
+      },
+    })
+    const r = await service.cargarCapaTests({
+      intentoId: INTENTO_ID,
+      body: { nota: 75, detalle: { fuente: "ci" } },
+      idempotencyKey: IDEMPOTENCY_KEY,
+      usuario: ADMIN,
+    })
+    expect(r.response.estado).toBe("EN_EVALUACION")
+    expect(notificaciones.crear).not.toHaveBeenCalledWith(
+      expect.objectContaining({ tipo: TipoEventoNotif.TRANSVERSAL_POR_REVISAR }),
+    )
+  })
+
+  it("NO avisa a los admins en un replay idempotente aunque el estado sea EVALUADO", async () => {
+    // El replay devuelve el body cacheado (estado EVALUADO) sin re-ejecutar: el
+    // aviso ya se emitió en la ejecución original, no debe repetirse.
+    idempotency.runOnce.mockImplementationOnce(
+      async (input: {
+        ejecutor: (tx: unknown) => Promise<{ status: number; body: unknown }>
+      }) => {
+        const res = await input.ejecutor(prisma)
+        return { status: res.status, body: res.body, replay: true }
+      },
+    )
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce(
+      intentoBase({ notaCualitativa: 80, notaComprension: 70 }),
+    )
+    prisma.intentoTransversal.update.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      transversalId: TRANSVERSAL_ID,
+      colaboradorId: COLABORADOR_ID,
+      fecha: new Date(),
+      estado: "EVALUADO",
+      anulado: false,
+      motivoAnulacion: null,
+      repoUrl: REPO_URL,
+      repoOArtefacto: { tipo: "URL_GIT", url: REPO_URL },
+      comentarioColaborador: null,
+      notaCapaTests: new Prisma.Decimal(75),
+      notaCapaCualitativa: new Prisma.Decimal(80),
+      notaCapaComprension: new Prisma.Decimal(70),
+      notaGlobal: null,
+      aprobado: false,
+      colaborador: { id: COLABORADOR_ID, nombre: "Colab", email: "c@nttdata.test" },
+      transversal: {
+        id: TRANSVERSAL_ID,
+        descripcion: "Mini-proyecto",
+        umbralAprobacion: new Prisma.Decimal(70),
+        curso: { id: CURSO_ID, titulo: "Curso mock" },
+      },
+    })
+    const r = await service.cargarCapaTests({
+      intentoId: INTENTO_ID,
+      body: { nota: 75, detalle: { fuente: "ci" } },
+      idempotencyKey: IDEMPOTENCY_KEY,
+      usuario: ADMIN,
+    })
+    expect(r.replay).toBe(true)
+    expect(notificaciones.crear).not.toHaveBeenCalledWith(
+      expect.objectContaining({ tipo: TipoEventoNotif.TRANSVERSAL_POR_REVISAR }),
+    )
   })
 })
 

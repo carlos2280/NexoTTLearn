@@ -216,6 +216,7 @@ enum TipoEventoNotif {
   MODULO_HUERFANO_SKILL
   PLANES_DESACTUALIZADOS
   CENTRO_REVISION
+  TRANSVERSAL_POR_REVISAR
 
   @@map("tipo_evento_notif_enum")
 }

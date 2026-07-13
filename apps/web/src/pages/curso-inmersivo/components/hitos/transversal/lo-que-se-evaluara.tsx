@@ -36,7 +36,7 @@ export function LoQueSeEvaluara({ criterios = [] }: LoQueSeEvaluaraProps) {
           <ul className="flex flex-col gap-1.5">
             {criterios.map((criterio, i) => (
               // Viñeta neutra (no un ✓): son criterios por evaluar, no logros ya cumplidos.
-              // biome-ignore lint/suspicious/noArrayIndexKey: dos criterios pueden tener el mismo texto.
+              // Key con índice: dos criterios podrían tener el mismo texto.
               <li key={`${i}-${criterio}`} className="flex items-start gap-2.5">
                 <span
                   aria-hidden={true}

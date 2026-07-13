@@ -20,6 +20,7 @@ export const TIPOS_EVENTO_NOTIF = [
   "MODULO_HUERFANO_SKILL",
   "PLANES_DESACTUALIZADOS",
   "CENTRO_REVISION",
+  "TRANSVERSAL_POR_REVISAR",
 ] as const
 
 export type TipoEventoNotif = (typeof TIPOS_EVENTO_NOTIF)[number]
