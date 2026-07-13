@@ -52,6 +52,10 @@ function Reproductor({
         title="Video del curso"
         className="aspect-video w-full"
         loading="lazy"
+        // El servidor de la web fija `Referrer-Policy: no-referrer` (default de helmet); sin
+        // Referer, el player de YouTube no valida el dominio y falla ("Error 153"). Este policy
+        // por-iframe restaura el envío del origin y permite la reproducción.
+        referrerPolicy="strict-origin-when-cross-origin"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen={true}
       />
@@ -61,7 +65,12 @@ function Reproductor({
 
 const YOUTUBE_PATH_PREFIX = /^\/(embed\/|shorts\/)?/
 
-function embedUrl(url: string, proveedor: ProveedorVideo): string | null {
+/**
+ * Convierte la URL del proveedor a su embed canónico. Devuelve `null` si no se
+ * puede derivar el ID. `rel=0` limita las recomendaciones del final del video a
+ * las del mismo canal (apropiado para un curso: no manda al alumno a videos ajenos).
+ */
+export function embedUrl(url: string, proveedor: ProveedorVideo): string | null {
   try {
     const u = new URL(url)
     if (proveedor === "youtube") {
@@ -69,7 +78,7 @@ function embedUrl(url: string, proveedor: ProveedorVideo): string | null {
       if (id.length === 0) {
         return null
       }
-      return `https://www.youtube.com/embed/${id}`
+      return `https://www.youtube.com/embed/${id}?rel=0`
     }
     if (proveedor === "vimeo") {
       const id = u.pathname.split("/").filter(Boolean).pop()
