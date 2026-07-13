@@ -67,6 +67,7 @@ describe("validateEnv", () => {
         ["COOKIE_SECURE", "true"],
         ["ALLOWED_ORIGINS", "https://app.example.com,https://admin.example.com"],
         ["STORAGE_ROOT", "/data/nexott/storage"],
+        ["API_PUBLIC_URL", "https://api.example.com"],
       ),
     )
     expect(env.COOKIE_SECURE).toBe(true)
@@ -86,6 +87,7 @@ describe("validateEnv", () => {
         ["COOKIE_SAMESITE", "none"],
         ["ALLOWED_ORIGINS", "https://app.example.com"],
         ["STORAGE_ROOT", "/data/nexott/storage"],
+        ["API_PUBLIC_URL", "https://api.example.com"],
       ),
     )
     expect(env.COOKIE_SAMESITE).toBe("none")
@@ -171,6 +173,7 @@ describe("validateEnv", () => {
         ["COOKIE_SECURE", "true"],
         ["ALLOWED_ORIGINS", "https://app.example.com"],
         ["STORAGE_ROOT", "/data/nexott/storage"],
+        ["API_PUBLIC_URL", "https://api.example.com"],
       ),
     )
     expect(env.STORAGE_ROOT).toBe("/data/nexott/storage")
@@ -185,6 +188,17 @@ describe("validateEnv", () => {
     const env = validateEnv(buildEnv())
     expect(env.NOTIF_PURGA_CRON).toBe("0 3 * * *")
     expect(env.APP_BASE_URL).toBe("http://localhost:4000")
+  })
+
+  it("aplica el default de API_PUBLIC_URL", () => {
+    const env = validateEnv(buildEnv())
+    expect(env.API_PUBLIC_URL).toBe("http://localhost:4000")
+  })
+
+  it("rechaza API_PUBLIC_URL que no sea una URL valida", () => {
+    expect(() => validateEnv(buildEnv(["API_PUBLIC_URL", "no-es-una-url"]))).toThrow(
+      /API_PUBLIC_URL/,
+    )
   })
 
   it("acepta NOTIF_PURGA_CRON con caracteres validos", () => {
@@ -208,8 +222,35 @@ describe("validateEnv", () => {
         ["ALLOWED_ORIGINS", "https://app.example.com"],
         ["STORAGE_ROOT", "/data/nexott/storage"],
         ["APP_BASE_URL", "https://app.example.com"],
+        ["API_PUBLIC_URL", "https://api.example.com"],
       ),
     )
     expect(env.APP_BASE_URL).toBe("https://app.example.com")
+  })
+
+  it("rechaza API_PUBLIC_URL localhost (default) en NODE_ENV=production", () => {
+    expect(() =>
+      validateEnv(
+        buildEnv(
+          ["NODE_ENV", "production"],
+          ["COOKIE_SECURE", "true"],
+          ["ALLOWED_ORIGINS", "https://app.example.com"],
+          ["STORAGE_ROOT", "/data/nexott/storage"],
+        ),
+      ),
+    ).toThrow(/API_PUBLIC_URL/)
+  })
+
+  it("acepta API_PUBLIC_URL https en NODE_ENV=production", () => {
+    const env = validateEnv(
+      buildEnv(
+        ["NODE_ENV", "production"],
+        ["COOKIE_SECURE", "true"],
+        ["ALLOWED_ORIGINS", "https://app.example.com"],
+        ["STORAGE_ROOT", "/data/nexott/storage"],
+        ["API_PUBLIC_URL", "https://api.example.com"],
+      ),
+    )
+    expect(env.API_PUBLIC_URL).toBe("https://api.example.com")
   })
 })
