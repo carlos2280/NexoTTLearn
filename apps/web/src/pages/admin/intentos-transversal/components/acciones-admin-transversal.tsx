@@ -8,6 +8,7 @@ import type {
   IntentoTransversalAdminResponse,
 } from "@nexott-learn/shared-types"
 import { useState } from "react"
+import { GestionIntentosExtra } from "./gestion-intentos-extra"
 
 interface AccionesAdminTransversalProps {
   readonly intento: IntentoTransversalAdminResponse
@@ -81,6 +82,8 @@ export function AccionesAdminTransversal({ intento }: AccionesAdminTransversalPr
           Anular intento
         </Button>
       </div>
+
+      {intento.cupoIntentos ? <GestionIntentosExtra cupo={intento.cupoIntentos} /> : null}
 
       <ConfirmDialog
         abierto={finalizarAbierto}

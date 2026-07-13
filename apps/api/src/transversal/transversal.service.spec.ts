@@ -39,7 +39,10 @@ interface PrismaMock {
     findUniqueOrThrow: ReturnType<typeof vi.fn>
     findUnique: ReturnType<typeof vi.fn>
   }
-  asignacionCurso: { findUnique: ReturnType<typeof vi.fn> }
+  asignacionCurso: {
+    findUnique: ReturnType<typeof vi.fn>
+    update: ReturnType<typeof vi.fn>
+  }
   intentoTransversal: {
     findUnique: ReturnType<typeof vi.fn>
     findMany: ReturnType<typeof vi.fn>
@@ -68,7 +71,7 @@ function buildPrismaMock(): PrismaMock {
       findUniqueOrThrow: vi.fn(),
       findUnique: vi.fn().mockResolvedValue({ intentosMax: 3 }),
     },
-    asignacionCurso: { findUnique: vi.fn() },
+    asignacionCurso: { findUnique: vi.fn(), update: vi.fn() },
     intentoTransversal: {
       findUnique: vi.fn(),
       findMany: vi.fn().mockResolvedValue([]),
@@ -528,6 +531,101 @@ describe("E5. GET intento por id", () => {
     expect("notaCapaTests" in r).toBe(false)
     expect(r.notaGlobal).toBe(74)
     expect(r.aprobado).toBe(true)
+  })
+})
+
+describe("E5 cupo. obtenerIntento ADMIN enriquece cupoIntentos (Fase 4b ②)", () => {
+  function mockIntentoAdmin(): void {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      transversalId: TRANSVERSAL_ID,
+      colaboradorId: COLABORADOR_ID,
+      fecha: new Date("2026-05-11T10:00:00Z"),
+      estado: "EVALUADO",
+      anulado: false,
+      motivoAnulacion: null,
+      repoUrl: REPO_URL,
+      repoOArtefacto: { tipo: "URL_GIT", url: REPO_URL },
+      comentarioColaborador: null,
+      notaCapaTests: null,
+      notaCapaCualitativa: null,
+      notaCapaComprension: null,
+      notaGlobal: null,
+      aprobado: null,
+      colaborador: { id: COLABORADOR_ID, nombre: "Colab", email: "c@nttdata.test" },
+      transversal: {
+        id: TRANSVERSAL_ID,
+        descripcion: "Mini-proyecto",
+        umbralAprobacion: new Prisma.Decimal(70),
+        curso: { id: CURSO_ID, titulo: "Curso mock" },
+      },
+    })
+  }
+
+  it("cupoIntentos = usados / (intentosMax + extra)", async () => {
+    mockIntentoAdmin()
+    prisma.asignacionCurso.findUnique.mockResolvedValueOnce({
+      id: ASIGNACION_ID,
+      intentosExtraTransversal: 2,
+    })
+    prisma.proyectoTransversal.findUnique.mockResolvedValueOnce({ intentosMax: 3 })
+    prisma.intentoTransversal.count.mockResolvedValueOnce(4)
+    const r = (await service.obtenerIntento(INTENTO_ID, ADMIN)) as Record<string, unknown>
+    expect(r.cupoIntentos).toEqual({
+      asignacionId: ASIGNACION_ID,
+      intentosUsados: 4,
+      intentosCupo: 5,
+    })
+  })
+
+  it("cupoIntentos = null si la asignación ya no existe", async () => {
+    mockIntentoAdmin()
+    prisma.asignacionCurso.findUnique.mockResolvedValueOnce(null)
+    const r = (await service.obtenerIntento(INTENTO_ID, ADMIN)) as Record<string, unknown>
+    expect(r.cupoIntentos).toBeNull()
+  })
+})
+
+describe("E12. POST /asignaciones/:id/intentos-transversal/intento-extra (dar +1)", () => {
+  it("incrementa intentosExtraTransversal y devuelve el cupo nuevo", async () => {
+    prisma.asignacionCurso.findUnique
+      .mockResolvedValueOnce({
+        colaboradorId: COLABORADOR_ID,
+        curso: { id: CURSO_ID, transversalId: TRANSVERSAL_ID },
+      })
+      .mockResolvedValueOnce({ id: ASIGNACION_ID, intentosExtraTransversal: 1 })
+    prisma.asignacionCurso.update.mockResolvedValueOnce({ id: ASIGNACION_ID })
+    prisma.proyectoTransversal.findUnique.mockResolvedValueOnce({ intentosMax: 3 })
+    prisma.intentoTransversal.count.mockResolvedValueOnce(3)
+
+    const r = await service.darIntentoExtra({ asignacionId: ASIGNACION_ID })
+
+    expect(prisma.asignacionCurso.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: ASIGNACION_ID },
+        data: { intentosExtraTransversal: { increment: 1 } },
+      }),
+    )
+    expect(r).toEqual({ asignacionId: ASIGNACION_ID, intentosUsados: 3, intentosCupo: 4 })
+  })
+
+  it("404 si la asignación no existe (no incrementa)", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValueOnce(null)
+    await expect(service.darIntentoExtra({ asignacionId: ASIGNACION_ID })).rejects.toBeInstanceOf(
+      NotFoundException,
+    )
+    expect(prisma.asignacionCurso.update).not.toHaveBeenCalled()
+  })
+
+  it("404 si el curso no tiene transversal (no incrementa)", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValueOnce({
+      colaboradorId: COLABORADOR_ID,
+      curso: { id: CURSO_ID, transversalId: null },
+    })
+    await expect(service.darIntentoExtra({ asignacionId: ASIGNACION_ID })).rejects.toBeInstanceOf(
+      NotFoundException,
+    )
+    expect(prisma.asignacionCurso.update).not.toHaveBeenCalled()
   })
 })
 

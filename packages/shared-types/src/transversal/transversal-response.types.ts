@@ -144,6 +144,30 @@ export type IntentoTransversalParticipanteResponse = z.infer<
   typeof intentoTransversalParticipanteResponseSchema
 >
 
+/**
+ * Cupo de intentos del transversal para una asignación (Fase 4b ②). El cupo
+ * efectivo = `ProyectoTransversal.intentosMax` + `AsignacionCurso.intentosExtraTransversal`.
+ * `intentosUsados` cuenta los intentos NO anulados. Solo admin: alimenta el
+ * bloque "Intentos" de la pantalla del intento y es también el shape que
+ * devuelve el endpoint "dar +1 intento".
+ */
+export const cupoIntentosTransversalSchema = z
+  .object({
+    asignacionId: z.string().uuid(),
+    intentosUsados: z.number().int().min(0),
+    intentosCupo: z.number().int().min(0),
+  })
+  .strict()
+
+export type CupoIntentosTransversal = z.infer<typeof cupoIntentosTransversalSchema>
+
+/** Respuesta del endpoint `POST /asignaciones/:id/intentos-transversal/intento-extra`. */
+export const darIntentoExtraTransversalResponseSchema = cupoIntentosTransversalSchema
+
+export type DarIntentoExtraTransversalResponse = z.infer<
+  typeof darIntentoExtraTransversalResponseSchema
+>
+
 export const intentoTransversalAdminResponseSchema = intentoTransversalBaseSchema
   .extend({
     notaCapaTests: z.number().min(0).max(100).nullable(),
@@ -184,6 +208,13 @@ export const intentoTransversalAdminResponseSchema = intentoTransversalBaseSchem
         umbralAprobacion: z.number().min(0).max(100),
       })
       .strict(),
+    /**
+     * Cupo de intentos de la asignación (usados / cupo efectivo). `null` cuando
+     * no se pudo resolver la asignación (p. ej. el colaborador ya no está
+     * asignado al curso). Lo puebla el endpoint de detalle; los mappers de
+     * listado/capas lo dejan en `null` (no lo necesitan).
+     */
+    cupoIntentos: cupoIntentosTransversalSchema.nullable(),
   })
   .strict()
 

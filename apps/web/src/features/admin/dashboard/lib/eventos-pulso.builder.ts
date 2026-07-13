@@ -21,6 +21,7 @@ const TIPO_POR_ACCION = new Map<AccionAuditoriaLiteral, TipoEvento>([
   ["ASIGNACION_INICIADA", "matricula"],
   ["VOLUNTARIO_AUTOINSCRITO", "matricula"],
   ["NOTA_SKILL_EDITADA_MANUALMENTE", "matricula"],
+  ["INTENTO_TRANSVERSAL_EXTRA_OTORGADO", "matricula"],
   // evaluacion — cierres / resultados
   ["EVALUACION_APLICADA", "evaluacion"],
   ["INTENTO_TRANSVERSAL_FINALIZADO", "evaluacion"],
@@ -60,6 +61,7 @@ const VERBO_POR_ACCION = new Map<AccionAuditoriaLiteral, string>([
   ["ASIGNACION_INICIADA", "inició una asignación"],
   ["VOLUNTARIO_AUTOINSCRITO", "se autoinscribió"],
   ["NOTA_SKILL_EDITADA_MANUALMENTE", "editó una nota de skill"],
+  ["INTENTO_TRANSVERSAL_EXTRA_OTORGADO", "otorgó un intento extra del transversal"],
   ["EVALUACION_APLICADA", "aplicó la evaluación inicial"],
   ["INTENTO_TRANSVERSAL_FINALIZADO", "cerró un intento transversal"],
   ["INTENTO_ENTREVISTA_IA_FINALIZADO", "cerró una entrevista IA"],

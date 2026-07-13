@@ -21,6 +21,7 @@ import {
   CargarCapaTestsInput,
   CrearIntentoTransversalInput,
   CrearIntentoTransversalResponse,
+  DarIntentoExtraTransversalResponse,
   DisponibilidadTransversalResponse,
   EditarSkillsTransversalInput,
   EditarSkillsTransversalResponse,
@@ -391,6 +392,32 @@ export class TransversalController {
       })
     }
     return response
+  }
+
+  // E12
+  @Post("asignaciones/:asignacionId/intentos-transversal/intento-extra")
+  @Roles(RolUsuario.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async darIntentoExtra(
+    @Param("asignacionId", ParseUUIDPipe) asignacionId: string,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+    @Req() req: Request,
+  ): Promise<DarIntentoExtraTransversalResponse> {
+    const sesion = this.requireUsuario(usuario)
+    const cupo = await this.transversal.darIntentoExtra({ asignacionId })
+    await this.auditLog.record({
+      usuarioId: sesion.usuarioId,
+      accion: AccionAuditoria.INTENTO_TRANSVERSAL_EXTRA_OTORGADO,
+      exito: true,
+      recursoTipo: "asignacion_curso",
+      recursoId: asignacionId,
+      metadata: {
+        intentosCupo: cupo.intentosCupo,
+        intentosUsados: cupo.intentosUsados,
+      },
+      ...extractContextoHttp(req),
+    })
+    return cupo
   }
 
   private requireUsuario(usuario: SesionUsuario | undefined): SesionUsuario {

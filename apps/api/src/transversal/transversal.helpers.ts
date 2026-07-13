@@ -131,6 +131,10 @@ export function toIntentoAdmin(
       descripcion: intento.transversal.descripcion,
       umbralAprobacion: Number(intento.transversal.umbralAprobacion.toString()),
     },
+    // El cupo de intentos es un dato de asignación (no del intento). El mapper
+    // se mantiene puro devolviendo `null`; solo el endpoint de detalle lo puebla
+    // (Fase 4b ②). Los mappers de listado/capas lo dejan en `null`.
+    cupoIntentos: null,
   }
 }
 
