@@ -7,6 +7,7 @@ import {
   InternalServerErrorException,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   Req,
@@ -21,10 +22,12 @@ import {
   CargarCapaTestsInput,
   CrearIntentoTransversalInput,
   CrearIntentoTransversalResponse,
+  CurarReporteFinalInput,
   DarIntentoExtraTransversalResponse,
   DisponibilidadTransversalResponse,
   EditarSkillsTransversalInput,
   EditarSkillsTransversalResponse,
+  EvidenciaRepo,
   FinalizarTransversalBodyInput,
   FinalizarTransversalResponse,
   IntentoTransversalAdminResponse,
@@ -38,6 +41,7 @@ import {
   cargarCapaCualitativaSchema,
   cargarCapaTestsSchema,
   crearIntentoTransversalSchema,
+  curarReporteFinalSchema,
   editarSkillsTransversalSchema,
   finalizarTransversalBodySchema,
   listarIntentosTransversalCursoQuerySchema,
@@ -418,6 +422,48 @@ export class TransversalController {
       ...extractContextoHttp(req),
     })
     return cupo
+  }
+
+  // E13 — Curación del informe (Fase 4b ③). El admin edita el `reporteFinal` (lo
+  // que verá el participante) antes de finalizar. Solo mientras el intento está
+  // en EVALUADO; una vez finalizado el informe queda publicado.
+  @Patch("intentos-transversal/:intentoId/reporte-final")
+  @Roles(RolUsuario.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async curarReporteFinal(
+    @Param("intentoId", ParseUUIDPipe) intentoId: string,
+    @Body(new ZodValidationPipe(curarReporteFinalSchema)) body: CurarReporteFinalInput,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+    @Req() req: Request,
+  ): Promise<IntentoTransversalAdminResponse> {
+    const sesion = this.requireUsuario(usuario)
+    const resultado = await this.transversal.curarReporteFinal({
+      intentoId,
+      reporteFinal: body.reporteFinal,
+    })
+    // A09: la curación cambia lo que verá el participante — se audita quién editó.
+    // Metadata sin contenido evaluable (solo IDs), patrón D-AUDIT-1 (fuera de TX).
+    await this.auditLog.record({
+      usuarioId: sesion.usuarioId,
+      accion: AccionAuditoria.INTENTO_TRANSVERSAL_REPORTE_CURADO,
+      exito: true,
+      recursoTipo: "intento_transversal",
+      recursoId: intentoId,
+      ...extractContextoHttp(req),
+    })
+    return resultado
+  }
+
+  // E14 — "Qué evaluó la IA" (Fase 4b ③): contenido completo del snapshot del
+  // repo (pesado). Va en endpoint aparte para no inflar el detalle del intento.
+  @Get("intentos-transversal/:intentoId/evidencia-repo")
+  @Roles(RolUsuario.ADMIN)
+  obtenerEvidenciaRepo(
+    @Param("intentoId", ParseUUIDPipe) intentoId: string,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<EvidenciaRepo> {
+    this.requireUsuario(usuario)
+    return this.transversal.obtenerEvidenciaRepo({ intentoId })
   }
 
   private requireUsuario(usuario: SesionUsuario | undefined): SesionUsuario {

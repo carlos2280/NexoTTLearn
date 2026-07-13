@@ -1,10 +1,12 @@
 import { BadRequestException, InternalServerErrorException } from "@nestjs/common"
 import {
+  EvidenciaRepoResumen,
   IntentoTransversalAdminResponse,
   IntentoTransversalParticipanteResponse,
   RepoOArtefacto,
   RevisionIa,
   criteriosEvaluacionSchema,
+  evidenciaRepoSchema,
   repoOArtefactoSchema,
   revisionIaSchema,
 } from "@nexott-learn/shared-types"
@@ -12,6 +14,14 @@ import { Prisma } from "@prisma/client"
 import { z } from "zod"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { IntentoTransversalSeleccionado } from "./transversal.types"
+
+/**
+ * Los mappers aceptan tanto el payload de detalle (con `evidenciaRepo`) como el
+ * del listado (sin `evidenciaRepo`, aligerado). Se modela con el campo opcional.
+ */
+type IntentoParaMapper = Omit<IntentoTransversalSeleccionado, "evidenciaRepo"> & {
+  readonly evidenciaRepo?: Prisma.JsonValue
+}
 
 const idempotencyKeyUuidSchema = z.string().uuid()
 
@@ -98,9 +108,39 @@ function extraerRevisionIa(evaluacionesCapas: Prisma.JsonValue): RevisionIa | nu
   return parsed.success ? parsed.data : null
 }
 
-export function toIntentoAdmin(
-  intento: IntentoTransversalSeleccionado,
-): IntentoTransversalAdminResponse {
+/**
+ * Parsea una columna JSONB que guarda un informe (`reporteIa` / `reporteFinal`,
+ * Fase 4b ③) directamente como `RevisionIa`. `null` si aún no existe o no cumple
+ * el shape (defensa ante legacy/corrupto).
+ */
+function parsearReporte(value: Prisma.JsonValue | null): RevisionIa | null {
+  if (value === null || value === undefined) {
+    return null
+  }
+  const parsed = revisionIaSchema.safeParse(value)
+  return parsed.success ? parsed.data : null
+}
+
+/**
+ * Extrae el RESUMEN de la evidencia del repo (sin el `contenido` pesado) para el
+ * detalle admin. Valida contra el shape completo y descarta el contenido; `null`
+ * si aún no hay evidencia o el JSON no cumple el contrato.
+ */
+function extraerEvidenciaResumen(
+  value: Prisma.JsonValue | null | undefined,
+): EvidenciaRepoResumen | null {
+  if (value === null || value === undefined) {
+    return null
+  }
+  const parsed = evidenciaRepoSchema.safeParse(value)
+  if (!parsed.success) {
+    return null
+  }
+  const { commit, archivos, truncado, bytesTotales } = parsed.data
+  return { commit, archivos, truncado, bytesTotales }
+}
+
+export function toIntentoAdmin(intento: IntentoParaMapper): IntentoTransversalAdminResponse {
   // Invariante de dominio: todo ProyectoTransversal pertenece a un Curso
   // (Curso.transversalId @unique). La relacion inversa es nullable en Prisma
   // por el orden de cascada al borrar — en runtime no puede faltar.
@@ -124,6 +164,11 @@ export function toIntentoAdmin(
     anulado: intento.anulado,
     motivoAnulacion: intento.motivoAnulacion,
     revisionIa: extraerRevisionIa(intento.evaluacionesCapas),
+    reporteIa: parsearReporte(intento.reporteIa),
+    reporteFinal: parsearReporte(intento.reporteFinal),
+    evidenciaRepo: extraerEvidenciaResumen(intento.evidenciaRepo),
+    validadoPor: intento.validadoPor ?? null,
+    fechaValidacion: intento.fechaValidacion?.toISOString() ?? null,
     colaborador: intento.colaborador,
     curso: intento.transversal.curso,
     transversal: {
@@ -143,7 +188,7 @@ export function toIntentoAdmin(
  * Solo al FINALIZADO se le suma `notaGlobal` + `aprobado`.
  */
 export function toIntentoParticipante(
-  intento: IntentoTransversalSeleccionado,
+  intento: IntentoParaMapper,
 ): IntentoTransversalParticipanteResponse {
   const finalizado = intento.estado === "FINALIZADO"
   return {
@@ -154,5 +199,8 @@ export function toIntentoParticipante(
     comentarioColaborador: intento.comentarioColaborador,
     notaGlobal: finalizado ? decimalAnumero(intento.notaGlobal) : null,
     aprobado: finalizado ? intento.aprobado : null,
+    // El informe FINAL curado por el admin (Fase 4b ③). Solo al FINALIZADO — antes
+    // el participante no ve nada del informe. Nunca el crudo ni la evidencia.
+    informe: finalizado ? parsearReporte(intento.reporteFinal) : null,
   }
 }

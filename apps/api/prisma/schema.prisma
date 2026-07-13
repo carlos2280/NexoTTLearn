@@ -327,6 +327,7 @@ enum AccionAuditoria {
   INTENTO_TRANSVERSAL_ANULADO
   INTENTO_TRANSVERSAL_CAPA_CARGADA
   INTENTO_TRANSVERSAL_EXTRA_OTORGADO
+  INTENTO_TRANSVERSAL_REPORTE_CURADO
   TRANSVERSAL_SKILLS_ACTUALIZADAS
   INTENTO_ENTREVISTA_IA_CREADO
   INTENTO_ENTREVISTA_IA_FINALIZADO
@@ -738,6 +739,7 @@ model Usuario {
   previewsEvalInicial   PreviewEvaluacionInicial[]    @relation("PreviewEvalInicial_CreadoPor")
   cargasEvalInicial     CargaEvaluacionInicial[]      @relation("CargaEvalInicial_AplicadoPor")
   idempotencyKeys       IdempotencyKey[]
+  intentosTransvValidados IntentoTransversal[]        @relation("IntentoTransversal_Validador")
 
   @@index([rol])
   @@map("usuarios")
@@ -1093,14 +1095,24 @@ model IntentoTransversal {
   notaCapaCualitativa   Decimal?                 @map("nota_capa_cualitativa") @db.Decimal(5, 2)
   notaCapaComprension   Decimal?                 @map("nota_capa_comprension") @db.Decimal(5, 2)
   notaGlobal            Decimal?                 @map("nota_global") @db.Decimal(5, 2)
+  // Curacion del informe (Fase 4b3): pre-informe crudo de la IA (inmutable),
+  // snapshot de lo que la IA leyo del repo, informe final curado por el admin
+  // (lo unico que ve el participante), y sello de quien/cuando lo valido.
+  reporteIa             Json?                    @map("reporte_ia") @db.JsonB
+  evidenciaRepo         Json?                    @map("evidencia_repo") @db.JsonB
+  reporteFinal          Json?                    @map("reporte_final") @db.JsonB
+  validadoPor           String?                  @map("validado_por") @db.Uuid
+  fechaValidacion       DateTime?                @map("fecha_validacion") @db.Timestamptz(6)
 
   transversal ProyectoTransversal @relation(fields: [transversalId], references: [id], onDelete: Restrict)
   colaborador Colaborador         @relation(fields: [colaboradorId], references: [id], onDelete: Restrict)
+  validador   Usuario?            @relation("IntentoTransversal_Validador", fields: [validadoPor], references: [id], onDelete: SetNull)
 
   @@index([transversalId, colaboradorId, fecha(sort: Desc)], map: "idx_intentos_trans_colab")
   @@index([estado], map: "idx_intentos_transversal_estado_no_anulado")
   @@index([transversalId], map: "idx_intentos_transversal_transversal_id")
   @@index([colaboradorId], map: "idx_intentos_transversal_colaborador_id")
+  @@index([validadoPor], map: "idx_intentos_transversal_validado_por")
   @@map("intentos_transversal")
 }
 

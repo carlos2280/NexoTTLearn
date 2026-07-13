@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client"
 import { describe, expect, it } from "vitest"
-import { toIntentoAdmin } from "./transversal.helpers"
+import { toIntentoAdmin, toIntentoParticipante } from "./transversal.helpers"
 import { IntentoTransversalSeleccionado } from "./transversal.types"
 
 const REVISION_IA_VALIDA = {
@@ -15,7 +15,10 @@ const REVISION_IA_VALIDA = {
   aReforzar: [{ que: "tests", sugerencia: "casos borde" }],
 }
 
-function buildIntento(evaluacionesCapas: Prisma.JsonValue): IntentoTransversalSeleccionado {
+function buildIntento(
+  evaluacionesCapas: Prisma.JsonValue,
+  extra: Record<string, unknown> = {},
+): IntentoTransversalSeleccionado {
   return {
     id: "11111111-1111-1111-1111-111111111111",
     transversalId: "22222222-2222-2222-2222-222222222222",
@@ -33,6 +36,11 @@ function buildIntento(evaluacionesCapas: Prisma.JsonValue): IntentoTransversalSe
     notaGlobal: null,
     aprobado: null,
     evaluacionesCapas,
+    reporteIa: null,
+    reporteFinal: null,
+    evidenciaRepo: null,
+    validadoPor: null,
+    fechaValidacion: null,
     colaborador: { id: "33333333-3333-3333-3333-333333333333", nombre: "Juan", email: "j@x.com" },
     transversal: {
       id: "22222222-2222-2222-2222-222222222222",
@@ -40,6 +48,7 @@ function buildIntento(evaluacionesCapas: Prisma.JsonValue): IntentoTransversalSe
       umbralAprobacion: new Prisma.Decimal(70),
       curso: { id: "44444444-4444-4444-4444-444444444444", titulo: "Curso" },
     },
+    ...extra,
   } as unknown as IntentoTransversalSeleccionado
 }
 
@@ -68,5 +77,84 @@ describe("toIntentoAdmin — revisionIa", () => {
   it("devuelve null (no lanza) ante un detalle corrupto", () => {
     const res = toIntentoAdmin(buildIntento({ cualitativa: { confianza: "INVALIDA" } }))
     expect(res.revisionIa).toBeNull()
+  })
+})
+
+describe("toIntentoAdmin — curación (Fase 4b ③)", () => {
+  it("expone reporteIa, reporteFinal y sello de validación", () => {
+    const res = toIntentoAdmin(
+      buildIntento(
+        {},
+        {
+          reporteIa: { comentario: "crudo IA", confianza: "MEDIA" },
+          reporteFinal: { comentario: "final curado", confianza: "ALTA" },
+          validadoPor: "55555555-5555-5555-5555-555555555555",
+          fechaValidacion: new Date("2026-07-12T13:00:00.000Z"),
+        },
+      ),
+    )
+    expect(res.reporteIa?.comentario).toBe("crudo IA")
+    expect(res.reporteFinal?.comentario).toBe("final curado")
+    expect(res.validadoPor).toBe("55555555-5555-5555-5555-555555555555")
+    expect(res.fechaValidacion).toBe("2026-07-12T13:00:00.000Z")
+  })
+
+  it("evidenciaRepo se expone como RESUMEN (sin el contenido pesado)", () => {
+    const res = toIntentoAdmin(
+      buildIntento(
+        {},
+        {
+          evidenciaRepo: {
+            commit: "abc1234",
+            archivos: ["index.js"],
+            truncado: false,
+            bytesTotales: 42,
+            contenido: "no debe viajar en el detalle",
+          },
+        },
+      ),
+    )
+    expect(res.evidenciaRepo).toEqual({
+      commit: "abc1234",
+      archivos: ["index.js"],
+      truncado: false,
+      bytesTotales: 42,
+    })
+    expect(res.evidenciaRepo).not.toHaveProperty("contenido")
+  })
+
+  it("campos de curación null cuando aún no existen", () => {
+    const res = toIntentoAdmin(buildIntento({}))
+    expect(res.reporteIa).toBeNull()
+    expect(res.reporteFinal).toBeNull()
+    expect(res.evidenciaRepo).toBeNull()
+    expect(res.validadoPor).toBeNull()
+    expect(res.fechaValidacion).toBeNull()
+  })
+})
+
+const INFORME_FINAL = { comentario: "áreas por reforzar", confianza: "ALTA" as const }
+
+describe("toIntentoParticipante — informe final (Fase 4b ③)", () => {
+  it("NO expone el informe antes de FINALIZADO (EVALUADO)", () => {
+    const res = toIntentoParticipante(
+      buildIntento({}, { estado: "EVALUADO", reporteFinal: INFORME_FINAL }),
+    )
+    expect(res.informe).toBeNull()
+  })
+
+  it("expone el reporteFinal como `informe` en FINALIZADO", () => {
+    const res = toIntentoParticipante(
+      buildIntento({}, { estado: "FINALIZADO", reporteFinal: INFORME_FINAL }),
+    )
+    expect(res.informe?.comentario).toBe("áreas por reforzar")
+  })
+
+  it("nunca expone el crudo ni la evidencia", () => {
+    const res = toIntentoParticipante(
+      buildIntento({}, { estado: "FINALIZADO", reporteFinal: INFORME_FINAL }),
+    ) as Record<string, unknown>
+    expect("reporteIa" in res).toBe(false)
+    expect("evidenciaRepo" in res).toBe(false)
   })
 })

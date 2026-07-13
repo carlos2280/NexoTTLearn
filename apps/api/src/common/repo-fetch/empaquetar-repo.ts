@@ -29,9 +29,13 @@ export interface ArchivoLeido {
 
 export interface RepoEmpaquetado {
   readonly contenido: string
+  /** Rutas de los archivos efectivamente incluidos (orden estable). */
+  readonly archivos: readonly string[]
   readonly archivosIncluidos: number
   readonly bytesTotales: number
   readonly truncado: boolean
+  /** SHA del HEAD clonado; lo puebla `RepoFetchService` (null si no se resolvió). */
+  readonly commit: string | null
 }
 
 /** Directorios que nunca aportan valor de evaluación (ruido / peso). */
@@ -172,6 +176,7 @@ export function empaquetarArchivos(
 ): RepoEmpaquetado {
   const ordenados = [...archivos].sort((a, b) => a.ruta.localeCompare(b.ruta))
   const bloques: string[] = []
+  const rutasIncluidas: string[] = []
   let bytesTotales = 0
   let incluidos = 0
   let truncado = false
@@ -184,14 +189,18 @@ export function empaquetarArchivos(
       continue
     }
     bloques.push(`===== ${archivo.ruta} =====\n${archivo.contenido}`)
+    rutasIncluidas.push(archivo.ruta)
     bytesTotales += archivo.bytes
     incluidos += 1
   }
 
   return {
     contenido: bloques.join("\n\n"),
+    archivos: rutasIncluidas,
     archivosIncluidos: incluidos,
     bytesTotales,
     truncado,
+    // El commit lo resuelve el service tras el clone; el empaquetado no lo conoce.
+    commit: null,
   }
 }

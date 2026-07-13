@@ -46,6 +46,9 @@ export {
   criterioEvaluacionSchema,
   criteriosEvaluacionSchema,
   cumplimientoCriterioSchema,
+  evidenciaRepoSchema,
+  evidenciaRepoResumenSchema,
+  curarReporteFinalSchema,
 } from "./capas.schema"
 export type {
   CargarCapaTestsInput,
@@ -56,6 +59,9 @@ export type {
   RevisionIa,
   CriteriosEvaluacion,
   CumplimientoCriterio,
+  EvidenciaRepo,
+  EvidenciaRepoResumen,
+  CurarReporteFinalInput,
 } from "./capas.schema"
 export {
   finalizarTransversalBodySchema,

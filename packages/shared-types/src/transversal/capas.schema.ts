@@ -134,6 +134,46 @@ export const cargarCapaCualitativaSchema = z
 
 export type CargarCapaCualitativaInput = z.infer<typeof cargarCapaCualitativaSchema>
 
+/**
+ * "Qué evaluó la IA" (Fase 4b ③): snapshot de lo que la IA leyó del repo, para
+ * que la evidencia sobreviva aunque el participante borre o cambie el repo. Se
+ * captura al evaluar (`RepoFetchService`) y se persiste inmutable en el intento.
+ * `contenido` es el texto exacto empaquetado (hasta el tope del empaquetador).
+ */
+export const evidenciaRepoSchema = z
+  .object({
+    commit: z.string().max(64).nullable(),
+    archivos: z.array(z.string().max(500)).max(500),
+    truncado: z.boolean(),
+    bytesTotales: z.number().int().nonnegative(),
+    contenido: z.string(),
+  })
+  .strict()
+
+export type EvidenciaRepo = z.infer<typeof evidenciaRepoSchema>
+
+/**
+ * Metadata de la evidencia SIN el `contenido` (que puede pesar cientos de KB).
+ * Es lo que viaja en el detalle admin del intento; el `contenido` completo se
+ * pide bajo demanda a su endpoint propio.
+ */
+export const evidenciaRepoResumenSchema = evidenciaRepoSchema.omit({ contenido: true })
+
+export type EvidenciaRepoResumen = z.infer<typeof evidenciaRepoResumenSchema>
+
+/**
+ * Body de curación del informe final (Fase 4b ③): el admin edita el informe que
+ * verá el participante. Reusa el shape de `revisionIaSchema` (mismo informe, ya
+ * curado). El backend sella `validadoPor`/`fechaValidacion` al finalizar.
+ */
+export const curarReporteFinalSchema = z
+  .object({
+    reporteFinal: revisionIaSchema,
+  })
+  .strict()
+
+export type CurarReporteFinalInput = z.infer<typeof curarReporteFinalSchema>
+
 export const cargarCapaComprensionSchema = z
   .object({
     nota: notaCapaSchema,

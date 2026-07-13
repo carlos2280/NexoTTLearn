@@ -1,5 +1,9 @@
 import { z } from "zod"
-import { criteriosEvaluacionSchema, revisionIaSchema } from "./capas.schema"
+import {
+  criteriosEvaluacionSchema,
+  evidenciaRepoResumenSchema,
+  revisionIaSchema,
+} from "./capas.schema"
 
 /**
  * Shapes de respuesta del dominio transversal (Slice 8 P8a — D-S8-C3, D86).
@@ -137,6 +141,12 @@ export const intentoTransversalParticipanteResponseSchema = intentoTransversalBa
   .extend({
     notaGlobal: z.number().min(0).max(100).nullable(),
     aprobado: z.boolean().nullable(),
+    /**
+     * Informe FINAL curado por el admin (Fase 4b ③). Es lo ÚNICO del informe que
+     * ve el participante, y sólo cuando `estado === 'FINALIZADO'` (antes es
+     * `null`). Nunca ve el `reporteIa` crudo ni la evidencia del repo.
+     */
+    informe: revisionIaSchema.nullable(),
   })
   .strict()
 
@@ -183,6 +193,20 @@ export const intentoTransversalAdminResponseSchema = intentoTransversalBaseSchem
      * admin: alimenta la pantalla de revisión del intento (Fase 4).
      */
     revisionIa: revisionIaSchema.nullable(),
+    /**
+     * Curación del informe (Fase 4b ③), sólo admin:
+     *  - `reporteIa`: pre-informe CRUDO de la IA (inmutable). `null` si aún no evaluó.
+     *  - `reporteFinal`: informe curado por el admin (lo que verá el participante).
+     *    Arranca como copia del crudo; editable hasta finalizar.
+     *  - `evidenciaRepo`: metadata de "qué evaluó la IA" (commit, archivos,
+     *    truncado, bytes) SIN el contenido pesado (se pide a su endpoint aparte).
+     *  - `validadoPor` / `fechaValidacion`: sello de quién cerró la curación y cuándo.
+     */
+    reporteIa: revisionIaSchema.nullable(),
+    reporteFinal: revisionIaSchema.nullable(),
+    evidenciaRepo: evidenciaRepoResumenSchema.nullable(),
+    validadoPor: z.string().uuid().nullable(),
+    fechaValidacion: z.string().nullable(),
     /**
      * Contexto del intento para que la pantalla admin no tenga que hacer
      * lookups adicionales por colaborador/curso/transversal. Solo admin

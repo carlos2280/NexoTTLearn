@@ -17,13 +17,16 @@ import {
   DisponibilidadTransversalResponse,
   EditarSkillsTransversalInput,
   EditarSkillsTransversalResponse,
+  EvidenciaRepo,
   FinalizarTransversalResponse,
   IntentoTransversalAdminResponse,
   IntentoTransversalListadoItem,
   IntentoTransversalParticipanteResponse,
   ListarIntentosTransversalCursoQuery,
   ListarIntentosTransversalQuery,
+  RevisionIa,
   TransversalResponse,
+  evidenciaRepoSchema,
 } from "@nexott-learn/shared-types"
 import {
   DesbloqueoCurso,
@@ -53,7 +56,11 @@ import {
   toIntentoAdmin,
   toIntentoParticipante,
 } from "./transversal.helpers"
-import { SELECT_INTENTO_TRANSVERSAL_FIELDS, SELECT_TRANSVERSAL_FIELDS } from "./transversal.types"
+import {
+  SELECT_INTENTO_TRANSVERSAL_FIELDS,
+  SELECT_INTENTO_TRANSVERSAL_LISTA_FIELDS,
+  SELECT_TRANSVERSAL_FIELDS,
+} from "./transversal.types"
 
 export type { CargarCapaResult } from "./transversal-capas.service"
 
@@ -506,15 +513,19 @@ export class TransversalService {
     const [data, total] = await this.prisma.$transaction([
       this.prisma.intentoTransversal.findMany({
         where,
-        select: SELECT_INTENTO_TRANSVERSAL_FIELDS,
+        // Listado: SELECT aligerado (sin el `contenido` pesado de evidenciaRepo).
+        select: SELECT_INTENTO_TRANSVERSAL_LISTA_FIELDS,
         orderBy: { fecha: "desc" },
         skip,
         take,
       }),
       this.prisma.intentoTransversal.count({ where }),
     ])
-    const mapper = input.usuario.rol === RolUsuario.ADMIN ? toIntentoAdmin : toIntentoParticipante
-    return buildPaginatedResponse(data.map(mapper), total, page, pageSize)
+    const esAdmin = input.usuario.rol === RolUsuario.ADMIN
+    const items = data.map((intento) =>
+      esAdmin ? toIntentoAdmin(intento) : toIntentoParticipante(intento),
+    )
+    return buildPaginatedResponse(items, total, page, pageSize)
   }
 
   // =========================================================================
@@ -753,6 +764,12 @@ export class TransversalService {
           notaGlobal: new Prisma.Decimal(notaGlobal),
           aprobado,
           fechaFinalizacion: new Date(),
+          // Sello de curación (Fase 4b ③): finalizar = publicar el informe final
+          // al participante. Registramos quién lo validó (Usuario.id de la sesión
+          // admin, FK válida) y cuándo. `reporteFinal` ya trae la copia del crudo,
+          // editable hasta este punto; a partir de aquí el participante lo ve.
+          validadoPor: input.usuario.usuarioId,
+          fechaValidacion: new Date(),
         },
       })
       if (r.count === 0) {
@@ -874,6 +891,84 @@ export class TransversalService {
       },
     })
     return { response: ejecucion.body, replay: ejecucion.replay }
+  }
+
+  // =========================================================================
+  // E13. PATCH /api/v1/intentos-transversal/:intentoId/reporte-final
+  //
+  // Curación del informe (Fase 4b ③): el admin edita el `reporteFinal` (lo que
+  // verá el participante) antes de finalizar. Solo editable mientras el intento
+  // sigue en EVALUADO; una vez FINALIZADO/ANULADO el informe queda cerrado. El
+  // `reporteIa` crudo NUNCA se toca (evidencia inmutable de lo que dijo la IA).
+  // =========================================================================
+  async curarReporteFinal(input: {
+    readonly intentoId: string
+    readonly reporteFinal: RevisionIa
+  }): Promise<IntentoTransversalAdminResponse> {
+    const intento = await this.prisma.intentoTransversal.findUnique({
+      where: { id: input.intentoId },
+      select: { id: true, estado: true, anulado: true },
+    })
+    if (!intento) {
+      throw new NotFoundException({
+        code: apiErrorCodes.intentoTransversalNoEncontrado,
+        message: `Intento transversal ${input.intentoId} no encontrado.`,
+      })
+    }
+    if (intento.anulado || intento.estado !== "EVALUADO") {
+      throw new ConflictException({
+        code: apiErrorCodes.conflictIntentoTransversalNoEditable,
+        message: "El informe solo se puede curar mientras el intento está en EVALUADO.",
+        details: { estado: intento.estado, anulado: intento.anulado },
+      })
+    }
+    try {
+      const actualizado = await this.prisma.intentoTransversal.update({
+        where: { id: input.intentoId },
+        data: { reporteFinal: input.reporteFinal as unknown as Prisma.InputJsonValue },
+        select: SELECT_INTENTO_TRANSVERSAL_FIELDS,
+      })
+      return toIntentoAdmin(actualizado)
+    } catch (error) {
+      // TOCTOU: si el intento se borró entre el SELECT y el UPDATE (P2025).
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+        throw new NotFoundException({
+          code: apiErrorCodes.intentoTransversalNoEncontrado,
+          message: `Intento transversal ${input.intentoId} no encontrado.`,
+        })
+      }
+      throw error
+    }
+  }
+
+  // =========================================================================
+  // E14. GET /api/v1/intentos-transversal/:intentoId/evidencia-repo
+  //
+  // "Qué evaluó la IA" (Fase 4b ③): devuelve el snapshot COMPLETO del repo que
+  // leyó la IA (incluye el `contenido` pesado). Endpoint aparte del detalle para
+  // no inflar cada carga. 404 si el intento no existe o aún no tiene evidencia.
+  // =========================================================================
+  async obtenerEvidenciaRepo(input: { readonly intentoId: string }): Promise<EvidenciaRepo> {
+    const intento = await this.prisma.intentoTransversal.findUnique({
+      where: { id: input.intentoId },
+      select: { id: true, evidenciaRepo: true },
+    })
+    if (!intento) {
+      throw new NotFoundException({
+        code: apiErrorCodes.intentoTransversalNoEncontrado,
+        message: `Intento transversal ${input.intentoId} no encontrado.`,
+      })
+    }
+    const parsed = evidenciaRepoSchema.safeParse(intento.evidenciaRepo)
+    if (!parsed.success) {
+      // El intento existe pero aún no tiene evidencia (o el JSON no valida): code
+      // propio para no confundir con "el intento no existe".
+      throw new NotFoundException({
+        code: apiErrorCodes.evidenciaRepoNoDisponible,
+        message: "Este intento aún no tiene evidencia del repositorio.",
+      })
+    }
+    return parsed.data
   }
 
   // =========================================================================

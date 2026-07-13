@@ -257,6 +257,15 @@ export class JobEvaluacionTransversalService implements OnModuleInit {
         },
         idempotencyKey: this.derivarKey(intentoId, "cualitativa"),
         usuario: sesion,
+        // Evidencia inmutable de "qué evaluó la IA" (Fase 4b ③): sobrevive aunque
+        // el participante borre o cambie el repo. `contenido` = texto exacto leído.
+        evidenciaRepo: {
+          commit: repo.commit,
+          archivos: [...repo.archivos],
+          truncado: repo.truncado,
+          bytesTotales: repo.bytesTotales,
+          contenido: repo.contenido,
+        },
       })
       return true
     } catch (error) {

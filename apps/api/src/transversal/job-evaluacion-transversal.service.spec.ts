@@ -79,9 +79,11 @@ function buildRepoFetchMock(): {
 } {
   const descargarYEmpaquetar = vi.fn().mockResolvedValue({
     contenido: CONTENIDO_REPO,
+    archivos: ["index.js"],
     archivosIncluidos: 1,
     bytesTotales: CONTENIDO_REPO.length,
     truncado: false,
+    commit: "abc1234",
   })
   return {
     mock: { descargarYEmpaquetar } as unknown as RepoFetchService,

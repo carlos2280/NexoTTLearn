@@ -186,6 +186,9 @@ function handlerCrearIntento(req: MockRequest): CrearIntentoTransversalResponse 
     comentarioColaborador: req.body.comentarioColaborador?.trim() || null,
     notaGlobal: null,
     aprobado: null,
+    // Fase 4b ③: informe final curado; el mock lo deja null (el participante solo
+    // lo ve al FINALIZADO, y este mock no cura informes).
+    informe: null,
     asignacionId,
     resolvedAt,
   }
