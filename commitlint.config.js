@@ -13,6 +13,12 @@
  */
 module.exports = {
   extends: ["@commitlint/config-conventional"],
+  // Los merge commits no siguen Conventional Commits por diseno. `defaultIgnores`
+  // solo cubre el formato por defecto de GitHub ("Merge pull request..." / "Merge
+  // branch..."); un merge con asunto escrito a mano ("Merge #51: ...") se colaba al
+  // linter. Este ignore adicional salta cualquier commit que empiece por "Merge ".
+  // No relaja ninguna regla: solo acota que se lintea (no aplica a commits normales).
+  ignores: [(message) => /^Merge /.test(message)],
   rules: {
     "type-enum": [
       2,
