@@ -334,4 +334,69 @@ describe("ClaudeProvider (P8b — activo)", () => {
     expect(logCombined).not.toContain("bar-secreto")
     expect(logCombined).not.toContain("resumen")
   })
+
+  it("mantenerTurnoComprension OK devuelve la siguiente pregunta cuando no finaliza", async () => {
+    asInternals(provider).client.messages.create.mockResolvedValueOnce({
+      model: "claude-sonnet-test",
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            nota: null,
+            siguientePregunta: "Que hace el modulo X?",
+            finalizado: false,
+          }),
+        },
+      ],
+      usage: usageMock({ inputTokens: 20, outputTokens: 10 }),
+    })
+    const r = await provider.mantenerTurnoComprension({
+      repoUrl: "https://github.com/acme/repo",
+      profundidad: "SEMI_SENIOR",
+      turnoIndex: 0,
+      transcripcionPrevia: [],
+    })
+    expect(r.finalizado).toBe(false)
+    expect(r.siguientePregunta).toBe("Que hace el modulo X?")
+    expect(r.nota).toBeNull()
+  })
+
+  it("mantenerTurnoComprension finalizado devuelve la nota y sin siguiente pregunta", async () => {
+    asInternals(provider).client.messages.create.mockResolvedValueOnce({
+      model: "claude-sonnet-test",
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ nota: 82, siguientePregunta: "ignorada", finalizado: true }),
+        },
+      ],
+      usage: usageMock({ inputTokens: 20, outputTokens: 10 }),
+    })
+    const r = await provider.mantenerTurnoComprension({
+      repoUrl: "https://github.com/acme/repo",
+      profundidad: "SEMI_SENIOR",
+      turnoIndex: 2,
+      transcripcionPrevia: [],
+    })
+    expect(r.finalizado).toBe(true)
+    expect(r.nota).toBe(82)
+    expect(r.siguientePregunta).toBeNull()
+  })
+
+  it("mantenerTurnoComprension shape inesperado -> BadRequestException", async () => {
+    asInternals(provider).client.messages.create.mockResolvedValueOnce({
+      model: "claude-sonnet-test",
+      // JSON valido pero viola el schema (falta `nota`, campo extra con strict()).
+      content: [{ type: "text", text: '{"foo": "bar"}' }],
+      usage: usageMock({ inputTokens: 1, outputTokens: 1 }),
+    })
+    await expect(
+      provider.mantenerTurnoComprension({
+        repoUrl: "https://github.com/acme/repo",
+        profundidad: "JUNIOR",
+        turnoIndex: 0,
+        transcripcionPrevia: [],
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException)
+  })
 })
