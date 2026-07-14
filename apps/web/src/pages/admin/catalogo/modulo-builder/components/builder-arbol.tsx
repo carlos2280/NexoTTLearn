@@ -13,7 +13,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-
 import { CSS } from "@dnd-kit/utilities"
 import type { BloqueResponse, SeccionResponse } from "@nexott-learn/shared-types"
 import { ChevronDown, ChevronRight, GripVertical, Pencil, Plus, Trash2 } from "lucide-react"
-import { type CSSProperties, useEffect, useState } from "react"
+import { type CSSProperties, useEffect, useRef, useState } from "react"
 import { tipoBloqueMeta } from "../bloque-tipo-meta"
 import { bloquesVisibles, construirPermutacionConOcultos } from "../reordenar-bloques"
 import type { SeccionConBloques, Seleccion } from "../types"
@@ -41,6 +41,18 @@ interface BuilderArbolProps {
 const PREFIX_SEC = "sec:"
 const PREFIX_BLQ = "blq:"
 
+/**
+ * Ids de secciones que aún no se habían visto — se auto-expanden una sola vez.
+ * Las ya conocidas (incluidas las que el usuario colapsó a propósito) NO se
+ * re-expanden aunque `arbol` cambie de referencia por un refetch de la query.
+ */
+export function idsSeccionesNuevas(
+  idsActuales: readonly string[],
+  conocidas: ReadonlySet<string>,
+): readonly string[] {
+  return idsActuales.filter((id) => !conocidas.has(id))
+}
+
 export function BuilderArbol({
   arbol,
   seleccion,
@@ -57,12 +69,26 @@ export function BuilderArbol({
   const [expandidas, setExpandidas] = useState<ReadonlySet<string>>(
     () => new Set(arbol.map((item) => item.seccion.id)),
   )
+  // Secciones a las que ya se les aplicó el estado inicial (expandido por
+  // defecto). Es un ref, no estado: solo sirve para no re-expandir una sección
+  // colapsada cuando `arbol` cambia de referencia (refetch en cada navegación).
+  const seccionesConocidas = useRef<Set<string>>(new Set(arbol.map((item) => item.seccion.id)))
 
   useEffect(() => {
+    const nuevas = idsSeccionesNuevas(
+      arbol.map((item) => item.seccion.id),
+      seccionesConocidas.current,
+    )
+    if (nuevas.length === 0) {
+      return
+    }
+    for (const id of nuevas) {
+      seccionesConocidas.current.add(id)
+    }
     setExpandidas((prev) => {
       const siguiente = new Set(prev)
-      for (const item of arbol) {
-        siguiente.add(item.seccion.id)
+      for (const id of nuevas) {
+        siguiente.add(id)
       }
       return siguiente
     })
