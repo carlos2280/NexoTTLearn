@@ -460,7 +460,9 @@ export class IntentosBloqueService {
         { orden: "asc" },
       ],
     })
-    if (bloques.length === 0) return []
+    if (bloques.length === 0) {
+      return []
+    }
 
     const bloqueIds = bloques.map((b) => b.id)
     const intentos = await this.prisma.intentoBloque.findMany({
@@ -529,7 +531,7 @@ export class IntentosBloqueService {
       where: { id: input.bloqueId },
       select: { id: true, tipo: true, version: true, contenido: true, esEvaluable: true },
     })
-    if (!bloque || !bloque.esEvaluable) {
+    if (!bloque?.esEvaluable) {
       throw new NotFoundException({
         code: apiErrorCodes.bloqueNoEncontrado,
         message: "Bloque evaluable no encontrado.",
@@ -565,10 +567,14 @@ export class IntentosBloqueService {
     const colaboradores: BloqueEvaluableColaboradorItem[] = []
     for (const [, lista] of porColaborador) {
       const mejor = lista.find((l) => l.esMejorIntento) ?? lista[0]
-      if (!mejor) continue
+      if (!mejor) {
+        continue
+      }
       const mejorNota = Number(mejor.nota)
       const ultimo = lista[0]
-      if (!ultimo) continue
+      if (!ultimo) {
+        continue
+      }
       colaboradores.push({
         colaborador: {
           id: mejor.colaborador.id,
@@ -978,9 +984,13 @@ function agregarPreguntasFalladas(
   const conteo = new Map<string, number>()
   for (const it of intentos) {
     const raw = it.preguntasFalladas
-    if (!Array.isArray(raw)) continue
+    if (!Array.isArray(raw)) {
+      continue
+    }
     for (const v of raw) {
-      if (typeof v !== "string") continue
+      if (typeof v !== "string") {
+        continue
+      }
       conteo.set(v, (conteo.get(v) ?? 0) + 1)
     }
   }
