@@ -19,10 +19,10 @@ export function VistaEvaluandoTransversal({ intento }: VistaEvaluandoTransversal
       <header className="flex flex-col gap-2">
         <span className="nx-eyebrow text-aurora-violet">Hito de cierre</span>
         <h2 className="text-display-md text-text-primary leading-tight">
-          Tu proyecto esta siendo evaluado.
+          Tu proyecto está siendo evaluado.
         </h2>
         <p className="text-body text-text-secondary">
-          Tomate un cafe — te avisaremos cuando este. Mientras tanto puedes seguir estudiando.
+          Tómate un café — te avisaremos cuando esté. Mientras tanto puedes seguir estudiando.
         </p>
       </header>
 
@@ -44,7 +44,7 @@ export function VistaEvaluandoTransversal({ intento }: VistaEvaluandoTransversal
             className="nx-pulse-dot inline-block h-2 w-2 rounded-pill bg-aurora-cyan"
             style={{ boxShadow: "0 0 8px 2px rgb(var(--color-aurora-cyan-rgb) / 0.35)" }}
           />
-          <span className="text-body-sm text-text-secondary">En evaluacion</span>
+          <span className="text-body-sm text-text-secondary">En evaluación</span>
         </div>
       </article>
     </section>
