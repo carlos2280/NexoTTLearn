@@ -5,6 +5,7 @@ import { ArchivoTipo } from "@prisma/client"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { StorageService } from "../common/storage/storage.service"
 import { LeerArchivoResult } from "../common/storage/storage.types"
+import { AppEnv } from "../config/env.validation"
 import { detectarMimeImagen } from "./deteccion-mime-imagen"
 
 const PREFIJO_API = "/api/v1"
@@ -17,13 +18,17 @@ interface SubirImagenInput {
 
 @Injectable()
 export class ImagenesService {
-  private readonly appBaseUrl: string
+  // La API sirve las imagenes, asi que el `src` debe apuntar a la URL publica de
+  // la API (API_PUBLIC_URL), no a la de la web (APP_BASE_URL, la de los emails).
+  // En prod web y API viven en hostnames distintos: usar APP_BASE_URL aqui hace
+  // que el <img> pida la foto a la web y reciba el index.html en su lugar.
+  private readonly apiPublicUrl: string
 
   constructor(
     private readonly storage: StorageService,
-    configService: ConfigService,
+    config: ConfigService<AppEnv, true>,
   ) {
-    this.appBaseUrl = configService.getOrThrow<string>("APP_BASE_URL")
+    this.apiPublicUrl = config.get("API_PUBLIC_URL", { infer: true })
   }
 
   /**
@@ -52,7 +57,7 @@ export class ImagenesService {
       },
     })
 
-    return { archivoId, url: `${this.appBaseUrl}${PREFIJO_API}/imagenes/${archivoId}` }
+    return { archivoId, url: `${this.apiPublicUrl}${PREFIJO_API}/imagenes/${archivoId}` }
   }
 
   /**

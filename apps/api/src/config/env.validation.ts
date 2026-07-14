@@ -175,6 +175,13 @@ const envSchema = z
       .default("0 8 * * *"),
     // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
     APP_BASE_URL: z.string().url().default("http://localhost:4000"),
+    // URL publica de la API (este servicio). Distinta de APP_BASE_URL, que apunta
+    // a la WEB (links de los emails). Se usa para construir el `src` de las
+    // imagenes de contenido, que SIEMPRE las sirve la API. En deploys separados
+    // (web y API en hostnames distintos) usar APP_BASE_URL aqui rompe las
+    // imagenes en prod: el <img> pediria la foto a la web y recibiria el HTML.
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    API_PUBLIC_URL: z.string().url().default("http://localhost:4000"),
     // ---------------------------------------------------------------------
     // Reportes estrategicos (Slice 11 P11c — D-S11-C2, D-S11-C4).
     //   REPORTE_CACHE_CRON  — recalculo nocturno top-N scopes (default 03:00).
@@ -257,6 +264,18 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ["ALLOWED_ORIGINS"],
         message: "ALLOWED_ORIGINS no puede estar vacio en NODE_ENV=production",
+      })
+    }
+    // API_PUBLIC_URL con el default localhost en prod repetiria el bug de las
+    // imagenes rotas (el <img> pediria la foto a localhost). Falla al arranque
+    // en vez de servir imagenes rotas en silencio.
+    const apiPublicHost = new URL(data.API_PUBLIC_URL).hostname
+    if (apiPublicHost === "localhost" || apiPublicHost === "127.0.0.1") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["API_PUBLIC_URL"],
+        message:
+          "API_PUBLIC_URL no puede apuntar a localhost en NODE_ENV=production (debe ser el dominio publico de la API que sirve las imagenes)",
       })
     }
     if (data.SECRETS_ENCRYPTION_KEY.toLowerCase() === SECRETS_ENCRYPTION_KEY_PLACEHOLDER) {

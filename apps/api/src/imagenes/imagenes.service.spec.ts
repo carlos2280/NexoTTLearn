@@ -3,6 +3,7 @@ import type { ConfigService } from "@nestjs/config"
 import { ArchivoTipo } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { StorageService } from "../common/storage/storage.service"
+import type { AppEnv } from "../config/env.validation"
 import { ImagenesService } from "./imagenes.service"
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00])
@@ -14,10 +15,18 @@ let service: ImagenesService
 
 beforeEach(() => {
   storage = { guardar: vi.fn(), leer: vi.fn() }
-  const config = { getOrThrow: vi.fn().mockReturnValue("https://api.nexott.test") }
+  // El `src` de la imagen debe salir de API_PUBLIC_URL (dominio de la API), no de
+  // APP_BASE_URL (dominio de la web). El mock devuelve el dominio de la API solo
+  // para esa clave, de modo que el test falla si el servicio lee la variable
+  // equivocada.
+  const config = {
+    get: vi.fn((key: string) =>
+      key === "API_PUBLIC_URL" ? "https://api.nexott.test" : "https://web.nexott.test",
+    ),
+  }
   service = new ImagenesService(
     storage as unknown as StorageService,
-    config as unknown as ConfigService,
+    config as unknown as ConfigService<AppEnv, true>,
   )
 })
 
