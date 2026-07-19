@@ -1,5 +1,6 @@
 import { Badge } from "@/shared/components/ui/badge"
 import { RUTAS } from "@/shared/constants/rutas"
+import { extraerTextoPlano } from "@/shared/lib/sanitize-html"
 import type { IntentoTransversalAdminResponse } from "@nexott-learn/shared-types"
 import { ArrowLeft } from "lucide-react"
 import { Link } from "react-router-dom"
@@ -50,7 +51,7 @@ export function HeaderIntentoTransversal({ intento }: HeaderIntentoTransversalPr
         <p className="text-body text-text-secondary">
           {intento.curso.titulo}
           <span className="px-2 text-text-disabled">·</span>
-          {intento.transversal.descripcion}
+          {extraerTextoPlano(intento.transversal.descripcion)}
         </p>
         <p className="text-body-sm text-text-tertiary">{intento.colaborador.email}</p>
         <div className="mt-1 flex items-center gap-3 text-body-sm text-text-tertiary">
