@@ -48,7 +48,7 @@ NexoTTLearn/
 | `make dev-api` | Solo backend (localhost:4000) |
 | `make db-up` / `db-down` | Postgres en Docker |
 | `make db-migrate` | `prisma migrate dev` |
-| `make db-seed` | Seed (admin@nexott.local / Admin1234!) |
+| `make db-seed` | Seed (curso demo + admins + participante) — credenciales en "Credenciales de acceso local" |
 | `make db-studio` | Prisma Studio |
 | `make db-reset` | ⚠️ Reset destructivo de la BD |
 | `make validate` | typecheck + lint + test (gate de CI) |
@@ -60,6 +60,28 @@ NexoTTLearn/
 - 5173 — Web Vite
 - 5435 — Postgres (Docker, expuesto en host; container interno 5432)
 - 5555 — Prisma Studio (cuando se levanta)
+
+## Credenciales de acceso local
+
+Qué usuario funciona depende de `VITE_USE_MOCKS` en `apps/web/.env`.
+
+**Backend real** (`VITE_USE_MOCKS=false`, tras `make db-seed`):
+
+| Rol | Email | Password |
+|---|---|---|
+| Admin (sin cambio forzado) | `qa-admin@nexott.local` | `Cambiar2026!` |
+| Participante | `participante@nexott.local` | `Qa1234!` |
+
+Los admins `royarzun@emeal.nttdata.com` y `carlos.fuentes.fuentes@emeal.nttdata.com` usan la misma `Cambiar2026!` pero **exigen cambio de password** al entrar. Override del seed: env `QA_ADMIN_PASSWORD` / `QA_USER_PASSWORD`.
+
+**Datos mock** (`VITE_USE_MOCKS=true`, sin backend, vía MSW — usados al maquetar UI sola):
+
+| Rol | Email | Password |
+|---|---|---|
+| Admin | `admin@nexott.local` | `Admin1234!` |
+| Participante | `participante@nexott.local` | `Participante1234!` |
+
+⚠️ Si `VITE_USE_MOCKS` **no** está definida en `apps/web/.env`, el default interno es `true` (mock): usarías las credenciales mock aunque el backend esté corriendo.
 
 ## Convenciones (autoridad y carga automática)
 
