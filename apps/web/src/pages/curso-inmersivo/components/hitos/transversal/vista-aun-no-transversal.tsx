@@ -1,7 +1,12 @@
 import { Button } from "@/shared/components/ui/button"
 import { tiempoRelativo } from "@/shared/lib/tiempo-relativo"
-import type { IntentoTransversalParticipanteResponse } from "@nexott-learn/shared-types"
+import type {
+  CupoIntentosTransversal,
+  IntentoTransversalParticipanteResponse,
+} from "@nexott-learn/shared-types"
 import { ExternalLink, RefreshCw } from "lucide-react"
+import { AvisoIntentosAgotados } from "./aviso-intentos-agotados"
+import { copyIntentosRestantes, hayIntentosDisponibles } from "./cupo-transversal.helpers"
 import { HistorialIntentosTransversal } from "./historial-intentos-transversal"
 
 const RGX_HTTPS_PREFIJO = /^https:\/\//
@@ -9,6 +14,7 @@ const RGX_HTTPS_PREFIJO = /^https:\/\//
 interface VistaAunNoTransversalProps {
   readonly intento: IntentoTransversalParticipanteResponse
   readonly intentos: readonly IntentoTransversalParticipanteResponse[]
+  readonly cupo: CupoIntentosTransversal | null
   readonly onIntentarDeNuevo: () => void
 }
 
@@ -21,8 +27,13 @@ interface VistaAunNoTransversalProps {
 export function VistaAunNoTransversal({
   intento,
   intentos,
+  cupo,
   onIntentarDeNuevo,
 }: VistaAunNoTransversalProps) {
+  // Con el cupo agotado el reenvío ya no procede (backend 409): mostramos el
+  // aviso honesto en vez del CTA. `cupo === null` (cargando/sin dato) no bloquea.
+  const agotado = cupo !== null && !hayIntentosDisponibles(cupo)
+
   return (
     <section className="flex flex-col gap-8">
       <header className="flex flex-col gap-3">
@@ -34,12 +45,19 @@ export function VistaAunNoTransversal({
         </p>
       </header>
 
-      <div>
-        <Button onClick={onIntentarDeNuevo}>
-          <RefreshCw className="mr-2 h-3.5 w-3.5" aria-hidden={true} />
-          Enviar otro intento
-        </Button>
-      </div>
+      {agotado ? (
+        <AvisoIntentosAgotados />
+      ) : (
+        <div className="flex flex-col gap-2">
+          {cupo ? (
+            <p className="text-body-sm text-text-secondary">{copyIntentosRestantes(cupo)}</p>
+          ) : null}
+          <Button className="self-start" onClick={onIntentarDeNuevo}>
+            <RefreshCw className="mr-2 h-3.5 w-3.5" aria-hidden={true} />
+            Enviar otro intento
+          </Button>
+        </div>
+      )}
 
       <article className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-6">
         <span className="nx-eyebrow text-text-tertiary">Tu ultimo intento</span>

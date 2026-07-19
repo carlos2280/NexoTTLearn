@@ -1,5 +1,6 @@
 import type {
   CrearIntentoTransversalResponse,
+  CupoIntentosTransversal,
   IntentoTransversalParticipanteResponse,
   Paginated,
   TransversalResponse,
@@ -11,13 +12,16 @@ import { type MockRequest, defineRoute } from "./router"
 const RTE_TRANSVERSAL_CURSO = /^\/cursos\/([^/]+)\/transversal$/
 const RTE_INTENTOS_LIST = /^\/asignaciones\/([^/]+)\/intentos-transversal$/
 const RTE_INTENTOS_CREATE = /^\/asignaciones\/([^/]+)\/intentos-transversal$/
+const RTE_CUPO = /^\/asignaciones\/([^/]+)\/transversal\/cupo$/
 
 const RGX_CURSO_ID = /^\/cursos\/([^/]+)\/transversal/
 const RGX_ASIG_ID = /^\/asignaciones\/([^/]+)\/intentos-transversal/
+const RGX_ASIG_ID_CUPO = /^\/asignaciones\/([^/]+)\/transversal\/cupo/
 
 const STORAGE_KEY_INTENTOS = "transversal-intentos"
 const RESULT_OVERRIDE_KEY = "nexott-mock:transversal-resultado"
 const EVALUACION_MS = 10_000
+const CUPO_INTENTOS_MOCK = 3
 const RGX_URL_GIT_VALIDA = /^https:\/\/(github|gitlab)\.com\//
 
 const TRANSVERSAL_POR_CURSO: ReadonlyMap<string, TransversalResponse> = new Map([
@@ -218,8 +222,23 @@ function handlerListarIntentos(
   }
 }
 
+function handlerCupoTransversal(req: MockRequest): CupoIntentosTransversal {
+  resolverIntentosVencidos()
+  const match = req.path.match(RGX_ASIG_ID_CUPO)
+  const asignacionId = match?.[1] ?? "asg-unknown"
+  const intentosUsados = cargarIntentos().filter(
+    (intento) => intento.asignacionId === asignacionId,
+  ).length
+  return {
+    asignacionId: pad36(asignacionId),
+    intentosUsados,
+    intentosCupo: CUPO_INTENTOS_MOCK,
+  }
+}
+
 export const handlersTransversal = [
   defineRoute("GET", RTE_TRANSVERSAL_CURSO, handlerTransversalCurso),
+  defineRoute("GET", RTE_CUPO, handlerCupoTransversal),
   defineRoute("GET", RTE_INTENTOS_LIST, handlerListarIntentos),
   defineRoute("POST", RTE_INTENTOS_CREATE, handlerCrearIntento),
 ]

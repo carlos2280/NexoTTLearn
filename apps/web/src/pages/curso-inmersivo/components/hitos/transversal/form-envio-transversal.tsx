@@ -2,12 +2,17 @@ import { useCrearIntentoTransversal } from "@/features/transversal/hooks/use-cre
 import { Button } from "@/shared/components/ui/button"
 import { TextField } from "@/shared/components/ui/text-field"
 import { Textarea } from "@/shared/components/ui/textarea"
-import { crearIntentoTransversalSchema } from "@nexott-learn/shared-types"
+import {
+  type CupoIntentosTransversal,
+  crearIntentoTransversalSchema,
+} from "@nexott-learn/shared-types"
 import { GitBranch, Send } from "lucide-react"
 import { useState } from "react"
+import { copyIntentosRestantes } from "./cupo-transversal.helpers"
 
 interface FormEnvioTransversalProps {
   readonly asignacionId: string
+  readonly cupo: CupoIntentosTransversal | null
   readonly urlInicial?: string
   readonly onIntentoCreado: (intentoId: string) => void
 }
@@ -28,6 +33,7 @@ const MAX_COMENTARIO = 2000
  */
 export function FormEnvioTransversal({
   asignacionId,
+  cupo,
   urlInicial = "",
   onIntentoCreado,
 }: FormEnvioTransversalProps) {
@@ -113,7 +119,9 @@ export function FormEnvioTransversal({
           <Send className="mr-2 h-3.5 w-3.5" aria-hidden={true} />
           {crear.isPending ? "Enviando…" : "Enviar mi proyecto"}
         </Button>
-        <p className="text-caption text-text-tertiary">Recibiras el resultado en pocos minutos.</p>
+        <p className="text-caption text-text-tertiary">
+          {cupo ? `${copyIntentosRestantes(cupo)} · ` : ""}Recibiras el resultado en pocos minutos.
+        </p>
       </footer>
     </section>
   )

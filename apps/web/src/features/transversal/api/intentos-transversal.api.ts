@@ -6,6 +6,7 @@ import type {
   CargarCapaTestsInput,
   CrearIntentoTransversalInput,
   CrearIntentoTransversalResponse,
+  CupoIntentosTransversal,
   DarIntentoExtraTransversalResponse,
   FinalizarTransversalResponse,
   IntentoTransversalAdminResponse,
@@ -41,6 +42,15 @@ export async function listarIntentosTransversal(
     `/asignaciones/${asignacionId}/intentos-transversal`,
   )
   return respuesta.data
+}
+
+/**
+ * `GET /api/v1/asignaciones/:asignacionId/transversal/cupo` (E15). Cupo de
+ * intentos del participante para el hito transversal (B1): usados / cupo
+ * efectivo. Mismo shape que consume el bloque "Intentos" del admin.
+ */
+export function obtenerCupoTransversal(asignacionId: string): Promise<CupoIntentosTransversal> {
+  return httpClient.get<CupoIntentosTransversal>(`/asignaciones/${asignacionId}/transversal/cupo`)
 }
 
 /**

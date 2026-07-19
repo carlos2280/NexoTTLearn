@@ -1,6 +1,8 @@
+import { useCupoTransversal } from "@/features/transversal/hooks/use-cupo-transversal"
 import { useListarIntentosTransversal } from "@/features/transversal/hooks/use-listar-intentos-transversal"
 import { useTransversalCurso } from "@/features/transversal/hooks/use-transversal-curso"
 import type {
+  CupoIntentosTransversal,
   IntentoTransversalParticipanteResponse,
   TransversalResponse,
 } from "@nexott-learn/shared-types"
@@ -53,6 +55,10 @@ export function CanvasTransversal({
   // dedupe por queryKey, asi que esto NO dispara dos requests.
   useListarIntentosTransversal(asignacionId, { pollingActivo: haySondeable })
 
+  // Cupo de intentos (B1). Es una mejora, NO un bloqueante: no entra en el gate
+  // de carga; si falla, el canvas sigue funcionando sin el "N de M".
+  const cupo = useCupoTransversal(asignacionId)
+
   const intentoActivo = useMemo(
     () => decidirIntentoActivo(intentos.data ?? [], intentoIdRecienCreado),
     [intentos.data, intentoIdRecienCreado],
@@ -92,6 +98,7 @@ export function CanvasTransversal({
           asignacionId={asignacionId}
           intentoActivo={intentoActivo}
           intentos={listaIntentos}
+          cupo={cupo.data ?? null}
           forzarBrief={forzarBrief}
           tieneEntrevistaIa={tieneEntrevistaIa}
           onIntentoCreado={onIntentoCreado}
@@ -107,6 +114,7 @@ interface ContenidoTransversalProps {
   readonly asignacionId: string
   readonly intentoActivo: IntentoTransversalParticipanteResponse | null
   readonly intentos: readonly IntentoTransversalParticipanteResponse[]
+  readonly cupo: CupoIntentosTransversal | null
   readonly forzarBrief: boolean
   readonly tieneEntrevistaIa: boolean
   readonly onIntentoCreado: (intentoId: string) => void
@@ -119,6 +127,7 @@ function ContenidoTransversal(props: ContenidoTransversalProps) {
     asignacionId,
     intentoActivo,
     intentos,
+    cupo,
     forzarBrief,
     tieneEntrevistaIa,
     onIntentoCreado,
@@ -133,6 +142,7 @@ function ContenidoTransversal(props: ContenidoTransversalProps) {
       <VistaBriefTransversal
         transversal={transversal}
         asignacionId={asignacionId}
+        cupo={cupo}
         onIntentoCreado={onIntentoCreado}
         urlInicial={urlInicial}
       />
@@ -159,6 +169,7 @@ function ContenidoTransversal(props: ContenidoTransversalProps) {
     <VistaAunNoTransversal
       intento={intentoActivo}
       intentos={intentos}
+      cupo={cupo}
       onIntentarDeNuevo={onIntentarDeNuevo}
     />
   )

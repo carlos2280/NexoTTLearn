@@ -1,11 +1,14 @@
 import { sanitizarHtml } from "@/shared/lib/sanitize-html"
-import type { TransversalResponse } from "@nexott-learn/shared-types"
+import type { CupoIntentosTransversal, TransversalResponse } from "@nexott-learn/shared-types"
+import { AvisoIntentosAgotados } from "./aviso-intentos-agotados"
+import { hayIntentosDisponibles } from "./cupo-transversal.helpers"
 import { FormEnvioTransversal } from "./form-envio-transversal"
 import { LoQueSeEvaluara } from "./lo-que-se-evaluara"
 
 interface VistaBriefTransversalProps {
   readonly transversal: TransversalResponse
   readonly asignacionId: string
+  readonly cupo: CupoIntentosTransversal | null
   readonly onIntentoCreado: (intentoId: string) => void
   readonly urlInicial?: string
 }
@@ -19,9 +22,14 @@ interface VistaBriefTransversalProps {
 export function VistaBriefTransversal({
   transversal,
   asignacionId,
+  cupo,
   onIntentoCreado,
   urlInicial,
 }: VistaBriefTransversalProps) {
+  // Si el cupo se agotó no hay envío posible (el backend lo rechazaría con 409):
+  // en su lugar, el aviso honesto. `cupo === null` (cargando/sin dato) no bloquea.
+  const agotado = cupo !== null && !hayIntentosDisponibles(cupo)
+
   return (
     <section className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
@@ -36,11 +44,16 @@ export function VistaBriefTransversal({
 
       <LoQueSeEvaluara criterios={transversal.criteriosEvaluacion} />
 
-      <FormEnvioTransversal
-        asignacionId={asignacionId}
-        urlInicial={urlInicial}
-        onIntentoCreado={onIntentoCreado}
-      />
+      {agotado ? (
+        <AvisoIntentosAgotados />
+      ) : (
+        <FormEnvioTransversal
+          asignacionId={asignacionId}
+          cupo={cupo}
+          urlInicial={urlInicial}
+          onIntentoCreado={onIntentoCreado}
+        />
+      )}
     </section>
   )
 }
