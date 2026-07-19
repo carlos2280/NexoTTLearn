@@ -629,6 +629,45 @@ describe("E12. POST /asignaciones/:id/intentos-transversal/intento-extra (dar +1
   })
 })
 
+describe("E15. GET /asignaciones/:id/transversal/cupo (cupo del participante, B1)", () => {
+  it("devuelve usados / (intentosMax + extra); los anulados no cuentan", async () => {
+    configurarAsignacion(prisma, { intentosExtra: 2 })
+    prisma.intentoTransversal.count.mockResolvedValue(1)
+    const r = await service.obtenerCupoIntentos(ASIGNACION_ID, ADMIN)
+    expect(r).toEqual({ asignacionId: ASIGNACION_ID, intentosUsados: 1, intentosCupo: 5 })
+    // El conteo excluye los anulados (misma regla que verificarCupoIntentos).
+    expect(prisma.intentoTransversal.count).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ anulado: false }) }),
+    )
+  })
+
+  it("404 transversalNoEncontrado si el curso no tiene transversal", async () => {
+    configurarAsignacion(prisma, { transversalId: null })
+    await expect(service.obtenerCupoIntentos(ASIGNACION_ID, ADMIN)).rejects.toMatchObject({
+      response: { code: apiErrorCodes.transversalNoEncontrado },
+    })
+  })
+
+  it("participante que no es dueño de la asignación -> 404 (anti-IDOR, no calcula cupo)", async () => {
+    configurarAsignacion(prisma)
+    // El participante autenticado apunta a OTRO colaborador que el de la asignación.
+    prisma.usuario.findUnique.mockResolvedValue({
+      colaboradorId: "f0000000-0000-0000-0000-0000000000ff",
+    })
+    await expect(service.obtenerCupoIntentos(ASIGNACION_ID, PARTICIPANTE)).rejects.toMatchObject({
+      response: { code: apiErrorCodes.asignacionNoEncontrada },
+    })
+    expect(prisma.intentoTransversal.count).not.toHaveBeenCalled()
+  })
+
+  it("participante dueño -> ve su propio cupo", async () => {
+    configurarAsignacion(prisma, { intentosExtra: 0 })
+    prisma.intentoTransversal.count.mockResolvedValue(3)
+    const r = await service.obtenerCupoIntentos(ASIGNACION_ID, PARTICIPANTE)
+    expect(r).toEqual({ asignacionId: ASIGNACION_ID, intentosUsados: 3, intentosCupo: 3 })
+  })
+})
+
 describe("E2. POST skills transversal", () => {
   it("422 si skill no existe / archivada", async () => {
     prisma.curso.findUnique.mockResolvedValueOnce({

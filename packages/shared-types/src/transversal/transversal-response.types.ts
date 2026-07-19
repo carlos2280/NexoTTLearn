@@ -157,9 +157,10 @@ export type IntentoTransversalParticipanteResponse = z.infer<
 /**
  * Cupo de intentos del transversal para una asignación (Fase 4b ②). El cupo
  * efectivo = `ProyectoTransversal.intentosMax` + `AsignacionCurso.intentosExtraTransversal`.
- * `intentosUsados` cuenta los intentos NO anulados. Solo admin: alimenta el
- * bloque "Intentos" de la pantalla del intento y es también el shape que
- * devuelve el endpoint "dar +1 intento".
+ * `intentosUsados` cuenta los intentos NO anulados. Lo consumen: el bloque
+ * "Intentos" de la pantalla admin del intento, el endpoint "dar +1 intento", y
+ * (B1) el hito transversal del participante para mostrar "N de M" intentos y el
+ * aviso "sin intentos → tu admin revisará".
  */
 export const cupoIntentosTransversalSchema = z
   .object({

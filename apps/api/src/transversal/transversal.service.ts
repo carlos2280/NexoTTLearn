@@ -529,6 +529,45 @@ export class TransversalService {
   }
 
   // =========================================================================
+  // E15. GET /api/v1/asignaciones/:asignacionId/transversal/cupo
+  //
+  // Cupo de intentos para el hito del PARTICIPANTE (B1): usados / cupo efectivo.
+  // Reusa el mismo cálculo (`calcularCupoIntentos`) y el mismo shape
+  // (`CupoIntentosTransversal`) que el detalle admin del intento (E5), única
+  // fuente de verdad del cupo. La propiedad de la asignación la valida
+  // `resolverAsignacionConCurso` (el participante solo ve la suya; D-AS-9), así
+  // que un participante no puede leer el cupo de otro (anti-IDOR).
+  // =========================================================================
+
+  async obtenerCupoIntentos(
+    asignacionId: string,
+    usuario: SesionUsuario,
+  ): Promise<CupoIntentosTransversal> {
+    const asignacion = await this.resolverAsignacionConCurso(asignacionId, usuario)
+    if (asignacion.curso.transversalId === null) {
+      throw new NotFoundException({
+        code: apiErrorCodes.transversalNoEncontrado,
+        message: "El curso no tiene proyecto transversal configurado.",
+      })
+    }
+    const cupo = await this.calcularCupoIntentos({
+      transversalId: asignacion.curso.transversalId,
+      colaboradorId: asignacion.colaboradorId,
+      cursoId: asignacion.curso.id,
+    })
+    if (cupo === null) {
+      // `resolverAsignacionConCurso` ya garantizó asignación + transversal; un
+      // `null` aquí solo sería una carrera (borrado de la asignación entre
+      // lecturas) → 404 uniforme, consistente con E12 `darIntentoExtra`.
+      throw new NotFoundException({
+        code: apiErrorCodes.asignacionNoEncontrada,
+        message: `Asignacion ${asignacionId} no encontrada.`,
+      })
+    }
+    return cupo
+  }
+
+  // =========================================================================
   // E6b. GET /api/v1/cursos/:cursoId/intentos-transversal
   //
   // Listado admin paginado de todos los intentos del proyecto transversal del

@@ -22,6 +22,7 @@ import {
   CargarCapaTestsInput,
   CrearIntentoTransversalInput,
   CrearIntentoTransversalResponse,
+  CupoIntentosTransversal,
   CurarReporteFinalInput,
   DarIntentoExtraTransversalResponse,
   DisponibilidadTransversalResponse,
@@ -69,6 +70,7 @@ import { TransversalService } from "./transversal.service"
  * - GET    /cursos/:cursoId/transversal                          ADMIN o PARTICIPANTE inscrito
  * - POST   /cursos/:cursoId/transversal/skills                   ADMIN + X-Motivo si curso ACTIVO
  * - GET    /asignaciones/:asignacionId/transversal/disponibilidad ADMIN o propio (D-AS-9)
+ * - GET    /asignaciones/:asignacionId/transversal/cupo          ADMIN o propio (B1)
  * - POST   /asignaciones/:asignacionId/intentos-transversal      PARTICIPANTE para si / ADMIN
  *                                                                Idempotency-Key UUID v4
  *                                                                Throttle 10/min/usuario
@@ -146,6 +148,19 @@ export class TransversalController {
     @CurrentUser() usuario: SesionUsuario | undefined,
   ): Promise<DisponibilidadTransversalResponse> {
     return this.transversal.obtenerDisponibilidad(asignacionId, this.requireUsuario(usuario))
+  }
+
+  // E15 — Cupo de intentos del participante (B1). Mismo shape que el bloque
+  // "Intentos" del admin; endpoint propio para que el hito muestre "N de M" y el
+  // aviso "sin intentos → tu admin revisará". ADMIN o propio (guard de propiedad
+  // en el service; el participante no ve el cupo de otro).
+  @Get("asignaciones/:asignacionId/transversal/cupo")
+  @Roles(RolUsuario.ADMIN, RolUsuario.PARTICIPANTE)
+  obtenerCupoIntentos(
+    @Param("asignacionId", ParseUUIDPipe) asignacionId: string,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<CupoIntentosTransversal> {
+    return this.transversal.obtenerCupoIntentos(asignacionId, this.requireUsuario(usuario))
   }
 
   // E4
