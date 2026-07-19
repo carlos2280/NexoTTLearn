@@ -6,7 +6,7 @@ import type { INestApplication, Type } from "@nestjs/common"
 import { PrismaClient } from "@prisma/client"
 import bcrypt from "bcrypt"
 import supertest, { type Agent, type Response } from "supertest"
-import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 
 const HAS_DB_URL = Boolean(process.env.DATABASE_URL)
 const DIST_DIR = resolve(__dirname, "..", "dist")
@@ -72,6 +72,7 @@ describe.runIf(RUN_E2E)("cursos e2e (P4a + P4b)", () => {
   let csrfPart: string
   let prisma: PrismaClient
   let clienteId: string
+  let throttlerStorageFake: { reset: () => void }
 
   beforeAll(async () => {
     prisma = new PrismaClient()
@@ -159,13 +160,17 @@ describe.runIf(RUN_E2E)("cursos e2e (P4a + P4b)", () => {
     const moduleApp = (await import(join(DIST_DIR, "app.module.js"))) as ModuloApp
     const moduleHttp = (await import(join(DIST_DIR, "bootstrap-http.js"))) as ModuloHttp
     const { Test } = await import("@nestjs/testing")
-    const { ThrottlerGuard } = await import("@nestjs/throttler")
+    const { ThrottlerGuard, ThrottlerStorage } = await import("@nestjs/throttler")
+    const { ThrottlerStorageFake } = await import("./throttler-storage-fake.js")
+    throttlerStorageFake = new ThrottlerStorageFake()
     const throttlerSiempreOk = { canActivate: (): boolean => true }
     const moduleRef = await Test.createTestingModule({
       imports: [moduleApp.AppModule],
     })
       .overrideGuard(ThrottlerGuard)
       .useValue(throttlerSiempreOk)
+      .overrideProvider(ThrottlerStorage)
+      .useValue(throttlerStorageFake)
       .compile()
     app = moduleRef.createNestApplication()
     moduleHttp.configurarHttp(app)
@@ -175,6 +180,13 @@ describe.runIf(RUN_E2E)("cursos e2e (P4a + P4b)", () => {
     csrfAdmin = await loginYObtenerCsrf(agenteAdmin, ADMIN_EMAIL)
     csrfPart = await loginYObtenerCsrf(agentePart, PARTICIPANTE_EMAIL)
   }, 60_000)
+
+  // Limpia los buckets del throttler entre tests: el override de ThrottlerGuard
+  // no neutraliza el guard global (APP_GUARD), asi que sin reset los ~60 tests
+  // acumulan >100 hits en la ventana de 60s y POST /cursos devuelve 429.
+  beforeEach(() => {
+    throttlerStorageFake.reset()
+  })
 
   afterAll(async () => {
     try {
