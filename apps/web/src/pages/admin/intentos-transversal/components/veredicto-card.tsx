@@ -1,5 +1,7 @@
 import { Badge } from "@/shared/components/ui/badge"
+import { cn } from "@/shared/lib/cn"
 import type { IntentoTransversalAdminResponse } from "@nexott-learn/shared-types"
+import { CLASE_TEXTO_NOTA, estadoNota } from "./nota-umbral.helpers"
 
 interface VeredictoCardProps {
   readonly intento: IntentoTransversalAdminResponse
@@ -19,16 +21,21 @@ export function VeredictoCard({ intento }: VeredictoCardProps) {
         <span className="nx-eyebrow text-text-tertiary">Veredicto</span>
         <h2 className="text-h3 text-text-primary">Resultado del intento</h2>
       </div>
-      <div className="flex flex-wrap items-baseline gap-4">
-        <div className="flex flex-col">
-          <span className="text-caption text-text-tertiary">Nota global</span>
-          <span className="tabular text-display-md text-text-primary leading-tight">
-            {intento.notaGlobal === null ? "—" : intento.notaGlobal}
-            {intento.notaGlobal !== null ? (
+      <div className="flex flex-wrap items-baseline gap-6">
+        {intento.notaGlobal !== null ? (
+          <div className="flex flex-col">
+            <span className="text-caption text-text-tertiary">Nota global</span>
+            <span
+              className={cn(
+                "tabular text-display-md leading-tight",
+                CLASE_TEXTO_NOTA[estadoNota(intento.notaGlobal, umbral)],
+              )}
+            >
+              {intento.notaGlobal}
               <span className="ml-1 text-body-sm text-text-tertiary">/100</span>
-            ) : null}
-          </span>
-        </div>
+            </span>
+          </div>
+        ) : null}
         <div className="flex flex-col">
           <span className="text-caption text-text-tertiary">Umbral aprobación</span>
           <span className="tabular text-body text-text-primary">{umbral}/100</span>

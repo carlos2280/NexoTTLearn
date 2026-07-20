@@ -45,6 +45,7 @@ export function RevisionIaCard({ intento }: RevisionIaCardProps) {
           revision={intento.revisionIa}
           nota={intento.notaCapaCualitativa}
           umbral={intento.transversal.umbralAprobacion}
+          notaGlobalVisible={intento.notaGlobal !== null}
         />
       )}
 
