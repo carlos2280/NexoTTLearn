@@ -104,6 +104,7 @@ export function CanvasTransversal({
           tieneEntrevistaIa={tieneEntrevistaIa}
           onIntentoCreado={onIntentoCreado}
           onIntentarDeNuevo={() => setForzarBrief(true)}
+          onVolverAlResultado={() => setForzarBrief(false)}
         />
       </div>
     </main>
@@ -120,6 +121,7 @@ interface ContenidoTransversalProps {
   readonly tieneEntrevistaIa: boolean
   readonly onIntentoCreado: (intentoId: string) => void
   readonly onIntentarDeNuevo: () => void
+  readonly onVolverAlResultado: () => void
 }
 
 function ContenidoTransversal(props: ContenidoTransversalProps) {
@@ -133,6 +135,7 @@ function ContenidoTransversal(props: ContenidoTransversalProps) {
     tieneEntrevistaIa,
     onIntentoCreado,
     onIntentarDeNuevo,
+    onVolverAlResultado,
   } = props
 
   if (forzarBrief || intentoActivo === null) {
@@ -146,6 +149,7 @@ function ContenidoTransversal(props: ContenidoTransversalProps) {
         cupo={cupo}
         onIntentoCreado={onIntentoCreado}
         urlInicial={urlInicial}
+        onVolver={forzarBrief ? onVolverAlResultado : undefined}
       />
     )
   }

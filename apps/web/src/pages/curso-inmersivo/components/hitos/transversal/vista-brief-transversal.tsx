@@ -1,5 +1,6 @@
 import { sanitizarHtml } from "@/shared/lib/sanitize-html"
 import type { CupoIntentosTransversal, TransversalResponse } from "@nexott-learn/shared-types"
+import { ArrowLeft } from "lucide-react"
 import { AvisoIntentosAgotados } from "./aviso-intentos-agotados"
 import { hayIntentosDisponibles } from "./cupo-transversal.helpers"
 import { FormEnvioTransversal } from "./form-envio-transversal"
@@ -11,6 +12,8 @@ interface VistaBriefTransversalProps {
   readonly cupo: CupoIntentosTransversal | null
   readonly onIntentoCreado: (intentoId: string) => void
   readonly urlInicial?: string
+  /** Volver al resultado sin enviar. Solo llega al reintentar (hay un resultado previo). */
+  readonly onVolver?: () => void
 }
 
 /**
@@ -25,6 +28,7 @@ export function VistaBriefTransversal({
   cupo,
   onIntentoCreado,
   urlInicial,
+  onVolver,
 }: VistaBriefTransversalProps) {
   // Si el cupo se agotó no hay envío posible (el backend lo rechazaría con 409):
   // en su lugar, el aviso honesto. `cupo === null` (cargando/sin dato) no bloquea.
@@ -32,6 +36,17 @@ export function VistaBriefTransversal({
 
   return (
     <section className="flex flex-col gap-6">
+      {onVolver ? (
+        <button
+          type="button"
+          onClick={onVolver}
+          className="inline-flex w-fit items-center gap-1.5 self-start text-body-sm text-text-secondary transition-colors duration-base ease-default hover:text-text-primary"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden={true} />
+          Volver al resultado
+        </button>
+      ) : null}
+
       <header className="flex flex-col gap-2">
         <span className="nx-eyebrow text-aurora-violet">Hito de cierre</span>
         <h2 className="text-display-md text-text-primary leading-tight">Proyecto transversal</h2>
