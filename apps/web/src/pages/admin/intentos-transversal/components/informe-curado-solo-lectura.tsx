@@ -24,7 +24,7 @@ export function InformeCuradoSoloLectura({
   const vacio = !resumen && areas.length === 0
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-body-sm text-text-tertiary">{nota}</p>
+      <p className="text-body-sm text-text-secondary">{nota}</p>
       {resumen ? (
         <div className="flex flex-col gap-1">
           <span className="nx-eyebrow text-text-tertiary">Resumen</span>
@@ -38,14 +38,14 @@ export function InformeCuradoSoloLectura({
             {areas.map((r, i) => (
               <li key={`${i}-${r.que}`} className="flex flex-col">
                 <span className="text-body-sm text-text-primary">{r.que}</span>
-                <span className="text-caption text-text-tertiary">{r.sugerencia}</span>
+                <span className="text-caption text-text-secondary">{r.sugerencia}</span>
               </li>
             ))}
           </ul>
         </div>
       ) : null}
       {vacio ? (
-        <p className="text-body-sm text-text-tertiary">
+        <p className="text-body-sm text-text-secondary">
           No se curó un informe para el participante.
         </p>
       ) : null}

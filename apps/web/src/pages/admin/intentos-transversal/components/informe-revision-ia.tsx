@@ -48,7 +48,9 @@ export function InformeRevisionIa({
 
       {resumen ? <p className="text-body-sm text-text-secondary">{resumen}</p> : null}
 
-      {dimensiones.length > 0 ? <DimensionesRevisionIa dimensiones={dimensiones} /> : null}
+      {dimensiones.length > 0 ? (
+        <DimensionesRevisionIa dimensiones={dimensiones} umbral={umbral} />
+      ) : null}
 
       <CumplimientoCriterios criterios={revision.cumplimientoCriterios ?? []} />
 
@@ -58,7 +60,7 @@ export function InformeRevisionIa({
       />
 
       {revision.queReviso || revision.queNoReviso ? (
-        <div className="flex flex-col gap-1 border-border border-t pt-3 text-caption text-text-tertiary">
+        <div className="flex flex-col gap-1 border-border border-t pt-3 text-caption text-text-secondary">
           {revision.queReviso ? <span>Revisó: {revision.queReviso}</span> : null}
           {revision.queNoReviso ? <span>No revisó: {revision.queNoReviso}</span> : null}
         </div>

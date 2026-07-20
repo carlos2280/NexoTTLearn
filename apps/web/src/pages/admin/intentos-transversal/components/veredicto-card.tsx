@@ -59,12 +59,12 @@ export function VeredictoCard({ intento }: VeredictoCardProps) {
         </div>
       </div>
       {intento.estado === "FALLO_ACCESO_REPO" ? (
-        <p className="text-body-sm text-text-tertiary">
+        <p className="text-body-sm text-text-secondary">
           El repositorio entregado no se pudo abrir, así que no hubo evaluación. Este intento no
           consume cupo; el alumno puede reenviar con un repositorio accesible.
         </p>
       ) : !finalizado && intento.estado !== "ANULADO" ? (
-        <p className="text-body-sm text-text-tertiary">
+        <p className="text-body-sm text-text-secondary">
           La nota global se calcula al finalizar la evaluación, a partir de la revisión con IA.
         </p>
       ) : null}
