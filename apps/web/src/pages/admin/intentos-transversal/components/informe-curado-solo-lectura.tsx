@@ -1,3 +1,4 @@
+import { sanitizarHtml } from "@/shared/lib/sanitize-html"
 import type { PuntoAReforzar } from "@nexott-learn/shared-types"
 
 interface InformeCuradoSoloLecturaProps {
@@ -28,7 +29,11 @@ export function InformeCuradoSoloLectura({
       {resumen ? (
         <div className="flex flex-col gap-1">
           <span className="nx-eyebrow text-text-tertiary">Resumen</span>
-          <p className="text-body-sm text-text-secondary">{resumen}</p>
+          <div
+            className="tiptap text-body-sm text-text-secondary"
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: informe curado por el admin, sanitizado.
+            dangerouslySetInnerHTML={{ __html: sanitizarHtml(resumen) }}
+          />
         </div>
       ) : null}
       {areas.length > 0 ? (

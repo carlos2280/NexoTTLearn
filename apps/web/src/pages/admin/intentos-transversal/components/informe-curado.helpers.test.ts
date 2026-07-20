@@ -4,6 +4,7 @@ import {
   baseParaCurar,
   construirReporteFinal,
   esCurable,
+  esResumenVacio,
   estadoInicialCuracion,
   hayFilasIncompletas,
 } from "./informe-curado.helpers"
@@ -108,11 +109,36 @@ describe("construirReporteFinal", () => {
     expect(res.aReforzar).toBeUndefined()
   })
 
+  it("HTML de TipTap vacío ('<p></p>') NO se persiste; con texto sí", () => {
+    expect(
+      construirReporteFinal(base, { resumen: "<p></p>", aReforzar: [] }).resumen,
+    ).toBeUndefined()
+    expect(
+      construirReporteFinal(base, { resumen: "<p>Buen trabajo</p>", aReforzar: [] }).resumen,
+    ).toBe("<p>Buen trabajo</p>")
+  })
+
   it("usa un cimiento mínimo válido si la base es null (intento legacy)", () => {
     const res = construirReporteFinal(null, { resumen: "hola", aReforzar: [] })
     expect(res.comentario).toBe("")
     expect(res.confianza).toBe("MEDIA")
     expect(res.resumen).toBe("hola")
+  })
+})
+
+describe("esResumenVacio", () => {
+  it("true para cadena vacía y HTML sin texto visible", () => {
+    expect(esResumenVacio("")).toBe(true)
+    expect(esResumenVacio("<p></p>")).toBe(true)
+    expect(esResumenVacio("<p>   </p>")).toBe(true)
+    expect(esResumenVacio("<p>&nbsp;</p>")).toBe(true)
+    expect(esResumenVacio("<p><br></p>")).toBe(true)
+    expect(esResumenVacio("<ul><li></li></ul>")).toBe(true)
+  })
+  it("false cuando hay texto real (aunque esté envuelto en tags)", () => {
+    expect(esResumenVacio("<p>Buen trabajo</p>")).toBe(false)
+    expect(esResumenVacio("texto plano")).toBe(false)
+    expect(esResumenVacio("<ul><li>casos borde</li></ul>")).toBe(false)
   })
 })
 

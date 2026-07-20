@@ -1,6 +1,7 @@
 import { useCurarReporteFinal } from "@/features/transversal/hooks/use-curar-reporte-final"
+import { TiptapEditor } from "@/pages/admin/catalogo/modulo-builder/editores/shared/tiptap-editor"
+import { extensionesMinimas } from "@/pages/admin/catalogo/modulo-builder/editores/shared/tiptap-extensiones"
 import { Button } from "@/shared/components/ui/button"
-import { Textarea } from "@/shared/components/ui/textarea"
 import { cn } from "@/shared/lib/cn"
 import type { IntentoTransversalAdminResponse } from "@nexott-learn/shared-types"
 import { type ReactNode, useRef, useState } from "react"
@@ -13,7 +14,9 @@ import {
   hayFilasIncompletas,
 } from "./informe-curado.helpers"
 
-const MAX_RESUMEN = 2000
+// Debe coincidir con `revisionIaSchema.resumen.max` del backend; el HTML de
+// TipTap infla rápido, así avisamos antes de que la API rechace con 422.
+const LIMITE_RESUMEN = 10000
 
 interface InformeParticipanteEditorProps {
   readonly intento: IntentoTransversalAdminResponse
@@ -80,18 +83,26 @@ export function InformeParticipanteEditor({ intento }: InformeParticipanteEditor
   }
 
   const incompletas = hayFilasIncompletas(filas)
+  const excedido = resumen.length > LIMITE_RESUMEN
 
   return (
     <Tarjeta>
       <div className="flex flex-col gap-2">
-        <span className="nx-eyebrow text-text-tertiary">Resumen</span>
-        <Textarea
-          aria-label="Resumen del informe para el participante"
-          rows={4}
-          maxLength={MAX_RESUMEN}
-          placeholder="Un resumen honesto y accionable de su proyecto."
-          value={resumen}
-          onChange={(e) => setResumen(e.target.value)}
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="nx-eyebrow text-text-tertiary">Resumen</span>
+          {excedido ? (
+            <span className="text-caption text-danger">
+              Supera el límite ({resumen.length.toLocaleString()} /{" "}
+              {LIMITE_RESUMEN.toLocaleString()})
+            </span>
+          ) : null}
+        </div>
+        <TiptapEditor
+          htmlInicial={resumen}
+          extensiones={extensionesMinimas("Un resumen honesto y accionable de su proyecto.")}
+          variante="minima"
+          altoMin="140px"
+          onCambio={(html) => setResumen(html)}
         />
       </div>
 
@@ -106,7 +117,11 @@ export function InformeParticipanteEditor({ intento }: InformeParticipanteEditor
       />
 
       <div className="flex items-center gap-3">
-        <Button size="sm" onClick={guardar} disabled={incompletas || mutation.isPending}>
+        <Button
+          size="sm"
+          onClick={guardar}
+          disabled={incompletas || excedido || mutation.isPending}
+        >
           {mutation.isPending ? "Guardando…" : "Guardar informe"}
         </Button>
         <Feedback incompletas={incompletas} mutation={mutation} />

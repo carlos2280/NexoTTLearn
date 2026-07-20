@@ -1,5 +1,5 @@
 import { Button } from "@/shared/components/ui/button"
-import { Input } from "@/shared/components/ui/input"
+import { Textarea } from "@/shared/components/ui/textarea"
 import { Plus, Trash2 } from "lucide-react"
 import { MAX_AREAS_REFORZAR } from "./informe-curado.helpers"
 
@@ -43,19 +43,21 @@ export function EditorAreasReforzar({
               className="flex items-start gap-2 rounded-xl border border-border bg-canvas p-3"
             >
               <div className="flex flex-1 flex-col gap-2">
-                <Input
+                <Textarea
                   aria-label={`Área ${i + 1}: qué reforzar`}
                   placeholder="Qué reforzar"
                   value={fila.que}
                   disabled={disabled}
+                  rows={2}
                   maxLength={300}
                   onChange={(e) => onEditar(fila.id, "que", e.target.value)}
                 />
-                <Input
+                <Textarea
                   aria-label={`Área ${i + 1}: sugerencia`}
                   placeholder="Sugerencia concreta"
                   value={fila.sugerencia}
                   disabled={disabled}
+                  rows={3}
                   maxLength={500}
                   onChange={(e) => onEditar(fila.id, "sugerencia", e.target.value)}
                 />

@@ -1,3 +1,4 @@
+import { sanitizarHtml } from "@/shared/lib/sanitize-html"
 import type { InformeParticipante } from "@nexott-learn/shared-types"
 
 interface InformeParticipanteTransversalProps {
@@ -19,7 +20,13 @@ export function InformeParticipanteTransversal({ informe }: InformeParticipanteT
   return (
     <article className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-6">
       <span className="nx-eyebrow text-text-tertiary">Comentario de tu evaluador</span>
-      {resumen.length > 0 ? <p className="text-body text-text-secondary">{resumen}</p> : null}
+      {resumen.length > 0 ? (
+        <div
+          className="tiptap max-w-prose text-body text-text-secondary"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: informe curado por el admin, sanitizado.
+          dangerouslySetInnerHTML={{ __html: sanitizarHtml(resumen) }}
+        />
+      ) : null}
       {aReforzar.length > 0 ? (
         <div className="flex flex-col gap-2">
           <span className="nx-eyebrow text-text-tertiary">A reforzar</span>

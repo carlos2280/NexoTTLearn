@@ -17,6 +17,19 @@ export interface FormularioCuracion {
 /** Tope de áreas a reforzar (espeja `revisionIaSchema.aReforzar.max(5)`). */
 export const MAX_AREAS_REFORZAR = 5
 
+// Regex a top level (lint/performance/useTopLevelRegex).
+const TAGS_RE = /<[^>]*>/g
+const ESPACIOS_HTML_RE = /(&nbsp;|\s)+/g
+
+/**
+ * `true` si el HTML del resumen no tiene texto visible: cadena vacía o el
+ * "<p></p>" que emite TipTap cuando está vacío. Evita persistir un resumen que
+ * se ve vacío pero pasaría un `length > 0`. Puro (regex, sin DOM) para testear.
+ */
+export function esResumenVacio(html: string): boolean {
+  return html.replace(TAGS_RE, "").replace(ESPACIOS_HTML_RE, "").length === 0
+}
+
 /** El informe solo se cura mientras el intento sigue EVALUADO (lo enforcea el backend E13). */
 export function esCurable(estado: IntentoTransversalAdminResponse["estado"]): boolean {
   return estado === "EVALUADO"
@@ -58,7 +71,8 @@ export function construirReporteFinal(
     .filter((r) => r.que.length > 0 && r.sugerencia.length > 0)
   return {
     ...cimiento,
-    resumen: resumen.length > 0 ? resumen : undefined,
+    // El resumen ahora es HTML de TipTap: "<p></p>" vacío NO debe persistirse.
+    resumen: esResumenVacio(resumen) ? undefined : resumen,
     aReforzar: aReforzar.length > 0 ? aReforzar : undefined,
   }
 }
