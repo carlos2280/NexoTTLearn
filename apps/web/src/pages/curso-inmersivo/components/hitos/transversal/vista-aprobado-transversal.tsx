@@ -6,6 +6,7 @@ import type { IntentoTransversalParticipanteResponse } from "@nexott-learn/share
 import { motion, useReducedMotion } from "framer-motion"
 import { ArrowRight, ExternalLink } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import { notaEntera } from "./graduacion-transversal.helpers"
 import { HistorialIntentosTransversal } from "./historial-intentos-transversal"
 import { InformeParticipanteTransversal } from "./informe-participante-transversal"
 
@@ -63,6 +64,23 @@ export function VistaAprobadoTransversal({
           style={{ background: "var(--gradient-aurora)", transformOrigin: "left center" }}
           className="mt-3 h-px max-w-[260px] rounded-pill"
         />
+        {intento.notaGlobal !== null ? (
+          <div
+            className="mt-1 flex items-baseline gap-2"
+            role="img"
+            aria-label={`Nota final ${notaEntera(intento.notaGlobal)} de 100`}
+          >
+            <span className="nx-eyebrow text-text-tertiary" aria-hidden={true}>
+              Nota final
+            </span>
+            <span className="tabular font-semibold text-h3 text-text-primary" aria-hidden={true}>
+              {notaEntera(intento.notaGlobal)}
+            </span>
+            <span className="tabular text-body-sm text-text-secondary" aria-hidden={true}>
+              / 100
+            </span>
+          </div>
+        ) : null}
       </header>
 
       <InformeParticipanteTransversal informe={intento.informe} />

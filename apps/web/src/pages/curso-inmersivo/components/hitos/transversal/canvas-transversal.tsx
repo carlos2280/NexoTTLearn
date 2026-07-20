@@ -184,6 +184,7 @@ function ContenidoTransversal(props: ContenidoTransversalProps) {
       intento={intentoActivo}
       intentos={intentos}
       cupo={cupo}
+      umbral={transversal.umbralAprobacion}
       onIntentarDeNuevo={onIntentarDeNuevo}
     />
   )
