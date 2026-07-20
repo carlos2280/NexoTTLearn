@@ -208,7 +208,24 @@ export const intentoTransversalAdminResponseSchema = intentoTransversalBaseSchem
     notaCapaTests: z.number().min(0).max(100).nullable(),
     notaCapaCualitativa: z.number().min(0).max(100).nullable(),
     notaCapaComprension: z.number().min(0).max(100).nullable(),
+    /**
+     * Nota EFECTIVA publicada: la ajustada por el admin si la corrigió, si no la
+     * calculada. `null` hasta FINALIZADO. Es la que ve el alumno.
+     */
     notaGlobal: z.number().min(0).max(100).nullable(),
+    /**
+     * Nota que la IA calcularía de las capas AHORA (preview), independiente del
+     * estado. Deja al admin ver el número antes de publicar y compararlo si lo
+     * ajustó. `null` si aún no hay capas suficientes para calcularla.
+     */
+    notaCalculada: z.number().min(0).max(100).nullable(),
+    /**
+     * Corrección manual del admin al publicar (o `null` si publicó la calculada
+     * tal cual). Espejo de `IntentoEntrevistaIA.notaAjustadaAdmin`; marca que hubo
+     * ajuste. `motivoAjusteNota` es la razón que dejó el admin.
+     */
+    notaAjustadaAdmin: z.number().min(0).max(100).nullable(),
+    motivoAjusteNota: z.string().nullable(),
     aprobado: z.boolean().nullable(),
     anulado: z.boolean(),
     motivoAnulacion: z.string().nullable(),

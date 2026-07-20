@@ -435,16 +435,27 @@ describe("E5. GET intento por id", () => {
       notaCapaCualitativa: new Prisma.Decimal(80),
       notaCapaComprension: new Prisma.Decimal(72),
       notaGlobal: null,
+      notaAjustadaAdmin: null,
+      motivoAjusteNota: null,
       aprobado: null,
       colaborador: { id: COLABORADOR_ID, nombre: "Colab", email: "c@nttdata.test" },
       transversal: {
         id: TRANSVERSAL_ID,
         descripcion: "Mini-proyecto",
         umbralAprobacion: new Prisma.Decimal(70),
+        pesoCapaTests: new Prisma.Decimal(40),
+        pesoCapaCualitativa: new Prisma.Decimal(30),
+        pesoCapaComprension: new Prisma.Decimal(30),
+        capaTestsActiva: true,
+        capaCualitativaActiva: true,
+        capaComprensionActiva: true,
         curso: { id: CURSO_ID, titulo: "Curso mock" },
       },
     })
     const r = (await service.obtenerIntento(INTENTO_ID, ADMIN)) as Record<string, unknown>
+    // B-nota: el detalle computa la nota que la IA calcularía (0.4*70 + 0.3*80 + 0.3*72).
+    expect(r.notaCalculada).toBe(73.6)
+    expect(r.notaAjustadaAdmin).toBeNull()
     expect(r.notaCapaTests).toBe(70)
     expect(r.notaCapaCualitativa).toBe(80)
     expect(r.anulado).toBe(false)
@@ -553,12 +564,20 @@ describe("E5 cupo. obtenerIntento ADMIN enriquece cupoIntentos (Fase 4b ②)", (
       notaCapaCualitativa: null,
       notaCapaComprension: null,
       notaGlobal: null,
+      notaAjustadaAdmin: null,
+      motivoAjusteNota: null,
       aprobado: null,
       colaborador: { id: COLABORADOR_ID, nombre: "Colab", email: "c@nttdata.test" },
       transversal: {
         id: TRANSVERSAL_ID,
         descripcion: "Mini-proyecto",
         umbralAprobacion: new Prisma.Decimal(70),
+        pesoCapaTests: new Prisma.Decimal(40),
+        pesoCapaCualitativa: new Prisma.Decimal(30),
+        pesoCapaComprension: new Prisma.Decimal(30),
+        capaTestsActiva: true,
+        capaCualitativaActiva: true,
+        capaComprensionActiva: true,
         curso: { id: CURSO_ID, titulo: "Curso mock" },
       },
     })
@@ -1102,6 +1121,197 @@ describe("E10. POST /intentos-transversal/:id/finalizar (P8b)", () => {
     )
   })
 
+  it("B-nota: sin ajuste, notaAjustadaAdmin queda null y publica la calculada", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      transversalId: TRANSVERSAL_ID,
+      colaboradorId: COLABORADOR_ID,
+      estado: "EVALUADO",
+      anulado: false,
+      notaCapaTests: new Prisma.Decimal(80),
+      notaCapaCualitativa: new Prisma.Decimal(70),
+      notaCapaComprension: new Prisma.Decimal(90),
+      transversal: {
+        cursoId: CURSO_ID,
+        umbralAprobacion: new Prisma.Decimal(70),
+        pesoCapaTests: new Prisma.Decimal(40),
+        pesoCapaCualitativa: new Prisma.Decimal(30),
+        pesoCapaComprension: new Prisma.Decimal(30),
+        capaTestsActiva: true,
+        capaCualitativaActiva: true,
+        capaComprensionActiva: true,
+        skills: [],
+      },
+    })
+    prisma.intentoTransversal.updateMany.mockResolvedValueOnce({ count: 1 })
+
+    const r = await service.finalizar({ intentoId: INTENTO_ID, usuario: ADMIN })
+
+    expect(r.notaGlobal).toBe(80)
+    expect(r.notaCalculada).toBe(80)
+    expect(r.notaAjustada).toBeNull()
+    expect(prisma.intentoTransversal.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ notaAjustadaAdmin: null, motivoAjusteNota: null }),
+      }),
+    )
+  })
+
+  it("B-nota: con ajuste, publica la nota ajustada y re-deriva aprobado + traza", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      transversalId: TRANSVERSAL_ID,
+      colaboradorId: COLABORADOR_ID,
+      estado: "EVALUADO",
+      anulado: false,
+      // La IA calcularía 15 (reprueba); el admin lo sube a 75 (aprueba).
+      notaCapaTests: new Prisma.Decimal(15),
+      notaCapaCualitativa: new Prisma.Decimal(15),
+      notaCapaComprension: new Prisma.Decimal(15),
+      transversal: {
+        cursoId: CURSO_ID,
+        umbralAprobacion: new Prisma.Decimal(70),
+        pesoCapaTests: new Prisma.Decimal(40),
+        pesoCapaCualitativa: new Prisma.Decimal(30),
+        pesoCapaComprension: new Prisma.Decimal(30),
+        capaTestsActiva: true,
+        capaCualitativaActiva: true,
+        capaComprensionActiva: true,
+        skills: [{ skillId: SKILL_ID }],
+      },
+    })
+    prisma.intentoTransversal.updateMany.mockResolvedValueOnce({ count: 1 })
+
+    const r = await service.finalizar({
+      intentoId: INTENTO_ID,
+      usuario: ADMIN,
+      notaAjustada: 75,
+      motivoAjuste: "El repo se evaluó incompleto; la entrevista lo respalda.",
+    })
+
+    expect(r.notaGlobal).toBe(75)
+    expect(r.notaAjustada).toBe(75)
+    // La original (15) queda en la respuesta para auditar el "de 15 a 75".
+    expect(r.notaCalculada).toBe(15)
+    // 75 >= 70 aunque la calculada (15) reprobaría.
+    expect(r.aprobado).toBe(true)
+    expect(prisma.intentoTransversal.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          notaGlobal: new Prisma.Decimal(75),
+          notaAjustadaAdmin: new Prisma.Decimal(75),
+          motivoAjusteNota: "El repo se evaluó incompleto; la entrevista lo respalda.",
+          aprobado: true,
+        }),
+      }),
+    )
+  })
+
+  it("B-nota: ajuste a 0 se persiste como 0 (no null) y reprueba", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      transversalId: TRANSVERSAL_ID,
+      colaboradorId: COLABORADOR_ID,
+      estado: "EVALUADO",
+      anulado: false,
+      notaCapaTests: new Prisma.Decimal(80),
+      notaCapaCualitativa: new Prisma.Decimal(80),
+      notaCapaComprension: new Prisma.Decimal(80),
+      transversal: {
+        cursoId: CURSO_ID,
+        umbralAprobacion: new Prisma.Decimal(70),
+        pesoCapaTests: new Prisma.Decimal(40),
+        pesoCapaCualitativa: new Prisma.Decimal(30),
+        pesoCapaComprension: new Prisma.Decimal(30),
+        capaTestsActiva: true,
+        capaCualitativaActiva: true,
+        capaComprensionActiva: true,
+        skills: [],
+      },
+    })
+    prisma.intentoTransversal.updateMany.mockResolvedValueOnce({ count: 1 })
+
+    const r = await service.finalizar({
+      intentoId: INTENTO_ID,
+      usuario: ADMIN,
+      notaAjustada: 0,
+      motivoAjuste: "Entrega vacía; anulo el crédito de la IA.",
+    })
+
+    expect(r.notaGlobal).toBe(0)
+    expect(r.notaAjustada).toBe(0)
+    expect(r.aprobado).toBe(false)
+    expect(prisma.intentoTransversal.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ notaAjustadaAdmin: new Prisma.Decimal(0) }),
+      }),
+    )
+  })
+
+  it("B-nota: si la IA no pudo calcular, el override a mano permite publicar igual", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      transversalId: TRANSVERSAL_ID,
+      colaboradorId: COLABORADOR_ID,
+      estado: "EVALUADO",
+      anulado: false,
+      // Todas las capas activas SIN nota → calcularNotaTransversal lanza faltantes.
+      notaCapaTests: null,
+      notaCapaCualitativa: null,
+      notaCapaComprension: null,
+      transversal: {
+        cursoId: CURSO_ID,
+        umbralAprobacion: new Prisma.Decimal(70),
+        pesoCapaTests: new Prisma.Decimal(40),
+        pesoCapaCualitativa: new Prisma.Decimal(30),
+        pesoCapaComprension: new Prisma.Decimal(30),
+        capaTestsActiva: true,
+        capaCualitativaActiva: true,
+        capaComprensionActiva: true,
+        skills: [],
+      },
+    })
+    prisma.intentoTransversal.updateMany.mockResolvedValueOnce({ count: 1 })
+
+    const r = await service.finalizar({
+      intentoId: INTENTO_ID,
+      usuario: ADMIN,
+      notaAjustada: 60,
+      motivoAjuste: "La IA no pudo leer el repo; evalúo a mano con la entrevista.",
+    })
+
+    expect(r.notaCalculada).toBeNull()
+    expect(r.notaGlobal).toBe(60)
+    expect(r.notaAjustada).toBe(60)
+  })
+
+  it("B-nota: sin capas calculables Y sin override -> 409 puntajesFaltantes", async () => {
+    prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
+      id: INTENTO_ID,
+      transversalId: TRANSVERSAL_ID,
+      colaboradorId: COLABORADOR_ID,
+      estado: "EVALUADO",
+      anulado: false,
+      notaCapaTests: null,
+      notaCapaCualitativa: null,
+      notaCapaComprension: null,
+      transversal: {
+        cursoId: CURSO_ID,
+        umbralAprobacion: new Prisma.Decimal(70),
+        pesoCapaTests: new Prisma.Decimal(40),
+        pesoCapaCualitativa: new Prisma.Decimal(30),
+        pesoCapaComprension: new Prisma.Decimal(30),
+        capaTestsActiva: true,
+        capaCualitativaActiva: true,
+        capaComprensionActiva: true,
+        skills: [],
+      },
+    })
+    await expect(
+      service.finalizar({ intentoId: INTENTO_ID, usuario: ADMIN }),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.puntajesFaltantes } })
+  })
+
   it("409 conflictIntentoTransversalYaAnulado si anulado=true", async () => {
     prisma.intentoTransversal.findUnique.mockResolvedValueOnce({
       id: INTENTO_ID,
@@ -1152,6 +1362,8 @@ function intentoSeleccionadoFixture(
     notaCapaCualitativa: new Prisma.Decimal(80),
     notaCapaComprension: null,
     notaGlobal: null,
+    notaAjustadaAdmin: null,
+    motivoAjusteNota: null,
     aprobado: null,
     evaluacionesCapas: {},
     reporteIa: { comentario: "crudo", confianza: "MEDIA" },
@@ -1164,6 +1376,12 @@ function intentoSeleccionadoFixture(
       id: TRANSVERSAL_ID,
       descripcion: "Mini-proyecto",
       umbralAprobacion: new Prisma.Decimal(70),
+      pesoCapaTests: new Prisma.Decimal(40),
+      pesoCapaCualitativa: new Prisma.Decimal(30),
+      pesoCapaComprension: new Prisma.Decimal(30),
+      capaTestsActiva: true,
+      capaCualitativaActiva: true,
+      capaComprensionActiva: true,
       curso: { id: CURSO_ID, titulo: "Curso mock" },
     },
     ...overrides,

@@ -14,6 +14,7 @@ import {
 import { Prisma } from "@prisma/client"
 import { z } from "zod"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
+import { PUNTAJES_FALTANTES_ERROR, calcularNotaTransversal } from "./calcular-nota-transversal"
 import { IntentoTransversalSeleccionado } from "./transversal.types"
 
 /**
@@ -83,8 +84,8 @@ export function parsearRepoOArtefacto(
  * Decimal -> number con redondeo 2 decimales. Usado por mappers que serializan
  * notas para el cliente.
  */
-function decimalAnumero(value: Prisma.Decimal | null): number | null {
-  if (value === null) {
+function decimalAnumero(value: Prisma.Decimal | null | undefined): number | null {
+  if (value === null || value === undefined) {
     return null
   }
   return Number(value.toString())
@@ -166,6 +167,39 @@ function extraerEvidenciaResumen(
   return { commit, archivos, truncado, bytesTotales }
 }
 
+/**
+ * Nota que la IA calcularía AHORA de las capas cargadas (preview para el admin,
+ * independiente del estado del intento). Deja ver el número antes de publicar y
+ * compararlo si el admin lo ajusta. `null` cuando aún no hay capas activas con
+ * nota suficientes para calcularla (mismo criterio que `finalizar`).
+ */
+export function calcularNotaPreview(intento: IntentoParaMapper): number | null {
+  try {
+    return calcularNotaTransversal(
+      {
+        tests: decimalAnumero(intento.notaCapaTests),
+        cualitativa: decimalAnumero(intento.notaCapaCualitativa),
+        comprension: decimalAnumero(intento.notaCapaComprension),
+      },
+      {
+        tests: Number(intento.transversal.pesoCapaTests.toString()),
+        cualitativa: Number(intento.transversal.pesoCapaCualitativa.toString()),
+        comprension: Number(intento.transversal.pesoCapaComprension.toString()),
+      },
+      {
+        tests: intento.transversal.capaTestsActiva,
+        cualitativa: intento.transversal.capaCualitativaActiva,
+        comprension: intento.transversal.capaComprensionActiva,
+      },
+    )
+  } catch (error) {
+    if (error instanceof Error && error.message === PUNTAJES_FALTANTES_ERROR) {
+      return null
+    }
+    throw error
+  }
+}
+
 export function toIntentoAdmin(intento: IntentoParaMapper): IntentoTransversalAdminResponse {
   // Invariante de dominio: todo ProyectoTransversal pertenece a un Curso
   // (Curso.transversalId @unique). La relacion inversa es nullable en Prisma
@@ -186,6 +220,12 @@ export function toIntentoAdmin(intento: IntentoParaMapper): IntentoTransversalAd
     notaCapaCualitativa: decimalAnumero(intento.notaCapaCualitativa),
     notaCapaComprension: decimalAnumero(intento.notaCapaComprension),
     notaGlobal: decimalAnumero(intento.notaGlobal),
+    // `notaCalculada` (preview de la IA) la puebla SOLO el endpoint de detalle,
+    // igual que `cupoIntentos`: el mapper compartido (listado/capas) la deja null
+    // para no exigir los pesos de capa en todos los selects.
+    notaCalculada: null,
+    notaAjustadaAdmin: decimalAnumero(intento.notaAjustadaAdmin),
+    motivoAjusteNota: intento.motivoAjusteNota ?? null,
     aprobado: intento.aprobado,
     anulado: intento.anulado,
     motivoAnulacion: intento.motivoAnulacion,

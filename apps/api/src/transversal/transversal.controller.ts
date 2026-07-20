@@ -346,12 +346,17 @@ export class TransversalController {
   async finalizar(
     @Param("intentoId", ParseUUIDPipe) intentoId: string,
     @Body(new ZodValidationPipe(finalizarTransversalBodySchema))
-    _body: FinalizarTransversalBodyInput,
+    body: FinalizarTransversalBodyInput,
     @CurrentUser() usuario: SesionUsuario | undefined,
     @Req() req: Request,
   ): Promise<FinalizarTransversalResponse> {
     const sesion = this.requireUsuario(usuario)
-    const resultado = await this.transversal.finalizar({ intentoId, usuario: sesion })
+    const resultado = await this.transversal.finalizar({
+      intentoId,
+      usuario: sesion,
+      notaAjustada: body.notaAjustada,
+      motivoAjuste: body.motivoAjuste,
+    })
     await this.auditLog.record({
       usuarioId: sesion.usuarioId,
       accion: AccionAuditoria.INTENTO_TRANSVERSAL_FINALIZADO,
@@ -365,6 +370,26 @@ export class TransversalController {
       },
       ...extractContextoHttp(req),
     })
+    // A09: si el admin corrigió la nota, se audita aparte (accountability de quién
+    // cambió el número y por qué). El motivo vive en la columna del intento; aquí
+    // solo su longitud (patrón sin contenido evaluable, como en anular).
+    if (resultado.notaAjustada !== null) {
+      await this.auditLog.record({
+        usuarioId: sesion.usuarioId,
+        accion: AccionAuditoria.INTENTO_TRANSVERSAL_NOTA_AJUSTADA,
+        exito: true,
+        recursoTipo: "intento_transversal",
+        recursoId: resultado.intentoId,
+        metadata: {
+          // "De X a Y": la nota que calculó la IA (null si no era computable) y la
+          // que fijó el admin. Rastro completo del cambio de calificación (A09).
+          notaCalculada: resultado.notaCalculada,
+          notaAjustada: resultado.notaAjustada,
+          motivoLength: body.motivoAjuste?.length ?? 0,
+        },
+        ...extractContextoHttp(req),
+      })
+    }
     return resultado
   }
 

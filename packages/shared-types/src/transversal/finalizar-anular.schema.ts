@@ -10,7 +10,23 @@ import { z } from "zod"
  * payloads inesperados (defensa contra clientes que envien campos por error).
  */
 
-export const finalizarTransversalBodySchema = z.object({}).strict()
+/**
+ * `finalizar` acepta un ajuste manual OPCIONAL de la nota por el admin
+ * ("Publicar y cerrar"): humano en el loop sobre el numero, no solo el texto.
+ * `notaAjustada` y `motivoAjuste` van juntos (o ninguno): si el admin corrige la
+ * nota, el motivo es obligatorio (traza de accountability, calca la entrevista IA
+ * E19). Sin ajuste = se publica la nota calculada de las capas.
+ */
+export const finalizarTransversalBodySchema = z
+  .object({
+    notaAjustada: z.number().min(0).max(100).optional(),
+    motivoAjuste: z.string().trim().min(1).max(500).optional(),
+  })
+  .strict()
+  .refine((d) => (d.notaAjustada === undefined) === (d.motivoAjuste === undefined), {
+    message: "El motivo es obligatorio al ajustar la nota (y solo cuando se ajusta).",
+    path: ["motivoAjuste"],
+  })
 
 export type FinalizarTransversalBodyInput = z.infer<typeof finalizarTransversalBodySchema>
 
@@ -25,7 +41,14 @@ export type AnularTransversalBodyInput = z.infer<typeof anularTransversalBodySch
 export const finalizarTransversalResponseSchema = z
   .object({
     intentoId: z.string().uuid(),
+    // Nota EFECTIVA publicada (la ajustada por el admin si la corrigio, si no la
+    // calculada). Es la que ve el alumno y la que alimenta las skills.
     notaGlobal: z.number().min(0).max(100),
+    // La nota que la IA calculo de las capas, o null si no era computable y el
+    // admin fijo la nota a mano. Permite auditar el "de X a Y" del ajuste.
+    notaCalculada: z.number().min(0).max(100).nullable(),
+    // La correccion manual del admin, o null si publico la calculada tal cual.
+    notaAjustada: z.number().min(0).max(100).nullable(),
     aprobado: z.boolean(),
     skillsActualizadas: z.array(z.string().uuid()),
   })

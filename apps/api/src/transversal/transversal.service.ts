@@ -52,6 +52,7 @@ import { motivoTransversal } from "./disponibilidad-motivo.helpers"
 import { JobEvaluacionTransversalService } from "./job-evaluacion-transversal.service"
 import { type CargarCapaResult, TransversalCapasService } from "./transversal-capas.service"
 import {
+  calcularNotaPreview,
   parsearCriteriosEvaluacion,
   toIntentoAdmin,
   toIntentoParticipante,
@@ -484,7 +485,9 @@ export class TransversalService {
       colaboradorId: intento.colaboradorId,
       cursoId: admin.curso.id,
     })
-    return { ...admin, cupoIntentos }
+    // B-nota: la nota que la IA calcularía de las capas (preview), para que el
+    // admin la vea antes de publicar y decida si la ajusta. Solo en el detalle.
+    return { ...admin, cupoIntentos, notaCalculada: calcularNotaPreview(intento) }
   }
 
   // =========================================================================
@@ -707,6 +710,10 @@ export class TransversalService {
   async finalizar(input: {
     readonly intentoId: string
     readonly usuario: SesionUsuario
+    // Ajuste manual OPCIONAL del admin al publicar (B-nota). Van juntos o ninguno
+    // (el schema del body lo garantiza): si ajusta la nota, el motivo es obligatorio.
+    readonly notaAjustada?: number
+    readonly motivoAjuste?: string
   }): Promise<FinalizarTransversalResponse> {
     const intento = await this.prisma.intentoTransversal.findUnique({
       where: { id: input.intentoId },
@@ -753,9 +760,12 @@ export class TransversalService {
       })
     }
 
-    let notaGlobal: number
+    // Nota que la IA calcula de las capas. Puede quedar `null` si no hay capas
+    // activas con nota suficientes; en ese caso el intento solo se puede publicar
+    // si el admin fija una nota a mano (el override cubre el hueco de la IA).
+    let notaCalculada: number | null
     try {
-      notaGlobal = calcularNotaTransversal(
+      notaCalculada = calcularNotaTransversal(
         {
           tests: intento.notaCapaTests === null ? null : Number(intento.notaCapaTests.toString()),
           cualitativa:
@@ -780,16 +790,27 @@ export class TransversalService {
       )
     } catch (error) {
       if (error instanceof Error && error.message === PUNTAJES_FALTANTES_ERROR) {
-        throw new ConflictException({
-          code: apiErrorCodes.puntajesFaltantes,
-          message: "No hay capas activas con nota suficientes para calcular nota global.",
-        })
+        notaCalculada = null
+      } else {
+        throw error
       }
-      throw error
     }
 
     const umbral = Number(intento.transversal.umbralAprobacion.toString())
-    const aprobado = notaGlobal >= umbral
+    // Nota EFECTIVA publicada: la ajustada por el admin si la corrigio en el
+    // dialogo de "Publicar y cerrar", si no la calculada. Se persiste en
+    // `notaGlobal` para que el motor de skills y el participante la lean sin
+    // cambios; `notaAjustadaAdmin` solo marca aparte que hubo ajuste (traza).
+    const notaFinal = input.notaAjustada ?? notaCalculada
+    if (notaFinal === null) {
+      // Ni la IA pudo calcular ni el admin fijo una nota: no hay que publicar.
+      throw new ConflictException({
+        code: apiErrorCodes.puntajesFaltantes,
+        message:
+          "No hay capas activas con nota suficientes para calcular la nota; ajusta la nota a mano para publicar.",
+      })
+    }
+    const aprobado = notaFinal >= umbral
     const skillsIds = intento.transversal.skills.map((s) => s.skillId)
 
     await this.prisma.$transaction(async (tx) => {
@@ -800,7 +821,10 @@ export class TransversalService {
         where: { id: input.intentoId, estado: "EVALUADO", anulado: false },
         data: {
           estado: "FINALIZADO",
-          notaGlobal: new Prisma.Decimal(notaGlobal),
+          notaGlobal: new Prisma.Decimal(notaFinal),
+          notaAjustadaAdmin:
+            input.notaAjustada === undefined ? null : new Prisma.Decimal(input.notaAjustada),
+          motivoAjusteNota: input.motivoAjuste ?? null,
           aprobado,
           fechaFinalizacion: new Date(),
           // Sello de curación (Fase 4b ③): finalizar = publicar el informe final
@@ -833,7 +857,11 @@ export class TransversalService {
 
     return {
       intentoId: input.intentoId,
-      notaGlobal,
+      notaGlobal: notaFinal,
+      // La calculada por la IA (o null si no era computable y el admin fijo la nota
+      // a mano). Deja al controller auditar el "de X a Y" del ajuste.
+      notaCalculada,
+      notaAjustada: input.notaAjustada ?? null,
       aprobado,
       skillsActualizadas: skillsIds,
     }
