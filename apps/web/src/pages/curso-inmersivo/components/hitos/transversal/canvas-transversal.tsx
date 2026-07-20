@@ -14,6 +14,7 @@ import { VistaAunNoTransversal } from "./vista-aun-no-transversal"
 import { VistaBriefTransversal } from "./vista-brief-transversal"
 import { VistaEnRevisionTransversal } from "./vista-en-revision-transversal"
 import { VistaEvaluandoTransversal } from "./vista-evaluando-transversal"
+import { VistaRepoInaccesibleTransversal } from "./vista-repo-inaccesible-transversal"
 
 interface CanvasTransversalProps {
   readonly cursoId: string
@@ -154,6 +155,15 @@ function ContenidoTransversal(props: ContenidoTransversalProps) {
   }
   if (vista === "en-revision") {
     return <VistaEnRevisionTransversal intento={intentoActivo} />
+  }
+  if (vista === "repo-inaccesible") {
+    return (
+      <VistaRepoInaccesibleTransversal
+        intento={intentoActivo}
+        intentos={intentos}
+        onIntentarDeNuevo={onIntentarDeNuevo}
+      />
+    )
   }
   if (vista === "aprobado") {
     return (

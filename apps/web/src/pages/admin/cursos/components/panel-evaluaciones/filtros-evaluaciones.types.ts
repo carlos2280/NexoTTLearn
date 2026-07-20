@@ -5,6 +5,8 @@ export type FiltroEstadoUi =
   | "ANULADO"
   | "EN_EVALUACION"
   | "EVALUADO"
+  // Solo lo usa la tabla del transversal (repo inaccesible, B2c).
+  | "FALLO_ACCESO_REPO"
 
 export type FiltroAprobadoUi = "TODOS" | "SI" | "NO" | "PENDIENTE"
 

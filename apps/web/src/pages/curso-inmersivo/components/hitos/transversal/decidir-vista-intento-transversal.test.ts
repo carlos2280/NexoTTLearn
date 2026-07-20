@@ -29,4 +29,10 @@ describe("decidirVistaIntentoTransversal", () => {
   it("ANULADO → aun-no (permite reenviar)", () => {
     expect(decidirVistaIntentoTransversal({ estado: "ANULADO", aprobado: null })).toBe("aun-no")
   })
+
+  it("FALLO_ACCESO_REPO → repo-inaccesible (B2c: no queda colgado en 'evaluando')", () => {
+    expect(decidirVistaIntentoTransversal({ estado: "FALLO_ACCESO_REPO", aprobado: null })).toBe(
+      "repo-inaccesible",
+    )
+  })
 })

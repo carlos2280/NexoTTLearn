@@ -14,12 +14,17 @@ interface AccionesAdminTransversalProps {
   readonly intento: IntentoTransversalAdminResponse
 }
 
+const COPY_REPO_INACCESIBLE = "El repositorio no se pudo abrir; el alumno debe reenviar"
+
 function copyFinalizar(estado: EstadoIntentoTransversal, revisionCargada: boolean): string {
   if (estado === "FINALIZADO") {
     return "El intento ya está finalizado"
   }
   if (estado === "ANULADO") {
     return "Intento anulado"
+  }
+  if (estado === "FALLO_ACCESO_REPO") {
+    return COPY_REPO_INACCESIBLE
   }
   if (!revisionCargada) {
     return "Falta la revisión con IA"
@@ -42,6 +47,10 @@ export function AccionesAdminTransversal({ intento }: AccionesAdminTransversalPr
   const editable = intento.estado === "EN_EVALUACION" || intento.estado === "EVALUADO"
   const puedeFinalizar = editable && revisionCargada
   const tooltipFinalizar = copyFinalizar(intento.estado, revisionCargada)
+  const tooltipAnular =
+    intento.estado === "FALLO_ACCESO_REPO"
+      ? COPY_REPO_INACCESIBLE
+      : "El intento ya está finalizado o anulado"
 
   async function confirmarFinalizar() {
     await finalizarMutation.mutateAsync({ intentoId: intento.intentoId })
@@ -77,7 +86,7 @@ export function AccionesAdminTransversal({ intento }: AccionesAdminTransversalPr
           size="sm"
           onClick={() => setAnularAbierto(true)}
           disabled={!editable}
-          title={editable ? undefined : "El intento ya está finalizado o anulado"}
+          title={editable ? undefined : tooltipAnular}
         >
           Anular intento
         </Button>

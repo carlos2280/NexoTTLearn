@@ -25,6 +25,7 @@ const OPCIONES_ESTADO: readonly OpcionEstado[] = [
   { value: "EVALUADO", etiqueta: "Listo para finalizar" },
   { value: "FINALIZADO", etiqueta: "Finalizado" },
   { value: "ANULADO", etiqueta: "Anulado" },
+  { value: "FALLO_ACCESO_REPO", etiqueta: "Repo inaccesible" },
 ]
 
 const TONO_ESTADO: ReadonlyMap<
@@ -35,6 +36,7 @@ const TONO_ESTADO: ReadonlyMap<
   ["EVALUADO", "neutro"],
   ["FINALIZADO", "success"],
   ["ANULADO", "danger"],
+  ["FALLO_ACCESO_REPO", "danger"],
 ])
 
 const ETIQUETA_ESTADO: ReadonlyMap<EstadoIntentoTransversal, string> = new Map([
@@ -42,6 +44,7 @@ const ETIQUETA_ESTADO: ReadonlyMap<EstadoIntentoTransversal, string> = new Map([
   ["EVALUADO", "Listo para finalizar"],
   ["FINALIZADO", "Finalizado"],
   ["ANULADO", "Anulado"],
+  ["FALLO_ACCESO_REPO", "Repo inaccesible"],
 ])
 
 interface Props {
@@ -63,6 +66,7 @@ export function TablaIntentosTransversal({ cursoId }: Props) {
         "EVALUADO",
         "FINALIZADO",
         "ANULADO",
+        "FALLO_ACCESO_REPO",
       ]),
       busqueda: filtros.busqueda.trim() || undefined,
     }),

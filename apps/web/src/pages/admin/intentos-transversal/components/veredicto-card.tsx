@@ -35,7 +35,10 @@ export function VeredictoCard({ intento }: VeredictoCardProps) {
         </div>
         <div className="flex flex-col">
           <span className="text-caption text-text-tertiary">Aprobado</span>
-          {intento.aprobado === null ? (
+          {intento.estado === "FALLO_ACCESO_REPO" ? (
+            // No hubo evaluación: "Pendiente" leería como "aún se evaluará", que aquí es falso.
+            <span className="text-body text-text-tertiary">—</span>
+          ) : intento.aprobado === null ? (
             <span className="text-body text-text-tertiary">Pendiente</span>
           ) : intento.aprobado ? (
             <Badge tono="success" conPunto={false}>
@@ -48,7 +51,12 @@ export function VeredictoCard({ intento }: VeredictoCardProps) {
           )}
         </div>
       </div>
-      {!finalizado && intento.estado !== "ANULADO" ? (
+      {intento.estado === "FALLO_ACCESO_REPO" ? (
+        <p className="text-body-sm text-text-tertiary">
+          El repositorio entregado no se pudo abrir, así que no hubo evaluación. Este intento no
+          consume cupo; el alumno puede reenviar con un repositorio accesible.
+        </p>
+      ) : !finalizado && intento.estado !== "ANULADO" ? (
         <p className="text-body-sm text-text-tertiary">
           La nota global se calcula al finalizar la evaluación, a partir de la revisión con IA.
         </p>

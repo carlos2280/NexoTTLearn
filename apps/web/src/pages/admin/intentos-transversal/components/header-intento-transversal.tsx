@@ -17,6 +17,7 @@ const TONO_ESTADO: ReadonlyMap<EstadoIntento, TonoBadge> = new Map([
   ["EVALUADO", "neutro"],
   ["FINALIZADO", "success"],
   ["ANULADO", "danger"],
+  ["FALLO_ACCESO_REPO", "danger"],
 ])
 
 const ETIQUETA_ESTADO: ReadonlyMap<EstadoIntento, string> = new Map([
@@ -24,6 +25,7 @@ const ETIQUETA_ESTADO: ReadonlyMap<EstadoIntento, string> = new Map([
   ["EVALUADO", "Listo para finalizar"],
   ["FINALIZADO", "Finalizado"],
   ["ANULADO", "Anulado"],
+  ["FALLO_ACCESO_REPO", "Repo inaccesible"],
 ])
 
 export function HeaderIntentoTransversal({ intento }: HeaderIntentoTransversalProps) {
