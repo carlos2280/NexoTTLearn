@@ -8,6 +8,7 @@ import { ExternalLink, RefreshCw } from "lucide-react"
 import { AvisoIntentosAgotados } from "./aviso-intentos-agotados"
 import { copyIntentosRestantes, hayIntentosDisponibles } from "./cupo-transversal.helpers"
 import { HistorialIntentosTransversal } from "./historial-intentos-transversal"
+import { InformeParticipanteTransversal } from "./informe-participante-transversal"
 
 const RGX_HTTPS_PREFIJO = /^https:\/\//
 
@@ -44,6 +45,8 @@ export function VistaAunNoTransversal({
           cuenta.
         </p>
       </header>
+
+      <InformeParticipanteTransversal informe={intento.informe} />
 
       {agotado ? (
         <AvisoIntentosAgotados />

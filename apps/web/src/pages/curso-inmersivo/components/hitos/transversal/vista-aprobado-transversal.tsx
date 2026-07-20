@@ -7,6 +7,7 @@ import { motion, useReducedMotion } from "framer-motion"
 import { ArrowRight, ExternalLink } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { HistorialIntentosTransversal } from "./historial-intentos-transversal"
+import { InformeParticipanteTransversal } from "./informe-participante-transversal"
 
 const RGX_HTTPS_PREFIJO = /^https:\/\//
 
@@ -63,6 +64,8 @@ export function VistaAprobadoTransversal({
           className="mt-3 h-px max-w-[260px] rounded-pill"
         />
       </header>
+
+      <InformeParticipanteTransversal informe={intento.informe} />
 
       {skillsDemostradas.length > 0 ? (
         <article className="flex flex-col gap-3">

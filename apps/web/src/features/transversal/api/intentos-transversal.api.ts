@@ -7,6 +7,7 @@ import type {
   CrearIntentoTransversalInput,
   CrearIntentoTransversalResponse,
   CupoIntentosTransversal,
+  CurarReporteFinalInput,
   DarIntentoExtraTransversalResponse,
   FinalizarTransversalResponse,
   IntentoTransversalAdminResponse,
@@ -123,6 +124,22 @@ export function finalizarIntentoTransversal(input: {
   return httpClient.post<FinalizarTransversalResponse>(
     `/intentos-transversal/${input.intentoId}/finalizar`,
     {},
+  )
+}
+
+/**
+ * `PATCH /api/v1/intentos-transversal/:intentoId/reporte-final` (E13, admin).
+ * Cura el informe que verá el participante (`reporteFinal`): resumen + áreas a
+ * reforzar. Solo editable mientras el intento está EVALUADO; el `reporteIa`
+ * crudo nunca se toca (evidencia inmutable). Fase 4b ③ / B3.
+ */
+export function curarReporteFinal(input: {
+  readonly intentoId: string
+  readonly body: CurarReporteFinalInput
+}): Promise<IntentoTransversalAdminResponse> {
+  return httpClient.patch<IntentoTransversalAdminResponse>(
+    `/intentos-transversal/${input.intentoId}/reporte-final`,
+    input.body,
   )
 }
 
