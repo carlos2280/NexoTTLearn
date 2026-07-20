@@ -65,10 +65,10 @@ export function AccionesAdminTransversal({ intento }: AccionesAdminTransversalPr
     <section className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-6">
       <div className="flex flex-col gap-1">
         <span className="nx-eyebrow text-text-tertiary">Acciones</span>
-        <h2 className="text-h3 text-text-primary">Finalizar o anular</h2>
+        <h2 className="text-h3 text-text-primary">Publicar el veredicto</h2>
         <p className="text-body-sm text-text-secondary">
-          Al finalizar se calcula la nota global desde la revisión con IA y se actualizan las skills
-          del colaborador. Anular deja el intento sin efecto en las skills.
+          Al publicar, el alumno verá el informe que editaste y el caso queda cerrado. Se calcula la
+          nota global y se actualizan sus skills. No se puede deshacer.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -79,7 +79,7 @@ export function AccionesAdminTransversal({ intento }: AccionesAdminTransversalPr
           disabled={!puedeFinalizar}
           title={puedeFinalizar ? undefined : tooltipFinalizar}
         >
-          Finalizar evaluación
+          Publicar y cerrar
         </Button>
         <Button
           variant="ghost"
@@ -97,9 +97,9 @@ export function AccionesAdminTransversal({ intento }: AccionesAdminTransversalPr
       <ConfirmDialog
         abierto={finalizarAbierto}
         onCambiarAbierto={setFinalizarAbierto}
-        titulo="Finalizar evaluación"
-        descripcion="Se calculará la nota global y se actualizarán las skills del colaborador. La acción no se puede deshacer."
-        textoConfirmar="Finalizar y calcular"
+        titulo="Publicar y cerrar el intento"
+        descripcion="El alumno verá el informe que editaste y el caso queda cerrado. Se calcula la nota global y se actualizan sus skills. La acción no se puede deshacer."
+        textoConfirmar="Publicar y cerrar"
         variante="primary"
         enviando={finalizarMutation.isPending}
         onConfirmar={confirmarFinalizar}

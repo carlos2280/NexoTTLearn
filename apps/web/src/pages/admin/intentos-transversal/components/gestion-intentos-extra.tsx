@@ -33,7 +33,7 @@ export function GestionIntentosExtra({ cupo }: GestionIntentosExtraProps) {
   return (
     <div className="flex flex-col gap-3 border-border border-t pt-4">
       <div className="flex flex-col gap-0.5">
-        <span className="nx-eyebrow text-text-tertiary">Intentos</span>
+        <span className="nx-eyebrow text-text-tertiary">Intentos del alumno</span>
         <p className="text-body-sm text-text-secondary">
           <span className="tabular text-text-primary">
             Usó {cupo.intentosUsados} de {cupo.intentosCupo}
