@@ -1,6 +1,7 @@
 import { BadRequestException, InternalServerErrorException } from "@nestjs/common"
 import {
   EvidenciaRepoResumen,
+  InformeParticipante,
   IntentoTransversalAdminResponse,
   IntentoTransversalParticipanteResponse,
   RepoOArtefacto,
@@ -122,6 +123,31 @@ function parsearReporte(value: Prisma.JsonValue | null): RevisionIa | null {
 }
 
 /**
+ * Proyecta el `reporteFinal` a lo ÚNICO que ve el participante (B3): `resumen` +
+ * `aReforzar`. NO expone el comentario crudo de la IA ni las notas por dimensión
+ * (rúbrica) — la poda ocurre en el backend, así que esos campos no viajan ni en
+ * la respuesta de red. `null` si no hay informe o si el admin no curó ninguno de
+ * los dos campos.
+ */
+function proyectarInformeParticipante(value: Prisma.JsonValue | null): InformeParticipante | null {
+  const parsed = parsearReporte(value)
+  if (parsed === null) {
+    return null
+  }
+  const informe: InformeParticipante = {}
+  const resumen = parsed.resumen?.trim()
+  if (resumen !== undefined && resumen.length > 0) {
+    informe.resumen = resumen
+  }
+  if (parsed.aReforzar !== undefined && parsed.aReforzar.length > 0) {
+    informe.aReforzar = parsed.aReforzar
+  }
+  // Resumen vacío/blanco y sin áreas → el admin no curó nada visible: no
+  // mostramos un informe vacío (coherente con "solo lo curado").
+  return informe.resumen === undefined && informe.aReforzar === undefined ? null : informe
+}
+
+/**
  * Extrae el RESUMEN de la evidencia del repo (sin el `contenido` pesado) para el
  * detalle admin. Valida contra el shape completo y descarta el contenido; `null`
  * si aún no hay evidencia o el JSON no cumple el contrato.
@@ -199,8 +225,9 @@ export function toIntentoParticipante(
     comentarioColaborador: intento.comentarioColaborador,
     notaGlobal: finalizado ? decimalAnumero(intento.notaGlobal) : null,
     aprobado: finalizado ? intento.aprobado : null,
-    // El informe FINAL curado por el admin (Fase 4b ③). Solo al FINALIZADO — antes
-    // el participante no ve nada del informe. Nunca el crudo ni la evidencia.
-    informe: finalizado ? parsearReporte(intento.reporteFinal) : null,
+    // El informe FINAL curado por el admin (Fase 4b ③ / B3). Solo al FINALIZADO.
+    // Proyectado a resumen + aReforzar: el crudo, la rúbrica y la evidencia se
+    // podan aquí, no viajan ni en la respuesta de red.
+    informe: finalizado ? proyectarInformeParticipante(intento.reporteFinal) : null,
   }
 }

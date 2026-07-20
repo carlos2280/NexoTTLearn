@@ -2,6 +2,7 @@ import { z } from "zod"
 import {
   criteriosEvaluacionSchema,
   evidenciaRepoResumenSchema,
+  puntoAReforzarSchema,
   revisionIaSchema,
 } from "./capas.schema"
 
@@ -141,16 +142,32 @@ export const intentoTransversalBaseSchema = z
 
 export type IntentoTransversalBase = z.infer<typeof intentoTransversalBaseSchema>
 
+/**
+ * Informe curado que ve el PARTICIPANTE (B3). Proyección ESTRECHA del
+ * `reporteFinal`: sólo `resumen` + `aReforzar`. Nunca viajan (ni en la respuesta
+ * de red) el comentario crudo de la IA ni las notas por dimensión (rúbrica). El
+ * admin cura exactamente estos dos campos; el resto queda como evidencia interna.
+ */
+export const informeParticipanteSchema = z
+  .object({
+    resumen: z.string().max(2000).optional(),
+    aReforzar: z.array(puntoAReforzarSchema).max(5).optional(),
+  })
+  .strict()
+
+export type InformeParticipante = z.infer<typeof informeParticipanteSchema>
+
 export const intentoTransversalParticipanteResponseSchema = intentoTransversalBaseSchema
   .extend({
     notaGlobal: z.number().min(0).max(100).nullable(),
     aprobado: z.boolean().nullable(),
     /**
-     * Informe FINAL curado por el admin (Fase 4b ③). Es lo ÚNICO del informe que
-     * ve el participante, y sólo cuando `estado === 'FINALIZADO'` (antes es
-     * `null`). Nunca ve el `reporteIa` crudo ni la evidencia del repo.
+     * Informe FINAL curado por el admin (Fase 4b ③ / B3). Es lo ÚNICO del informe
+     * que ve el participante, y sólo cuando `estado === 'FINALIZADO'` (antes es
+     * `null`). Proyectado a resumen + aReforzar: nunca el `reporteIa` crudo, la
+     * rúbrica (notas por dimensión) ni la evidencia del repo.
      */
-    informe: revisionIaSchema.nullable(),
+    informe: informeParticipanteSchema.nullable(),
   })
   .strict()
 
