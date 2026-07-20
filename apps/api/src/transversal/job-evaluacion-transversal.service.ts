@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto"
-import { Injectable, Logger, type OnModuleInit } from "@nestjs/common"
+import { Injectable, Logger, type OnModuleInit, UnprocessableEntityException } from "@nestjs/common"
 import { RolUsuario } from "@prisma/client"
 import { AiService } from "../common/ai/ai.service"
+import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { RepoFetchService } from "../common/repo-fetch/repo-fetch.service"
 import { SesionUsuario } from "../common/types/sesion.types"
@@ -269,9 +270,49 @@ export class JobEvaluacionTransversalService implements OnModuleInit {
       })
       return true
     } catch (error) {
+      // Distinguimos el repo inaccesible (culpa del entregable: privado, URL
+      // muerta, timeout o sin archivos) de un fallo transitorio de IA/infra. El
+      // primero es terminal → transicionamos a FALLO_ACCESO_REPO para que el
+      // alumno vea feedback honesto y reenvie (B2c). El segundo NO transiciona:
+      // el intento sigue EN_EVALUACION y `onModuleInit` lo reintenta al arranque.
+      if (esErrorAccesoRepo(error)) {
+        return this.registrarFalloAccesoRepo(intentoId, error)
+      }
       this.logCapaFallo("cualitativa", intentoId, error)
       return false
     }
+  }
+
+  /**
+   * Transiciona el intento a `FALLO_ACCESO_REPO` (repo inaccesible). El
+   * `updateMany` es race-safe: solo cambia el estado si sigue EN_EVALUACION y no
+   * anulado (un admin pudo anular/finalizar en paralelo) y nunca lanza si 0
+   * filas. Siempre devuelve `false` (no se cargo capa) y jamas propaga: mantiene
+   * el contrato "Seguro" de `cargarCapaCualitativaSeguro`.
+   */
+  private async registrarFalloAccesoRepo(intentoId: string, error: unknown): Promise<boolean> {
+    const code = extraerCodeError(error)
+    try {
+      const { count } = await this.prisma.intentoTransversal.updateMany({
+        where: { id: intentoId, estado: "EN_EVALUACION", anulado: false },
+        data: { estado: "FALLO_ACCESO_REPO" },
+      })
+      if (count === 0) {
+        // Un admin anuló/finalizó en paralelo entre el guard de entrada y aquí:
+        // el updateMany no pisó su transición (race-safe). Lo decimos honestamente.
+        this.logger.warn(
+          `Intento ${intentoId}: repo inaccesible (${code}), pero ya no estaba EN_EVALUACION (race); sin cambios.`,
+        )
+      } else {
+        this.logger.warn(
+          `Intento ${intentoId}: repo inaccesible (${code}); marcado FALLO_ACCESO_REPO.`,
+        )
+      }
+    } catch (fallo) {
+      const detalle = fallo instanceof Error ? fallo.message : "?"
+      this.logger.error(`Intento ${intentoId}: no se pudo marcar FALLO_ACCESO_REPO: ${detalle}`)
+    }
+    return false
   }
 
   private logCapaFallo(capa: string, intentoId: string, error: unknown): void {
@@ -329,6 +370,34 @@ export class JobEvaluacionTransversalService implements OnModuleInit {
   private esperar(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms))
   }
+}
+
+/**
+ * `true` si el error es "no pudimos abrir el repo" (privado, URL muerta,
+ * timeout, sin archivos legibles o URL invalida). `RepoFetchService` los lanza
+ * como `UnprocessableEntityException` con `code` REPO_NO_ACCESIBLE / REPO_URL_INVALIDA.
+ * Cualquier otro error (IA caida, rate-limit, infra) NO cuenta: es transitorio y
+ * se reintenta al arranque.
+ */
+function esErrorAccesoRepo(error: unknown): boolean {
+  if (!(error instanceof UnprocessableEntityException)) {
+    return false
+  }
+  const code = extraerCodeError(error)
+  return code === apiErrorCodes.repoNoAccesible || code === apiErrorCodes.repoUrlInvalida
+}
+
+/** Extrae el `code` del cuerpo `{ code, message }` de una excepcion Nest; `?` si no lo tiene. */
+function extraerCodeError(error: unknown): string {
+  if (!(error instanceof UnprocessableEntityException)) {
+    return "?"
+  }
+  const respuesta = error.getResponse()
+  if (typeof respuesta === "object" && respuesta !== null && "code" in respuesta) {
+    const { code } = respuesta as { readonly code?: unknown }
+    return typeof code === "string" ? code : "?"
+  }
+  return "?"
 }
 
 function confianzaAUpper(c: "alta" | "media" | "baja"): "ALTA" | "MEDIA" | "BAJA" {

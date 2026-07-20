@@ -14,6 +14,10 @@ export const estadoIntentoTransversalSchema = z.enum([
   "EVALUADO",
   "FINALIZADO",
   "ANULADO",
+  // El repo entregado no se pudo abrir (privado, URL muerta, timeout o sin
+  // archivos legibles): el job transiciona aqui en vez de dejar el intento
+  // colgado EN_EVALUACION (B2c). No consume cupo. Espeja el enum de Prisma.
+  "FALLO_ACCESO_REPO",
 ])
 
 export type EstadoIntentoTransversal = z.infer<typeof estadoIntentoTransversalSchema>

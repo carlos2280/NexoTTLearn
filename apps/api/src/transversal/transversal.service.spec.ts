@@ -382,7 +382,7 @@ describe("E4. POST intento", () => {
     expect(job.dispatch).toHaveBeenCalledWith(INTENTO_ID)
   })
 
-  it("el conteo de cupo excluye anulados (where completo) y crea el intento", async () => {
+  it("el conteo de cupo excluye anulados y repo inaccesible (where completo) y crea el intento", async () => {
     configurarAsignacion(prisma, { desbloqueo: DesbloqueoCurso.SIEMPRE })
     prisma.intentoTransversal.create.mockResolvedValueOnce({
       id: INTENTO_ID,
@@ -402,6 +402,8 @@ describe("E4. POST intento", () => {
           transversalId: TRANSVERSAL_ID,
           colaboradorId: COLABORADOR_ID,
           anulado: false,
+          // B2c: un repo inaccesible no consume ficha → se excluye del conteo.
+          estado: { not: "FALLO_ACCESO_REPO" },
         }),
       }),
     )

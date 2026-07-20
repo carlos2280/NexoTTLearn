@@ -1116,8 +1116,8 @@ export class TransversalService {
   /**
    * Enforcement del tope de intentos (Fase 1a). Cupo efectivo = tope global del
    * transversal (`ProyectoTransversal.intentosMax`) + extra por participante
-   * (`AsignacionCurso.intentosExtraTransversal`). Los intentos anulados NO
-   * consumen cupo.
+   * (`AsignacionCurso.intentosExtraTransversal`). Los intentos anulados y los
+   * de repo inaccesible (`FALLO_ACCESO_REPO`, B2c) NO consumen cupo.
    *
    * Nota de carrera: el conteo no toma lock, asi que dos envios concurrentes
    * podrian pasar el chequeo y exceder el cupo en 1. Es aceptable para un
@@ -1146,6 +1146,8 @@ export class TransversalService {
         transversalId: input.transversalId,
         colaboradorId: input.colaboradorId,
         anulado: false,
+        // Un repo inaccesible (B2c) no consume ficha: no pudimos ni leerlo.
+        estado: { not: "FALLO_ACCESO_REPO" },
       },
     })
 
@@ -1166,7 +1168,8 @@ export class TransversalService {
   /**
    * Cupo de intentos de una asignación para la pantalla admin (Fase 4b ②).
    * Cupo efectivo = `ProyectoTransversal.intentosMax` + extra por participante;
-   * `intentosUsados` cuenta los NO anulados (idéntico a `verificarCupoIntentos`).
+   * `intentosUsados` cuenta los NO anulados y NO `FALLO_ACCESO_REPO` (idéntico a
+   * `verificarCupoIntentos`).
    * Devuelve `null` si no hay asignación o transversal (el intento apunta a un
    * curso sin transversal, o el colaborador ya no está asignado).
    */
@@ -1195,6 +1198,8 @@ export class TransversalService {
           transversalId: input.transversalId,
           colaboradorId: input.colaboradorId,
           anulado: false,
+          // Idéntico a `verificarCupoIntentos`: un repo inaccesible no consume ficha (B2c).
+          estado: { not: "FALLO_ACCESO_REPO" },
         },
       }),
     ])

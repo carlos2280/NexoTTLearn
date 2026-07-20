@@ -357,6 +357,10 @@ enum EstadoIntentoTransversal {
   EVALUADO
   FINALIZADO
   ANULADO
+  // El repo entregado no se pudo abrir (privado, URL muerta, timeout o sin
+  // archivos legibles). El job transiciona aqui en vez de dejar el intento
+  // colgado EN_EVALUACION (B2c). No consume cupo (ver `calcularCupoIntentos`).
+  FALLO_ACCESO_REPO
 
   @@map("estado_intento_transversal_enum")
 }
