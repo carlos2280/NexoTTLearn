@@ -120,10 +120,18 @@ export function cargarCapaComprension(input: {
  */
 export function finalizarIntentoTransversal(input: {
   readonly intentoId: string
+  // Ajuste OPCIONAL de la nota por el admin al publicar. Van juntos o ninguno; se
+  // OMITEN (no se mandan) cuando el admin publica la nota calculada tal cual.
+  readonly notaAjustada?: number
+  readonly motivoAjuste?: string
 }): Promise<FinalizarTransversalResponse> {
+  const body =
+    input.notaAjustada === undefined
+      ? {}
+      : { notaAjustada: input.notaAjustada, motivoAjuste: input.motivoAjuste }
   return httpClient.post<FinalizarTransversalResponse>(
     `/intentos-transversal/${input.intentoId}/finalizar`,
-    {},
+    body,
   )
 }
 

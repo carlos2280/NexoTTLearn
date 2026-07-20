@@ -1,13 +1,13 @@
 import { useAnularIntentoTransversal } from "@/features/transversal/hooks/use-anular-intento-transversal"
 import { useFinalizarIntentoTransversal } from "@/features/transversal/hooks/use-finalizar-intento-transversal"
 import { Button } from "@/shared/components/ui/button"
-import { ConfirmDialog } from "@/shared/components/ui/confirm-dialog"
 import { ConfirmMotivoDialog } from "@/shared/components/ui/confirm-motivo-dialog"
 import type {
   EstadoIntentoTransversal,
   IntentoTransversalAdminResponse,
 } from "@nexott-learn/shared-types"
 import { useState } from "react"
+import { DialogPublicarTransversal } from "./dialog-publicar-transversal"
 import { GestionIntentosExtra } from "./gestion-intentos-extra"
 
 interface AccionesAdminTransversalProps {
@@ -52,8 +52,8 @@ export function AccionesAdminTransversal({ intento }: AccionesAdminTransversalPr
       ? COPY_REPO_INACCESIBLE
       : "El intento ya está finalizado o anulado"
 
-  async function confirmarFinalizar() {
-    await finalizarMutation.mutateAsync({ intentoId: intento.intentoId })
+  async function publicar(body: { notaAjustada?: number; motivoAjuste?: string }) {
+    await finalizarMutation.mutateAsync({ intentoId: intento.intentoId, ...body })
     setFinalizarAbierto(false)
   }
   async function confirmarAnular(motivo: string) {
@@ -94,15 +94,13 @@ export function AccionesAdminTransversal({ intento }: AccionesAdminTransversalPr
 
       {intento.cupoIntentos ? <GestionIntentosExtra cupo={intento.cupoIntentos} /> : null}
 
-      <ConfirmDialog
+      <DialogPublicarTransversal
         abierto={finalizarAbierto}
         onCambiarAbierto={setFinalizarAbierto}
-        titulo="Publicar y cerrar el intento"
-        descripcion="El alumno verá el informe que editaste y el caso queda cerrado. Se calcula la nota global y se actualizan sus skills. La acción no se puede deshacer."
-        textoConfirmar="Publicar y cerrar"
-        variante="primary"
+        notaCalculada={intento.notaCalculada}
+        umbral={intento.transversal.umbralAprobacion}
         enviando={finalizarMutation.isPending}
-        onConfirmar={confirmarFinalizar}
+        onPublicar={publicar}
       />
       <ConfirmMotivoDialog
         abierto={anularAbierto}
