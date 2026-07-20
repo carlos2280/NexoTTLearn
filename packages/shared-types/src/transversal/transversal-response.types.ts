@@ -150,7 +150,10 @@ export type IntentoTransversalBase = z.infer<typeof intentoTransversalBaseSchema
  */
 export const informeParticipanteSchema = z
   .object({
-    resumen: z.string().max(2000).optional(),
+    // El resumen curado puede ser HTML de TipTap; el tope debe coincidir con el
+    // de escritura (`revisionIaSchema.resumen`) o un resumen largo no se
+    // proyectaría al alumno. Se sanitiza al renderizar.
+    resumen: z.string().max(10000).optional(),
     aReforzar: z.array(puntoAReforzarSchema).max(5).optional(),
   })
   .strict()
