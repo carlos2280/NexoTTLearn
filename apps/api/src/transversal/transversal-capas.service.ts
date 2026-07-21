@@ -6,7 +6,7 @@ import {
   EvidenciaRepo,
   IntentoTransversalAdminResponse,
 } from "@nexott-learn/shared-types"
-import { Prisma, TipoEventoNotif } from "@prisma/client"
+import { type EstadoIntentoTransversal, Prisma, TipoEventoNotif } from "@prisma/client"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
@@ -221,7 +221,7 @@ export class TransversalCapasService {
 
 interface IntentoConCapasYActivas {
   readonly id: string
-  readonly estado: "EN_EVALUACION" | "EVALUADO" | "FINALIZADO" | "ANULADO"
+  readonly estado: EstadoIntentoTransversal
   readonly anulado: boolean
   readonly notaCapaTests: Prisma.Decimal | null
   readonly notaCapaCualitativa: Prisma.Decimal | null
@@ -236,7 +236,14 @@ interface IntentoConCapasYActivas {
 }
 
 function validarIntentoEditableCapa(intento: IntentoConCapasYActivas): void {
-  if (intento.anulado || intento.estado === "FINALIZADO" || intento.estado === "ANULADO") {
+  // FALLO_ACCESO_REPO es terminal (B2c): el repo no se pudo abrir, así que no se
+  // cargan capas a mano; el camino es que el alumno reenvíe con un repo accesible.
+  if (
+    intento.anulado ||
+    intento.estado === "FINALIZADO" ||
+    intento.estado === "ANULADO" ||
+    intento.estado === "FALLO_ACCESO_REPO"
+  ) {
     throw new ConflictException({
       code: apiErrorCodes.conflictIntentoTransversalNoEditable,
       message: "El intento no admite cargar capas en su estado actual.",

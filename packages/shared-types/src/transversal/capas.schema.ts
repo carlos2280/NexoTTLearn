@@ -108,7 +108,10 @@ export const revisionIaSchema = z
     comentario: z.string().max(4000).trim(),
     confianza: z.enum(["BAJA", "MEDIA", "ALTA"]),
     veredicto: z.enum(["apto", "necesita_ajustes"]).optional(),
-    resumen: z.string().max(2000).optional(),
+    // El curado por el admin (reporteFinal) puede traer HTML de TipTap; el crudo
+    // de la IA es texto plano. Ambos se sanitizan al renderizar. Tope holgado
+    // para acomodar el formato (tags + texto).
+    resumen: z.string().max(10000).optional(),
     queReviso: z.string().max(500).optional(),
     queNoReviso: z.string().max(500).optional(),
     porDimension: z.array(dimensionInformeSchema).max(30).optional(),

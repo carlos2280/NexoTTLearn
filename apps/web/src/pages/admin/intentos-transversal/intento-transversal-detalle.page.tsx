@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom"
 import { AccionesAdminTransversal } from "./components/acciones-admin-transversal"
 import { EntregaCard } from "./components/entrega-card"
 import { HeaderIntentoTransversal } from "./components/header-intento-transversal"
+import { InformeParticipanteEditor } from "./components/informe-participante-editor"
 import { RevisionIaCard } from "./components/revision-ia-card"
 import { VeredictoCard } from "./components/veredicto-card"
 
@@ -29,6 +30,7 @@ export function IntentoTransversalDetallePage() {
       <EntregaCard intento={intento.data} />
       <VeredictoCard intento={intento.data} />
       <RevisionIaCard intento={intento.data} />
+      <InformeParticipanteEditor key={intento.data.intentoId} intento={intento.data} />
       <AccionesAdminTransversal intento={intento.data} />
     </main>
   )

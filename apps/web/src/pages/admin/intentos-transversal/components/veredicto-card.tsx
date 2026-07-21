@@ -1,5 +1,7 @@
 import { Badge } from "@/shared/components/ui/badge"
+import { cn } from "@/shared/lib/cn"
 import type { IntentoTransversalAdminResponse } from "@nexott-learn/shared-types"
+import { CLASE_TEXTO_NOTA, estadoNota } from "./nota-umbral.helpers"
 
 interface VeredictoCardProps {
   readonly intento: IntentoTransversalAdminResponse
@@ -19,23 +21,31 @@ export function VeredictoCard({ intento }: VeredictoCardProps) {
         <span className="nx-eyebrow text-text-tertiary">Veredicto</span>
         <h2 className="text-h3 text-text-primary">Resultado del intento</h2>
       </div>
-      <div className="flex flex-wrap items-baseline gap-4">
-        <div className="flex flex-col">
-          <span className="text-caption text-text-tertiary">Nota global</span>
-          <span className="tabular text-display-md text-text-primary leading-tight">
-            {intento.notaGlobal === null ? "—" : intento.notaGlobal}
-            {intento.notaGlobal !== null ? (
+      <div className="flex flex-wrap items-baseline gap-6">
+        {intento.notaGlobal !== null ? (
+          <div className="flex flex-col">
+            <span className="text-caption text-text-tertiary">Nota global</span>
+            <span
+              className={cn(
+                "tabular text-display-md leading-tight",
+                CLASE_TEXTO_NOTA[estadoNota(intento.notaGlobal, umbral)],
+              )}
+            >
+              {intento.notaGlobal}
               <span className="ml-1 text-body-sm text-text-tertiary">/100</span>
-            ) : null}
-          </span>
-        </div>
+            </span>
+          </div>
+        ) : null}
         <div className="flex flex-col">
           <span className="text-caption text-text-tertiary">Umbral aprobación</span>
           <span className="tabular text-body text-text-primary">{umbral}/100</span>
         </div>
         <div className="flex flex-col">
           <span className="text-caption text-text-tertiary">Aprobado</span>
-          {intento.aprobado === null ? (
+          {intento.estado === "FALLO_ACCESO_REPO" ? (
+            // No hubo evaluación: "Pendiente" leería como "aún se evaluará", que aquí es falso.
+            <span className="text-body text-text-tertiary">—</span>
+          ) : intento.aprobado === null ? (
             <span className="text-body text-text-tertiary">Pendiente</span>
           ) : intento.aprobado ? (
             <Badge tono="success" conPunto={false}>
@@ -48,8 +58,13 @@ export function VeredictoCard({ intento }: VeredictoCardProps) {
           )}
         </div>
       </div>
-      {!finalizado && intento.estado !== "ANULADO" ? (
-        <p className="text-body-sm text-text-tertiary">
+      {intento.estado === "FALLO_ACCESO_REPO" ? (
+        <p className="text-body-sm text-text-secondary">
+          El repositorio entregado no se pudo abrir, así que no hubo evaluación. Este intento no
+          consume cupo; el alumno puede reenviar con un repositorio accesible.
+        </p>
+      ) : !finalizado && intento.estado !== "ANULADO" ? (
+        <p className="text-body-sm text-text-secondary">
           La nota global se calcula al finalizar la evaluación, a partir de la revisión con IA.
         </p>
       ) : null}

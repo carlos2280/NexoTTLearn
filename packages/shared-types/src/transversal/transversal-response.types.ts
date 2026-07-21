@@ -2,6 +2,7 @@ import { z } from "zod"
 import {
   criteriosEvaluacionSchema,
   evidenciaRepoResumenSchema,
+  puntoAReforzarSchema,
   revisionIaSchema,
 } from "./capas.schema"
 
@@ -14,6 +15,10 @@ export const estadoIntentoTransversalSchema = z.enum([
   "EVALUADO",
   "FINALIZADO",
   "ANULADO",
+  // El repo entregado no se pudo abrir (privado, URL muerta, timeout o sin
+  // archivos legibles): el job transiciona aqui en vez de dejar el intento
+  // colgado EN_EVALUACION (B2c). No consume cupo. Espeja el enum de Prisma.
+  "FALLO_ACCESO_REPO",
 ])
 
 export type EstadoIntentoTransversal = z.infer<typeof estadoIntentoTransversalSchema>
@@ -137,16 +142,35 @@ export const intentoTransversalBaseSchema = z
 
 export type IntentoTransversalBase = z.infer<typeof intentoTransversalBaseSchema>
 
+/**
+ * Informe curado que ve el PARTICIPANTE (B3). Proyección ESTRECHA del
+ * `reporteFinal`: sólo `resumen` + `aReforzar`. Nunca viajan (ni en la respuesta
+ * de red) el comentario crudo de la IA ni las notas por dimensión (rúbrica). El
+ * admin cura exactamente estos dos campos; el resto queda como evidencia interna.
+ */
+export const informeParticipanteSchema = z
+  .object({
+    // El resumen curado puede ser HTML de TipTap; el tope debe coincidir con el
+    // de escritura (`revisionIaSchema.resumen`) o un resumen largo no se
+    // proyectaría al alumno. Se sanitiza al renderizar.
+    resumen: z.string().max(10000).optional(),
+    aReforzar: z.array(puntoAReforzarSchema).max(5).optional(),
+  })
+  .strict()
+
+export type InformeParticipante = z.infer<typeof informeParticipanteSchema>
+
 export const intentoTransversalParticipanteResponseSchema = intentoTransversalBaseSchema
   .extend({
     notaGlobal: z.number().min(0).max(100).nullable(),
     aprobado: z.boolean().nullable(),
     /**
-     * Informe FINAL curado por el admin (Fase 4b ③). Es lo ÚNICO del informe que
-     * ve el participante, y sólo cuando `estado === 'FINALIZADO'` (antes es
-     * `null`). Nunca ve el `reporteIa` crudo ni la evidencia del repo.
+     * Informe FINAL curado por el admin (Fase 4b ③ / B3). Es lo ÚNICO del informe
+     * que ve el participante, y sólo cuando `estado === 'FINALIZADO'` (antes es
+     * `null`). Proyectado a resumen + aReforzar: nunca el `reporteIa` crudo, la
+     * rúbrica (notas por dimensión) ni la evidencia del repo.
      */
-    informe: revisionIaSchema.nullable(),
+    informe: informeParticipanteSchema.nullable(),
   })
   .strict()
 
@@ -157,9 +181,10 @@ export type IntentoTransversalParticipanteResponse = z.infer<
 /**
  * Cupo de intentos del transversal para una asignación (Fase 4b ②). El cupo
  * efectivo = `ProyectoTransversal.intentosMax` + `AsignacionCurso.intentosExtraTransversal`.
- * `intentosUsados` cuenta los intentos NO anulados. Solo admin: alimenta el
- * bloque "Intentos" de la pantalla del intento y es también el shape que
- * devuelve el endpoint "dar +1 intento".
+ * `intentosUsados` cuenta los intentos NO anulados. Lo consumen: el bloque
+ * "Intentos" de la pantalla admin del intento, el endpoint "dar +1 intento", y
+ * (B1) el hito transversal del participante para mostrar "N de M" intentos y el
+ * aviso "sin intentos → tu admin revisará".
  */
 export const cupoIntentosTransversalSchema = z
   .object({
@@ -183,7 +208,24 @@ export const intentoTransversalAdminResponseSchema = intentoTransversalBaseSchem
     notaCapaTests: z.number().min(0).max(100).nullable(),
     notaCapaCualitativa: z.number().min(0).max(100).nullable(),
     notaCapaComprension: z.number().min(0).max(100).nullable(),
+    /**
+     * Nota EFECTIVA publicada: la ajustada por el admin si la corrigió, si no la
+     * calculada. `null` hasta FINALIZADO. Es la que ve el alumno.
+     */
     notaGlobal: z.number().min(0).max(100).nullable(),
+    /**
+     * Nota que la IA calcularía de las capas AHORA (preview), independiente del
+     * estado. Deja al admin ver el número antes de publicar y compararlo si lo
+     * ajustó. `null` si aún no hay capas suficientes para calcularla.
+     */
+    notaCalculada: z.number().min(0).max(100).nullable(),
+    /**
+     * Corrección manual del admin al publicar (o `null` si publicó la calculada
+     * tal cual). Espejo de `IntentoEntrevistaIA.notaAjustadaAdmin`; marca que hubo
+     * ajuste. `motivoAjusteNota` es la razón que dejó el admin.
+     */
+    notaAjustadaAdmin: z.number().min(0).max(100).nullable(),
+    motivoAjusteNota: z.string().nullable(),
     aprobado: z.boolean().nullable(),
     anulado: z.boolean(),
     motivoAnulacion: z.string().nullable(),

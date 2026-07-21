@@ -475,6 +475,22 @@ describe.runIf(RUN_E2E)("transversal e2e (Slice 8 P8a)", () => {
   })
 
   // ===========================================================================
+  // E15 — cupo de intentos del participante (B1)
+  // ===========================================================================
+
+  it("GET cupo ajeno -> 404 (D-AS-9, anti-IDOR) para PARTICIPANTE", async () => {
+    const res = await agentePart.get(`/api/v1/asignaciones/${asignacionPart2Id}/transversal/cupo`)
+    expect(res.status).toBe(404)
+  })
+
+  it("GET cupo propio -> 200 con usados/cupo", async () => {
+    const res = await agentePart.get(`/api/v1/asignaciones/${asignacionPartId}/transversal/cupo`)
+    expect(res.status).toBe(200)
+    expect(res.body).toMatchObject({ asignacionId: asignacionPartId, intentosUsados: 0 })
+    expect((res.body as { intentosCupo: number }).intentosCupo).toBeGreaterThanOrEqual(1)
+  })
+
+  // ===========================================================================
   // E4 — POST intento (Idempotency-Key obligatoria, throttle, audit)
   // ===========================================================================
 

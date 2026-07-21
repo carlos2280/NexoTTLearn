@@ -1,6 +1,7 @@
 import { BadRequestException, InternalServerErrorException } from "@nestjs/common"
 import {
   EvidenciaRepoResumen,
+  InformeParticipante,
   IntentoTransversalAdminResponse,
   IntentoTransversalParticipanteResponse,
   RepoOArtefacto,
@@ -13,6 +14,7 @@ import {
 import { Prisma } from "@prisma/client"
 import { z } from "zod"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
+import { PUNTAJES_FALTANTES_ERROR, calcularNotaTransversal } from "./calcular-nota-transversal"
 import { IntentoTransversalSeleccionado } from "./transversal.types"
 
 /**
@@ -82,8 +84,8 @@ export function parsearRepoOArtefacto(
  * Decimal -> number con redondeo 2 decimales. Usado por mappers que serializan
  * notas para el cliente.
  */
-function decimalAnumero(value: Prisma.Decimal | null): number | null {
-  if (value === null) {
+function decimalAnumero(value: Prisma.Decimal | null | undefined): number | null {
+  if (value === null || value === undefined) {
     return null
   }
   return Number(value.toString())
@@ -122,6 +124,31 @@ function parsearReporte(value: Prisma.JsonValue | null): RevisionIa | null {
 }
 
 /**
+ * Proyecta el `reporteFinal` a lo ÚNICO que ve el participante (B3): `resumen` +
+ * `aReforzar`. NO expone el comentario crudo de la IA ni las notas por dimensión
+ * (rúbrica) — la poda ocurre en el backend, así que esos campos no viajan ni en
+ * la respuesta de red. `null` si no hay informe o si el admin no curó ninguno de
+ * los dos campos.
+ */
+function proyectarInformeParticipante(value: Prisma.JsonValue | null): InformeParticipante | null {
+  const parsed = parsearReporte(value)
+  if (parsed === null) {
+    return null
+  }
+  const informe: InformeParticipante = {}
+  const resumen = parsed.resumen?.trim()
+  if (resumen !== undefined && resumen.length > 0) {
+    informe.resumen = resumen
+  }
+  if (parsed.aReforzar !== undefined && parsed.aReforzar.length > 0) {
+    informe.aReforzar = parsed.aReforzar
+  }
+  // Resumen vacío/blanco y sin áreas → el admin no curó nada visible: no
+  // mostramos un informe vacío (coherente con "solo lo curado").
+  return informe.resumen === undefined && informe.aReforzar === undefined ? null : informe
+}
+
+/**
  * Extrae el RESUMEN de la evidencia del repo (sin el `contenido` pesado) para el
  * detalle admin. Valida contra el shape completo y descarta el contenido; `null`
  * si aún no hay evidencia o el JSON no cumple el contrato.
@@ -138,6 +165,39 @@ function extraerEvidenciaResumen(
   }
   const { commit, archivos, truncado, bytesTotales } = parsed.data
   return { commit, archivos, truncado, bytesTotales }
+}
+
+/**
+ * Nota que la IA calcularía AHORA de las capas cargadas (preview para el admin,
+ * independiente del estado del intento). Deja ver el número antes de publicar y
+ * compararlo si el admin lo ajusta. `null` cuando aún no hay capas activas con
+ * nota suficientes para calcularla (mismo criterio que `finalizar`).
+ */
+export function calcularNotaPreview(intento: IntentoParaMapper): number | null {
+  try {
+    return calcularNotaTransversal(
+      {
+        tests: decimalAnumero(intento.notaCapaTests),
+        cualitativa: decimalAnumero(intento.notaCapaCualitativa),
+        comprension: decimalAnumero(intento.notaCapaComprension),
+      },
+      {
+        tests: Number(intento.transversal.pesoCapaTests.toString()),
+        cualitativa: Number(intento.transversal.pesoCapaCualitativa.toString()),
+        comprension: Number(intento.transversal.pesoCapaComprension.toString()),
+      },
+      {
+        tests: intento.transversal.capaTestsActiva,
+        cualitativa: intento.transversal.capaCualitativaActiva,
+        comprension: intento.transversal.capaComprensionActiva,
+      },
+    )
+  } catch (error) {
+    if (error instanceof Error && error.message === PUNTAJES_FALTANTES_ERROR) {
+      return null
+    }
+    throw error
+  }
 }
 
 export function toIntentoAdmin(intento: IntentoParaMapper): IntentoTransversalAdminResponse {
@@ -160,6 +220,12 @@ export function toIntentoAdmin(intento: IntentoParaMapper): IntentoTransversalAd
     notaCapaCualitativa: decimalAnumero(intento.notaCapaCualitativa),
     notaCapaComprension: decimalAnumero(intento.notaCapaComprension),
     notaGlobal: decimalAnumero(intento.notaGlobal),
+    // `notaCalculada` (preview de la IA) la puebla SOLO el endpoint de detalle,
+    // igual que `cupoIntentos`: el mapper compartido (listado/capas) la deja null
+    // para no exigir los pesos de capa en todos los selects.
+    notaCalculada: null,
+    notaAjustadaAdmin: decimalAnumero(intento.notaAjustadaAdmin),
+    motivoAjusteNota: intento.motivoAjusteNota ?? null,
     aprobado: intento.aprobado,
     anulado: intento.anulado,
     motivoAnulacion: intento.motivoAnulacion,
@@ -199,8 +265,9 @@ export function toIntentoParticipante(
     comentarioColaborador: intento.comentarioColaborador,
     notaGlobal: finalizado ? decimalAnumero(intento.notaGlobal) : null,
     aprobado: finalizado ? intento.aprobado : null,
-    // El informe FINAL curado por el admin (Fase 4b ③). Solo al FINALIZADO — antes
-    // el participante no ve nada del informe. Nunca el crudo ni la evidencia.
-    informe: finalizado ? parsearReporte(intento.reporteFinal) : null,
+    // El informe FINAL curado por el admin (Fase 4b ③ / B3). Solo al FINALIZADO.
+    // Proyectado a resumen + aReforzar: el crudo, la rúbrica y la evidencia se
+    // podan aquí, no viajan ni en la respuesta de red.
+    informe: finalizado ? proyectarInformeParticipante(intento.reporteFinal) : null,
   }
 }

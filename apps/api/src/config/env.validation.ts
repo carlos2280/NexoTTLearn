@@ -115,9 +115,9 @@ const envSchema = z
     // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
     AI_MODEL_JUNIOR: z.string().default("claude-haiku-4-5-20251001"),
     // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
-    AI_MODEL_SEMI_SENIOR: z.string().default("claude-sonnet-4-6"),
+    AI_MODEL_SEMI_SENIOR: z.string().default("claude-sonnet-5"),
     // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
-    AI_MODEL_SENIOR: z.string().default("claude-opus-4-7"),
+    AI_MODEL_SENIOR: z.string().default("claude-opus-4-8"),
     // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
     AI_MODEL_OVERRIDE: z.string().optional(),
     // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).

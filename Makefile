@@ -38,6 +38,19 @@ install: ## Instala dependencias del workspace
 	@printf "$(C_BLUE)→ Instalando dependencias…$(C_RESET)\n"
 	pnpm install
 
+.PHONY: env
+env: ## Copia las plantillas .env.example → .env (solo si no existen; no destructivo)
+	@printf "$(C_BLUE)→ Preparando archivos .env…$(C_RESET)\n"
+	@for pair in ".env.example:.env" "apps/api/.env.example:apps/api/.env" "apps/web/.env.example:apps/web/.env"; do \
+	  src="$${pair%%:*}"; dst="$${pair##*:}"; \
+	  if [ -f "$$dst" ]; then \
+	    printf "  $(C_YELLOW)· %s ya existe (no se toca)$(C_RESET)\n" "$$dst"; \
+	  else \
+	    cp "$$src" "$$dst"; \
+	    printf "  $(C_GREEN)✓ creado %s$(C_RESET)\n" "$$dst"; \
+	  fi; \
+	done
+
 .PHONY: clean
 clean: kill ## Limpia node_modules, dist y .turbo
 	@printf "$(C_YELLOW)→ Limpiando node_modules, dist, .turbo…$(C_RESET)\n"
@@ -195,7 +208,7 @@ validate: typecheck lint test ## typecheck + lint + test (CI gate)
 # ─────────────────────────────────────────────────────────
 
 .PHONY: setup
-setup: install db-up db-migrate db-seed ## Setup completo de cero (install + db + seed)
+setup: install env db-up db-migrate db-seed ## Setup completo de cero (install + env + db + seed)
 	@printf "$(C_GREEN)✓ Setup completo. Ahora 'make dev'$(C_RESET)\n"
 
 .PHONY: fresh

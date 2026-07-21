@@ -100,7 +100,9 @@ async function ejecutarPython(
   let stdinPos = 0
   pyodide.setStdin({
     read: (buffer: Uint8Array) => {
-      if (stdinPos >= stdinBytes.length) return 0
+      if (stdinPos >= stdinBytes.length) {
+        return 0
+      }
       const n = Math.min(buffer.length, stdinBytes.length - stdinPos)
       buffer.set(stdinBytes.subarray(stdinPos, stdinPos + n))
       stdinPos += n
@@ -118,7 +120,9 @@ async function ejecutarPython(
     // messageCallback vacio: los avisos de carga ("Loading pandas...") NO deben
     // contaminar el stdout que se compara con la salida esperada del ejercicio.
     await pyodide.loadPackagesFromImports(solicitud.codigo, {
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: silenciar los avisos de carga de Pyodide ("Loading pandas...") a proposito, para no contaminar el stdout comparado con la salida esperada.
       messageCallback: () => {},
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: idem: descartar los errores de carga aqui; el fallo real se captura al ejecutar el codigo mas abajo.
       errorCallback: () => {},
     })
     await pyodide.runPythonAsync(solicitud.codigo)

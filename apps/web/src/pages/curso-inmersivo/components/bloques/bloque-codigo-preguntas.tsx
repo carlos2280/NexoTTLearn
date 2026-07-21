@@ -2,6 +2,7 @@ import { useMejorIntentoBloque } from "@/features/intentos-bloque/hooks/use-mejo
 import { Button } from "@/shared/components/ui/button"
 import { CodeEditorNexott } from "@/shared/components/ui/code-editor-nexott"
 import { cn } from "@/shared/lib/cn"
+import { extraerTextoPlano } from "@/shared/lib/sanitize-html"
 import {
   type ContenidoCodigoPreguntas,
   type ContenidoCodigoTests,
@@ -11,6 +12,8 @@ import {
 import { Play, RotateCcw, Send } from "lucide-react"
 import { useState } from "react"
 import { EncabezadoCelda } from "../ide/encabezado-celda"
+import { EjemplosTests } from "./codigo-preguntas/ejemplos-tests"
+import { extraerPistasOcultos } from "./codigo-preguntas/extraer-pistas-ocultos"
 import { PanelEnunciado } from "./codigo-preguntas/panel-enunciado"
 import { ResultadoIntento } from "./codigo-preguntas/resultado-intento"
 import { TerminalTests } from "./codigo-preguntas/terminal-tests"
@@ -133,6 +136,13 @@ function RetoActivo({
   const todosLosTestsPasaron = Boolean(
     flujo.ejecucion && flujo.ejecucion.testsPasados === flujo.ejecucion.testsTotales,
   )
+  // ¿Hay una pista realmente visible en la consola? (algún oculto falló con
+  // descripción no vacía). El banner parcial solo menciona "la pista" si existe.
+  const hayPistaOculta = flujo.ejecucion
+    ? extraerPistasOcultos(flujo.ejecucion.resultados).some(
+        (p) => extraerTextoPlano(p.texto).length > 0,
+      )
+    : false
   const estadoEditor = derivarEstadoEditor({
     codigo: flujo.codigo,
     esqueletoInicial: contenido.esqueletoInicial,
@@ -145,6 +155,7 @@ function RetoActivo({
     <article className="flex flex-col gap-5">
       <EncabezadoCelda glifo=">" etiqueta="ejercicio de código" tonoGlifo="text-accent" />
       <PanelEnunciado contenido={contenido} />
+      <EjemplosTests tests={contenidoTests?.tests ?? []} />
       <div
         className="overflow-hidden rounded-2xl border border-border-strong bg-surface"
         style={{ boxShadow: "var(--shadow-card-resting)" }}
@@ -199,6 +210,7 @@ function RetoActivo({
         intento={flujo.ultimoIntento}
         notaAprobado={NOTA_APROBADO_DEFAULT}
         mejorPrevio={mejorPrevioAlEnviar}
+        hayPistaOculta={hayPistaOculta}
       />
     </article>
   )

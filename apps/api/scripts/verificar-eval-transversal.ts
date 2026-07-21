@@ -12,8 +12,8 @@
  *   pnpm --dir apps/api exec tsx scripts/verificar-eval-transversal.ts [repoUrl]
  *
  * Con AI_PROVIDER=claude + AI_API_KEY en .env hace una llamada REAL a Claude
- * (tiene coste). Recomendado además AI_MODEL_OVERRIDE=claude-sonnet-5 (el default
- * sonnet-4-6 puede estar desactualizado).
+ * (tiene coste). El default de la capa semi-senior ya es claude-sonnet-5; usa
+ * AI_MODEL_OVERRIDE solo si quieres forzar otro modelo puntualmente.
  */
 import { Module } from "@nestjs/common"
 import { ConfigModule } from "@nestjs/config"
@@ -32,6 +32,13 @@ import { validateEnv } from "../src/config/env.validation"
   ],
 })
 class VerificacionModule {}
+
+/**
+ * Ejes a puntuar para el smoke test. En la app vienen de las skills declaradas
+ * por el transversal (`TransversalSkill` → `Skill.etiquetaVisible`); aquí van
+ * fijos para poder correr el script contra cualquier repo público.
+ */
+const DIMENSIONES_DEMO = ["Calidad de código", "Estructura del proyecto", "Buenas prácticas"]
 
 async function main(): Promise<void> {
   const repoUrl = process.argv[2] ?? "https://github.com/sindresorhus/is-odd"
@@ -52,9 +59,35 @@ async function main(): Promise<void> {
     const res = await ai.evaluarRepoCualitativo({
       contenidoRepo: repo.contenido,
       profundidad: "SEMI_SENIOR",
+      dimensiones: DIMENSIONES_DEMO,
     })
     console.log(`\n[verificar] NOTA=${res.nota}  CONFIANZA=${res.confianza}`)
-    console.log(`[verificar] COMENTARIO:\n${res.comentario}\n`)
+    console.log(`[verificar] RESUMEN:\n${res.resumen}\n`)
+    console.log(`[verificar] QUÉ REVISÓ: ${res.queReviso}`)
+    console.log(`[verificar] QUÉ NO REVISÓ: ${res.queNoReviso}`)
+    console.log("[verificar] POR DIMENSIÓN:")
+    for (const dim of res.porDimension) {
+      console.log(`  · ${dim.dimension}: nota=${dim.nota} — ${dim.comentario}`)
+    }
+    if (res.fortalezas.length > 0) {
+      console.log("[verificar] FORTALEZAS:")
+      for (const fortaleza of res.fortalezas) {
+        console.log(`  + ${fortaleza}`)
+      }
+    }
+    if (res.aReforzar.length > 0) {
+      console.log("[verificar] A REFORZAR:")
+      for (const item of res.aReforzar) {
+        console.log(`  ! ${item.que} → ${item.sugerencia}`)
+      }
+    }
+    if (res.cumplimientoCriterios && res.cumplimientoCriterios.length > 0) {
+      console.log("[verificar] CUMPLIMIENTO DE CRITERIOS:")
+      for (const crit of res.cumplimientoCriterios) {
+        console.log(`  [${crit.cumple ?? "sin-verificar"}] ${crit.criterio} — ${crit.evidencia}`)
+      }
+    }
+    console.log("")
   } finally {
     await app.close()
   }

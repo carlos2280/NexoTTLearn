@@ -37,4 +37,11 @@ describe("etiquetaHistorialIntento", () => {
       tono: "neutro",
     })
   })
+
+  it("FALLO_ACCESO_REPO → 'Repo no accesible' neutro (B2c: no es un rechazo del alumno)", () => {
+    expect(etiquetaHistorialIntento({ estado: "FALLO_ACCESO_REPO", aprobado: null })).toEqual({
+      texto: "Repo no accesible",
+      tono: "neutro",
+    })
+  })
 })

@@ -133,9 +133,36 @@ describe("toIntentoAdmin — curación (Fase 4b ③)", () => {
   })
 })
 
-const INFORME_FINAL = { comentario: "áreas por reforzar", confianza: "ALTA" as const }
+// reporteFinal curado + TODOS los campos crudos/sensibles que NO debe ver el
+// participante (B3): comentario crudo, rúbrica (porDimension), checklist de
+// criterios, y el resto del RevisionIa. El fixture los incluye para probar que
+// la proyección (allowlist) los poda incluso si el shape gana campos.
+const CAMPOS_SENSIBLES = [
+  "comentario",
+  "confianza",
+  "veredicto",
+  "queReviso",
+  "queNoReviso",
+  "porDimension",
+  "fortalezas",
+  "cumplimientoCriterios",
+] as const
+const INFORME_FINAL = {
+  comentario: "comentario crudo interno de la IA",
+  confianza: "ALTA" as const,
+  veredicto: "necesita_ajustes" as const,
+  resumen: "Buen trabajo general, con puntos a pulir.",
+  queReviso: "estructura y tests",
+  queNoReviso: "no ejecuté el código",
+  porDimension: [{ dimension: "TypeScript", nota: 80, comentario: "sólido" }],
+  fortalezas: ["estructura clara"],
+  aReforzar: [{ que: "cobertura de tests", sugerencia: "agrega casos borde" }],
+  cumplimientoCriterios: [
+    { criterio: "usa TS estricto", cumple: "cumple" as const, evidencia: "tsconfig strict" },
+  ],
+}
 
-describe("toIntentoParticipante — informe final (Fase 4b ③)", () => {
+describe("toIntentoParticipante — informe final (Fase 4b ③ / B3)", () => {
   it("NO expone el informe antes de FINALIZADO (EVALUADO)", () => {
     const res = toIntentoParticipante(
       buildIntento({}, { estado: "EVALUADO", reporteFinal: INFORME_FINAL }),
@@ -143,11 +170,28 @@ describe("toIntentoParticipante — informe final (Fase 4b ③)", () => {
     expect(res.informe).toBeNull()
   })
 
-  it("expone el reporteFinal como `informe` en FINALIZADO", () => {
+  it("expone SOLO resumen + aReforzar del reporteFinal en FINALIZADO (proyección B3)", () => {
     const res = toIntentoParticipante(
       buildIntento({}, { estado: "FINALIZADO", reporteFinal: INFORME_FINAL }),
     )
-    expect(res.informe?.comentario).toBe("áreas por reforzar")
+    expect(res.informe?.resumen).toBe("Buen trabajo general, con puntos a pulir.")
+    expect(res.informe?.aReforzar).toEqual([
+      { que: "cobertura de tests", sugerencia: "agrega casos borde" },
+    ])
+    // Poda (allowlist): NINGÚN campo crudo/rúbrica/checklist viaja al participante.
+    for (const campo of CAMPOS_SENSIBLES) {
+      expect(res.informe).not.toHaveProperty(campo)
+    }
+  })
+
+  it("informe null en FINALIZADO si el admin no curó resumen ni aReforzar", () => {
+    const res = toIntentoParticipante(
+      buildIntento(
+        {},
+        { estado: "FINALIZADO", reporteFinal: { comentario: "solo crudo", confianza: "MEDIA" } },
+      ),
+    )
+    expect(res.informe).toBeNull()
   })
 
   it("nunca expone el crudo ni la evidencia", () => {

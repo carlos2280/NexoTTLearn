@@ -1,0 +1,15 @@
+-- B2c — Nuevo estado terminal `FALLO_ACCESO_REPO` para el intento transversal.
+--
+-- Contexto: cuando el repo entregado no se puede abrir (privado, URL muerta,
+-- timeout de clone o sin archivos legibles), el job lanzaba `REPO_NO_ACCESIBLE`,
+-- lo logueaba y NO transicionaba: el intento quedaba EN_EVALUACION para siempre
+-- (el alumno veia "En evaluacion" eterno y `onModuleInit` lo reencolaba en cada
+-- arranque como item veneno). Este estado da un destino honesto: el alumno ve
+-- "no pudimos acceder a tu repo" + reenviar, y el barrido de arranque ya no lo
+-- toca (deja de ser EN_EVALUACION). No consume cupo (`calcularCupoIntentos` /
+-- `verificarCupoIntentos` lo excluyen del conteo).
+--
+-- 100% aditiva, zero-downtime: solo `ALTER TYPE ... ADD VALUE`, sin DROP/RENAME
+-- ni backfill. Idempotente (`IF NOT EXISTS`). El valor no se usa en esta misma
+-- migracion (requisito de PG16 para `ALTER TYPE ... ADD VALUE`).
+ALTER TYPE "estado_intento_transversal_enum" ADD VALUE IF NOT EXISTS 'FALLO_ACCESO_REPO';

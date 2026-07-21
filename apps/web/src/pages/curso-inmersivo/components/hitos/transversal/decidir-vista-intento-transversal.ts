@@ -1,6 +1,11 @@
 import type { EstadoIntentoTransversal } from "@nexott-learn/shared-types"
 
-export type VistaIntentoTransversal = "evaluando" | "en-revision" | "aprobado" | "aun-no"
+export type VistaIntentoTransversal =
+  | "evaluando"
+  | "en-revision"
+  | "aprobado"
+  | "aun-no"
+  | "repo-inaccesible"
 
 /**
  * Decide qué vista mostrarle al participante para un intento ya existente (el
@@ -10,6 +15,9 @@ export type VistaIntentoTransversal = "evaluando" | "en-revision" | "aprobado" |
  * vista "en revisión". Antes ese estado intermedio caía en "aun-no" porque
  * `aprobado` es `null` hasta FINALIZADO → mostraba un "Casi" falso y dejaba
  * reenviar un proyecto que quizá aprobó. Este mapeo lo corrige.
+ *
+ * FALLO_ACCESO_REPO (B2c): el repo no se pudo abrir → vista honesta "repo
+ * inaccesible" con reenviar, en vez de quedar colgado en "En evaluación".
  */
 export function decidirVistaIntentoTransversal(intento: {
   readonly estado: EstadoIntentoTransversal
@@ -20,6 +28,9 @@ export function decidirVistaIntentoTransversal(intento: {
   }
   if (intento.estado === "EVALUADO") {
     return "en-revision"
+  }
+  if (intento.estado === "FALLO_ACCESO_REPO") {
+    return "repo-inaccesible"
   }
   // FINALIZADO / ANULADO: el veredicto ya está sellado (o el intento quedó sin
   // efecto). Solo aquí `aprobado` es fiable.
