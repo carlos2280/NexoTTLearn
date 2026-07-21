@@ -15,6 +15,9 @@ interface SeccionTestsDelRetoProps {
   readonly reto: BloqueDetalleResponse
   /** Lenguaje del reto, para que la "Solución de referencia" resalte igual. */
   readonly lenguaje: string
+  /** Tiempo límite por test del reto, para validar la referencia con la misma
+   *  restricción que el participante. */
+  readonly tiempoLimiteSeg: number
 }
 
 /**
@@ -23,7 +26,7 @@ interface SeccionTestsDelRetoProps {
  * lo edita ahí mismo. Si el reto aún no tiene tests (import antiguo), ofrece
  * crearlos. Así el autor edita reto + tests en un solo lugar.
  */
-export function SeccionTestsDelReto({ reto, lenguaje }: SeccionTestsDelRetoProps) {
+export function SeccionTestsDelReto({ reto, lenguaje, tiempoLimiteSeg }: SeccionTestsDelRetoProps) {
   const lista = useListarBloques({
     page: 1,
     pageSize: 1,
@@ -62,7 +65,14 @@ export function SeccionTestsDelReto({ reto, lenguaje }: SeccionTestsDelRetoProps
   } else if (detalle.isError || !detalle.data) {
     cuerpo = <AvisoError onReintentar={() => detalle.refetch()} />
   } else {
-    cuerpo = <EditorTestsEmbebido key={detalle.data.id} bloque={detalle.data} lenguaje={lenguaje} />
+    cuerpo = (
+      <EditorTestsEmbebido
+        key={detalle.data.id}
+        bloque={detalle.data}
+        lenguaje={lenguaje}
+        tiempoLimiteSeg={tiempoLimiteSeg}
+      />
+    )
   }
 
   return (
