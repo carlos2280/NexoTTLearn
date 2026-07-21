@@ -38,7 +38,7 @@ export function ListasRevisionIa({ fortalezas, aReforzar }: ListasRevisionIaProp
             {aReforzar.map((r, i) => (
               <li key={`${i}-${r.que}`} className="flex flex-col">
                 <span className="text-body-sm text-text-primary">{r.que}</span>
-                <span className="text-caption text-text-tertiary">{r.sugerencia}</span>
+                <span className="text-caption text-text-secondary">{r.sugerencia}</span>
               </li>
             ))}
           </ul>

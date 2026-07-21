@@ -130,7 +130,12 @@ export function EditorCodigoPreguntas({ bloque }: EditorCodigoPreguntasProps) {
         )}
       </Field>
 
-      <SeccionTestsDelReto key={bloque.id} reto={bloque} lenguaje={datos.lenguaje} />
+      <SeccionTestsDelReto
+        key={bloque.id}
+        reto={bloque}
+        lenguaje={datos.lenguaje}
+        tiempoLimiteSeg={datos.tiempoLimiteSeg}
+      />
     </EditorBloqueShell>
   )
 }

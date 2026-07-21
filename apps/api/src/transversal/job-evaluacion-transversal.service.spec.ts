@@ -1,6 +1,8 @@
+import { UnprocessableEntityException } from "@nestjs/common"
 import { Prisma } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AiService } from "../common/ai/ai.service"
+import { apiErrorCodes } from "../common/errors/api-error.codes"
 import type { PrismaService } from "../common/prisma/prisma.service"
 import type { RepoFetchService } from "../common/repo-fetch/repo-fetch.service"
 import { JobEvaluacionTransversalService } from "./job-evaluacion-transversal.service"
@@ -16,6 +18,7 @@ interface PrismaMock {
   readonly intentoTransversal: {
     readonly findUnique: ReturnType<typeof vi.fn>
     readonly findMany: ReturnType<typeof vi.fn>
+    readonly updateMany: ReturnType<typeof vi.fn>
   }
 }
 
@@ -35,6 +38,7 @@ function buildPrismaMock(): PrismaMock {
         },
       }),
       findMany: vi.fn().mockResolvedValue([]),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
   }
 }
@@ -208,6 +212,70 @@ describe("JobEvaluacionTransversalService (una capa: revisión con IA)", () => {
 
     expect(ai.evaluarRepoCualitativo).toHaveBeenCalledOnce()
     expect(capas.cargarCapaCualitativa).not.toHaveBeenCalled()
+  })
+
+  it("repo inaccesible → transiciona a FALLO_ACCESO_REPO (race-safe) y no evalúa con IA", async () => {
+    repoFetch.descargarYEmpaquetar.mockRejectedValueOnce(
+      new UnprocessableEntityException({
+        code: apiErrorCodes.repoNoAccesible,
+        message: "No se pudo clonar el repositorio (inaccesible, privado o demasiado grande).",
+      }),
+    )
+    job.dispatch(`${INTENTO_ID_BASE}7`)
+    await flushHasta(2100)
+
+    // Falló antes de la IA: ni evalúa ni carga capa.
+    expect(ai.evaluarRepoCualitativo).not.toHaveBeenCalled()
+    expect(capas.cargarCapaCualitativa).not.toHaveBeenCalled()
+    // Transiciona el intento fuera de EN_EVALUACION (B2c), solo si sigue ahí y no
+    // anulado (race-safe): así deja de colgar en "En evaluación" y el barrido de
+    // arranque ya no lo reencola (ítem veneno).
+    expect(prisma.intentoTransversal.updateMany).toHaveBeenCalledWith({
+      where: { id: `${INTENTO_ID_BASE}7`, estado: "EN_EVALUACION", anulado: false },
+      data: { estado: "FALLO_ACCESO_REPO" },
+    })
+  })
+
+  it("URL de repo inválida (REPO_URL_INVALIDA) también transiciona a FALLO_ACCESO_REPO", async () => {
+    repoFetch.descargarYEmpaquetar.mockRejectedValueOnce(
+      new UnprocessableEntityException({
+        code: apiErrorCodes.repoUrlInvalida,
+        message: "La URL del repositorio no es válida.",
+      }),
+    )
+    job.dispatch(`${INTENTO_ID_BASE}9`)
+    await flushHasta(2100)
+
+    expect(prisma.intentoTransversal.updateMany).toHaveBeenCalledWith({
+      where: { id: `${INTENTO_ID_BASE}9`, estado: "EN_EVALUACION", anulado: false },
+      data: { estado: "FALLO_ACCESO_REPO" },
+    })
+  })
+
+  it("un 422 de OTRO código NO transiciona (discriminador estrecho, no 'cualquier 422')", async () => {
+    // Blindaje de la rama negativa: si alguien ensancha el discriminador a
+    // "cualquier UnprocessableEntity", este test lo caza.
+    repoFetch.descargarYEmpaquetar.mockRejectedValueOnce(
+      new UnprocessableEntityException({ code: "OTRO_422", message: "otro error de validación" }),
+    )
+    job.dispatch(`${INTENTO_ID_BASE}4`)
+    await flushHasta(2100)
+
+    expect(prisma.intentoTransversal.updateMany).not.toHaveBeenCalled()
+  })
+
+  it("fallo transitorio de IA → NO transiciona (sigue EN_EVALUACION para reintento al arranque)", async () => {
+    ;(ai.evaluarRepoCualitativo as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error("claude 429"),
+    )
+    job.dispatch(`${INTENTO_ID_BASE}8`)
+    await flushHasta(2100)
+
+    // El repo sí se descargó; el fallo fue de la IA (transitorio) → no se marca
+    // FALLO_ACCESO_REPO; el intento queda EN_EVALUACION para que el barrido lo reintente.
+    expect(repoFetch.descargarYEmpaquetar).toHaveBeenCalledOnce()
+    expect(capas.cargarCapaCualitativa).not.toHaveBeenCalled()
+    expect(prisma.intentoTransversal.updateMany).not.toHaveBeenCalled()
   })
 
   it("omite el job si el colaborador del intento no tiene usuario asociado", async () => {

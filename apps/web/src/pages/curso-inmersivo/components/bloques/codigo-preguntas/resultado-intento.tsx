@@ -1,6 +1,7 @@
 import { cn } from "@/shared/lib/cn"
 import type { IntentoBloqueResponse } from "@nexott-learn/shared-types"
-import { CheckCircle2, RotateCcw } from "lucide-react"
+import { AlertTriangle, CheckCircle2, type LucideIcon, RotateCcw } from "lucide-react"
+import { type EstadoVeredicto, type Veredicto, evaluarVeredicto } from "./evaluar-veredicto"
 
 interface ResultadoIntentoProps {
   /** `null` mientras no se haya enviado ningún intento. El componente se monta
@@ -8,20 +9,30 @@ interface ResultadoIntentoProps {
   readonly intento: IntentoBloqueResponse | null
   readonly notaAprobado: number
   /**
-   * Mejor intento *previo* al actual (antes de enviar). Permite distinguir
-   * primera aprobacion de un re-envio cuando ya estabas aprobado.
+   * Mejor intento *previo* al actual (antes de enviar). Permite distinguir la
+   * primera vez que se alcanza el 100% de un re-envío ya pleno.
    */
   readonly mejorPrevio: IntentoBloqueResponse | null
+  /** Hay una pista visible en la consola (algún oculto falló con descripción).
+   *  El mensaje parcial solo menciona la pista cuando esto es `true`. Opcional:
+   *  los bloques sin concepto de pista (p. ej. SQL_EJERCICIO) lo omiten. */
+  readonly hayPistaOculta?: boolean
 }
 
-interface Veredicto {
-  readonly aprobado: boolean
-  readonly primeraVez: boolean
-  readonly mensaje: string
-}
-
-export function ResultadoIntento({ intento, notaAprobado, mejorPrevio }: ResultadoIntentoProps) {
-  const veredicto = intento ? evaluarVeredicto(intento.nota, notaAprobado, mejorPrevio) : null
+export function ResultadoIntento({
+  intento,
+  notaAprobado,
+  mejorPrevio,
+  hayPistaOculta = false,
+}: ResultadoIntentoProps) {
+  const veredicto = intento
+    ? evaluarVeredicto({
+        nota: intento.nota,
+        notaAprobado,
+        notaPrevia: mejorPrevio?.nota ?? null,
+        hayPistaOculta,
+      })
+    : null
   return (
     <>
       {/* Región live persistente: se monta SIEMPRE (aunque no haya intento) y su
@@ -33,45 +44,52 @@ export function ResultadoIntento({ intento, notaAprobado, mejorPrevio }: Resulta
   )
 }
 
+interface EstiloEstado {
+  readonly contenedor: string
+  readonly texto: string
+  readonly colorIcono: string
+  readonly icono: LucideIcon
+}
+
+/**
+ * Verde solo para el 100% (`pleno`). Parcial y reprobado comparten el ámbar
+ * ("aún no está redondo"): el parcial aprobó el avance pero un oculto sigue
+ * fallando, así que su color NO debe leerse como "todo perfecto".
+ */
+const ESTILO_ESTADO: Record<EstadoVeredicto, EstiloEstado> = {
+  pleno: {
+    contenedor: "border-success/30 bg-success-soft",
+    texto: "text-success-on-soft",
+    colorIcono: "text-success",
+    icono: CheckCircle2,
+  },
+  parcial: {
+    contenedor: "border-warmth/30 bg-warning-soft",
+    texto: "text-warning-on-soft",
+    colorIcono: "text-warning-on-soft",
+    icono: AlertTriangle,
+  },
+  reprobado: {
+    contenedor: "border-warmth/30 bg-warning-soft",
+    texto: "text-warning-on-soft",
+    colorIcono: "text-warning-on-soft",
+    icono: RotateCcw,
+  },
+}
+
 function BannerVeredicto({ veredicto }: { readonly veredicto: Veredicto }) {
-  const { aprobado, primeraVez, mensaje } = veredicto
-  const Icono = aprobado ? CheckCircle2 : RotateCcw
+  const estilo = ESTILO_ESTADO[veredicto.estado]
+  const Icono = estilo.icono
   return (
     <aside
       className={cn(
         "flex items-start gap-3 rounded-2xl border p-4",
-        aprobado ? "border-success/30 bg-success-soft" : "border-warmth/30 bg-warning-soft",
-        primeraVez && "nx-aurora-pulse",
+        estilo.contenedor,
+        veredicto.celebrar && "nx-aurora-pulse",
       )}
     >
-      <Icono
-        className={cn("mt-0.5 h-5 w-5 shrink-0", aprobado ? "text-success" : "text-warmth")}
-        aria-hidden={true}
-      />
-      <p className={cn("text-body-sm", aprobado ? "text-success-on-soft" : "text-warning-on-soft")}>
-        {mensaje}
-      </p>
+      <Icono className={cn("mt-0.5 h-5 w-5 shrink-0", estilo.colorIcono)} aria-hidden={true} />
+      <p className={cn("text-body-sm", estilo.texto)}>{veredicto.mensaje}</p>
     </aside>
   )
-}
-
-function evaluarVeredicto(
-  nota: number,
-  notaAprobado: number,
-  mejorPrevio: IntentoBloqueResponse | null,
-): Veredicto {
-  const aprobado = nota >= notaAprobado
-  const yaEstabaAprobado = (mejorPrevio?.nota ?? -1) >= notaAprobado
-  const primeraVez = aprobado && !yaEstabaAprobado
-  return { aprobado, primeraVez, mensaje: construirMensaje({ aprobado, primeraVez }) }
-}
-
-function construirMensaje(args: { aprobado: boolean; primeraVez: boolean }): string {
-  if (args.primeraVez) {
-    return "Lo lograste. Acabas de demostrar capacidad nueva."
-  }
-  if (args.aprobado) {
-    return "Aprobado. Tu mejor intento sigue contando."
-  }
-  return "Aún no. Revisa los tests que fallaron y vuelve a intentarlo — la mejor cuenta."
 }

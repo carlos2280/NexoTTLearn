@@ -52,6 +52,7 @@ import { motivoTransversal } from "./disponibilidad-motivo.helpers"
 import { JobEvaluacionTransversalService } from "./job-evaluacion-transversal.service"
 import { type CargarCapaResult, TransversalCapasService } from "./transversal-capas.service"
 import {
+  calcularNotaPreview,
   parsearCriteriosEvaluacion,
   toIntentoAdmin,
   toIntentoParticipante,
@@ -484,7 +485,9 @@ export class TransversalService {
       colaboradorId: intento.colaboradorId,
       cursoId: admin.curso.id,
     })
-    return { ...admin, cupoIntentos }
+    // B-nota: la nota que la IA calcularía de las capas (preview), para que el
+    // admin la vea antes de publicar y decida si la ajusta. Solo en el detalle.
+    return { ...admin, cupoIntentos, notaCalculada: calcularNotaPreview(intento) }
   }
 
   // =========================================================================
@@ -526,6 +529,45 @@ export class TransversalService {
       esAdmin ? toIntentoAdmin(intento) : toIntentoParticipante(intento),
     )
     return buildPaginatedResponse(items, total, page, pageSize)
+  }
+
+  // =========================================================================
+  // E15. GET /api/v1/asignaciones/:asignacionId/transversal/cupo
+  //
+  // Cupo de intentos para el hito del PARTICIPANTE (B1): usados / cupo efectivo.
+  // Reusa el mismo cálculo (`calcularCupoIntentos`) y el mismo shape
+  // (`CupoIntentosTransversal`) que el detalle admin del intento (E5), única
+  // fuente de verdad del cupo. La propiedad de la asignación la valida
+  // `resolverAsignacionConCurso` (el participante solo ve la suya; D-AS-9), así
+  // que un participante no puede leer el cupo de otro (anti-IDOR).
+  // =========================================================================
+
+  async obtenerCupoIntentos(
+    asignacionId: string,
+    usuario: SesionUsuario,
+  ): Promise<CupoIntentosTransversal> {
+    const asignacion = await this.resolverAsignacionConCurso(asignacionId, usuario)
+    if (asignacion.curso.transversalId === null) {
+      throw new NotFoundException({
+        code: apiErrorCodes.transversalNoEncontrado,
+        message: "El curso no tiene proyecto transversal configurado.",
+      })
+    }
+    const cupo = await this.calcularCupoIntentos({
+      transversalId: asignacion.curso.transversalId,
+      colaboradorId: asignacion.colaboradorId,
+      cursoId: asignacion.curso.id,
+    })
+    if (cupo === null) {
+      // `resolverAsignacionConCurso` ya garantizó asignación + transversal; un
+      // `null` aquí solo sería una carrera (borrado de la asignación entre
+      // lecturas) → 404 uniforme, consistente con E12 `darIntentoExtra`.
+      throw new NotFoundException({
+        code: apiErrorCodes.asignacionNoEncontrada,
+        message: `Asignacion ${asignacionId} no encontrada.`,
+      })
+    }
+    return cupo
   }
 
   // =========================================================================
@@ -668,6 +710,10 @@ export class TransversalService {
   async finalizar(input: {
     readonly intentoId: string
     readonly usuario: SesionUsuario
+    // Ajuste manual OPCIONAL del admin al publicar (B-nota). Van juntos o ninguno
+    // (el schema del body lo garantiza): si ajusta la nota, el motivo es obligatorio.
+    readonly notaAjustada?: number
+    readonly motivoAjuste?: string
   }): Promise<FinalizarTransversalResponse> {
     const intento = await this.prisma.intentoTransversal.findUnique({
       where: { id: input.intentoId },
@@ -714,9 +760,12 @@ export class TransversalService {
       })
     }
 
-    let notaGlobal: number
+    // Nota que la IA calcula de las capas. Puede quedar `null` si no hay capas
+    // activas con nota suficientes; en ese caso el intento solo se puede publicar
+    // si el admin fija una nota a mano (el override cubre el hueco de la IA).
+    let notaCalculada: number | null
     try {
-      notaGlobal = calcularNotaTransversal(
+      notaCalculada = calcularNotaTransversal(
         {
           tests: intento.notaCapaTests === null ? null : Number(intento.notaCapaTests.toString()),
           cualitativa:
@@ -741,16 +790,27 @@ export class TransversalService {
       )
     } catch (error) {
       if (error instanceof Error && error.message === PUNTAJES_FALTANTES_ERROR) {
-        throw new ConflictException({
-          code: apiErrorCodes.puntajesFaltantes,
-          message: "No hay capas activas con nota suficientes para calcular nota global.",
-        })
+        notaCalculada = null
+      } else {
+        throw error
       }
-      throw error
     }
 
     const umbral = Number(intento.transversal.umbralAprobacion.toString())
-    const aprobado = notaGlobal >= umbral
+    // Nota EFECTIVA publicada: la ajustada por el admin si la corrigio en el
+    // dialogo de "Publicar y cerrar", si no la calculada. Se persiste en
+    // `notaGlobal` para que el motor de skills y el participante la lean sin
+    // cambios; `notaAjustadaAdmin` solo marca aparte que hubo ajuste (traza).
+    const notaFinal = input.notaAjustada ?? notaCalculada
+    if (notaFinal === null) {
+      // Ni la IA pudo calcular ni el admin fijo una nota: no hay que publicar.
+      throw new ConflictException({
+        code: apiErrorCodes.puntajesFaltantes,
+        message:
+          "No hay capas activas con nota suficientes para calcular la nota; ajusta la nota a mano para publicar.",
+      })
+    }
+    const aprobado = notaFinal >= umbral
     const skillsIds = intento.transversal.skills.map((s) => s.skillId)
 
     await this.prisma.$transaction(async (tx) => {
@@ -761,7 +821,10 @@ export class TransversalService {
         where: { id: input.intentoId, estado: "EVALUADO", anulado: false },
         data: {
           estado: "FINALIZADO",
-          notaGlobal: new Prisma.Decimal(notaGlobal),
+          notaGlobal: new Prisma.Decimal(notaFinal),
+          notaAjustadaAdmin:
+            input.notaAjustada === undefined ? null : new Prisma.Decimal(input.notaAjustada),
+          motivoAjusteNota: input.motivoAjuste ?? null,
           aprobado,
           fechaFinalizacion: new Date(),
           // Sello de curación (Fase 4b ③): finalizar = publicar el informe final
@@ -794,7 +857,11 @@ export class TransversalService {
 
     return {
       intentoId: input.intentoId,
-      notaGlobal,
+      notaGlobal: notaFinal,
+      // La calculada por la IA (o null si no era computable y el admin fijo la nota
+      // a mano). Deja al controller auditar el "de X a Y" del ajuste.
+      notaCalculada,
+      notaAjustada: input.notaAjustada ?? null,
       aprobado,
       skillsActualizadas: skillsIds,
     }
@@ -1077,8 +1144,8 @@ export class TransversalService {
   /**
    * Enforcement del tope de intentos (Fase 1a). Cupo efectivo = tope global del
    * transversal (`ProyectoTransversal.intentosMax`) + extra por participante
-   * (`AsignacionCurso.intentosExtraTransversal`). Los intentos anulados NO
-   * consumen cupo.
+   * (`AsignacionCurso.intentosExtraTransversal`). Los intentos anulados y los
+   * de repo inaccesible (`FALLO_ACCESO_REPO`, B2c) NO consumen cupo.
    *
    * Nota de carrera: el conteo no toma lock, asi que dos envios concurrentes
    * podrian pasar el chequeo y exceder el cupo en 1. Es aceptable para un
@@ -1107,6 +1174,8 @@ export class TransversalService {
         transversalId: input.transversalId,
         colaboradorId: input.colaboradorId,
         anulado: false,
+        // Un repo inaccesible (B2c) no consume ficha: no pudimos ni leerlo.
+        estado: { not: "FALLO_ACCESO_REPO" },
       },
     })
 
@@ -1127,7 +1196,8 @@ export class TransversalService {
   /**
    * Cupo de intentos de una asignación para la pantalla admin (Fase 4b ②).
    * Cupo efectivo = `ProyectoTransversal.intentosMax` + extra por participante;
-   * `intentosUsados` cuenta los NO anulados (idéntico a `verificarCupoIntentos`).
+   * `intentosUsados` cuenta los NO anulados y NO `FALLO_ACCESO_REPO` (idéntico a
+   * `verificarCupoIntentos`).
    * Devuelve `null` si no hay asignación o transversal (el intento apunta a un
    * curso sin transversal, o el colaborador ya no está asignado).
    */
@@ -1156,6 +1226,8 @@ export class TransversalService {
           transversalId: input.transversalId,
           colaboradorId: input.colaboradorId,
           anulado: false,
+          // Idéntico a `verificarCupoIntentos`: un repo inaccesible no consume ficha (B2c).
+          estado: { not: "FALLO_ACCESO_REPO" },
         },
       }),
     ])

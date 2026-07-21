@@ -34,6 +34,10 @@ export const SELECT_INTENTO_TRANSVERSAL_FIELDS = {
   notaCapaCualitativa: true,
   notaCapaComprension: true,
   notaGlobal: true,
+  // Ajuste manual del admin al publicar (B-nota). El mapper ADMIN lo expone;
+  // el participante lo ignora (solo ve la `notaGlobal` efectiva).
+  notaAjustadaAdmin: true,
+  motivoAjusteNota: true,
   aprobado: true,
   // Informe estructurado de la capa cualitativa (JSONB). El mapper ADMIN extrae
   // `evaluacionesCapas.cualitativa` como `revisionIa`; el participante lo ignora.
@@ -57,6 +61,14 @@ export const SELECT_INTENTO_TRANSVERSAL_FIELDS = {
       id: true,
       descripcion: true,
       umbralAprobacion: true,
+      // Pesos + flags de capas activas: el mapper ADMIN los usa para calcular la
+      // `notaCalculada` (preview de la IA que ve el admin antes de publicar).
+      pesoCapaTests: true,
+      pesoCapaCualitativa: true,
+      pesoCapaComprension: true,
+      capaTestsActiva: true,
+      capaCualitativaActiva: true,
+      capaComprensionActiva: true,
       curso: {
         select: { id: true, titulo: true },
       },

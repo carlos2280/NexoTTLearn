@@ -10,8 +10,12 @@ import { paginacionQuerySchema } from "../paginacion"
  * input==output).
  */
 const booleanQuerySchema = z.preprocess((v) => {
-  if (v === "true") return true
-  if (v === "false") return false
+  if (v === "true") {
+    return true
+  }
+  if (v === "false") {
+    return false
+  }
   return v
 }, z.boolean())
 

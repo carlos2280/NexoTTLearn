@@ -25,6 +25,11 @@ export function etiquetaHistorialIntento(
   if (intento.estado === "ANULADO") {
     return { texto: "Anulado", tono: "anulado" }
   }
+  if (intento.estado === "FALLO_ACCESO_REPO") {
+    // Repo inaccesible (B2c): no se pudo abrir y no consume cupo. Tono neutro
+    // para no leerse como un rechazo del trabajo del alumno.
+    return { texto: "Repo no accesible", tono: "neutro" }
+  }
   if (intento.aprobado === true) {
     return { texto: "Aprobado", tono: "aprobado" }
   }

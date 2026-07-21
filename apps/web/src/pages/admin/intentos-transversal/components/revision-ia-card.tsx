@@ -18,6 +18,11 @@ export function RevisionIaCard({ intento }: RevisionIaCardProps) {
   const [cargarAbierto, setCargarAbierto] = useState(false)
   const editable = intento.estado === "EN_EVALUACION" || intento.estado === "EVALUADO"
   const sinRevision = intento.revisionIa === null
+  const mensajeSinRevision = editable
+    ? "La revisión con IA todavía no está disponible. Si el intento sigue en evaluación, espera a que termine; si la evaluación falló, puedes cargarla manualmente."
+    : intento.estado === "FALLO_ACCESO_REPO"
+      ? "El repositorio entregado no se pudo abrir, así que no hubo revisión con IA. El alumno puede reenviar con un repositorio accesible."
+      : "Este intento se cerró sin una revisión con IA registrada."
 
   return (
     <section className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-6">
@@ -34,16 +39,13 @@ export function RevisionIaCard({ intento }: RevisionIaCardProps) {
       </div>
 
       {intento.revisionIa === null ? (
-        <p className="text-body-sm text-text-secondary">
-          {editable
-            ? "La revisión con IA todavía no está disponible. Si el intento sigue en evaluación, espera a que termine; si la evaluación falló, puedes cargarla manualmente."
-            : "Este intento se cerró sin una revisión con IA registrada."}
-        </p>
+        <p className="text-body-sm text-text-secondary">{mensajeSinRevision}</p>
       ) : (
         <InformeRevisionIa
           revision={intento.revisionIa}
           nota={intento.notaCapaCualitativa}
           umbral={intento.transversal.umbralAprobacion}
+          notaGlobalVisible={intento.notaGlobal !== null}
         />
       )}
 

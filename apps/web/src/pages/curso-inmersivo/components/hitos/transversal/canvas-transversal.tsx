@@ -1,6 +1,8 @@
+import { useCupoTransversal } from "@/features/transversal/hooks/use-cupo-transversal"
 import { useListarIntentosTransversal } from "@/features/transversal/hooks/use-listar-intentos-transversal"
 import { useTransversalCurso } from "@/features/transversal/hooks/use-transversal-curso"
 import type {
+  CupoIntentosTransversal,
   IntentoTransversalParticipanteResponse,
   TransversalResponse,
 } from "@nexott-learn/shared-types"
@@ -12,6 +14,7 @@ import { VistaAunNoTransversal } from "./vista-aun-no-transversal"
 import { VistaBriefTransversal } from "./vista-brief-transversal"
 import { VistaEnRevisionTransversal } from "./vista-en-revision-transversal"
 import { VistaEvaluandoTransversal } from "./vista-evaluando-transversal"
+import { VistaRepoInaccesibleTransversal } from "./vista-repo-inaccesible-transversal"
 
 interface CanvasTransversalProps {
   readonly cursoId: string
@@ -53,6 +56,10 @@ export function CanvasTransversal({
   // dedupe por queryKey, asi que esto NO dispara dos requests.
   useListarIntentosTransversal(asignacionId, { pollingActivo: haySondeable })
 
+  // Cupo de intentos (B1). Es una mejora, NO un bloqueante: no entra en el gate
+  // de carga; si falla, el canvas sigue funcionando sin el "N de M".
+  const cupo = useCupoTransversal(asignacionId)
+
   const intentoActivo = useMemo(
     () => decidirIntentoActivo(intentos.data ?? [], intentoIdRecienCreado),
     [intentos.data, intentoIdRecienCreado],
@@ -92,10 +99,12 @@ export function CanvasTransversal({
           asignacionId={asignacionId}
           intentoActivo={intentoActivo}
           intentos={listaIntentos}
+          cupo={cupo.data ?? null}
           forzarBrief={forzarBrief}
           tieneEntrevistaIa={tieneEntrevistaIa}
           onIntentoCreado={onIntentoCreado}
           onIntentarDeNuevo={() => setForzarBrief(true)}
+          onVolverAlResultado={() => setForzarBrief(false)}
         />
       </div>
     </main>
@@ -107,10 +116,12 @@ interface ContenidoTransversalProps {
   readonly asignacionId: string
   readonly intentoActivo: IntentoTransversalParticipanteResponse | null
   readonly intentos: readonly IntentoTransversalParticipanteResponse[]
+  readonly cupo: CupoIntentosTransversal | null
   readonly forzarBrief: boolean
   readonly tieneEntrevistaIa: boolean
   readonly onIntentoCreado: (intentoId: string) => void
   readonly onIntentarDeNuevo: () => void
+  readonly onVolverAlResultado: () => void
 }
 
 function ContenidoTransversal(props: ContenidoTransversalProps) {
@@ -119,10 +130,12 @@ function ContenidoTransversal(props: ContenidoTransversalProps) {
     asignacionId,
     intentoActivo,
     intentos,
+    cupo,
     forzarBrief,
     tieneEntrevistaIa,
     onIntentoCreado,
     onIntentarDeNuevo,
+    onVolverAlResultado,
   } = props
 
   if (forzarBrief || intentoActivo === null) {
@@ -133,8 +146,10 @@ function ContenidoTransversal(props: ContenidoTransversalProps) {
       <VistaBriefTransversal
         transversal={transversal}
         asignacionId={asignacionId}
+        cupo={cupo}
         onIntentoCreado={onIntentoCreado}
         urlInicial={urlInicial}
+        onVolver={forzarBrief ? onVolverAlResultado : undefined}
       />
     )
   }
@@ -144,6 +159,15 @@ function ContenidoTransversal(props: ContenidoTransversalProps) {
   }
   if (vista === "en-revision") {
     return <VistaEnRevisionTransversal intento={intentoActivo} />
+  }
+  if (vista === "repo-inaccesible") {
+    return (
+      <VistaRepoInaccesibleTransversal
+        intento={intentoActivo}
+        intentos={intentos}
+        onIntentarDeNuevo={onIntentarDeNuevo}
+      />
+    )
   }
   if (vista === "aprobado") {
     return (
@@ -159,6 +183,8 @@ function ContenidoTransversal(props: ContenidoTransversalProps) {
     <VistaAunNoTransversal
       intento={intentoActivo}
       intentos={intentos}
+      cupo={cupo}
+      umbral={transversal.umbralAprobacion}
       onIntentarDeNuevo={onIntentarDeNuevo}
     />
   )

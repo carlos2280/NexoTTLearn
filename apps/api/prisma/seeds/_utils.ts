@@ -211,7 +211,9 @@ function normalizarPregunta(p: PreguntaQuiz): Record<string, unknown> {
     pesoPunto: 1,
     tipo,
   }
-  if (p.explicacion !== undefined) base.explicacion = p.explicacion
+  if (p.explicacion !== undefined) {
+    base.explicacion = p.explicacion
+  }
   if (tipo === "OPCION_UNICA") {
     base.opciones = (p as PreguntaOpcionUnica).opciones
     return base
@@ -228,7 +230,9 @@ function normalizarPregunta(p: PreguntaQuiz): Record<string, unknown> {
   }
   const corta = p as PreguntaRespuestaCorta
   base.respuestasAceptadas = corta.respuestasAceptadas
-  if (corta.normalizacion) base.normalizacion = corta.normalizacion
+  if (corta.normalizacion) {
+    base.normalizacion = corta.normalizacion
+  }
   return base
 }
 

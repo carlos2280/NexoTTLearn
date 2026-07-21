@@ -6,6 +6,8 @@ import type {
   CargarCapaTestsInput,
   CrearIntentoTransversalInput,
   CrearIntentoTransversalResponse,
+  CupoIntentosTransversal,
+  CurarReporteFinalInput,
   DarIntentoExtraTransversalResponse,
   FinalizarTransversalResponse,
   IntentoTransversalAdminResponse,
@@ -41,6 +43,15 @@ export async function listarIntentosTransversal(
     `/asignaciones/${asignacionId}/intentos-transversal`,
   )
   return respuesta.data
+}
+
+/**
+ * `GET /api/v1/asignaciones/:asignacionId/transversal/cupo` (E15). Cupo de
+ * intentos del participante para el hito transversal (B1): usados / cupo
+ * efectivo. Mismo shape que consume el bloque "Intentos" del admin.
+ */
+export function obtenerCupoTransversal(asignacionId: string): Promise<CupoIntentosTransversal> {
+  return httpClient.get<CupoIntentosTransversal>(`/asignaciones/${asignacionId}/transversal/cupo`)
 }
 
 /**
@@ -109,10 +120,34 @@ export function cargarCapaComprension(input: {
  */
 export function finalizarIntentoTransversal(input: {
   readonly intentoId: string
+  // Ajuste OPCIONAL de la nota por el admin al publicar. Van juntos o ninguno; se
+  // OMITEN (no se mandan) cuando el admin publica la nota calculada tal cual.
+  readonly notaAjustada?: number
+  readonly motivoAjuste?: string
 }): Promise<FinalizarTransversalResponse> {
+  const body =
+    input.notaAjustada === undefined
+      ? {}
+      : { notaAjustada: input.notaAjustada, motivoAjuste: input.motivoAjuste }
   return httpClient.post<FinalizarTransversalResponse>(
     `/intentos-transversal/${input.intentoId}/finalizar`,
-    {},
+    body,
+  )
+}
+
+/**
+ * `PATCH /api/v1/intentos-transversal/:intentoId/reporte-final` (E13, admin).
+ * Cura el informe que verá el participante (`reporteFinal`): resumen + áreas a
+ * reforzar. Solo editable mientras el intento está EVALUADO; el `reporteIa`
+ * crudo nunca se toca (evidencia inmutable). Fase 4b ③ / B3.
+ */
+export function curarReporteFinal(input: {
+  readonly intentoId: string
+  readonly body: CurarReporteFinalInput
+}): Promise<IntentoTransversalAdminResponse> {
+  return httpClient.patch<IntentoTransversalAdminResponse>(
+    `/intentos-transversal/${input.intentoId}/reporte-final`,
+    input.body,
   )
 }
 

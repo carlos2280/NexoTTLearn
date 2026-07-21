@@ -1,7 +1,8 @@
 import { Badge } from "@/shared/components/ui/badge"
 import { RUTAS } from "@/shared/constants/rutas"
+import { sanitizarHtml } from "@/shared/lib/sanitize-html"
 import type { IntentoTransversalAdminResponse } from "@nexott-learn/shared-types"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, ChevronRight } from "lucide-react"
 import { Link } from "react-router-dom"
 
 interface HeaderIntentoTransversalProps {
@@ -16,6 +17,7 @@ const TONO_ESTADO: ReadonlyMap<EstadoIntento, TonoBadge> = new Map([
   ["EVALUADO", "neutro"],
   ["FINALIZADO", "success"],
   ["ANULADO", "danger"],
+  ["FALLO_ACCESO_REPO", "danger"],
 ])
 
 const ETIQUETA_ESTADO: ReadonlyMap<EstadoIntento, string> = new Map([
@@ -23,6 +25,7 @@ const ETIQUETA_ESTADO: ReadonlyMap<EstadoIntento, string> = new Map([
   ["EVALUADO", "Listo para finalizar"],
   ["FINALIZADO", "Finalizado"],
   ["ANULADO", "Anulado"],
+  ["FALLO_ACCESO_REPO", "Repo inaccesible"],
 ])
 
 export function HeaderIntentoTransversal({ intento }: HeaderIntentoTransversalProps) {
@@ -47,13 +50,9 @@ export function HeaderIntentoTransversal({ intento }: HeaderIntentoTransversalPr
         <h1 className="text-display-md text-text-primary leading-tight">
           {intento.colaborador.nombre}
         </h1>
-        <p className="text-body text-text-secondary">
-          {intento.curso.titulo}
-          <span className="px-2 text-text-disabled">·</span>
-          {intento.transversal.descripcion}
-        </p>
-        <p className="text-body-sm text-text-tertiary">{intento.colaborador.email}</p>
-        <div className="mt-1 flex items-center gap-3 text-body-sm text-text-tertiary">
+        <p className="text-body text-text-secondary">{intento.curso.titulo}</p>
+        <p className="text-body-sm text-text-secondary">{intento.colaborador.email}</p>
+        <div className="mt-1 flex items-center gap-3 text-body-sm text-text-secondary">
           <span>{fechaTxt}</span>
           <span className="text-text-disabled">·</span>
           <Badge tono={TONO_ESTADO.get(intento.estado) ?? "neutro"} conPunto={false}>
@@ -65,6 +64,22 @@ export function HeaderIntentoTransversal({ intento }: HeaderIntentoTransversalPr
             </Badge>
           ) : null}
         </div>
+        {intento.transversal.descripcion ? (
+          <details className="group border-border border-t pt-3">
+            <summary className="flex w-fit cursor-pointer list-none items-center gap-1.5 text-body-sm text-text-secondary transition-colors hover:text-text-primary [&::-webkit-details-marker]:hidden">
+              <ChevronRight
+                className="h-4 w-4 transition-transform group-open:rotate-90"
+                aria-hidden={true}
+              />
+              Ver enunciado del proyecto
+            </summary>
+            <div
+              className="tiptap mt-3 max-w-[65ch] text-body-sm text-text-secondary"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: brief del editor admin (TipTap), sanitizado.
+              dangerouslySetInnerHTML={{ __html: sanitizarHtml(intento.transversal.descripcion) }}
+            />
+          </details>
+        ) : null}
       </div>
     </header>
   )

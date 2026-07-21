@@ -6,6 +6,7 @@ import { useState } from "react"
 import { CodeEditor } from "../shared/code-editor"
 import { comentarioLinea } from "../shared/comentario-lenguaje"
 import { CodigoTestFila, type TestUnit, testVacio } from "./codigo-test-fila"
+import { ValidarReferencia } from "./validar-referencia"
 
 export interface BorradorTests {
   readonly solucionReferencia: string
@@ -17,6 +18,8 @@ interface CamposTestsRetoProps {
   readonly onCambio: (valor: BorradorTests) => void
   /** Lenguaje del reto pareado, para resaltar la solución de referencia. */
   readonly lenguaje: string
+  /** Tiempo límite por test del reto, para validar la solución de referencia. */
+  readonly tiempoLimiteSeg: number
 }
 
 /**
@@ -25,7 +28,12 @@ interface CamposTestsRetoProps {
  * borrador y recibe los cambios. Se usa desde el editor del Reto (sección
  * embebida `EditorTestsEmbebido`), que le pasa el lenguaje del reto.
  */
-export function CamposTestsReto({ valor, onCambio, lenguaje }: CamposTestsRetoProps) {
+export function CamposTestsReto({
+  valor,
+  onCambio,
+  lenguaje,
+  tiempoLimiteSeg,
+}: CamposTestsRetoProps) {
   const [expandidoId, setExpandidoId] = useState<string | null>(valor.tests[0]?.id ?? null)
 
   function cambiarTest(siguiente: TestUnit) {
@@ -65,6 +73,13 @@ export function CamposTestsReto({ valor, onCambio, lenguaje }: CamposTestsRetoPr
           />
         )}
       </Field>
+
+      <ValidarReferencia
+        solucionReferencia={valor.solucionReferencia}
+        tests={valor.tests}
+        lenguaje={lenguaje}
+        tiempoLimiteSeg={tiempoLimiteSeg}
+      />
 
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">

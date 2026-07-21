@@ -328,6 +328,7 @@ enum AccionAuditoria {
   INTENTO_TRANSVERSAL_CAPA_CARGADA
   INTENTO_TRANSVERSAL_EXTRA_OTORGADO
   INTENTO_TRANSVERSAL_REPORTE_CURADO
+  INTENTO_TRANSVERSAL_NOTA_AJUSTADA
   TRANSVERSAL_SKILLS_ACTUALIZADAS
   INTENTO_ENTREVISTA_IA_CREADO
   INTENTO_ENTREVISTA_IA_FINALIZADO
@@ -357,6 +358,10 @@ enum EstadoIntentoTransversal {
   EVALUADO
   FINALIZADO
   ANULADO
+  // El repo entregado no se pudo abrir (privado, URL muerta, timeout o sin
+  // archivos legibles). El job transiciona aqui en vez de dejar el intento
+  // colgado EN_EVALUACION (B2c). No consume cupo (ver `calcularCupoIntentos`).
+  FALLO_ACCESO_REPO
 
   @@map("estado_intento_transversal_enum")
 }
@@ -1095,6 +1100,15 @@ model IntentoTransversal {
   notaCapaCualitativa   Decimal?                 @map("nota_capa_cualitativa") @db.Decimal(5, 2)
   notaCapaComprension   Decimal?                 @map("nota_capa_comprension") @db.Decimal(5, 2)
   notaGlobal            Decimal?                 @map("nota_global") @db.Decimal(5, 2)
+  // Ajuste manual de la nota por el admin al publicar (humano en el loop sobre el
+  // numero, no solo el texto del informe). Calca el patron de la entrevista IA
+  // (`IntentoEntrevistaIA.notaAjustadaAdmin`). null = se publico la nota calculada
+  // de las capas; con valor = el admin la corrigio y esa es la que ve el alumno.
+  // `notaGlobal` ya guarda la nota EFECTIVA publicada (calculada o ajustada), asi
+  // el motor de skills y el participante la leen sin cambios; este campo solo marca
+  // que hubo ajuste (traza + auditoria). `motivoAjusteNota` es la razon del ajuste.
+  notaAjustadaAdmin     Decimal?                 @map("nota_ajustada_admin") @db.Decimal(5, 2)
+  motivoAjusteNota      String?                  @map("motivo_ajuste_nota")
   // Curacion del informe (Fase 4b3): pre-informe crudo de la IA (inmutable),
   // snapshot de lo que la IA leyo del repo, informe final curado por el admin
   // (lo unico que ve el participante), y sello de quien/cuando lo valido.

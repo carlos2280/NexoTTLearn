@@ -11,7 +11,6 @@ import { ConfigService } from "@nestjs/config"
 import { AppEnv } from "../../../config/env.validation"
 import { apiErrorCodes } from "../../errors/api-error.codes"
 import {
-  AiRespuestaEstructurada,
   CalcularNotasFinalEntrevistaInput,
   CalcularNotasFinalEntrevistaOutput,
   EvaluarRepoCualitativoInput,
@@ -96,7 +95,7 @@ export class ClaudeProvider implements IAiProvider {
       criterios: input.criterios,
     })
     const modelo = this.resolverModelo(input.profundidad)
-    const respuesta = await this.invocarClaudeRaw(modelo, mensajes.system, mensajes.user)
+    const respuesta = await this.invocarClaude(modelo, mensajes.system, mensajes.user)
     const parsed = aiInformeCualitativoSchema.safeParse(respuesta)
     if (!parsed.success) {
       throw new BadRequestException({
@@ -128,7 +127,15 @@ export class ClaudeProvider implements IAiProvider {
       transcripcionPrevia: input.transcripcionPrevia,
     })
     const modelo = this.resolverModelo(input.profundidad)
-    const respuesta = await this.invocarClaude(modelo, mensajes.system, mensajes.user)
+    const respuestaCruda = await this.invocarClaude(modelo, mensajes.system, mensajes.user)
+    const parsed = aiRespuestaEstructuradaSchema.safeParse(respuestaCruda)
+    if (!parsed.success) {
+      throw new BadRequestException({
+        code: apiErrorCodes.iaRespuestaMalformada,
+        message: "IA devolvio JSON con shape inesperado en turno de comprension.",
+      })
+    }
+    const respuesta = parsed.data
     const finalizado = respuesta.finalizado === true
     return {
       siguientePregunta: finalizado ? null : (respuesta.siguientePregunta ?? null),
@@ -159,7 +166,7 @@ export class ClaudeProvider implements IAiProvider {
       seccionesBaseSnapshot: input.seccionesBaseSnapshot,
     })
     const modelo = this.resolverModelo(input.profundidad)
-    const respuesta = await this.invocarClaudeRaw(modelo, mensajes.system, mensajes.user)
+    const respuesta = await this.invocarClaude(modelo, mensajes.system, mensajes.user)
     const parsed = iniciarEntrevistaResponseSchema.safeParse(respuesta)
     if (!parsed.success) {
       throw new BadRequestException({
@@ -181,7 +188,7 @@ export class ClaudeProvider implements IAiProvider {
       transcripcion: input.transcripcion,
     })
     const modelo = this.resolverModelo(input.profundidad)
-    const respuesta = await this.invocarClaudeRaw(modelo, mensajes.system, mensajes.user)
+    const respuesta = await this.invocarClaude(modelo, mensajes.system, mensajes.user)
     const parsed = turnoEntrevistaResponseSchema.safeParse(respuesta)
     if (!parsed.success) {
       throw new BadRequestException({
@@ -202,7 +209,7 @@ export class ClaudeProvider implements IAiProvider {
       transcripcion: input.transcripcion,
     })
     const modelo = this.resolverModelo(input.profundidad)
-    const respuesta = await this.invocarClaudeRaw(modelo, mensajes.system, mensajes.user)
+    const respuesta = await this.invocarClaude(modelo, mensajes.system, mensajes.user)
     const parsed = notasFinalEntrevistaSchema.safeParse(respuesta)
     if (!parsed.success) {
       throw new BadRequestException({
@@ -252,13 +259,6 @@ export class ClaudeProvider implements IAiProvider {
   }
 
   /**
-   * Wrapper unificado que maneja:
-   *  - backoff 1s/3s para 5xx (2 reintentos).
-   *  - mapeo de errores SDK a HTTPException (D-S8-B7).
-   *  - logging de metadatos sin PII (R-S8-10).
-   *  - parsing JSON validado con Zod (`aiRespuestaEstructuradaSchema`).
-   */
-  /**
    * Resuelve el modelo Claude segun profundidad del curso (D-S8-B3). Honra
    * `AI_MODEL_OVERRIDE` cuando esta seteado (R-S8-12: documentado para uso en
    * staging o pruebas A/B). Igual semantica que `AiService.resolveModel`.
@@ -278,11 +278,19 @@ export class ClaudeProvider implements IAiProvider {
     }
   }
 
+  /**
+   * Wrapper unificado de invocacion a Claude:
+   *  - backoff 1s/3s para 5xx (2 reintentos).
+   *  - mapeo de errores SDK a HTTPException (D-S8-B7).
+   *  - logging de metadatos sin PII (R-S8-10).
+   *  - devuelve el JSON crudo (`unknown`); cada caller lo valida con su propio
+   *    schema Zod dedicado (D-S8-D4).
+   */
   private async invocarClaude(
     modelo: string,
     system: ReturnType<typeof construirMensajesCualitativa>["system"],
     user: string,
-  ): Promise<AiRespuestaEstructurada> {
+  ): Promise<unknown> {
     const inicio = Date.now()
     const intentos: readonly number[] = [0, BACKOFF_MS_PRIMERO, BACKOFF_MS_SEGUNDO]
     let ultimoServerError: unknown = null
@@ -318,65 +326,6 @@ export class ClaudeProvider implements IAiProvider {
     system: ReturnType<typeof construirMensajesCualitativa>["system"],
     user: string,
     inicio: number,
-  ): Promise<AiRespuestaEstructurada> {
-    const respuesta = await this.client.messages.create({
-      model: modelo,
-      // biome-ignore lint/style/useNamingConvention: parametro del SDK Anthropic.
-      max_tokens: this.maxTokens,
-      system,
-      messages: [{ role: "user", content: user }],
-    })
-    const usage = respuesta.usage
-    this.logger.log(
-      `Claude OK model=${respuesta.model} tokens_in=${usage.input_tokens} tokens_out=${usage.output_tokens} cache_read=${usage.cache_read_input_tokens ?? 0} cache_creation=${usage.cache_creation_input_tokens ?? 0} latency_ms=${Date.now() - inicio}`,
-    )
-    return this.parsearRespuesta(respuesta.content)
-  }
-
-  /**
-   * Variante de `invocarClaude` que devuelve el JSON crudo (sin imponer el
-   * schema `aiRespuestaEstructuradaSchema`). Los metodos P8c validan despues
-   * con su propio schema Zod dedicado (D-S8-D4). Reutiliza el mismo wrapper
-   * de errores/backoff/log.
-   */
-  private async invocarClaudeRaw(
-    modelo: string,
-    system: ReturnType<typeof construirMensajesCualitativa>["system"],
-    user: string,
-  ): Promise<unknown> {
-    const inicio = Date.now()
-    const intentos: readonly number[] = [0, BACKOFF_MS_PRIMERO, BACKOFF_MS_SEGUNDO]
-    let ultimoServerError: unknown = null
-
-    for (const espera of intentos) {
-      if (espera > 0) {
-        await this.esperar(espera)
-      }
-      try {
-        return await this.intentarLlamadaRaw(modelo, system, user, inicio)
-      } catch (error: unknown) {
-        const reintentable = this.manejarErrorClaude(error, inicio)
-        if (!reintentable) {
-          throw error
-        }
-        ultimoServerError = error
-      }
-    }
-
-    this.logger.error(
-      `Claude no disponible tras reintentos latency_ms=${Date.now() - inicio} detalle=${ultimoServerError instanceof Error ? ultimoServerError.message : "desconocido"}`,
-    )
-    throw new ServiceUnavailableException({
-      code: apiErrorCodes.iaNoDisponible,
-      message: "IA no disponible tras reintentos.",
-    })
-  }
-
-  private async intentarLlamadaRaw(
-    modelo: string,
-    system: ReturnType<typeof construirMensajesCualitativa>["system"],
-    user: string,
-    inicio: number,
   ): Promise<unknown> {
     const respuesta = await this.client.messages.create({
       model: modelo,
@@ -392,6 +341,11 @@ export class ClaudeProvider implements IAiProvider {
     return this.parsearRespuestaCrudo(respuesta.content)
   }
 
+  /**
+   * Extrae y parsea el JSON crudo de la respuesta de Claude (sin imponer un
+   * schema): descarta fences, valida que no venga vacia y que sea JSON valido.
+   * La validacion de shape la hace cada caller con su schema Zod.
+   */
   private parsearRespuestaCrudo(content: Anthropic.Messages.Message["content"]): unknown {
     const textoCompleto = content
       .filter((c): c is Anthropic.Messages.TextBlock => c.type === "text")
@@ -463,40 +417,6 @@ export class ClaudeProvider implements IAiProvider {
     // Otros status no clasificados -> tratamos como reintenable para no perder
     // disponibilidad ante variantes nuevas del SDK.
     return true
-  }
-
-  private parsearRespuesta(
-    content: Anthropic.Messages.Message["content"],
-  ): AiRespuestaEstructurada {
-    const textoCompleto = content
-      .filter((c): c is Anthropic.Messages.TextBlock => c.type === "text")
-      .map((c) => c.text)
-      .join("\n")
-      .trim()
-    if (textoCompleto.length === 0) {
-      throw new BadRequestException({
-        code: apiErrorCodes.iaRespuestaMalformada,
-        message: "IA devolvio respuesta vacia.",
-      })
-    }
-    const jsonExtraido = this.extraerJsonEnvuelto(textoCompleto)
-    let parsedJson: unknown
-    try {
-      parsedJson = JSON.parse(jsonExtraido)
-    } catch {
-      throw new BadRequestException({
-        code: apiErrorCodes.iaRespuestaMalformada,
-        message: "IA devolvio JSON invalido.",
-      })
-    }
-    const result = aiRespuestaEstructuradaSchema.safeParse(parsedJson)
-    if (!result.success) {
-      throw new BadRequestException({
-        code: apiErrorCodes.iaRespuestaMalformada,
-        message: "IA devolvio JSON con shape inesperado.",
-      })
-    }
-    return result.data
   }
 
   /**

@@ -6,6 +6,8 @@ import { INTENTO_TRANSVERSAL_ADMIN_KEY } from "./use-obtener-intento-transversal
 
 interface FinalizarVars {
   readonly intentoId: string
+  readonly notaAjustada?: number
+  readonly motivoAjuste?: string
 }
 
 /**
