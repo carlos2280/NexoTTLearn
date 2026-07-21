@@ -3,6 +3,7 @@ import { cn } from "@/shared/lib/cn"
 import { extraerTextoPlano } from "@/shared/lib/sanitize-html"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { useEffect, useRef } from "react"
+import { type PistaOculta, extraerPistasOcultos } from "./extraer-pistas-ocultos"
 
 interface TerminalTestsProps {
   readonly ejecucion: ResultadoEjecucionSuite | null
@@ -80,7 +81,9 @@ export function resumenAccesibleTests(
   if (fallados === 0) {
     return `Ejecución completa: pasaron las ${ejecucion.testsTotales} pruebas.`
   }
-  return `Ejecución completa: ${ejecucion.testsPasados} de ${ejecucion.testsTotales} pruebas pasaron; ${fallados} fallaron.`
+  const hayPistas = extraerPistasOcultos(ejecucion.resultados).length > 0
+  const sufijoPista = hayPistas ? " Hay pistas en la consola para afinar tu solución." : ""
+  return `Ejecución completa: ${ejecucion.testsPasados} de ${ejecucion.testsTotales} pruebas pasaron; ${fallados} fallaron.${sufijoPista}`
 }
 
 function CabeceraTerminal({
@@ -128,6 +131,9 @@ function CuerpoTerminal({ ejecucion, isEjecutando, reducedMotion }: CuerpoTermin
   const ocultos = ejecucion.resultados.filter((r) => !r.visible)
   const ocultosPasados = ocultos.filter((r) => r.paso).length
   const ocultosFallados = ocultos.length - ocultosPasados
+  const pistasOcultos = extraerPistasOcultos(ocultos)
+    .map((p) => ({ testId: p.testId, texto: extraerTextoPlano(p.texto) }))
+    .filter((p) => p.texto.length > 0)
 
   return (
     <div className="flex flex-col gap-0.5 pt-1">
@@ -161,6 +167,7 @@ function CuerpoTerminal({ ejecucion, isEjecutando, reducedMotion }: CuerpoTermin
             totales={ocultos.length}
             pasados={ocultosPasados}
             fallados={ocultosFallados}
+            pistas={pistasOcultos}
           />
         </motion.div>
       ) : null}
@@ -282,23 +289,41 @@ function FilaOcultos({
   totales,
   pasados,
   fallados,
+  pistas,
 }: {
   readonly totales: number
   readonly pasados: number
   readonly fallados: number
+  readonly pistas: readonly PistaOculta[]
 }) {
   const todoOk = fallados === 0
   return (
-    <p className="flex items-baseline gap-2 pt-1">
-      <span
-        className="w-3 shrink-0"
-        style={{ color: todoOk ? "var(--color-test-pass)" : "var(--color-test-fail)" }}
-      >
-        {todoOk ? "✓" : "✗"}
-      </span>
-      <span className="text-white/70">
-        {pasados} / {totales} casos ocultos pasaron
-      </span>
-    </p>
+    <div className="flex flex-col gap-1 pt-1">
+      <p className="flex items-baseline gap-2">
+        <span
+          className="w-3 shrink-0"
+          style={{ color: todoOk ? "var(--color-test-pass)" : "var(--color-test-fail)" }}
+        >
+          {todoOk ? "✓" : "✗"}
+        </span>
+        <span className="text-white/70">
+          {pasados} / {totales} casos ocultos pasaron
+        </span>
+      </p>
+      {pistas.length > 0 ? (
+        <ul className="flex flex-col gap-0.5 pl-5 text-[11.5px]">
+          {pistas.map((pista) => (
+            <li
+              key={pista.testId}
+              className="flex items-baseline gap-2"
+              style={{ color: "var(--color-code-line-number)" }}
+            >
+              <span className="shrink-0 text-white/60">pista ·</span>
+              <span className="text-white/80">{pista.texto}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   )
 }

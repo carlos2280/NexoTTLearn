@@ -32,6 +32,29 @@ describe("resumenAccesibleTests", () => {
       "Ejecución completa: 1 de 3 pruebas pasaron; 2 fallaron.",
     )
   })
+
+  it("menciona las pistas cuando un oculto falla con descripción", () => {
+    const conPista: ResultadoEjecucionSuite = {
+      resultados: [
+        {
+          testId: "h1",
+          descripcion: "prueba con textos",
+          visible: false,
+          paso: false,
+          estado: "fallo",
+          stdoutObtenido: "x",
+          stdoutEsperado: "y",
+          stderr: "",
+          duracionMs: 1,
+        },
+      ],
+      testsPasados: 2,
+      testsTotales: 3,
+    }
+    expect(resumenAccesibleTests(conPista, false)).toBe(
+      "Ejecución completa: 2 de 3 pruebas pasaron; 1 fallaron. Hay pistas en la consola para afinar tu solución.",
+    )
+  })
 })
 
 describe("resumenAccesibleSql", () => {
