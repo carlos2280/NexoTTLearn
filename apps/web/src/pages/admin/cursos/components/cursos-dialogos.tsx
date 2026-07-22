@@ -2,8 +2,10 @@ import { ConfirmDialog } from "@/shared/components/ui/confirm-dialog"
 import { ConfirmMotivoDialog } from "@/shared/components/ui/confirm-motivo-dialog"
 import type { ClienteResponse } from "@nexott-learn/shared-types"
 import type { CursosOrquestacion } from "../hooks/use-cursos-orquestacion"
+import { extraerPrecondicionesFallidas } from "../lib/precondiciones-publicacion"
 import { CursoDuplicarDialog } from "./curso-duplicar-dialog"
 import { CursoNuevoDialog } from "./curso-nuevo-dialog"
+import { PrecondicionesPublicacionLista } from "./precondiciones-publicacion-lista"
 
 interface CursosDialogosProps {
   readonly orq: CursosOrquestacion
@@ -33,6 +35,13 @@ export function CursosDialogos({ orq, clientes, cargandoClientes }: CursosDialog
         enviando={estado.enviandoPublicar}
         onConfirmar={ejecutar.publicar}
         placeholderMotivo="Motivo opcional para el log…"
+        motivoObligatorio={false}
+        renderError={(err) => {
+          const precondiciones = extraerPrecondicionesFallidas(err)
+          return precondiciones.length > 0 ? (
+            <PrecondicionesPublicacionLista precondiciones={precondiciones} />
+          ) : null
+        }}
       />
       <ConfirmMotivoDialog
         abierto={dialog.modo === "archivar"}
