@@ -1,4 +1,4 @@
-import type { RespuestaPregunta, RespuestasIntento } from "@nexott-learn/shared-types"
+import type { RespuestaPregunta, RespuestasGuardadas } from "@nexott-learn/shared-types"
 import type { UseQuizRespuestasResult } from "./use-quiz-respuestas"
 
 /**
@@ -11,7 +11,7 @@ import type { UseQuizRespuestasResult } from "./use-quiz-respuestas"
  * vacio: la vista cae al modo interactivo normal.
  */
 export function construirRespuestasRevision(
-  respuestas: RespuestasIntento | undefined,
+  respuestas: RespuestasGuardadas | undefined,
 ): UseQuizRespuestasResult {
   const mapa = new Map<string, RespuestaPregunta>()
   if (respuestas?.tipo === "QUIZ") {

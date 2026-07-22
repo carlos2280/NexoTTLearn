@@ -1,8 +1,8 @@
-import type { RespuestasIntento } from "@nexott-learn/shared-types"
+import type { RespuestasGuardadas } from "@nexott-learn/shared-types"
 import { describe, expect, it } from "vitest"
 import { construirRespuestasRevision } from "./respuestas-revision"
 
-const quiz: RespuestasIntento = {
+const quiz: RespuestasGuardadas = {
   tipo: "QUIZ",
   preguntas: [
     { preguntaId: "q1", tipo: "OPCION_UNICA", opcionElegidaId: "o2" },
@@ -41,11 +41,24 @@ describe("construirRespuestasRevision", () => {
   })
 
   it("devuelve adaptador vacio si no es un intento QUIZ o es undefined", () => {
-    const codigo: RespuestasIntento = {
+    const codigo: RespuestasGuardadas = {
       tipo: "CODIGO_PREGUNTAS",
+      lenguaje: "python",
       codigoEnviado: "print(1)",
+      puntosObtenidos: 1,
+      puntosTotales: 1,
       resultadosTests: [
-        { testId: "t1", paso: true, estado: "ok", stdoutObtenido: "1", stderr: "", duracionMs: 5 },
+        {
+          testId: "t1",
+          descripcion: "suma",
+          visible: true,
+          paso: true,
+          estado: "ok",
+          stdoutObtenido: "1",
+          stdoutEsperado: "1",
+          stderr: "",
+          duracionMs: 5,
+        },
       ],
     }
     expect(construirRespuestasRevision(codigo).contestadas).toBe(0)

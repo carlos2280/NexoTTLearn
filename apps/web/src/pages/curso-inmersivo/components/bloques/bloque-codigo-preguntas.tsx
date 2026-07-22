@@ -16,6 +16,7 @@ import { EjemplosTests } from "./codigo-preguntas/ejemplos-tests"
 import { extraerPistasOcultos } from "./codigo-preguntas/extraer-pistas-ocultos"
 import { PanelEnunciado } from "./codigo-preguntas/panel-enunciado"
 import { ResultadoIntento } from "./codigo-preguntas/resultado-intento"
+import { RetoRevision } from "./codigo-preguntas/reto-revision"
 import { TerminalTests } from "./codigo-preguntas/terminal-tests"
 import { useFlujoCodigoPregunta } from "./codigo-preguntas/use-flujo-codigo-pregunta"
 
@@ -125,6 +126,33 @@ function RetoActivo({
     bloqueId,
   })
   const [mejorPrevioAlEnviar, setMejorPrevioAlEnviar] = useState<IntentoBloqueResponse | null>(null)
+  const [reintentando, setReintentando] = useState(false)
+  const archivo = nombreArchivo(contenido.lenguaje)
+
+  // Modo revisión (P21): al VOLVER a un reto ya aprobado (sin envío fresco esta
+  // sesión), mostramos el código enviado en solo lectura + los resultados.
+  // Cubre todos los lenguajes (el lenguaje es un campo del contenido).
+  const respuestasGuardadas = mejor.data?.respuestas
+  const puedeRevisar =
+    (mejor.data?.nota ?? -1) >= NOTA_APROBADO_DEFAULT && !flujo.ultimoIntento && !reintentando
+  if (puedeRevisar && mejor.data && respuestasGuardadas?.tipo === "CODIGO_PREGUNTAS") {
+    return (
+      <RetoRevision
+        contenido={contenido}
+        contenidoTests={contenidoTests}
+        codigoEnviado={respuestasGuardadas.codigoEnviado}
+        resultadosTests={respuestasGuardadas.resultadosTests}
+        intento={mejor.data}
+        notaAprobado={NOTA_APROBADO_DEFAULT}
+        archivo={archivo}
+        onReintentar={() => {
+          setReintentando(true)
+          flujo.reset()
+        }}
+      />
+    )
+  }
+
   const onEnviar = (): void => {
     setMejorPrevioAlEnviar(mejor.data ?? null)
     flujo.enviar()
@@ -149,7 +177,6 @@ function RetoActivo({
     ejecucion: flujo.ejecucion,
     codigoEjecutado: flujo.codigoEjecutado,
   })
-  const archivo = nombreArchivo(contenido.lenguaje)
 
   return (
     <article className="flex flex-col gap-5">

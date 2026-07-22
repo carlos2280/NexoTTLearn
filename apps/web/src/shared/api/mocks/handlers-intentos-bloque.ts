@@ -1,7 +1,7 @@
 import {
   type IntentoBloqueResponse,
   contenidoQuizSchema,
-  respuestasIntentoSchema,
+  respuestasGuardadasSchema,
 } from "@nexott-learn/shared-types"
 import { ApiError } from "../api-error"
 import { type MockRequest, defineRoute } from "./router"
@@ -175,9 +175,11 @@ function handlerCrearIntento(req: MockRequest): IntentoBloqueResponse {
   const { nota, preguntasFalladas } = calcularNota(req.body)
   const previo = mejoresPorBloque.get(req.body.bloqueId)
   const esMejorIntento = !previo || nota > previo.nota
-  // P13: guardamos las respuestas enviadas (parseadas al contrato) para que la
-  // vista de revisión las muestre al volver, igual que el backend real.
-  const respuestasParsed = respuestasIntentoSchema.safeParse(req.body.respuestas)
+  // P13: guardamos las respuestas para la vista de revisión al volver. QUIZ
+  // matchea (enviado = guardado). El código enviado en mock NO trae el shape
+  // enriquecido (lenguaje/puntos/tests) → se omite; su revisión mock queda para
+  // P21-SQL/código-mock. Contra el backend real, código sí funciona.
+  const respuestasParsed = respuestasGuardadasSchema.safeParse(req.body.respuestas)
   const intento: IntentoBloqueResponse = {
     intentoId: intentoIdAleatorio(),
     bloqueId: req.body.bloqueId,

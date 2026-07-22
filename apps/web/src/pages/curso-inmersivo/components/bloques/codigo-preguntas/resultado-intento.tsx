@@ -17,6 +17,9 @@ interface ResultadoIntentoProps {
    *  El mensaje parcial solo menciona la pista cuando esto es `true`. Opcional:
    *  los bloques sin concepto de pista (p. ej. SQL_EJERCICIO) lo omiten. */
   readonly hayPistaOculta?: boolean
+  /** Si `false`, el veredicto NO se anuncia por la región live (solo visual).
+   *  En revisión — al volver a un reto ya aprobado — no es una acción nueva. */
+  readonly anunciar?: boolean
 }
 
 export function ResultadoIntento({
@@ -24,6 +27,7 @@ export function ResultadoIntento({
   notaAprobado,
   mejorPrevio,
   hayPistaOculta = false,
+  anunciar = true,
 }: ResultadoIntentoProps) {
   const veredicto = intento
     ? evaluarVeredicto({
@@ -38,7 +42,7 @@ export function ResultadoIntento({
       {/* Región live persistente: se monta SIEMPRE (aunque no haya intento) y su
           texto pasa de "" al veredicto → anuncio fiable. Una región `status`
           insertada en el DOM ya poblada suele NO anunciarse (JAWS/NVDA). WCAG 2.2 §4.1.3. */}
-      <output className="sr-only">{veredicto?.mensaje ?? ""}</output>
+      <output className="sr-only">{anunciar ? (veredicto?.mensaje ?? "") : ""}</output>
       {veredicto ? <BannerVeredicto veredicto={veredicto} /> : null}
     </>
   )
