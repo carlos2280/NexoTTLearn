@@ -35,6 +35,7 @@ import {
   calcularNotaQuiz,
   parseRespuestasGuardadas,
   parsearContenidoQuiz,
+  redactarTestsOcultos,
   toIntentoResponse,
 } from "./intentos-bloque.helpers"
 import {
@@ -379,13 +380,14 @@ export class IntentosBloqueService {
     if (!intento) {
       return null
     }
-    // Revision del intento aprobado (P13): adjuntamos las `respuestas` guardadas
-    // para mostrarlas sin recomputar. Hoy solo el QUIZ matchea el contrato
-    // estricto; CODIGO_PREGUNTAS/SQL persisten un shape enriquecido y se omiten
-    // hasta que P21 les de su propio schema (ver `parseRespuestasGuardadas`).
+    // Revision del intento aprobado: adjuntamos las `respuestas` guardadas para
+    // mostrarlas sin recomputar (QUIZ P13 / CODIGO P21, todo lenguaje). Antes de
+    // devolverlas, `redactarTestsOcultos` borra el esperado/obtenido de los
+    // tests `visible:false` de codigo: son control de integridad y NO deben
+    // viajar al cliente (la UI ya los oculta, pero el dato iba en el JSON).
     const respuestas = parseRespuestasGuardadas(intento.respuestas)
     const base = toIntentoResponse(intento)
-    return respuestas ? { ...base, respuestas } : base
+    return respuestas ? { ...base, respuestas: redactarTestsOcultos(respuestas) } : base
   }
 
   // =========================================================================

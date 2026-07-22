@@ -4,9 +4,9 @@ import {
   type NormalizacionRespuestaCorta,
   type PreguntaQuiz,
   type RespuestaPregunta,
-  type RespuestasIntento,
+  type RespuestasGuardadas,
   contenidoQuizSchema,
-  respuestasIntentoSchema,
+  respuestasGuardadasSchema,
 } from "@nexott-learn/shared-types"
 import type { Prisma } from "@prisma/client"
 import { z } from "zod"
@@ -273,18 +273,38 @@ export function toIntentoResponse(intento: IntentoSeleccionado): {
 }
 
 /**
- * Parsea el `respuestas` (JsonB) persistido de un intento a la union tipada del
- * contrato de envio. Devuelve `undefined` si el JSON no matchea (defensivo).
+ * Parsea el `respuestas` (JsonB) persistido de un intento al contrato de
+ * respuestas GUARDADAS (el shape enriquecido que el service guarda, distinto
+ * del que envia el cliente). Devuelve `undefined` si el JSON no matchea
+ * (defensivo: intentos viejos/corruptos no rompen la vista de revision).
  *
- * OJO (P13): hoy solo el QUIZ matchea — su `respuestas` persistido es identico
- * al enviado. CODIGO_PREGUNTAS y SQL_EJERCICIO persisten un shape ENRIQUECIDO
- * (lenguaje, puntos*, tests con descripcion/visible/esperado) que el schema
- * `.strict()` rechaza, asi que se omiten. P21 (revisar el codigo enviado) debera
- * darles su propio schema de "respuestas persistidas".
+ * Cubre QUIZ (P13) y CODIGO_PREGUNTAS de cualquier lenguaje (P21). SQL_EJERCICIO
+ * aun no esta en `respuestasGuardadasSchema` -> se omite hasta P21-SQL.
  */
-export function parseRespuestasGuardadas(valor: Prisma.JsonValue): RespuestasIntento | undefined {
-  const parsed = respuestasIntentoSchema.safeParse(valor)
+export function parseRespuestasGuardadas(valor: Prisma.JsonValue): RespuestasGuardadas | undefined {
+  const parsed = respuestasGuardadasSchema.safeParse(valor)
   return parsed.success ? parsed.data : undefined
+}
+
+/**
+ * Redacta la salida ESPERADA/OBTENIDA de los tests OCULTOS (`visible:false`)
+ * antes de devolver las respuestas guardadas de un reto de codigo al alumno.
+ * Los tests ocultos son un control de integridad: su `stdoutEsperado` NO debe
+ * viajar al cliente (y el `stdoutObtenido` de un test que pasa COINCIDE con el
+ * esperado, asi que tambien se redacta). La UI ya los oculta, pero el dato
+ * viajaba en el JSON — se corta en el server (OWASP A01, regla dura 9).
+ * `descripcion` se CONSERVA: es la pista intencional de los ocultos (Fix 2).
+ */
+export function redactarTestsOcultos(respuestas: RespuestasGuardadas): RespuestasGuardadas {
+  if (respuestas.tipo !== "CODIGO_PREGUNTAS") {
+    return respuestas
+  }
+  return {
+    ...respuestas,
+    resultadosTests: respuestas.resultadosTests.map((t) =>
+      t.visible ? t : { ...t, stdoutObtenido: "", stdoutEsperado: "" },
+    ),
+  }
 }
 
 function extraerPreguntasFalladas(valor: Prisma.JsonValue | null): readonly string[] {

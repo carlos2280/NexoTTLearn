@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { booleanQuerySchema } from "../catalogo/paginacion"
-import { respuestasIntentoSchema } from "./crear-intento.schema"
+import { respuestasGuardadasSchema } from "./respuestas-guardadas.schema"
 
 /**
  * Shapes de respuesta del dominio intentos-bloque (Slice 7 P7b).
@@ -34,13 +34,13 @@ export const intentoBloqueResponseSchema = z
      */
     esPrimeraAprobacion: z.boolean().optional(),
     /**
-     * Respuestas guardadas del intento (lo que el participante eligio). Presente
-     * SOLO en la respuesta del `mejor-intento`; los listados la omiten a
-     * proposito (D-S7-D2). Hoy la consume la revision del QUIZ aprobado (P13);
-     * para CODIGO_PREGUNTAS/SQL el backend aun no la emite (el shape persistido
-     * es mas rico que este contrato estricto — ver `parseRespuestasGuardadas`).
+     * Respuestas guardadas del intento (lo que el participante eligio/envio, en
+     * el shape PERSISTIDO — ver `respuestasGuardadasSchema`). Presente SOLO en la
+     * respuesta del `mejor-intento`; los listados la omiten a proposito
+     * (D-S7-D2). La consume la revision del bloque aprobado: QUIZ (P13) y reto
+     * de CODIGO_PREGUNTAS (P21). SQL_EJERCICIO queda pendiente (P21-SQL).
      */
-    respuestas: respuestasIntentoSchema.optional(),
+    respuestas: respuestasGuardadasSchema.optional(),
   })
   .strict()
 

@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common"
 import { Test, type TestingModule } from "@nestjs/testing"
-import type { CrearIntentoBloqueInput } from "@nexott-learn/shared-types"
+import type { CrearIntentoBloqueInput, ResultadoTestGuardado } from "@nexott-learn/shared-types"
 import {
   EstadoAsignado,
   EstadoCurso,
@@ -21,7 +21,7 @@ import { IdempotencyService } from "../common/idempotency/idempotency.service"
 import { PrismaService } from "../common/prisma/prisma.service"
 import type { SesionUsuario } from "../common/types/sesion.types"
 import { NotaSkillService } from "../nota-skill/nota-skill.service"
-import { CodigoEvaluadorService } from "./codigo-evaluador.service"
+import { CodigoEvaluadorService, type ResultadoTestPersistido } from "./codigo-evaluador.service"
 import { IntentosBloqueService } from "./intentos-bloque.service"
 import { SqlEvaluadorService } from "./sql-evaluador.service"
 
@@ -957,33 +957,124 @@ describe("IntentosBloqueService — visibilidad y scope", () => {
     expect(r?.respuestas).toBeUndefined()
   })
 
-  it("obtenerMejorIntento omite las respuestas de CODIGO_PREGUNTAS (shape enriquecido; P21 pendiente)", async () => {
+  it("obtenerMejorIntento adjunta las respuestas de CODIGO_PREGUNTAS (revisión P21, todo lenguaje)", async () => {
+    prisma.usuario.findUnique.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
+    // Shape REAL enriquecido que persiste el service para codigo.
+    const guardadas = {
+      tipo: "CODIGO_PREGUNTAS",
+      lenguaje: "python",
+      codigoEnviado: "print(1)",
+      puntosObtenidos: 1,
+      puntosTotales: 1,
+      resultadosTests: [
+        {
+          testId: "t1",
+          descripcion: "suma",
+          visible: true,
+          paso: true,
+          estado: "ok",
+          stdoutObtenido: "1",
+          stdoutEsperado: "1",
+          stderr: "",
+          duracionMs: 5,
+        },
+      ],
+    }
+    prisma.intentoBloque.findFirst.mockResolvedValue({
+      ...makeIntento({ nota: 100, esMejorIntento: true }),
+      preguntasFalladas: [],
+      respuestas: guardadas,
+    })
+    const r = await service.obtenerMejorIntento({
+      colaboradorId: COLABORADOR_ID,
+      bloqueId: BLOQUE_ID,
+      usuario: PARTICIPANTE,
+    })
+    expect(r?.respuestas).toEqual(guardadas)
+  })
+
+  it("obtenerMejorIntento redacta el esperado/obtenido de los tests OCULTOS de código", async () => {
     prisma.usuario.findUnique.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
     prisma.intentoBloque.findFirst.mockResolvedValue({
       ...makeIntento({ nota: 100, esMejorIntento: true }),
       preguntasFalladas: [],
-      // Shape REAL que persiste el service para codigo: enriquecido con
-      // lenguaje/puntos* y tests con descripcion/visible/esperado -> el schema
-      // `.strict()` del contrato lo rechaza, asi que respuestas se omite.
       respuestas: {
         tipo: "CODIGO_PREGUNTAS",
-        codigoEnviado: "print(1)",
         lenguaje: "python",
-        puntosObtenidos: 1,
-        puntosTotales: 1,
+        codigoEnviado: "print(1)",
+        puntosObtenidos: 2,
+        puntosTotales: 2,
         resultadosTests: [
           {
-            testId: "t1",
+            testId: "v",
+            descripcion: "visible",
+            visible: true,
             paso: true,
             estado: "ok",
             stdoutObtenido: "1",
+            stdoutEsperado: "1",
             stderr: "",
             duracionMs: 5,
-            descripcion: "suma",
-            visible: true,
-            stdoutEsperado: "1",
+          },
+          {
+            testId: "o",
+            descripcion: "pista oculta",
+            visible: false,
+            paso: true,
+            estado: "ok",
+            stdoutObtenido: "42",
+            stdoutEsperado: "42",
+            stderr: "",
+            duracionMs: 5,
           },
         ],
+      },
+    })
+    const r = await service.obtenerMejorIntento({
+      colaboradorId: COLABORADOR_ID,
+      bloqueId: BLOQUE_ID,
+      usuario: PARTICIPANTE,
+    })
+    const tests = r?.respuestas?.tipo === "CODIGO_PREGUNTAS" ? r.respuestas.resultadosTests : []
+    const visible = tests.find((t) => t.testId === "v")
+    const oculto = tests.find((t) => t.testId === "o")
+    // El visible conserva su esperado; el oculto lo tiene redactado (esperado y
+    // obtenido) pero mantiene descripcion (pista) y paso/estado.
+    expect(visible?.stdoutEsperado).toBe("1")
+    expect(oculto?.stdoutEsperado).toBe("")
+    expect(oculto?.stdoutObtenido).toBe("")
+    expect(oculto?.descripcion).toBe("pista oculta")
+    expect(oculto?.paso).toBe(true)
+  })
+
+  it("el shape persistido por el evaluador de código matchea el contrato de lectura (drift guard)", () => {
+    const persistido: ResultadoTestPersistido = {
+      testId: "t",
+      descripcion: "d",
+      visible: true,
+      paso: true,
+      estado: "ok",
+      stdoutObtenido: "",
+      stdoutEsperado: "",
+      stderr: "",
+      duracionMs: 1,
+    }
+    // Falla a COMPILAR si ResultadoTestPersistido y ResultadoTestGuardado divergen.
+    const leido: ResultadoTestGuardado = persistido
+    expect(leido.testId).toBe("t")
+  })
+
+  it("obtenerMejorIntento omite las respuestas de SQL_EJERCICIO (aun no en el schema; P21-SQL pendiente)", async () => {
+    prisma.usuario.findUnique.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
+    prisma.intentoBloque.findFirst.mockResolvedValue({
+      ...makeIntento({ nota: 100, esMejorIntento: true }),
+      preguntasFalladas: [],
+      respuestas: {
+        tipo: "SQL_EJERCICIO",
+        consultaEnviada: "SELECT 1",
+        puntosObtenidos: 1,
+        puntosTotales: 1,
+        resultadosTests: [],
       },
     })
     const r = await service.obtenerMejorIntento({
