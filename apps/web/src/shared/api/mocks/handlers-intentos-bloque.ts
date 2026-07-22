@@ -1,4 +1,8 @@
-import { type IntentoBloqueResponse, contenidoQuizSchema } from "@nexott-learn/shared-types"
+import {
+  type IntentoBloqueResponse,
+  contenidoQuizSchema,
+  respuestasIntentoSchema,
+} from "@nexott-learn/shared-types"
 import { ApiError } from "../api-error"
 import { type MockRequest, defineRoute } from "./router"
 import { SEED_BLOQUES } from "./seed-bloques"
@@ -171,6 +175,9 @@ function handlerCrearIntento(req: MockRequest): IntentoBloqueResponse {
   const { nota, preguntasFalladas } = calcularNota(req.body)
   const previo = mejoresPorBloque.get(req.body.bloqueId)
   const esMejorIntento = !previo || nota > previo.nota
+  // P13: guardamos las respuestas enviadas (parseadas al contrato) para que la
+  // vista de revisión las muestre al volver, igual que el backend real.
+  const respuestasParsed = respuestasIntentoSchema.safeParse(req.body.respuestas)
   const intento: IntentoBloqueResponse = {
     intentoId: intentoIdAleatorio(),
     bloqueId: req.body.bloqueId,
@@ -182,6 +189,7 @@ function handlerCrearIntento(req: MockRequest): IntentoBloqueResponse {
     estaInvalidado: false,
     fecha: new Date().toISOString(),
     preguntasFalladas,
+    ...(respuestasParsed.success ? { respuestas: respuestasParsed.data } : {}),
   }
   if (esMejorIntento) {
     mejoresPorBloque.set(req.body.bloqueId, intento)

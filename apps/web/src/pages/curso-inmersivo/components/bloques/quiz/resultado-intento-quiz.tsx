@@ -14,6 +14,12 @@ interface ResultadoIntentoQuizProps {
    * (banner sobrio). `null` si nunca habia intentado.
    */
   readonly mejorPrevio: IntentoBloqueResponse | null
+  /**
+   * Si `false`, el veredicto NO se anuncia por la región live (solo la vista
+   * visual). En modo revisión — al volver a un quiz ya aprobado — no es una
+   * acción nueva, así que evitamos el anuncio y su no-determinismo por caché.
+   */
+  readonly anunciar?: boolean
 }
 
 interface VeredictoQuiz {
@@ -29,13 +35,15 @@ export function ResultadoIntentoQuiz({
   notaMinima,
   totalPreguntas,
   mejorPrevio,
+  anunciar = true,
 }: ResultadoIntentoQuizProps) {
   const veredicto = intento
     ? evaluarVeredictoQuiz(intento, notaMinima, totalPreguntas, mejorPrevio)
     : null
-  const fraseAccesible = veredicto
-    ? `${veredicto.nota} por ciento. Acertaste ${veredicto.acertadas} de ${totalPreguntas}. ${veredicto.mensaje}`
-    : ""
+  const fraseAccesible =
+    veredicto && anunciar
+      ? `${veredicto.nota} por ciento. Acertaste ${veredicto.acertadas} de ${totalPreguntas}. ${veredicto.mensaje}`
+      : ""
   return (
     <>
       {/* Región live persistente: se monta SIEMPRE y su texto pasa de "" al
