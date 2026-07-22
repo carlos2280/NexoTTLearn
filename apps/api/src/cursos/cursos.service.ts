@@ -33,7 +33,14 @@ import {
   SkillSinCobertura,
   UmbralesLogroValores,
 } from "@nexott-learn/shared-types"
-import { AccionLogCurso, EstadoCurso, EstadoModulo, Prisma, RolUsuario } from "@prisma/client"
+import {
+  AccionLogCurso,
+  EstadoBloque,
+  EstadoCurso,
+  EstadoModulo,
+  Prisma,
+  RolUsuario,
+} from "@prisma/client"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { buildPaginatedResponse, resolvePaginacion } from "../common/http/paginated"
 import { IdempotencyService } from "../common/idempotency/idempotency.service"
@@ -2429,21 +2436,59 @@ export class CursosService {
     if (skillsExigidasIds.length === 0) {
       return []
     }
-    const filas = await tx.seccionSkill.findMany({
-      where: { skillId: { in: [...skillsExigidasIds] } },
-      select: { skillId: true, seccion: { select: { moduloId: true } } },
-    })
-    const cobertura = new Map<string, Set<string>>()
-    for (const f of filas) {
-      const set = cobertura.get(f.skillId) ?? new Set<string>()
-      set.add(f.seccion.moduloId)
-      cobertura.set(f.skillId, set)
-    }
+    // Cobertura D82 por UNION de dos senales, para no marcar falsos "sin
+    // cobertura" (bug P24):
+    //  (1) SECCION etiquetada con la skill (`SeccionSkill`) — lo puebla el
+    //      importador de cursos desde el `.md`.
+    //  (2) BLOQUE evaluable ACTIVO cuya `skillQueMideId` es la skill — es lo que
+    //      setea el editor admin al armar un curso a mano. El importador no es la
+    //      unica via de crear contenido: sin esta rama, TODO curso construido a
+    //      mano quedaba "sin cobertura" aunque su quiz/reto midiera la skill.
+    // La union es MONOTONA: solo agrega cobertura, nunca la quita, asi que ningun
+    // curso que hoy publica dejaria de poder hacerlo.
+    //
+    // COHERENCIA: `modulos.service.ts calcularSkillsCubiertas` computa la MISMA
+    // union para avisar al archivar un modulo, pero ahi SI filtra
+    // `modulo.estado=ACTIVO` (un modulo archivado no cubre). Aca NO se filtra el
+    // estado del modulo A PROPOSITO: (a) preserva la monotonia (un modulo
+    // habilitado-pero-archivado que hoy cubre una skill seguiria publicando) y
+    // (b) mantiene el comportamiento previo de la rama SeccionSkill, que tampoco
+    // lo miraba. Si algun dia se unifican ambas definiciones (candidato a helper
+    // compartido), hacerlo sin romper esa monotonia.
     const habilitadosSet = new Set(modulosHabilitadosIds)
+    const [filasSeccion, filasBloque] = await Promise.all([
+      tx.seccionSkill.findMany({
+        where: { skillId: { in: [...skillsExigidasIds] } },
+        select: { skillId: true, seccion: { select: { moduloId: true } } },
+      }),
+      tx.bloque.findMany({
+        where: {
+          skillQueMideId: { in: [...skillsExigidasIds] },
+          esEvaluable: true,
+          estado: EstadoBloque.ACTIVO,
+          seccion: { moduloId: { in: [...modulosHabilitadosIds] } },
+        },
+        select: { skillQueMideId: true, seccion: { select: { moduloId: true } } },
+      }),
+    ])
+    const cobertura = new Map<string, Set<string>>()
+    const registrarCobertura = (skillId: string, moduloId: string): void => {
+      const set = cobertura.get(skillId) ?? new Set<string>()
+      set.add(moduloId)
+      cobertura.set(skillId, set)
+    }
+    for (const f of filasSeccion) {
+      registrarCobertura(f.skillId, f.seccion.moduloId)
+    }
+    for (const b of filasBloque) {
+      if (b.skillQueMideId !== null) {
+        registrarCobertura(b.skillQueMideId, b.seccion.moduloId)
+      }
+    }
     const sinCobertura: string[] = []
     for (const skillId of skillsExigidasIds) {
-      const modulosQueEnsenan = cobertura.get(skillId) ?? new Set<string>()
-      const cubierta = [...modulosQueEnsenan].some((m) => habilitadosSet.has(m))
+      const modulosQueLaCubren = cobertura.get(skillId) ?? new Set<string>()
+      const cubierta = [...modulosQueLaCubren].some((m) => habilitadosSet.has(m))
       if (!cubierta) {
         sinCobertura.push(skillId)
       }
