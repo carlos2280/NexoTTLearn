@@ -34,14 +34,14 @@ export const AYUDAS_CONFIG_CURSO = {
     queEs:
       "Las skills son lo específico dentro de un área (python.fastapi, azure.databricks). Aquí marcas qué skills concretas el cliente exige y con qué nota mínima.",
     siCambias:
-      "Exigir una skill específica obliga a que algún módulo activo la enseñe. Si exiges una skill y no hay módulo que la cubra, sale un aviso (no bloquea, pero alerta).",
+      "Exigir una skill obliga a que algún módulo activo la mida: un bloque evaluable cuya «skill que mide» sea esa, o una sección etiquetada con ella. Si no hay cobertura, se avisa aquí y el curso no se puede publicar hasta reponerla.",
     ejemplo: "Cliente que pide FastAPI específicamente → exiges python.fastapi con nota mínima 70.",
   },
   modulos: {
     queEs:
       "Selecciona qué módulos del catálogo global verán los colaboradores. Solo los habilitados aparecen en su plan personal.",
     siCambias:
-      "Quitar un módulo lo retira del curso. Si ese módulo era el único que enseñaba una skill exigida, queda sin cobertura (sale aviso). Añadirlo amplía lo que pueden estudiar.",
+      "Quitar un módulo lo retira del curso. Si era el único que cubría una skill exigida, esa skill queda sin cobertura y no podrás publicar hasta reponerla. Añadirlo amplía lo que pueden estudiar.",
     ejemplo:
       "Cliente no quiere Git avanzado → desactivas ese módulo. Necesitas reforzar testing → añades el módulo de pytest.",
   },
