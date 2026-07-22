@@ -4,7 +4,9 @@ import {
   type NormalizacionRespuestaCorta,
   type PreguntaQuiz,
   type RespuestaPregunta,
+  type RespuestasGuardadas,
   contenidoQuizSchema,
+  respuestasGuardadasSchema,
 } from "@nexott-learn/shared-types"
 import type { Prisma } from "@prisma/client"
 import { z } from "zod"
@@ -267,6 +269,41 @@ export function toIntentoResponse(intento: IntentoSeleccionado): {
     estaInvalidado: intento.estaInvalidado,
     fecha: intento.fecha.toISOString(),
     preguntasFalladas: extraerPreguntasFalladas(intento.preguntasFalladas),
+  }
+}
+
+/**
+ * Parsea el `respuestas` (JsonB) persistido de un intento al contrato de
+ * respuestas GUARDADAS (el shape enriquecido que el service guarda, distinto
+ * del que envia el cliente). Devuelve `undefined` si el JSON no matchea
+ * (defensivo: intentos viejos/corruptos no rompen la vista de revision).
+ *
+ * Cubre QUIZ (P13) y CODIGO_PREGUNTAS de cualquier lenguaje (P21). SQL_EJERCICIO
+ * aun no esta en `respuestasGuardadasSchema` -> se omite hasta P21-SQL.
+ */
+export function parseRespuestasGuardadas(valor: Prisma.JsonValue): RespuestasGuardadas | undefined {
+  const parsed = respuestasGuardadasSchema.safeParse(valor)
+  return parsed.success ? parsed.data : undefined
+}
+
+/**
+ * Redacta la salida ESPERADA/OBTENIDA de los tests OCULTOS (`visible:false`)
+ * antes de devolver las respuestas guardadas de un reto de codigo al alumno.
+ * Los tests ocultos son un control de integridad: su `stdoutEsperado` NO debe
+ * viajar al cliente (y el `stdoutObtenido` de un test que pasa COINCIDE con el
+ * esperado, asi que tambien se redacta). La UI ya los oculta, pero el dato
+ * viajaba en el JSON — se corta en el server (OWASP A01, regla dura 9).
+ * `descripcion` se CONSERVA: es la pista intencional de los ocultos (Fix 2).
+ */
+export function redactarTestsOcultos(respuestas: RespuestasGuardadas): RespuestasGuardadas {
+  if (respuestas.tipo !== "CODIGO_PREGUNTAS") {
+    return respuestas
+  }
+  return {
+    ...respuestas,
+    resultadosTests: respuestas.resultadosTests.map((t) =>
+      t.visible ? t : { ...t, stdoutObtenido: "", stdoutEsperado: "" },
+    ),
   }
 }
 

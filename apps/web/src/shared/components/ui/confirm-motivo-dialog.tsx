@@ -14,6 +14,14 @@ interface ConfirmMotivoDialogProps {
   readonly enviando: boolean
   readonly onConfirmar: (motivo: string) => Promise<void>
   readonly children?: ReactNode
+  /** Si `false`, el motivo es opcional (label + submit se relajan). Default: true. */
+  readonly motivoObligatorio?: boolean
+  /**
+   * Render opcional del error de `onConfirmar`. Si devuelve un nodo, se muestra
+   * en lugar del mensaje plano; si devuelve `null`/`undefined`, cae al mensaje
+   * plano. Permite pintar detalle estructurado (ej. precondiciones de publicar).
+   */
+  readonly renderError?: (err: unknown) => ReactNode
 }
 
 export function ConfirmMotivoDialog({
@@ -27,30 +35,41 @@ export function ConfirmMotivoDialog({
   enviando,
   onConfirmar,
   children,
+  motivoObligatorio = true,
+  renderError,
 }: ConfirmMotivoDialogProps) {
   const [motivo, setMotivo] = useState("")
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<unknown>(null)
+  const [hayError, setHayError] = useState(false)
 
   useEffect(() => {
     if (abierto) {
       setMotivo("")
       setError(null)
+      setHayError(false)
     }
   }, [abierto])
 
-  const motivoValido = motivo.trim().length > 0
+  const motivoValido = !motivoObligatorio || motivo.trim().length > 0
 
   async function manejarSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!motivoValido) {
       return
     }
+    setError(null)
+    setHayError(false)
     try {
       await onConfirmar(motivo.trim())
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo completar la acción")
+      setError(err)
+      setHayError(true)
     }
   }
+
+  const errorPersonalizado = hayError ? renderError?.(error) : null
+  const mensajeError =
+    error instanceof Error && error.message ? error.message : "No se pudo completar la acción"
 
   return (
     <Dialog
@@ -61,7 +80,7 @@ export function ConfirmMotivoDialog({
     >
       <form onSubmit={manejarSubmit} className="flex flex-col gap-4">
         {children}
-        <Field label="Motivo (obligatorio)">
+        <Field label={motivoObligatorio ? "Motivo (obligatorio)" : "Motivo (opcional)"}>
           {(p) => (
             <textarea
               {...p}
@@ -75,10 +94,12 @@ export function ConfirmMotivoDialog({
             />
           )}
         </Field>
-        {error ? (
-          <p role="alert" className="text-body-sm text-danger-on-soft">
-            {error}
-          </p>
+        {hayError ? (
+          <div role="alert">
+            {errorPersonalizado ?? (
+              <p className="text-body-sm text-danger-on-soft">{mensajeError}</p>
+            )}
+          </div>
         ) : null}
         <p className="text-caption text-text-tertiary">Quedará registrado en el log auditable.</p>
         <DialogFooter>

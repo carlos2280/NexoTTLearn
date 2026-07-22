@@ -52,6 +52,14 @@ export type {
   ResultadoTestSqlReportado,
 } from "./crear-intento.schema"
 export {
+  respuestasGuardadasSchema,
+  resultadoTestGuardadoSchema,
+} from "./respuestas-guardadas.schema"
+export type {
+  RespuestasGuardadas,
+  ResultadoTestGuardado,
+} from "./respuestas-guardadas.schema"
+export {
   intentoBloqueResponseSchema,
   listarIntentosBloqueQuerySchema,
   listarIntentosCursoBloqueQuerySchema,
