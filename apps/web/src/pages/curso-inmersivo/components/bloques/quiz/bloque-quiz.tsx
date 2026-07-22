@@ -8,6 +8,7 @@ import {
 } from "@nexott-learn/shared-types"
 import { useMemo, useState } from "react"
 import { CeldaBloque } from "../../ide/celda-bloque"
+import { ordenarPreguntasQuiz } from "./ordenar-preguntas"
 import { PreguntaItem } from "./pregunta-item"
 import { construirRespuestasRevision } from "./respuestas-revision"
 import { ResultadoIntentoQuiz, decidirMostrarSolucion } from "./resultado-intento-quiz"
@@ -79,6 +80,20 @@ function QuizActivo({ bloqueId, cursoId, colaboradorId, contenido }: QuizActivoP
     [respuestasGuardadas],
   )
 
+  // Orden de las preguntas para ESTE participante. Si el admin marcó "orden
+  // aleatorio", se baraja de forma estable por (participante + bloque) — mismo
+  // alumno, mismo orden siempre; alumnos distintos, órdenes distintos. Antes el
+  // flag `ordenAleatorio` se guardaba pero nadie lo aplicaba (P22).
+  const preguntasOrdenadas = useMemo(
+    () =>
+      ordenarPreguntasQuiz(
+        contenido.preguntas,
+        contenido.ordenAleatorio,
+        `${colaboradorId}:${bloqueId}`,
+      ),
+    [contenido.preguntas, contenido.ordenAleatorio, colaboradorId, bloqueId],
+  )
+
   const total = contenido.preguntas.length
   const completo = respuestas.contestadas === total
 
@@ -107,7 +122,7 @@ function QuizActivo({ bloqueId, cursoId, colaboradorId, contenido }: QuizActivoP
           cursoId,
           respuestas: {
             tipo: "QUIZ",
-            preguntas: [...respuestas.construirEnvio(contenido.preguntas)],
+            preguntas: [...respuestas.construirEnvio(preguntasOrdenadas)],
           },
         },
       },
@@ -133,7 +148,7 @@ function QuizActivo({ bloqueId, cursoId, colaboradorId, contenido }: QuizActivoP
       bodyClassName="flex flex-col gap-5"
     >
       <ol className="flex flex-col gap-6">
-        {contenido.preguntas.map((pregunta, idx) => (
+        {preguntasOrdenadas.map((pregunta, idx) => (
           <PreguntaItem
             key={pregunta.id}
             numero={idx + 1}
