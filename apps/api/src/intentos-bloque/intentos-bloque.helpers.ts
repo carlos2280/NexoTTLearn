@@ -4,7 +4,9 @@ import {
   type NormalizacionRespuestaCorta,
   type PreguntaQuiz,
   type RespuestaPregunta,
+  type RespuestasIntento,
   contenidoQuizSchema,
+  respuestasIntentoSchema,
 } from "@nexott-learn/shared-types"
 import type { Prisma } from "@prisma/client"
 import { z } from "zod"
@@ -268,6 +270,21 @@ export function toIntentoResponse(intento: IntentoSeleccionado): {
     fecha: intento.fecha.toISOString(),
     preguntasFalladas: extraerPreguntasFalladas(intento.preguntasFalladas),
   }
+}
+
+/**
+ * Parsea el `respuestas` (JsonB) persistido de un intento a la union tipada del
+ * contrato de envio. Devuelve `undefined` si el JSON no matchea (defensivo).
+ *
+ * OJO (P13): hoy solo el QUIZ matchea — su `respuestas` persistido es identico
+ * al enviado. CODIGO_PREGUNTAS y SQL_EJERCICIO persisten un shape ENRIQUECIDO
+ * (lenguaje, puntos*, tests con descripcion/visible/esperado) que el schema
+ * `.strict()` rechaza, asi que se omiten. P21 (revisar el codigo enviado) debera
+ * darles su propio schema de "respuestas persistidas".
+ */
+export function parseRespuestasGuardadas(valor: Prisma.JsonValue): RespuestasIntento | undefined {
+  const parsed = respuestasIntentoSchema.safeParse(valor)
+  return parsed.success ? parsed.data : undefined
 }
 
 function extraerPreguntasFalladas(valor: Prisma.JsonValue | null): readonly string[] {

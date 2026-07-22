@@ -919,6 +919,81 @@ describe("IntentosBloqueService — visibilidad y scope", () => {
     })
     expect(r).toBeNull()
   })
+
+  it("obtenerMejorIntento adjunta las respuestas guardadas (revisión P13)", async () => {
+    prisma.usuario.findUnique.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
+    prisma.intentoBloque.findFirst.mockResolvedValue({
+      ...makeIntento({ nota: 100, esMejorIntento: true }),
+      preguntasFalladas: [],
+      respuestas: {
+        tipo: "QUIZ",
+        preguntas: [{ preguntaId: "q1", tipo: "OPCION_UNICA", opcionElegidaId: "o2" }],
+      },
+    })
+    const r = await service.obtenerMejorIntento({
+      colaboradorId: COLABORADOR_ID,
+      bloqueId: BLOQUE_ID,
+      usuario: PARTICIPANTE,
+    })
+    expect(r?.respuestas).toEqual({
+      tipo: "QUIZ",
+      preguntas: [{ preguntaId: "q1", tipo: "OPCION_UNICA", opcionElegidaId: "o2" }],
+    })
+  })
+
+  it("obtenerMejorIntento omite respuestas si el JSON guardado es inválido", async () => {
+    prisma.usuario.findUnique.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
+    prisma.intentoBloque.findFirst.mockResolvedValue({
+      ...makeIntento({ nota: 100, esMejorIntento: true }),
+      preguntasFalladas: [],
+      respuestas: { basura: true },
+    })
+    const r = await service.obtenerMejorIntento({
+      colaboradorId: COLABORADOR_ID,
+      bloqueId: BLOQUE_ID,
+      usuario: PARTICIPANTE,
+    })
+    expect(r).not.toBeNull()
+    expect(r?.respuestas).toBeUndefined()
+  })
+
+  it("obtenerMejorIntento omite las respuestas de CODIGO_PREGUNTAS (shape enriquecido; P21 pendiente)", async () => {
+    prisma.usuario.findUnique.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
+    prisma.intentoBloque.findFirst.mockResolvedValue({
+      ...makeIntento({ nota: 100, esMejorIntento: true }),
+      preguntasFalladas: [],
+      // Shape REAL que persiste el service para codigo: enriquecido con
+      // lenguaje/puntos* y tests con descripcion/visible/esperado -> el schema
+      // `.strict()` del contrato lo rechaza, asi que respuestas se omite.
+      respuestas: {
+        tipo: "CODIGO_PREGUNTAS",
+        codigoEnviado: "print(1)",
+        lenguaje: "python",
+        puntosObtenidos: 1,
+        puntosTotales: 1,
+        resultadosTests: [
+          {
+            testId: "t1",
+            paso: true,
+            estado: "ok",
+            stdoutObtenido: "1",
+            stderr: "",
+            duracionMs: 5,
+            descripcion: "suma",
+            visible: true,
+            stdoutEsperado: "1",
+          },
+        ],
+      },
+    })
+    const r = await service.obtenerMejorIntento({
+      colaboradorId: COLABORADOR_ID,
+      bloqueId: BLOQUE_ID,
+      usuario: PARTICIPANTE,
+    })
+    expect(r).not.toBeNull()
+    expect(r?.respuestas).toBeUndefined()
+  })
 })
 
 // ============================================================================

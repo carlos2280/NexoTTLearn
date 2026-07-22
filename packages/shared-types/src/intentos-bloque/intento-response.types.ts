@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { booleanQuerySchema } from "../catalogo/paginacion"
+import { respuestasIntentoSchema } from "./crear-intento.schema"
 
 /**
  * Shapes de respuesta del dominio intentos-bloque (Slice 7 P7b).
@@ -32,6 +33,14 @@ export const intentoBloqueResponseSchema = z
      * manual de `mejor.data` antes del POST.
      */
     esPrimeraAprobacion: z.boolean().optional(),
+    /**
+     * Respuestas guardadas del intento (lo que el participante eligio). Presente
+     * SOLO en la respuesta del `mejor-intento`; los listados la omiten a
+     * proposito (D-S7-D2). Hoy la consume la revision del QUIZ aprobado (P13);
+     * para CODIGO_PREGUNTAS/SQL el backend aun no la emite (el shape persistido
+     * es mas rico que este contrato estricto — ver `parseRespuestasGuardadas`).
+     */
+    respuestas: respuestasIntentoSchema.optional(),
   })
   .strict()
 
