@@ -106,7 +106,7 @@ export function ConfigSkillsExigidas({ curso, bloqueado }: ConfigSkillsExigidasP
     <ConfigCard
       id="config-skills"
       titulo="Skills exigidas"
-      descripcion="Skills que el curso evalúa, con su nota mínima. Las skills sin cobertura por módulos generan aviso (no bloquea)."
+      descripcion="Skills que el curso evalúa, con su nota mínima. Si una skill no la mide ningún módulo activo, se avisa aquí y no podrás publicar hasta cubrirla."
       ayuda={AYUDAS_CONFIG_CURSO.skills}
       acciones={
         <div className="flex items-center gap-2">
@@ -145,7 +145,8 @@ export function ConfigSkillsExigidas({ curso, bloqueado }: ConfigSkillsExigidasP
     >
       {avisoSinCobertura.length > 0 ? (
         <Banner tone="warning" title="Skills sin cobertura">
-          Estas skills no las cubre ningún módulo habilitado: {avisoSinCobertura.join(", ")}.
+          Ningún módulo activo mide estas skills, así que el curso no se podrá publicar hasta
+          cubrirlas: {avisoSinCobertura.join(", ")}.
         </Banner>
       ) : null}
 
