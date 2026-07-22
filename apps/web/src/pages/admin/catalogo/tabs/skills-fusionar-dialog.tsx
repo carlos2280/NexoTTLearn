@@ -74,7 +74,7 @@ export function SkillsFusionarDialog({
           {(p) => (
             <Select
               {...p}
-              value={ganadoraId === "" ? undefined : ganadoraId}
+              value={ganadoraId}
               onValueChange={setGanadoraId}
               placeholder="Selecciona…"
             >
@@ -90,7 +90,7 @@ export function SkillsFusionarDialog({
           {(p) => (
             <Select
               {...p}
-              value={perdedoraId === "" ? undefined : perdedoraId}
+              value={perdedoraId}
               onValueChange={setPerdedoraId}
               placeholder="Selecciona…"
             >

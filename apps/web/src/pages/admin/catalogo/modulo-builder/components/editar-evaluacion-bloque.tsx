@@ -82,11 +82,7 @@ export function EditarEvaluacionBloque({ bloque }: EditarEvaluacionBloqueProps) 
       {esEvaluable ? (
         <div className="flex flex-col gap-1">
           <span className="text-caption text-text-tertiary">Skill que mide</span>
-          <Select
-            value={skillId === "" ? undefined : skillId}
-            onValueChange={setSkillId}
-            placeholder="— Selecciona una skill —"
-          >
+          <Select value={skillId} onValueChange={setSkillId} placeholder="— Selecciona una skill —">
             {skills.map((s) => (
               <SelectItem key={s.id} value={s.id}>
                 {s.etiquetaVisible}

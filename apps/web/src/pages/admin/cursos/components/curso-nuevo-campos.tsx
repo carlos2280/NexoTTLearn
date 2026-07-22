@@ -39,7 +39,7 @@ export function CursoNuevoCampos({
         {(p) => (
           <Select
             {...p}
-            value={form.clienteId === "" ? undefined : form.clienteId}
+            value={form.clienteId}
             onValueChange={(v) => onCambio({ ...form, clienteId: v })}
             hasError={Boolean(errores.clienteId)}
             disabled={cargandoClientes}

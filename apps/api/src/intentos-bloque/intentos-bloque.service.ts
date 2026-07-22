@@ -33,10 +33,16 @@ import { NotaSkillService } from "../nota-skill/nota-skill.service"
 import { CodigoEvaluadorService } from "./codigo-evaluador.service"
 import {
   calcularNotaQuiz,
+  parseRespuestasGuardadas,
   parsearContenidoQuiz,
+  redactarTestsOcultos,
   toIntentoResponse,
 } from "./intentos-bloque.helpers"
-import { type CalculoQuizResultado, SELECT_INTENTO_FIELDS } from "./intentos-bloque.types"
+import {
+  type CalculoQuizResultado,
+  SELECT_INTENTO_FIELDS,
+  SELECT_INTENTO_FIELDS_CON_RESPUESTAS,
+} from "./intentos-bloque.types"
 import { SqlEvaluadorService } from "./sql-evaluador.service"
 
 const IDEMPOTENCY_SCOPE = "intento-bloque"
@@ -369,9 +375,19 @@ export class IntentosBloqueService {
         esMejorIntento: true,
         estaInvalidado: false,
       },
-      select: SELECT_INTENTO_FIELDS,
+      select: SELECT_INTENTO_FIELDS_CON_RESPUESTAS,
     })
-    return intento ? toIntentoResponse(intento) : null
+    if (!intento) {
+      return null
+    }
+    // Revision del intento aprobado: adjuntamos las `respuestas` guardadas para
+    // mostrarlas sin recomputar (QUIZ P13 / CODIGO P21, todo lenguaje). Antes de
+    // devolverlas, `redactarTestsOcultos` borra el esperado/obtenido de los
+    // tests `visible:false` de codigo: son control de integridad y NO deben
+    // viajar al cliente (la UI ya los oculta, pero el dato iba en el JSON).
+    const respuestas = parseRespuestasGuardadas(intento.respuestas)
+    const base = toIntentoResponse(intento)
+    return respuestas ? { ...base, respuestas: redactarTestsOcultos(respuestas) } : base
   }
 
   // =========================================================================

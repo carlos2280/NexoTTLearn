@@ -627,23 +627,30 @@
   --lift-translate-sm: -1px;
   --lift-translate-md: -2px;
   --lift-translate-lg: -4px;
+
+  /* ---------- Z-index · escala semántica ----------
+     Van en @theme con el namespace `--z-index-*` para que Tailwind 4 genere
+     las utilities `z-raised`/`z-modal`/`z-popover`/`z-tooltip`/… Vivían en
+     `:root` como `--z-*`, namespace que v4 NO convierte en utility → clases
+     como `z-popover` quedaban muertas (sin z-index) y el popover del Select
+     caía detrás del modal (que sí lleva z-index inline). */
+  --z-index-base: 0;
+  --z-index-raised: 10;
+  --z-index-sticky: 20;
+  --z-index-overlay: 100;
+  --z-index-modal: 200;
+  --z-index-popover: 250;
+  --z-index-toast: 300;
+  --z-index-tooltip: 400;
 }
 
 /* ============================================================
-   Layered tokens — no son `@theme` porque dependen de
-   contexto (z-index escalonado, contornos compuestos).
+   Tokens de :root que dependen de contexto (no van en @theme;
+   ej. contornos compuestos). La escala de z-index se movió a
+   @theme (`--z-index-*`) para que Tailwind 4 genere sus utilities.
    ============================================================ */
 
 :root {
-  --z-base: 0;
-  --z-raised: 10;
-  --z-sticky: 20;
-  --z-overlay: 100;
-  --z-modal: 200;
-  --z-popover: 250;
-  --z-toast: 300;
-  --z-tooltip: 400;
-
   font-family: var(--font-sans);
   font-feature-settings: "ss01", "ss02", "ss03", "ss04", "tnum", "cv01", "cv11";
   color-scheme: light;

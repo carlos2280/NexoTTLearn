@@ -24,6 +24,19 @@ export type IntentoSeleccionado = Prisma.IntentoBloqueGetPayload<{
 }>
 
 /**
+ * Select del mejor-intento: incluye ademas `respuestas` (el body guardado) para
+ * la vista de revision del bloque (P13, hoy solo QUIZ). Acceso admin-o-dueño
+ * (@Roles ADMIN/PARTICIPANTE + `asegurarAccesoColaborador`): el alumno ve lo
+ * suyo y un admin puede verlo para moderar. Para QUIZ son las opciones elegidas,
+ * NO la clave de correccion (esa vive en `Bloque.contenido`). Los listados
+ * siguen con `SELECT_INTENTO_FIELDS` sin `respuestas` (D-S7-D2).
+ */
+export const SELECT_INTENTO_FIELDS_CON_RESPUESTAS = {
+  ...SELECT_INTENTO_FIELDS,
+  respuestas: true,
+} as const satisfies Prisma.IntentoBloqueSelect
+
+/**
  * Resultado interno del calculo de un intento QUIZ (D-S7-C2). El service
  * normaliza la nota a `Prisma.Decimal` antes de persistir.
  *

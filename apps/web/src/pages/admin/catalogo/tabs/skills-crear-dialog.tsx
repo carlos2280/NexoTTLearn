@@ -89,7 +89,7 @@ export function SkillsCrearDialog({
           {(p) => (
             <Select
               {...p}
-              value={areaId === "" ? undefined : areaId}
+              value={areaId}
               onValueChange={setAreaId}
               hasError={Boolean(errorArea)}
               placeholder="Selecciona un área…"
