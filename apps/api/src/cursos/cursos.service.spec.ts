@@ -8,6 +8,7 @@ import { Test, TestingModule } from "@nestjs/testing"
 import {
   AccionLogCurso,
   DesbloqueoCurso,
+  EstadoBloque,
   EstadoCurso,
   EstadoModulo,
   RolAsignacion,
@@ -92,7 +93,7 @@ interface MockPrisma {
     update: ReturnType<typeof vi.fn>
   }
   intentoEntrevistaIA: { count: ReturnType<typeof vi.fn> }
-  bloque: { findFirst: ReturnType<typeof vi.fn> }
+  bloque: { findFirst: ReturnType<typeof vi.fn>; findMany: ReturnType<typeof vi.fn> }
   logCambioCurso: {
     create: ReturnType<typeof vi.fn>
     deleteMany: ReturnType<typeof vi.fn>
@@ -144,7 +145,7 @@ function buildPrismaMock(): MockPrisma {
       update: vi.fn(),
     },
     intentoEntrevistaIA: { count: vi.fn() },
-    bloque: { findFirst: vi.fn() },
+    bloque: { findFirst: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
     logCambioCurso: {
       create: vi.fn(),
       deleteMany: vi.fn(),
@@ -997,6 +998,62 @@ describe("CursosService.actualizarSkillsExigidas", () => {
     await expect(
       service.actualizarSkillsExigidas(CURSO_ID, { skills: [] }, undefined, ADMIN_ID),
     ).rejects.toMatchObject({ response: { code: apiErrorCodes.motivoRequerido } })
+  })
+
+  it("P24: skill CUBIERTA por un bloque evaluable que la mide (sin SeccionSkill) no genera aviso", async () => {
+    prisma.curso.findUnique.mockResolvedValue(
+      buildCursoConfigRow({
+        estado: EstadoCurso.BORRADOR,
+        skillsExigidas: [{ skillId: SKILL_X, notaMinima: 70 }],
+        modulosHabilitados: [{ moduloId: MOD_A }],
+      }),
+    )
+    // Curso armado a mano: la SECCION no esta etiquetada (SeccionSkill vacio)...
+    prisma.seccionSkill.findMany.mockResolvedValue([])
+    // ...pero un BLOQUE evaluable ACTIVO de MOD_A mide SKILL_X -> queda cubierta.
+    prisma.bloque.findMany.mockResolvedValue([
+      { skillQueMideId: SKILL_X, seccion: { moduloId: MOD_A } },
+    ])
+    prisma.skill.findMany.mockResolvedValue([])
+    const res = await service.actualizarSkillsExigidas(
+      CURSO_ID,
+      { skills: [{ skillId: SKILL_X, notaMinima: 70 }] },
+      undefined,
+      ADMIN_ID,
+    )
+    // Cubierta -> la respuesta omite el aviso (no hay skills sin cobertura).
+    expect(res.skillsSinCobertura).toBeUndefined()
+    // La cobertura por bloque solo cuenta bloques evaluables ACTIVOS que miden la
+    // skill dentro de un modulo habilitado (no revive secciones ni modulos apagados).
+    expect(prisma.bloque.findMany).toHaveBeenCalledWith({
+      where: {
+        skillQueMideId: { in: [SKILL_X] },
+        esEvaluable: true,
+        estado: EstadoBloque.ACTIVO,
+        seccion: { moduloId: { in: [MOD_A] } },
+      },
+      select: { skillQueMideId: true, seccion: { select: { moduloId: true } } },
+    })
+  })
+
+  it("P24: sigue sin cobertura si ni la seccion ni un bloque evaluable miden la skill", async () => {
+    prisma.curso.findUnique.mockResolvedValue(
+      buildCursoConfigRow({
+        estado: EstadoCurso.BORRADOR,
+        skillsExigidas: [{ skillId: SKILL_Y, notaMinima: 70 }],
+        modulosHabilitados: [{ moduloId: MOD_A }],
+      }),
+    )
+    prisma.seccionSkill.findMany.mockResolvedValue([])
+    prisma.bloque.findMany.mockResolvedValue([])
+    prisma.skill.findMany.mockResolvedValue([{ id: SKILL_Y, etiquetaVisible: "Y" }])
+    const res = await service.actualizarSkillsExigidas(
+      CURSO_ID,
+      { skills: [{ skillId: SKILL_Y, notaMinima: 70 }] },
+      undefined,
+      ADMIN_ID,
+    )
+    expect(res.skillsSinCobertura).toEqual([{ skillId: SKILL_Y, etiquetaVisible: "Y" }])
   })
 
   it("H-12 interseccion: actualiza skill existente cuando notaMinima cambia", async () => {
