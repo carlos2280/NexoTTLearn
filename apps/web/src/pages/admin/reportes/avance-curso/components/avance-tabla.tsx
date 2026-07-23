@@ -1,18 +1,25 @@
 import type { FilaAvanceCurso } from "@nexott-learn/shared-types"
 import type { ReactNode } from "react"
+import { etiquetaRolFila } from "../avance-curso.filtros"
 import { obtenerEstado } from "../avance-curso.types"
 import { AvanceAlertasChips } from "./avance-alertas-chips"
 import { AvanceBarra } from "./avance-barra"
 
 interface AvanceTablaProps {
   readonly filas: readonly FilaAvanceCurso[]
+  /** True si hay un filtro de rol/busqueda activo: distingue vacio-por-filtro. */
+  readonly hayFiltro: boolean
 }
 
-export function AvanceTabla({ filas }: AvanceTablaProps) {
+export function AvanceTabla({ filas, hayFiltro }: AvanceTablaProps) {
   if (filas.length === 0) {
     return (
       <div className="rounded-2xl border border-border border-dashed bg-canvas px-6 py-12 text-center">
-        <p className="text-body-sm text-text-secondary">No hay asignaciones para este curso.</p>
+        <p className="text-body-sm text-text-secondary">
+          {hayFiltro
+            ? "No hay resultados para el filtro actual. Prueba con otro rol o limpia la búsqueda."
+            : "No hay asignaciones para este curso."}
+        </p>
       </div>
     )
   }
@@ -65,8 +72,15 @@ function FilaAvance({ fila }: FilaAvanceProps) {
     <tr className="border-border border-b transition-colors duration-base ease-default last:border-b-0 hover:bg-subtle/60">
       <td className="px-5 py-4">
         <div className="flex flex-col gap-0.5">
-          <span className="font-medium text-body-sm text-text-primary">
-            {fila.colaborador.nombre}
+          <span className="flex items-center gap-2">
+            <span className="font-medium text-body-sm text-text-primary">
+              {fila.colaborador.nombre}
+            </span>
+            {fila.rol === "VOLUNTARIO" && (
+              <span className="rounded-pill border border-border bg-subtle px-1.5 py-0.5 font-medium text-[11px] text-text-secondary">
+                {etiquetaRolFila(fila.rol)}
+              </span>
+            )}
           </span>
           <span className="text-caption text-text-tertiary">{fila.colaborador.email}</span>
         </div>

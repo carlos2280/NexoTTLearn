@@ -127,6 +127,7 @@ const FILAS_AVANCE: readonly FilaAvanceCurso[] = [
   {
     asignacionId: "as-001",
     colaborador: { id: "c-001", nombre: "María Fernández", email: "maria.fernandez@nttdata.com" },
+    rol: "ASIGNADO",
     estado: "EN_PROGRESO",
     porcentajeAvance: 78,
     alertas: [],
@@ -134,6 +135,7 @@ const FILAS_AVANCE: readonly FilaAvanceCurso[] = [
   {
     asignacionId: "as-002",
     colaborador: { id: "c-002", nombre: "Diego Cabrera", email: "diego.cabrera@nttdata.com" },
+    rol: "ASIGNADO",
     estado: "EN_PROGRESO",
     porcentajeAvance: 42,
     alertas: ["SIN_ACTIVIDAD_7_DIAS"],
@@ -141,6 +143,7 @@ const FILAS_AVANCE: readonly FilaAvanceCurso[] = [
   {
     asignacionId: "as-003",
     colaborador: { id: "c-003", nombre: "Lucía Romero", email: "lucia.romero@nttdata.com" },
+    rol: "ASIGNADO",
     estado: "APTO",
     porcentajeAvance: 100,
     alertas: [],
@@ -148,6 +151,7 @@ const FILAS_AVANCE: readonly FilaAvanceCurso[] = [
   {
     asignacionId: "as-004",
     colaborador: { id: "c-004", nombre: "Andrés Pinto", email: "andres.pinto@nttdata.com" },
+    rol: "ASIGNADO",
     estado: "ASIGNADO",
     porcentajeAvance: 0,
     alertas: ["PLAN_NO_CALCULADO"],
@@ -155,20 +159,25 @@ const FILAS_AVANCE: readonly FilaAvanceCurso[] = [
   {
     asignacionId: "as-005",
     colaborador: { id: "c-005", nombre: "Sofía Núñez", email: "sofia.nunez@nttdata.com" },
+    rol: "ASIGNADO",
     estado: "EN_PROGRESO",
     porcentajeAvance: 64,
     alertas: ["PLAN_DESACTUALIZADO"],
   },
   {
+    // Voluntario con avance real (aperturas / total): antes el reporte lo
+    // mostraba en 0%. Sirve para probar el filtro por rol con los mocks.
     asignacionId: "as-006",
     colaborador: { id: "c-006", nombre: "Bruno Acosta", email: "bruno.acosta@nttdata.com" },
-    estado: "EN_PROGRESO",
+    rol: "VOLUNTARIO",
+    estado: "INSCRITO",
     porcentajeAvance: 28,
-    alertas: ["SIN_ACTIVIDAD_7_DIAS", "INTENTO_INVALIDADO_RECIENTE"],
+    alertas: ["SIN_ACTIVIDAD_7_DIAS"],
   },
   {
     asignacionId: "as-007",
     colaborador: { id: "c-007", nombre: "Camila Ortega", email: "camila.ortega@nttdata.com" },
+    rol: "ASIGNADO",
     estado: "APTO",
     porcentajeAvance: 100,
     alertas: [],
@@ -176,6 +185,7 @@ const FILAS_AVANCE: readonly FilaAvanceCurso[] = [
   {
     asignacionId: "as-008",
     colaborador: { id: "c-008", nombre: "Pablo Salinas", email: "pablo.salinas@nttdata.com" },
+    rol: "ASIGNADO",
     estado: "NO_APTO",
     porcentajeAvance: 92,
     alertas: [],
@@ -183,13 +193,15 @@ const FILAS_AVANCE: readonly FilaAvanceCurso[] = [
   {
     asignacionId: "as-009",
     colaborador: { id: "c-009", nombre: "Valentina Báez", email: "valentina.baez@nttdata.com" },
-    estado: "EN_PROGRESO",
-    porcentajeAvance: 55,
+    rol: "VOLUNTARIO",
+    estado: "COMPLETADO",
+    porcentajeAvance: 100,
     alertas: [],
   },
   {
     asignacionId: "as-010",
     colaborador: { id: "c-010", nombre: "Mateo Galeano", email: "mateo.galeano@nttdata.com" },
+    rol: "ASIGNADO",
     estado: "EN_PROGRESO",
     porcentajeAvance: 87,
     alertas: [],
@@ -262,7 +274,26 @@ const obtenerAvanceCursoHandler: MockHandler = (req) => {
   if (vista === "HISTORICO") {
     return paginar(EVENTOS_HISTORICO, page, pageSize)
   }
-  return paginar(FILAS_AVANCE, page, pageSize)
+
+  // Replica los filtros del backend (rol default ASIGNADO + busqueda) para que
+  // la UI se pueda probar con mocks igual que contra el API real.
+  const rol = url.searchParams.get("rol") ?? "ASIGNADO"
+  const busqueda = (url.searchParams.get("busqueda") ?? "").trim().toLowerCase()
+  const filas = FILAS_AVANCE.filter((f) => {
+    if (rol !== "TODOS" && f.rol !== rol) {
+      return false
+    }
+    if (busqueda) {
+      const coincide =
+        f.colaborador.nombre.toLowerCase().includes(busqueda) ||
+        f.colaborador.email.toLowerCase().includes(busqueda)
+      if (!coincide) {
+        return false
+      }
+    }
+    return true
+  })
+  return paginar(filas, page, pageSize)
 }
 
 export const handlersReportes = [

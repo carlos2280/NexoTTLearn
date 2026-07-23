@@ -4,36 +4,23 @@ import { ApiError } from "@/shared/api/api-error"
 import { Banner } from "@/shared/components/ui/banner"
 import { Card } from "@/shared/components/ui/card"
 import { Pagination } from "@/shared/components/ui/pagination"
-import type {
-  AvanceCursoQuery,
-  CursoResumen,
-  EventoHistorico,
-  FilaAvanceCurso,
-} from "@nexott-learn/shared-types"
-import { useEffect, useMemo } from "react"
-import { useSearchParams } from "react-router-dom"
+import type { CursoResumen, EventoHistorico, FilaAvanceCurso } from "@nexott-learn/shared-types"
+import { useMemo } from "react"
 import type { CursoOpcion, VistaAvance } from "./avance-curso.types"
+import { AvanceFiltros } from "./components/avance-filtros"
 import { AvanceFotografiaPendiente } from "./components/avance-fotografia-pendiente"
 import { AvanceHeader } from "./components/avance-header"
 import { AvanceHistorico } from "./components/avance-historico"
 import { AvanceResumen } from "./components/avance-resumen"
 import { AvanceTabla } from "./components/avance-tabla"
 import { AvanceToolbar } from "./components/avance-toolbar"
-
-const VISTAS_VALIDAS: readonly VistaAvance[] = ["ACTUAL", "FOTOGRAFIA_CIERRE", "HISTORICO"]
-const PAGE_SIZE = 20
-
-function parsearVista(raw: string | null): VistaAvance {
-  return VISTAS_VALIDAS.includes(raw as VistaAvance) ? (raw as VistaAvance) : "ACTUAL"
-}
+import { useAvanceFiltros } from "./hooks/use-avance-filtros"
 
 function toCursoOpcion(c: CursoResumen): CursoOpcion {
   return { id: c.id, titulo: c.titulo }
 }
 
 export function AvanceCursoPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
-
   const cursosQuery = useListarCursos({
     page: 1,
     pageSize: 50,
@@ -45,42 +32,15 @@ export function AvanceCursoPage() {
     [cursosQuery.data],
   )
 
-  const cursoIdParam = searchParams.get("cursoId")
-  const cursoId = cursoIdParam ?? cursos[0]?.id ?? ""
-  const vista = parsearVista(searchParams.get("vista"))
-  const page = Number(searchParams.get("page") ?? "1")
-
-  // Si no hay cursoId en la URL y ya hay cursos cargados, fijamos el primero
-  // en la URL para que el estado sea shareable y consistente con la UI.
-  useEffect(() => {
-    const primero = cursos[0]
-    if (!cursoIdParam && primero) {
-      const next = new URLSearchParams(searchParams)
-      next.set("cursoId", primero.id)
-      setSearchParams(next, { replace: true })
-    }
-  }, [cursoIdParam, cursos, searchParams, setSearchParams])
-
-  const query: AvanceCursoQuery | null = useMemo(() => {
-    if (!cursoId) {
-      return null
-    }
-    return { cursoId, vista, page, pageSize: PAGE_SIZE, format: "json" }
-  }, [cursoId, vista, page])
-
+  const { cursoId, vista, rol, busqueda, query, actualizarParam, actualizarBusqueda } =
+    useAvanceFiltros(cursos)
   const { data, isLoading, error } = useAvanceCurso(query)
-
-  const actualizarParam = (clave: string, valor: string) => {
-    const next = new URLSearchParams(searchParams)
-    next.set(clave, valor)
-    if (clave !== "page") {
-      next.set("page", "1")
-    }
-    setSearchParams(next, { replace: true })
-  }
 
   const cargandoCursos = cursosQuery.isLoading
   const sinCursos = !cargandoCursos && cursos.length === 0
+  // ASIGNADO es el default, pero igual excluye voluntarios: solo TODOS sin
+  // busqueda muestra el curso completo, asi que cualquier otra cosa es "filtro".
+  const hayFiltro = rol !== "TODOS" || busqueda.trim().length > 0
 
   const esFotografiaPendiente =
     vista === "FOTOGRAFIA_CIERRE" &&
@@ -98,6 +58,15 @@ export function AvanceCursoPage() {
         onCambiarCurso={(id) => actualizarParam("cursoId", id)}
         onCambiarVista={(v) => actualizarParam("vista", v)}
       />
+
+      {vista === "ACTUAL" && !sinCursos && (
+        <AvanceFiltros
+          rol={rol}
+          busqueda={busqueda}
+          onCambiarRol={(r) => actualizarParam("rol", r)}
+          onCambiarBusqueda={actualizarBusqueda}
+        />
+      )}
 
       {sinCursos && (
         <Banner tone="info" title="Aún no hay cursos">
@@ -117,7 +86,7 @@ export function AvanceCursoPage() {
         (isLoading || cargandoCursos ? (
           <Skeleton vista={vista} />
         ) : data ? (
-          <Contenido data={data} vista={vista} />
+          <Contenido data={data} vista={vista} hayFiltro={hayFiltro} />
         ) : null)}
 
       {data && data.meta.totalPages > 1 && (
@@ -138,9 +107,10 @@ interface ContenidoProps {
     readonly meta: { readonly total: number }
   }
   readonly vista: VistaAvance
+  readonly hayFiltro: boolean
 }
 
-function Contenido({ data, vista }: ContenidoProps) {
+function Contenido({ data, vista, hayFiltro }: ContenidoProps) {
   if (vista === "HISTORICO") {
     return <AvanceHistorico eventos={data.data as readonly EventoHistorico[]} />
   }
@@ -148,7 +118,7 @@ function Contenido({ data, vista }: ContenidoProps) {
   return (
     <>
       <AvanceResumen filas={filas} total={data.meta.total} />
-      <AvanceTabla filas={filas} />
+      <AvanceTabla filas={filas} hayFiltro={hayFiltro} />
     </>
   )
 }

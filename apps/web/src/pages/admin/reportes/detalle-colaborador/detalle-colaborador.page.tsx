@@ -51,7 +51,9 @@ export function DetalleColaboradorPage() {
     if (!cursoId) {
       return null
     }
-    return { cursoId, vista: "ACTUAL", page: 1, pageSize: 100, format: "json" }
+    // Selector de colaboradores: necesita TODOS (asignados + voluntarios), no
+    // solo los asignados que el reporte muestra por defecto.
+    return { cursoId, vista: "ACTUAL", rol: "TODOS", page: 1, pageSize: 100, format: "json" }
   }, [cursoId])
   const avance = useAvanceCurso(avanceQuery)
 
