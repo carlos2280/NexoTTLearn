@@ -275,12 +275,16 @@ const obtenerAvanceCursoHandler: MockHandler = (req) => {
     return paginar(EVENTOS_HISTORICO, page, pageSize)
   }
 
-  // Replica los filtros del backend (rol default ASIGNADO + busqueda) para que
-  // la UI se pueda probar con mocks igual que contra el API real.
+  // Replica los filtros del backend (rol default ASIGNADO + estado + busqueda)
+  // para que la UI se pueda probar con mocks igual que contra el API real.
   const rol = url.searchParams.get("rol") ?? "ASIGNADO"
+  const estado = url.searchParams.get("estado") ?? ""
   const busqueda = (url.searchParams.get("busqueda") ?? "").trim().toLowerCase()
   const filas = FILAS_AVANCE.filter((f) => {
     if (rol !== "TODOS" && f.rol !== rol) {
+      return false
+    }
+    if (estado && f.estado !== estado) {
       return false
     }
     if (busqueda) {

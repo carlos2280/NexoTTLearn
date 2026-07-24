@@ -32,15 +32,26 @@ export function AvanceCursoPage() {
     [cursosQuery.data],
   )
 
-  const { cursoId, vista, rol, busqueda, query, actualizarParam, actualizarBusqueda } =
-    useAvanceFiltros(cursos)
+  const {
+    cursoId,
+    vista,
+    rol,
+    estado,
+    busqueda,
+    query,
+    actualizarParam,
+    actualizarRol,
+    actualizarEstado,
+    actualizarBusqueda,
+  } = useAvanceFiltros(cursos)
   const { data, isLoading, error } = useAvanceCurso(query)
 
   const cargandoCursos = cursosQuery.isLoading
   const sinCursos = !cargandoCursos && cursos.length === 0
   // ASIGNADO es el default, pero igual excluye voluntarios: solo TODOS sin
-  // busqueda muestra el curso completo, asi que cualquier otra cosa es "filtro".
-  const hayFiltro = rol !== "TODOS" || busqueda.trim().length > 0
+  // estado ni busqueda muestra el curso completo, asi que cualquier otra cosa
+  // es "filtro" (distingue vacio-por-filtro de curso-sin-gente en la tabla).
+  const hayFiltro = rol !== "TODOS" || estado.length > 0 || busqueda.trim().length > 0
 
   const esFotografiaPendiente =
     vista === "FOTOGRAFIA_CIERRE" &&
@@ -62,8 +73,10 @@ export function AvanceCursoPage() {
       {vista === "ACTUAL" && !sinCursos && (
         <AvanceFiltros
           rol={rol}
+          estado={estado}
           busqueda={busqueda}
-          onCambiarRol={(r) => actualizarParam("rol", r)}
+          onCambiarRol={actualizarRol}
+          onCambiarEstado={actualizarEstado}
           onCambiarBusqueda={actualizarBusqueda}
         />
       )}
