@@ -12,6 +12,13 @@ function buildQueryString(query: AvanceCursoQuery): string {
   const params = new URLSearchParams()
   params.set("cursoId", query.cursoId)
   params.set("vista", query.vista)
+  params.set("rol", query.rol)
+  if (query.estado) {
+    params.set("estado", query.estado)
+  }
+  if (query.busqueda) {
+    params.set("busqueda", query.busqueda)
+  }
   params.set("page", String(query.page))
   params.set("pageSize", String(query.pageSize))
   if (query.sort) {

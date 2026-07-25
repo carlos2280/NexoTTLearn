@@ -1,4 +1,5 @@
 import { NotFoundException, UnprocessableEntityException } from "@nestjs/common"
+import type { AvanceCursoQuery } from "@nexott-learn/shared-types"
 import { Prisma } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { PrismaService } from "../common/prisma/prisma.service"
@@ -161,6 +162,7 @@ describe("ReportesService.obtenerAvanceCurso (vista=ACTUAL)", () => {
     const result = await service.obtenerAvanceCurso({
       cursoId: CURSO_ID,
       vista: "ACTUAL",
+      rol: "TODOS",
       page: 1,
       pageSize: 20,
       format: "json",
@@ -205,6 +207,7 @@ describe("ReportesService.obtenerAvanceCurso (vista=ACTUAL)", () => {
     const result = await service.obtenerAvanceCurso({
       cursoId: CURSO_ID,
       vista: "ACTUAL",
+      rol: "TODOS",
       page: 1,
       pageSize: 20,
       format: "json",
@@ -243,6 +246,7 @@ describe("ReportesService.obtenerAvanceCurso (vista=ACTUAL)", () => {
     const result = await service.obtenerAvanceCurso({
       cursoId: CURSO_ID,
       vista: "ACTUAL",
+      rol: "TODOS",
       page: 1,
       pageSize: 20,
       format: "json",
@@ -280,6 +284,7 @@ describe("ReportesService.obtenerAvanceCurso (vista=ACTUAL)", () => {
     const result = await service.obtenerAvanceCurso({
       cursoId: CURSO_ID,
       vista: "ACTUAL",
+      rol: "TODOS",
       page: 1,
       pageSize: 20,
       format: "json",
@@ -337,6 +342,7 @@ describe("ReportesService.obtenerAvanceCurso (vista=ACTUAL)", () => {
     const result = await service.obtenerAvanceCurso({
       cursoId: CURSO_ID,
       vista: "ACTUAL",
+      rol: "TODOS",
       page: 1,
       pageSize: 20,
       format: "json",
@@ -364,6 +370,7 @@ describe("ReportesService.obtenerAvanceCurso (vista=ACTUAL)", () => {
     const result = await service.obtenerAvanceCurso({
       cursoId: CURSO_ID,
       vista: "ACTUAL",
+      rol: "TODOS",
       page: 1,
       pageSize: 20,
       format: "json",
@@ -371,6 +378,98 @@ describe("ReportesService.obtenerAvanceCurso (vista=ACTUAL)", () => {
 
     expect(result.data).toHaveLength(0)
     expect(planService.obtenerPorcentajeAvance).not.toHaveBeenCalled()
+  })
+})
+
+// =============================================================================
+// FIX-P18b — filtros del reporte de avance (vista ACTUAL). Se resuelven en el
+// `where` de la query (para paginar correcto). El default de `rol` es ASIGNADO.
+// =============================================================================
+
+describe("ReportesService.obtenerAvanceCurso filtros (where en DB)", () => {
+  let prisma: PrismaMock
+  let planService: PlanServiceMock
+  let service: ReportesService
+
+  beforeEach(() => {
+    prisma = buildPrismaMock()
+    planService = buildPlanServiceMock()
+    service = buildService(prisma, planService)
+  })
+
+  function avanceQuery(overrides: Partial<AvanceCursoQuery> = {}): AvanceCursoQuery {
+    return {
+      cursoId: CURSO_ID,
+      vista: "ACTUAL",
+      rol: "ASIGNADO",
+      page: 1,
+      pageSize: 20,
+      format: "json",
+      ...overrides,
+    }
+  }
+
+  async function whereDe(query: AvanceCursoQuery): Promise<Prisma.AsignacionCursoWhereInput> {
+    // findMany -> [] hace early-return: no toca groupBy ni el motor de %.
+    prisma.asignacionCurso.findMany.mockResolvedValueOnce([])
+    prisma.asignacionCurso.count.mockResolvedValueOnce(0)
+    await service.obtenerAvanceCurso(query)
+    const [primeraLlamada] = prisma.asignacionCurso.findMany.mock.calls
+    if (!primeraLlamada) {
+      throw new Error("asignacionCurso.findMany no fue invocado")
+    }
+    return primeraLlamada[0].where
+  }
+
+  it("rol ASIGNADO (default): filtra por rol en el where", async () => {
+    expect(await whereDe(avanceQuery())).toEqual({ cursoId: CURSO_ID, rol: "ASIGNADO" })
+  })
+
+  it("rol VOLUNTARIO: filtra por rol VOLUNTARIO", async () => {
+    expect(await whereDe(avanceQuery({ rol: "VOLUNTARIO" }))).toEqual({
+      cursoId: CURSO_ID,
+      rol: "VOLUNTARIO",
+    })
+  })
+
+  it("rol TODOS: no agrega filtro de rol", async () => {
+    expect(await whereDe(avanceQuery({ rol: "TODOS" }))).toEqual({ cursoId: CURSO_ID })
+  })
+
+  it("busqueda: OR case-insensitive por nombre o email del colaborador", async () => {
+    const where = await whereDe(avanceQuery({ busqueda: "ana" }))
+    expect(where.colaborador).toEqual({
+      // biome-ignore lint/style/useNamingConvention: `OR` es operador Prisma.
+      OR: [
+        { nombre: { contains: "ana", mode: "insensitive" } },
+        { email: { contains: "ana", mode: "insensitive" } },
+      ],
+    })
+  })
+
+  it("estado valido de asignado: filtra por estadoAsignado", async () => {
+    const where = await whereDe(avanceQuery({ estado: "EN_PROGRESO" }))
+    expect(where.OR).toEqual([{ estadoAsignado: "EN_PROGRESO" }])
+  })
+
+  it("estado desconocido: predicado imposible (no revienta Prisma, no trae nada)", async () => {
+    const where = await whereDe(avanceQuery({ estado: "NO_EXISTE" }))
+    expect(where.id).toEqual({ in: [] })
+  })
+
+  it("combina rol + estado + busqueda en el mismo where (se ANDean)", async () => {
+    const where = await whereDe(
+      avanceQuery({ rol: "ASIGNADO", estado: "EN_PROGRESO", busqueda: "ana" }),
+    )
+    expect(where.rol).toBe("ASIGNADO")
+    expect(where.OR).toEqual([{ estadoAsignado: "EN_PROGRESO" }])
+    expect(where.colaborador).toEqual({
+      // biome-ignore lint/style/useNamingConvention: `OR` es operador Prisma.
+      OR: [
+        { nombre: { contains: "ana", mode: "insensitive" } },
+        { email: { contains: "ana", mode: "insensitive" } },
+      ],
+    })
   })
 })
 
@@ -404,6 +503,7 @@ describe("ReportesService.obtenerAvanceCurso (vista=FOTOGRAFIA_CIERRE)", () => {
     const result = await service.obtenerAvanceCurso({
       cursoId: CURSO_ID,
       vista: "FOTOGRAFIA_CIERRE",
+      rol: "TODOS",
       page: 1,
       pageSize: 20,
       format: "json",
@@ -428,6 +528,7 @@ describe("ReportesService.obtenerAvanceCurso (vista=FOTOGRAFIA_CIERRE)", () => {
       service.obtenerAvanceCurso({
         cursoId: CURSO_ID,
         vista: "FOTOGRAFIA_CIERRE",
+        rol: "TODOS",
         page: 1,
         pageSize: 20,
         format: "json",
@@ -441,6 +542,7 @@ describe("ReportesService.obtenerAvanceCurso (vista=FOTOGRAFIA_CIERRE)", () => {
       service.obtenerAvanceCurso({
         cursoId: CURSO_ID,
         vista: "FOTOGRAFIA_CIERRE",
+        rol: "TODOS",
         page: 1,
         pageSize: 20,
         format: "json",
@@ -486,6 +588,7 @@ describe("ReportesService.obtenerAvanceCurso (vista=HISTORICO)", () => {
     const result = await service.obtenerAvanceCurso({
       cursoId: CURSO_ID,
       vista: "HISTORICO",
+      rol: "TODOS",
       page: 1,
       pageSize: 20,
       format: "json",

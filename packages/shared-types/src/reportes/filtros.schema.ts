@@ -77,12 +77,31 @@ export type FiltrosEstandar = z.infer<typeof filtrosEstandarSchema>
 // ---------------------------------------------------------------------------
 
 /**
+ * Rol de asignacion como filtro del reporte de avance. `TODOS` = no filtra.
+ * El default es `ASIGNADO`: el reporte operativo se centra por defecto en los
+ * asignados (los que van al veredicto APTO); los voluntarios se ven pidiendo
+ * `VOLUNTARIO` o `TODOS`. Su avance se mide distinto (aperturas sobre el total
+ * del curso) pero ya no aparece en 0% (FIX-P18a).
+ */
+export const rolAvanceFiltroSchema = z.enum(["ASIGNADO", "VOLUNTARIO", "TODOS"])
+export type RolAvanceFiltro = z.infer<typeof rolAvanceFiltroSchema>
+
+/**
  * `GET /reportes/avance-curso` — cursoId requerido, vista dispatcher.
+ *
+ * Filtros (solo vista `ACTUAL`, aplicados en base de datos para paginar
+ * correcto): `rol` (default ASIGNADO), `estado` (de asignacion; validado
+ * contra los enums reales en el service) y `busqueda` (nombre/email del
+ * colaborador, case-insensitive). Los filtros de alertas y rango de avance se
+ * computan en memoria y quedan fuera de esta fase (romperian la paginacion).
  */
 export const avanceCursoQuerySchema = z
   .object({
     cursoId: uuidSchema,
     vista: vistaReporteSchema.default("ACTUAL"),
+    rol: rolAvanceFiltroSchema.default("ASIGNADO"),
+    estado: z.string().min(1).max(40).optional(),
+    busqueda: z.string().trim().min(1).max(100).optional(),
     page: z.coerce.number().int().min(1).default(1),
     pageSize: z.coerce.number().int().min(1).max(100).default(20),
     sort: z.string().min(1).optional(),

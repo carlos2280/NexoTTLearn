@@ -1129,15 +1129,34 @@ export class PlanPersonalService {
   }
 
   /**
-   * §5.128 (FIX-P11b-avance): expone el porcentaje 0-100 del plan vigente de
-   * la asignacion reutilizando el motor `obtenerAvance` (D-S7-B6). Pensado
-   * para consumo desde `ReportesService.avanceCursoActual` — por eso no
-   * lanza si la asignacion aun no tiene `PlanEstudio` (caso ASIGNADO antes
-   * de `calcularExplicito` o VOLUNTARIO sin plan): devuelve 0. Tambien
-   * devuelve 0 si el plan no tiene items obligatorios (mismo criterio
-   * defensivo que `planEstaCompleto`: no hay metrica significativa).
+   * Fuente canonica del porcentaje 0-100 de avance de la asignacion. Lo
+   * consumen tanto el alumno (`MeCursosService` / `MeAvanceService`) como el
+   * admin (`ReportesService.avanceCursoActual` + `obtenerCoberturaCurso`) — no
+   * se duplica la regla de "seccion completada".
+   *
+   * Bifurca por rol (D-AS-1):
+   *  - ASIGNADO: % del plan vigente via `obtenerAvance` (D-S7-B6) = secciones
+   *    OBLIGATORIAS completadas / obligatorias. Devuelve 0 si aun no tiene
+   *    `PlanEstudio` (ASIGNADO antes de `calcularExplicito`) o si el plan no
+   *    tiene obligatorias (sin metrica significativa).
+   *  - VOLUNTARIO: no tiene `PlanEstudio`; su avance se mide sobre el catalogo
+   *    completo (aperturas / total de secciones del curso), igual que en la
+   *    vista del propio alumno. Antes esta rama NO existia aqui y el reporte
+   *    admin + la matriz de cobertura mostraban 0% perpetuo para voluntarios
+   *    (FIX-P18a); `MeCursos`/`MeAvance` ya lo resolvian por su cuenta, lo que
+   *    provocaba que el admin viera 0% y el alumno su % real.
    */
   async obtenerPorcentajeAvance(asignacionId: string): Promise<number> {
+    const asignacion = await this.prisma.asignacionCurso.findUnique({
+      where: { id: asignacionId },
+      select: { rol: true, cursoId: true, colaboradorId: true },
+    })
+    if (!asignacion) {
+      return 0
+    }
+    if (asignacion.rol === RolAsignacion.VOLUNTARIO) {
+      return this.porcentajeAvanceVoluntario(asignacionId, asignacion.cursoId)
+    }
     const plan = await this.prisma.planEstudio.findUnique({
       where: { asignacionId },
       select: { id: true },
@@ -1162,10 +1181,6 @@ export class PlanPersonalService {
         },
       },
     })
-    const asignacion = await this.prisma.asignacionCurso.findUniqueOrThrow({
-      where: { id: asignacionId },
-      select: { colaboradorId: true },
-    })
     const { avancePlan } = await this.obtenerAvance(
       this.prisma,
       asignacionId,
@@ -1174,6 +1189,26 @@ export class PlanPersonalService {
       secciones,
     )
     return avancePlan.porcentaje
+  }
+
+  /**
+   * Avance de un VOLUNTARIO (D-AS-1: sin `PlanEstudio`): denominador = total de
+   * secciones del curso (catalogo via `CursoModuloHabilitado`), numerador =
+   * secciones abiertas (`AperturaSeccion`). Redondeo a entero y clamp [0, 100]
+   * — misma formula que ve el alumno en `MeCursosService` / `MeAvanceService`,
+   * centralizada aqui para que el admin muestre exactamente el mismo numero.
+   */
+  private async porcentajeAvanceVoluntario(asignacionId: string, cursoId: string): Promise<number> {
+    const [aperturas, total] = await Promise.all([
+      this.prisma.aperturaSeccion.count({ where: { asignacionId } }),
+      this.prisma.seccion.count({
+        where: { modulo: { cursosModulosHabilitados: { some: { cursoId } } } },
+      }),
+    ])
+    if (total === 0) {
+      return 0
+    }
+    return Math.min(100, Math.round((aperturas / total) * 100))
   }
 
   /**

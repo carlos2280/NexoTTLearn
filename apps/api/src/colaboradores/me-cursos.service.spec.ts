@@ -134,15 +134,16 @@ describe("MeCursosService.listarMisCursos", () => {
     expect(plan.obtenerPorcentajeAvance).toHaveBeenCalledWith(ASIG_2)
   })
 
-  it("voluntario con aperturas: porcentaje = aperturas / total del curso (no invoca el motor)", async () => {
+  it("voluntario: delega el porcentaje al motor (que ya bifurca por rol), sin calcular local", async () => {
     prisma.usuario.findUnique.mockResolvedValueOnce({ colaboradorId: COLAB })
     prisma.asignacionCurso.findMany.mockResolvedValueOnce([
       asignacionRow({ id: ASIG_1, rol: "VOLUNTARIO" }),
     ])
     prisma.asignacionCurso.count.mockResolvedValueOnce(1)
-    // 2 secciones abiertas de 8 totales del curso = 25%.
-    prisma.aperturaSeccion.count.mockResolvedValueOnce(2)
-    prisma.seccion.count.mockResolvedValueOnce(8)
+    // Tras FIX-P18a la formula del voluntario (aperturas / total) vive en el
+    // motor `obtenerPorcentajeAvance`, no aqui. me-cursos delega por igual para
+    // ASIGNADO y VOLUNTARIO; asi el alumno y el reporte admin ven el mismo dato.
+    plan.obtenerPorcentajeAvance.mockResolvedValueOnce(25)
 
     const out = await service.listarMisCursos(USER, {
       page: 1,
@@ -153,44 +154,10 @@ describe("MeCursosService.listarMisCursos", () => {
 
     expect(out.data[0]?.porcentajeAvance).toBe(25)
     expect(out.data[0]?.rol).toBe("VOLUNTARIO")
-    expect(plan.obtenerPorcentajeAvance).not.toHaveBeenCalled()
-  })
-
-  it("voluntario sin aperturas: porcentaje=0", async () => {
-    prisma.usuario.findUnique.mockResolvedValueOnce({ colaboradorId: COLAB })
-    prisma.asignacionCurso.findMany.mockResolvedValueOnce([
-      asignacionRow({ id: ASIG_1, rol: "VOLUNTARIO" }),
-    ])
-    prisma.asignacionCurso.count.mockResolvedValueOnce(1)
-    prisma.aperturaSeccion.count.mockResolvedValueOnce(0)
-    prisma.seccion.count.mockResolvedValueOnce(8)
-
-    const out = await service.listarMisCursos(USER, {
-      page: 1,
-      pageSize: 20,
-      estado: "TODOS",
-      rol: "TODOS",
-    })
-
-    expect(out.data[0]?.porcentajeAvance).toBe(0)
-  })
-
-  it("voluntario en curso sin secciones declaradas: porcentaje=0 sin division por cero", async () => {
-    prisma.usuario.findUnique.mockResolvedValueOnce({ colaboradorId: COLAB })
-    prisma.asignacionCurso.findMany.mockResolvedValueOnce([
-      asignacionRow({ id: ASIG_1, rol: "VOLUNTARIO" }),
-    ])
-    prisma.asignacionCurso.count.mockResolvedValueOnce(1)
-    prisma.aperturaSeccion.count.mockResolvedValueOnce(0)
-    prisma.seccion.count.mockResolvedValueOnce(0)
-
-    const out = await service.listarMisCursos(USER, {
-      page: 1,
-      pageSize: 20,
-      estado: "TODOS",
-      rol: "TODOS",
-    })
-    expect(out.data[0]?.porcentajeAvance).toBe(0)
+    expect(plan.obtenerPorcentajeAvance).toHaveBeenCalledWith(ASIG_1)
+    // Ya no calcula el % del voluntario localmente.
+    expect(prisma.aperturaSeccion.count).not.toHaveBeenCalled()
+    expect(prisma.seccion.count).not.toHaveBeenCalled()
   })
 
   it("filtros: aplica estado curso y rol al where", async () => {

@@ -4,6 +4,7 @@ export type { TipoAlerta } from "./alertas"
 export {
   filtrosEstandarSchema,
   avanceCursoQuerySchema,
+  rolAvanceFiltroSchema,
   detalleColaboradorQuerySchema,
   brechasDetectadasQuerySchema,
   centroRevisionQuerySchema,
@@ -16,6 +17,7 @@ export type {
   VistaReporte,
   FiltrosEstandar,
   AvanceCursoQuery,
+  RolAvanceFiltro,
   DetalleColaboradorQuery,
   BrechasDetectadasQuery,
   CentroRevisionQuery,

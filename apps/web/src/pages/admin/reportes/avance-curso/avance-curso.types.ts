@@ -19,8 +19,17 @@ export interface EstadoDefinicion {
 
 const ESTADOS: readonly EstadoDefinicion[] = [
   {
+    // "ASIGNADO" es el estado inicial de una asignacion (aun sin empezar). Se
+    // muestra como "Sin iniciar" para no chocar con el ROL "Asignado".
     id: "ASIGNADO",
-    etiqueta: "Asignado",
+    etiqueta: "Sin iniciar",
+    tokenSoft: "var(--color-state-pendiente-soft)",
+    tokenOnSoft: "var(--color-state-pendiente-on-soft)",
+    tokenColor: "var(--color-state-pendiente)",
+  },
+  {
+    id: "INSCRITO",
+    etiqueta: "Inscrito",
     tokenSoft: "var(--color-state-pendiente-soft)",
     tokenOnSoft: "var(--color-state-pendiente-on-soft)",
     tokenColor: "var(--color-state-pendiente)",
@@ -31,6 +40,27 @@ const ESTADOS: readonly EstadoDefinicion[] = [
     tokenSoft: "var(--color-state-progreso-soft)",
     tokenOnSoft: "var(--color-state-progreso-on-soft)",
     tokenColor: "var(--color-state-progreso)",
+  },
+  {
+    id: "LISTO",
+    etiqueta: "Listo",
+    tokenSoft: "var(--color-state-solido-soft)",
+    tokenOnSoft: "var(--color-state-solido-on-soft)",
+    tokenColor: "var(--color-state-solido)",
+  },
+  {
+    id: "COMPLETADO",
+    etiqueta: "Completado",
+    tokenSoft: "var(--color-state-completado-soft)",
+    tokenOnSoft: "var(--color-state-completado-on-soft)",
+    tokenColor: "var(--color-state-completado)",
+  },
+  {
+    id: "RETIRADO",
+    etiqueta: "Retirado",
+    tokenSoft: "var(--color-subtle)",
+    tokenOnSoft: "var(--color-text-secondary)",
+    tokenColor: "var(--color-text-tertiary)",
   },
   {
     id: "APTO",
