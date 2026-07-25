@@ -8,6 +8,7 @@ import { ConfigPesos } from "./config-pesos"
 import { ConfigSkillsExigidas } from "./config-skills-exigidas"
 import { ConfigTransversal } from "./config-transversal"
 import { ConfigUmbralesLogro } from "./config-umbrales-logro"
+import { ConfigVoluntarios } from "./config-voluntarios"
 
 interface ConfigCursoTabProps {
   readonly curso: CursoDetalle & Partial<Pick<CursoConfiguracionResponse, "umbralesLogro">>
@@ -20,6 +21,7 @@ export function ConfigCursoTab({ curso }: ConfigCursoTabProps) {
     <div className="flex flex-col gap-6">
       <ConfigHeader />
       <ConfigParametros curso={curso} />
+      <ConfigVoluntarios curso={curso} bloqueado={bloqueado} />
       <ConfigAreasExigidas curso={curso} bloqueado={bloqueado} />
       <ConfigSkillsExigidas curso={curso} bloqueado={bloqueado} />
       <ConfigModulosHabilitados curso={curso} bloqueado={bloqueado} />
