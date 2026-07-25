@@ -22,6 +22,12 @@ export interface ColaboradorEmbed {
 export interface FilaAvanceCurso {
   readonly asignacionId: string
   readonly colaborador: ColaboradorEmbed
+  /**
+   * Rol de la asignacion. Permite distinguir en la tabla cuando el filtro es
+   * `TODOS`/`VOLUNTARIO` y aclara que el avance del voluntario se mide sobre el
+   * catalogo completo (no sobre un plan). Nunca es `TODOS` (ese es solo filtro).
+   */
+  readonly rol: "ASIGNADO" | "VOLUNTARIO"
   readonly estado: string
   readonly porcentajeAvance: number
   readonly alertas: readonly TipoAlerta[]

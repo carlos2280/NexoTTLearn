@@ -109,6 +109,7 @@ describe("ReportesController — exigirFormatoJson", () => {
     await ctrl.obtenerAvanceCurso({
       cursoId: CURSO_ID,
       vista: "ACTUAL",
+      rol: "TODOS",
       page: 1,
       pageSize: 20,
       format: "json",
@@ -121,6 +122,7 @@ describe("ReportesController — exigirFormatoJson", () => {
       ctrl.obtenerAvanceCurso({
         cursoId: CURSO_ID,
         vista: "ACTUAL",
+        rol: "TODOS",
         page: 1,
         pageSize: 20,
         // El controller defiende ante un schema mas laxo. Se le pasa un valor

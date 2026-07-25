@@ -78,6 +78,7 @@ interface MockPrisma {
   seccion: {
     findMany: ReturnType<typeof vi.fn>
     findUnique: ReturnType<typeof vi.fn>
+    count: ReturnType<typeof vi.fn>
   }
   planEstudio: {
     findUnique: ReturnType<typeof vi.fn>
@@ -99,6 +100,7 @@ interface MockPrisma {
     findMany: ReturnType<typeof vi.fn>
     findUnique: ReturnType<typeof vi.fn>
     create: ReturnType<typeof vi.fn>
+    count: ReturnType<typeof vi.fn>
   }
   intentoBloque: { findMany: ReturnType<typeof vi.fn> }
   usuario: { findUnique: ReturnType<typeof vi.fn> }
@@ -127,6 +129,7 @@ function buildPrismaMock(): MockPrisma {
     seccion: {
       findMany: vi.fn().mockResolvedValue([]),
       findUnique: vi.fn(),
+      count: vi.fn().mockResolvedValue(0),
     },
     planEstudio: {
       findUnique: vi.fn(),
@@ -148,6 +151,7 @@ function buildPrismaMock(): MockPrisma {
       findMany: vi.fn().mockResolvedValue([]),
       findUnique: vi.fn(),
       create: vi.fn(),
+      count: vi.fn().mockResolvedValue(0),
     },
     intentoBloque: { findMany: vi.fn().mockResolvedValue([]) },
     usuario: { findUnique: vi.fn() },
@@ -661,6 +665,65 @@ describe("PlanPersonalService.calcularSiAsignado (cierre TODO S7)", () => {
   it("Asignacion inexistente no lanza ni crea (defensa)", async () => {
     prisma.asignacionCurso.findUnique.mockResolvedValue(null)
     await expect(service.calcularSiAsignado(ASIGNACION_ID)).resolves.toBeUndefined()
+  })
+})
+
+// =============================================================================
+// FIX-P18a — `obtenerPorcentajeAvance` bifurca por rol (D-AS-1). El VOLUNTARIO
+// no tiene PlanEstudio: su avance se mide sobre el catalogo (aperturas / total
+// de secciones del curso), el mismo numero que ve el propio alumno. Antes esta
+// rama no existia y el reporte admin mostraba 0% perpetuo para voluntarios.
+// =============================================================================
+
+describe("PlanPersonalService.obtenerPorcentajeAvance (bifurca por rol)", () => {
+  it("VOLUNTARIO: aperturas / total de secciones del curso, redondeado", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      rol: RolAsignacion.VOLUNTARIO,
+      cursoId: CURSO_ID,
+      colaboradorId: COLABORADOR_ID,
+    })
+    prisma.aperturaSeccion.count.mockResolvedValue(6)
+    prisma.seccion.count.mockResolvedValue(38)
+
+    const pct = await service.obtenerPorcentajeAvance(ASIGNACION_ID)
+
+    // round(6/38*100) = round(15.78) = 16 — igual que la card del alumno.
+    expect(pct).toBe(16)
+    expect(prisma.aperturaSeccion.count).toHaveBeenCalledWith({
+      where: { asignacionId: ASIGNACION_ID },
+    })
+    // No debe consultar el plan: los voluntarios no tienen PlanEstudio.
+    expect(prisma.planEstudio.findUnique).not.toHaveBeenCalled()
+  })
+
+  it("VOLUNTARIO: curso sin secciones (total=0) -> 0 (sin dividir por cero)", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      rol: RolAsignacion.VOLUNTARIO,
+      cursoId: CURSO_ID,
+      colaboradorId: COLABORADOR_ID,
+    })
+    prisma.aperturaSeccion.count.mockResolvedValue(0)
+    prisma.seccion.count.mockResolvedValue(0)
+
+    await expect(service.obtenerPorcentajeAvance(ASIGNACION_ID)).resolves.toBe(0)
+  })
+
+  it("ASIGNADO sin PlanEstudio -> 0 (comportamiento preservado)", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      rol: RolAsignacion.ASIGNADO,
+      cursoId: CURSO_ID,
+      colaboradorId: COLABORADOR_ID,
+    })
+    prisma.planEstudio.findUnique.mockResolvedValue(null)
+
+    await expect(service.obtenerPorcentajeAvance(ASIGNACION_ID)).resolves.toBe(0)
+    // Un asignado NO usa la formula del voluntario.
+    expect(prisma.aperturaSeccion.count).not.toHaveBeenCalled()
+  })
+
+  it("Asignacion inexistente -> 0 (defensa)", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue(null)
+    await expect(service.obtenerPorcentajeAvance(ASIGNACION_ID)).resolves.toBe(0)
   })
 })
 
@@ -1385,8 +1448,20 @@ describe("PlanPersonalService.ajustarPlan -> notificacion PLAN_RECALCULADO", () 
   })
 })
 
-describe("PlanPersonalService.obtenerPorcentajeAvance (FIX-P11b-avance §5.128)", () => {
+describe("PlanPersonalService.obtenerPorcentajeAvance (ASIGNADO, % del plan)", () => {
+  // El % del asignado se calcula sobre las obligatorias del plan. Tras FIX-P18a
+  // el metodo lee primero la asignacion (para bifurcar por rol) y toma el
+  // `colaboradorId` de ahi, por lo que ya no usa `findUniqueOrThrow`.
+  function mockAsignado(): void {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      rol: RolAsignacion.ASIGNADO,
+      cursoId: CURSO_ID,
+      colaboradorId: COLABORADOR_ID,
+    })
+  }
+
   it("sin plan -> 0 sin lanzar (no consulta items ni secciones)", async () => {
+    mockAsignado()
     prisma.planEstudio.findUnique.mockResolvedValueOnce(null)
 
     const porcentaje = await service.obtenerPorcentajeAvance(ASIGNACION_ID)
@@ -1397,6 +1472,7 @@ describe("PlanPersonalService.obtenerPorcentajeAvance (FIX-P11b-avance §5.128)"
   })
 
   it("plan sin items obligatorios -> 0 (mismo criterio que planEstaCompleto)", async () => {
+    mockAsignado()
     prisma.planEstudio.findUnique.mockResolvedValueOnce({ id: "plan-1" })
     prisma.itemPlan.findMany.mockResolvedValueOnce([])
 
@@ -1407,6 +1483,7 @@ describe("PlanPersonalService.obtenerPorcentajeAvance (FIX-P11b-avance §5.128)"
   })
 
   it("plan con 2 obligatorias y 1 completada -> 50", async () => {
+    mockAsignado()
     prisma.planEstudio.findUnique.mockResolvedValueOnce({ id: "plan-1" })
     prisma.itemPlan.findMany.mockResolvedValueOnce([
       { seccionId: SECCION_ID_1 },
@@ -1416,9 +1493,6 @@ describe("PlanPersonalService.obtenerPorcentajeAvance (FIX-P11b-avance §5.128)"
       { id: SECCION_ID_1, bloques: [{ id: "b1", tipo: "QUIZ", contenido: {} }] },
       { id: SECCION_ID_2, bloques: [{ id: "b2", tipo: "QUIZ", contenido: {} }] },
     ])
-    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValueOnce({
-      colaboradorId: COLABORADOR_ID,
-    })
     // Solo b1 tiene mejor-intento; b2 queda sin intento -> 1/2 = 50%.
     // El umbral se resuelve via `umbralAprobacionBloque` desde el contenido.
     prisma.intentoBloque.findMany.mockResolvedValueOnce([
@@ -1432,12 +1506,10 @@ describe("PlanPersonalService.obtenerPorcentajeAvance (FIX-P11b-avance §5.128)"
   })
 
   it("plan con 1 obligatoria sin bloques pero con apertura -> 100", async () => {
+    mockAsignado()
     prisma.planEstudio.findUnique.mockResolvedValueOnce({ id: "plan-1" })
     prisma.itemPlan.findMany.mockResolvedValueOnce([{ seccionId: SECCION_ID_1 }])
     prisma.seccion.findMany.mockResolvedValueOnce([{ id: SECCION_ID_1, bloques: [] }])
-    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValueOnce({
-      colaboradorId: COLABORADOR_ID,
-    })
     prisma.intentoBloque.findMany.mockResolvedValueOnce([])
     prisma.aperturaSeccion.findMany.mockResolvedValueOnce([{ seccionId: SECCION_ID_1 }])
 

@@ -39,11 +39,11 @@ const CATALOGO_VACIO: CatalogoCursoEntry = {
  * `TODOS`) y `rol` de asignacion (`ASIGNADO` / `VOLUNTARIO` / `TODOS`).
  *
  * El porcentaje se obtiene del motor canonico `PlanPersonalService.obtenerPorcentajeAvance`
- * (D-S7-B6, FIX-P11b-avance §5.128) — no se duplica la regla de seccion
- * completada para asignados. Voluntarios (D-AS-1: sin PlanEstudio) usan la
- * misma formula que `MeAvanceService` para voluntarios: aperturas sobre el
- * total de secciones del curso (catalogo via `CursoModuloHabilitado`). Esto
- * evita el 0% perpetuo en la card "Mis cursos activos" de la bandeja.
+ * (D-S7-B6), que bifurca por rol internamente: ASIGNADO -> plan (secciones
+ * obligatorias); VOLUNTARIO (D-AS-1: sin PlanEstudio) -> aperturas sobre el
+ * total de secciones del curso (catalogo via `CursoModuloHabilitado`). Ese
+ * mismo motor lo consume el reporte admin, asi que alumno y admin muestran el
+ * mismo numero (FIX-P18a). No se duplica la regla aqui.
  *
  * Las lecturas autoservicio no se auditan (D-CAT-3).
  *
@@ -214,10 +214,10 @@ export class MeCursosService {
     row: AsignacionRow,
     catalogo: CatalogoCursoEntry,
   ): Promise<MeCursoResumen> {
-    const porcentajeAvance =
-      row.rol === RolAsignacion.ASIGNADO
-        ? await this.planPersonalService.obtenerPorcentajeAvance(row.id)
-        : await this.porcentajeAvanceVoluntario(row.id, row.curso.id)
+    // `obtenerPorcentajeAvance` bifurca por rol internamente (ASIGNADO -> plan;
+    // VOLUNTARIO -> aperturas / total del curso), asi que ya no duplicamos la
+    // formula del voluntario aqui (FIX-P18a).
+    const porcentajeAvance = await this.planPersonalService.obtenerPorcentajeAvance(row.id)
     return {
       asignacionId: row.id,
       cursoId: row.curso.id,
@@ -233,25 +233,5 @@ export class MeCursosService {
       areaCodigo: catalogo.areaCodigo,
       areaNombre: catalogo.areaNombre,
     }
-  }
-
-  /**
-   * Voluntario (D-AS-1: sin PlanEstudio): denominador = total de secciones
-   * del curso (catalogo via `CursoModuloHabilitado`), numerador = aperturas.
-   * Misma formula que `MeAvanceService.obtenerAvance` para voluntarios para
-   * que el % de la card en la bandeja coincida con el del topbar del
-   * inmersivo. Resultado clamped a [0, 100].
-   */
-  private async porcentajeAvanceVoluntario(asignacionId: string, cursoId: string): Promise<number> {
-    const [aperturas, total] = await Promise.all([
-      this.prisma.aperturaSeccion.count({ where: { asignacionId } }),
-      this.prisma.seccion.count({
-        where: { modulo: { cursosModulosHabilitados: { some: { cursoId } } } },
-      }),
-    ])
-    if (total === 0) {
-      return 0
-    }
-    return Math.min(100, Math.round((aperturas / total) * 100))
   }
 }

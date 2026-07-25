@@ -42,7 +42,7 @@ import type {
   TipoAlerta,
   UmbralesBrechas,
 } from "@nexott-learn/shared-types"
-import { Prisma, TipoReporteCache } from "@prisma/client"
+import { EstadoAsignado, EstadoVoluntario, Prisma, TipoReporteCache } from "@prisma/client"
 import { nivelDesdeNota } from "../colaboradores/nivel-cualitativo.helpers"
 import { parseUmbralesLogro } from "../colaboradores/umbrales-logro.helpers"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
@@ -104,7 +104,7 @@ export class ReportesService {
   private async avanceCursoActual(query: AvanceCursoQuery): Promise<Paginated<FilaAvanceCurso>> {
     const { skip, take, page, pageSize } = resolvePaginacion(query)
 
-    const where: Prisma.AsignacionCursoWhereInput = { cursoId: query.cursoId }
+    const where = this.buildAvanceCursoWhere(query)
     const [asignaciones, total] = await this.prisma.$transaction([
       this.prisma.asignacionCurso.findMany({
         where,
@@ -184,6 +184,7 @@ export class ReportesService {
           nombre: asig.colaborador.nombre,
           email: asig.colaborador.email,
         },
+        rol: asig.rol,
         estado: asig.estadoAsignado ?? asig.estadoVoluntario ?? "DESCONOCIDO",
         porcentajeAvance: porcentajePorAsignacion.get(asig.id) ?? 0,
         alertas,
@@ -191,6 +192,72 @@ export class ReportesService {
     })
 
     return buildPaginatedResponse(filas, total, page, pageSize)
+  }
+
+  /**
+   * Construye el `where` de `avance-curso` vista ACTUAL con los filtros que se
+   * pueden resolver en base de datos (para paginar correcto):
+   *  - `rol`: default ASIGNADO (el reporte se centra en los asignados); `TODOS`
+   *    no filtra.
+   *  - `estado`: se valida contra los enums reales (`EstadoAsignado` /
+   *    `EstadoVoluntario`) para no romper Prisma con un valor libre; un estado
+   *    desconocido no matchea nada (resultado vacio, no 500).
+   *  - `busqueda`: nombre o email del colaborador, case-insensitive.
+   * Los filtros de alertas y rango de avance se computan en memoria y NO viven
+   * aqui (romperian la paginacion).
+   */
+  private buildAvanceCursoWhere(query: AvanceCursoQuery): Prisma.AsignacionCursoWhereInput {
+    const where: Prisma.AsignacionCursoWhereInput = { cursoId: query.cursoId }
+    if (query.rol !== "TODOS") {
+      where.rol = query.rol
+    }
+    const filtroEstado = this.buildFiltroEstado(query.estado, query.rol)
+    if (filtroEstado) {
+      Object.assign(where, filtroEstado)
+    }
+    if (query.busqueda) {
+      where.colaborador = {
+        // biome-ignore lint/style/useNamingConvention: `OR` es operador Prisma.
+        OR: [
+          { nombre: { contains: query.busqueda, mode: "insensitive" } },
+          { email: { contains: query.busqueda, mode: "insensitive" } },
+        ],
+      }
+    }
+    return where
+  }
+
+  /**
+   * Traduce el `estado` (string libre del query) a un filtro Prisma seguro. El
+   * mismo texto puede ser un `EstadoAsignado` o un `EstadoVoluntario`, asi que
+   * se prueba contra ambos enums y se arma un `OR` con las columnas que
+   * apliquen. Si el estado no pertenece a ningun enum devuelve un predicado
+   * imposible (`id: { in: [] }`, un `IN ()` vacio siempre-falso) para no traer
+   * nada en vez de reventar Prisma.
+   */
+  private buildFiltroEstado(
+    estado: string | undefined,
+    rol: AvanceCursoQuery["rol"],
+  ): Prisma.AsignacionCursoWhereInput | null {
+    if (!estado) {
+      return null
+    }
+    const condiciones: Prisma.AsignacionCursoWhereInput[] = []
+    if (rol !== "VOLUNTARIO" && Object.values(EstadoAsignado).includes(estado as EstadoAsignado)) {
+      condiciones.push({ estadoAsignado: estado as EstadoAsignado })
+    }
+    if (
+      rol !== "ASIGNADO" &&
+      Object.values(EstadoVoluntario).includes(estado as EstadoVoluntario)
+    ) {
+      condiciones.push({ estadoVoluntario: estado as EstadoVoluntario })
+    }
+    if (condiciones.length === 0) {
+      // Estado desconocido para el rol pedido: no matchear nada (sin 500).
+      return { id: { in: [] } }
+    }
+    // biome-ignore lint/style/useNamingConvention: `OR` es operador Prisma.
+    return { OR: condiciones }
   }
 
   private async avanceCursoDesdeFotografia(
@@ -226,6 +293,10 @@ export class ReportesService {
           nombre: fila.colaborador.nombre,
           email: fila.colaborador.email,
         },
+        // El snapshot v1 no persiste el rol (dato historico congelado). La vista
+        // FOTOGRAFIA_CIERRE no filtra por rol, asi que el valor es solo informativo:
+        // caemos a ASIGNADO por defecto.
+        rol: "ASIGNADO" as const,
         estado: fila.estado,
         porcentajeAvance: fila.porcentajeAvance,
         alertas: [],
