@@ -47,7 +47,8 @@ export interface EstadoFiltroOpcion {
 // El conjunto valido depende del rol: un asignado nunca esta "INSCRITO" ni
 // "COMPLETADO", un voluntario nunca esta "APTO" ni "NO_APTO".
 const ESTADOS_ASIGNADO: readonly EstadoFiltroOpcion[] = [
-  { id: "ASIGNADO", etiqueta: "Asignado" },
+  // "Sin iniciar" (no "Asignado") para no confundirse con el filtro de rol.
+  { id: "ASIGNADO", etiqueta: "Sin iniciar" },
   { id: "EN_PROGRESO", etiqueta: "En progreso" },
   { id: "LISTO", etiqueta: "Listo" },
   { id: "APTO", etiqueta: "Apto" },

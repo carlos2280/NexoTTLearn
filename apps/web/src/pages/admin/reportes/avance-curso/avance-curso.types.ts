@@ -19,8 +19,10 @@ export interface EstadoDefinicion {
 
 const ESTADOS: readonly EstadoDefinicion[] = [
   {
+    // "ASIGNADO" es el estado inicial de una asignacion (aun sin empezar). Se
+    // muestra como "Sin iniciar" para no chocar con el ROL "Asignado".
     id: "ASIGNADO",
-    etiqueta: "Asignado",
+    etiqueta: "Sin iniciar",
     tokenSoft: "var(--color-state-pendiente-soft)",
     tokenOnSoft: "var(--color-state-pendiente-on-soft)",
     tokenColor: "var(--color-state-pendiente)",

@@ -1,3 +1,4 @@
+import { Select, SelectItem } from "@/shared/components/ui/select"
 import { cn } from "@/shared/lib/cn"
 import { Briefcase } from "lucide-react"
 import type { CursoOpcion, VistaAvance } from "../avance-curso.types"
@@ -39,30 +40,29 @@ interface SelectorCursoProps {
 
 function SelectorCurso({ cursos, cursoId, onCambiar }: SelectorCursoProps) {
   return (
-    <label className="flex items-center gap-3">
+    <div className="flex items-center gap-3">
       <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-subtle text-text-secondary">
         <Briefcase className="h-[16px] w-[16px]" aria-hidden={true} />
       </span>
-      <span className="flex flex-col gap-0.5">
+      <span className="flex min-w-0 flex-col gap-0.5">
         <span className="nx-eyebrow text-text-tertiary">Curso</span>
-        <select
+        <Select
+          variant="ghost"
           value={cursoId}
-          onChange={(e) => onCambiar(e.target.value)}
+          onValueChange={onCambiar}
           disabled={cursos.length === 0}
-          className="appearance-none bg-transparent pr-4 font-medium text-body text-text-primary outline-none focus-visible:underline focus-visible:decoration-2 focus-visible:decoration-aurora-violet focus-visible:underline-offset-4 disabled:cursor-not-allowed disabled:text-text-tertiary"
+          placeholder="Sin cursos disponibles"
+          aria-label="Seleccionar curso"
+          className="w-auto pr-0 pl-0 focus-visible:underline focus-visible:decoration-2 focus-visible:decoration-aurora-violet focus-visible:underline-offset-4"
         >
-          {cursos.length === 0 ? (
-            <option value="">Sin cursos disponibles</option>
-          ) : (
-            cursos.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.titulo}
-              </option>
-            ))
-          )}
-        </select>
+          {cursos.map((c) => (
+            <SelectItem key={c.id} value={c.id}>
+              {c.titulo}
+            </SelectItem>
+          ))}
+        </Select>
       </span>
-    </label>
+    </div>
   )
 }
 
