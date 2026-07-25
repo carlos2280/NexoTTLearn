@@ -13,7 +13,7 @@ import type { RazonDisponibilidadEntrevistaIa } from "@nexott-learn/shared-types
  */
 const MOTIVO_BASE: ReadonlyMap<RazonDisponibilidadEntrevistaIa, string | null> = new Map([
   ["DISPONIBLE", null],
-  ["PLAN_INCOMPLETO", "Completa primero tu plan de estudio."],
+  ["PLAN_INCOMPLETO", "Completa primero el curso."],
   ["TRANSVERSAL_NO_APROBADO", "Aprueba primero el transversal."],
   ["FECHA_NO_ALCANZADA", null],
   ["RATE_LIMIT_HORA", "Has usado tus 5 intentos de esta hora. Vuelve mas tarde."],

@@ -13,6 +13,7 @@ import {
   EstadoVoluntario as EstadoVoluntarioPrisma,
   Prisma,
   RolAsignacion as RolAsignacionPrisma,
+  TipoBloque,
 } from "@prisma/client"
 import { z } from "zod"
 import { umbralAprobacionBloque } from "../catalogo/bloques/umbral-aprobacion"
@@ -164,7 +165,7 @@ export async function evaluarCondicionesListo(
   if (!planCompleto) {
     faltantes.push({
       codigo: "PLAN_INCOMPLETO",
-      mensaje: "El plan personal del colaborador todavia no esta completo.",
+      mensaje: "El colaborador todavia no ha completado el curso.",
     })
   }
   if (transversalBloquea) {
@@ -258,50 +259,115 @@ async function entrevistaIaAprobada(
   return finalizados.some((i) => i.aprobado === true)
 }
 
+interface SeccionPlanCompleto {
+  readonly seccionId: string
+  readonly bloques: ReadonlyArray<{
+    readonly id: string
+    readonly tipo: TipoBloque
+    readonly contenido: Prisma.JsonValue
+  }>
+}
+
+/**
+ * "Plan completo" = todas las secciones que definen el avance estan completadas
+ * (D-S7-B6: seccion con bloques evaluables -> todos aprobados; sin bloques ->
+ * abierta). La fuente de secciones depende del rol:
+ *  - ASIGNADO: obligatorias de su PlanEstudio (sin plan -> no completo).
+ *  - VOLUNTARIO (D-AS-1, sin plan): TODO el catalogo del curso. Antes esta rama
+ *    devolvia `true` sin mirar nada, lo que desbloqueaba el transversal y la
+ *    graduacion con 0% de avance; ahora el voluntario debe completar el curso
+ *    igual que el asignado su plan. Los ASIGNADOS conservan el mismo calculo.
+ */
 async function calcularPlanCompleto(prisma: PrismaService, asignacionId: string): Promise<boolean> {
   const asignacion = await prisma.asignacionCurso.findUnique({
     where: { id: asignacionId },
-    select: { rol: true, colaboradorId: true },
+    select: { rol: true, colaboradorId: true, cursoId: true },
   })
   if (!asignacion) {
     return false
   }
-  if (asignacion.rol !== RolAsignacionPrisma.ASIGNADO) {
-    // Voluntarios no tienen plan personal (D-AS-1).
-    return true
-  }
-  const plan = await prisma.planEstudio.findUnique({
-    where: { asignacionId },
-    select: { id: true },
-  })
-  if (!plan) {
+  const secciones = await seccionesParaPlanCompleto(
+    prisma,
+    asignacion.rol,
+    asignacionId,
+    asignacion.cursoId,
+  )
+  if (secciones === null) {
+    // ASIGNADO sin PlanEstudio: no hay metrica -> no completo.
     return false
   }
-  const items = await prisma.itemPlan.findMany({
-    where: { planId: plan.id, caracter: "OBLIGATORIA" },
-    select: {
-      seccionId: true,
-      seccion: {
-        select: {
-          id: true,
-          bloques: {
-            where: { estado: "ACTIVO", esEvaluable: true },
-            select: { id: true, tipo: true, contenido: true },
+  if (secciones.length === 0) {
+    // Plan sin obligatorias o curso sin secciones: vacuamente completo.
+    return true
+  }
+  return seccionesTodasCompletas(prisma, asignacionId, asignacion.colaboradorId, secciones)
+}
+
+/**
+ * Secciones (con sus bloques evaluables activos) que definen el "plan completo"
+ * segun el rol. `null` = ASIGNADO sin PlanEstudio (no evaluable).
+ */
+async function seccionesParaPlanCompleto(
+  prisma: PrismaService,
+  rol: RolAsignacionPrisma,
+  asignacionId: string,
+  cursoId: string,
+): Promise<SeccionPlanCompleto[] | null> {
+  if (rol === RolAsignacionPrisma.ASIGNADO) {
+    const plan = await prisma.planEstudio.findUnique({
+      where: { asignacionId },
+      select: { id: true },
+    })
+    if (!plan) {
+      return null
+    }
+    const items = await prisma.itemPlan.findMany({
+      where: { planId: plan.id, caracter: "OBLIGATORIA" },
+      select: {
+        seccionId: true,
+        seccion: {
+          select: {
+            bloques: {
+              where: { estado: "ACTIVO", esEvaluable: true },
+              select: { id: true, tipo: true, contenido: true },
+            },
           },
         },
       },
+    })
+    return items.map((i) => ({ seccionId: i.seccionId, bloques: i.seccion.bloques }))
+  }
+  const secciones = await prisma.seccion.findMany({
+    where: { modulo: { cursosModulosHabilitados: { some: { cursoId } } } },
+    select: {
+      id: true,
+      bloques: {
+        where: { estado: "ACTIVO", esEvaluable: true },
+        select: { id: true, tipo: true, contenido: true },
+      },
     },
   })
-  if (items.length === 0) {
-    return true
-  }
-  const bloqueIds = items.flatMap((i) => i.seccion.bloques.map((b) => b.id))
+  return secciones.map((s) => ({ seccionId: s.id, bloques: s.bloques }))
+}
+
+/**
+ * Verifica que TODAS las secciones esten completas: con bloques evaluables ->
+ * todos aprobados (mejor intento vigente con nota >= umbral del bloque); sin
+ * bloques -> existe apertura de la seccion para la asignacion.
+ */
+async function seccionesTodasCompletas(
+  prisma: PrismaService,
+  asignacionId: string,
+  colaboradorId: string,
+  secciones: readonly SeccionPlanCompleto[],
+): Promise<boolean> {
+  const bloqueIds = secciones.flatMap((s) => s.bloques.map((b) => b.id))
   const intentos =
     bloqueIds.length === 0
       ? []
       : await prisma.intentoBloque.findMany({
           where: {
-            colaboradorId: asignacion.colaboradorId,
+            colaboradorId,
             bloqueId: { in: bloqueIds },
             esMejorIntento: true,
             estaInvalidado: false,
@@ -312,9 +378,9 @@ async function calcularPlanCompleto(prisma: PrismaService, asignacionId: string)
   for (const it of intentos) {
     intentoPorBloque.set(it.bloqueId, Number(it.nota.toString()))
   }
-  const seccionIdsSinBloques = items
-    .filter((i) => i.seccion.bloques.length === 0)
-    .map((i) => i.seccionId)
+  const seccionIdsSinBloques = secciones
+    .filter((s) => s.bloques.length === 0)
+    .map((s) => s.seccionId)
   const aperturas =
     seccionIdsSinBloques.length === 0
       ? []
@@ -323,15 +389,14 @@ async function calcularPlanCompleto(prisma: PrismaService, asignacionId: string)
           select: { seccionId: true },
         })
   const aperturasSet = new Set(aperturas.map((a) => a.seccionId))
-  for (const item of items) {
-    const bloques = item.seccion.bloques
-    if (bloques.length === 0) {
-      if (!aperturasSet.has(item.seccionId)) {
+  for (const seccion of secciones) {
+    if (seccion.bloques.length === 0) {
+      if (!aperturasSet.has(seccion.seccionId)) {
         return false
       }
       continue
     }
-    const todosCumplen = bloques.every((b) => {
+    const todosCumplen = seccion.bloques.every((b) => {
       const nota = intentoPorBloque.get(b.id)
       const umbral = umbralAprobacionBloque(b.tipo, b.contenido)
       return nota !== undefined && nota >= umbral
