@@ -215,8 +215,8 @@ export class MeCursosService {
     catalogo: CatalogoCursoEntry,
   ): Promise<MeCursoResumen> {
     // `obtenerPorcentajeAvance` bifurca por rol internamente (ASIGNADO -> plan;
-    // VOLUNTARIO -> aperturas / total del curso), asi que ya no duplicamos la
-    // formula del voluntario aqui (FIX-P18a).
+    // VOLUNTARIO -> mismas secciones del catalogo con la misma regla del asignado,
+    // "seccion aprobada"), asi que ya no duplicamos la formula del voluntario aqui.
     const porcentajeAvance = await this.planPersonalService.obtenerPorcentajeAvance(row.id)
     return {
       asignacionId: row.id,

@@ -44,6 +44,7 @@ const COLABORADOR_ID = "f0000000-0000-0000-0000-000000000001"
 const MODULO_ID_1 = "11111111-1111-1111-1111-111111111110"
 const SECCION_ID_1 = "22222222-2222-2222-2222-222222222221"
 const SECCION_ID_2 = "22222222-2222-2222-2222-222222222222"
+const SECCION_ID_3 = "22222222-2222-2222-2222-222222222223"
 const SKILL_FALTANTE = "31111111-1111-1111-1111-111111111111"
 const SKILL_CERCA = "32222222-2222-2222-2222-222222222222"
 const SKILL_CUMPLE = "33333333-3333-3333-3333-333333333333"
@@ -669,43 +670,62 @@ describe("PlanPersonalService.calcularSiAsignado (cierre TODO S7)", () => {
 })
 
 // =============================================================================
-// FIX-P18a — `obtenerPorcentajeAvance` bifurca por rol (D-AS-1). El VOLUNTARIO
-// no tiene PlanEstudio: su avance se mide sobre el catalogo (aperturas / total
-// de secciones del curso), el mismo numero que ve el propio alumno. Antes esta
-// rama no existia y el reporte admin mostraba 0% perpetuo para voluntarios.
+// FIX-P18a + unificacion 2026-07 — `obtenerPorcentajeAvance` bifurca por rol
+// (D-AS-1). El VOLUNTARIO no tiene PlanEstudio: su avance se mide sobre TODAS
+// las secciones del catalogo del curso con la MISMA regla del ASIGNADO (seccion
+// completada = bloques evaluables aprobados, o abierta si no tiene bloques
+// evaluables), reutilizando `obtenerAvance` -> `calcularAvance` y redondeando a
+// 2 decimales. Antes se medía solo por aperturas/total (recorrido), lo que
+// inflaba el % e impedia compararlo con el asignado.
 // =============================================================================
 
 describe("PlanPersonalService.obtenerPorcentajeAvance (bifurca por rol)", () => {
-  it("VOLUNTARIO: aperturas / total de secciones del curso, redondeado", async () => {
+  it("VOLUNTARIO: mide todas las secciones con la regla del asignado (bloques aprobados o abierta sin bloques), 2 decimales", async () => {
     prisma.asignacionCurso.findUnique.mockResolvedValue({
       rol: RolAsignacion.VOLUNTARIO,
       cursoId: CURSO_ID,
       colaboradorId: COLABORADOR_ID,
     })
-    prisma.aperturaSeccion.count.mockResolvedValue(6)
-    prisma.seccion.count.mockResolvedValue(38)
+    // Catalogo del curso: 3 secciones bajo los modulos habilitados.
+    prisma.seccion.findMany.mockResolvedValueOnce([
+      // Completada: su unico bloque evaluable esta aprobado (mejor intento >= umbral).
+      { id: SECCION_ID_1, bloques: [{ id: "b1", tipo: "QUIZ", contenido: {} }] },
+      // NO completada: tiene un bloque evaluable sin aprobar; la apertura ya NO cuenta.
+      { id: SECCION_ID_2, bloques: [{ id: "b2", tipo: "QUIZ", contenido: {} }] },
+      // Completada: sin bloques evaluables y abierta.
+      { id: SECCION_ID_3, bloques: [] },
+    ])
+    prisma.intentoBloque.findMany.mockResolvedValueOnce([
+      { bloqueId: "b1", nota: new Prisma.Decimal(80) },
+    ])
+    // S2 y S3 abiertas: la apertura solo completa S3 (la que no tiene bloques evaluables).
+    prisma.aperturaSeccion.findMany.mockResolvedValueOnce([
+      { seccionId: SECCION_ID_2 },
+      { seccionId: SECCION_ID_3 },
+    ])
 
     const pct = await service.obtenerPorcentajeAvance(ASIGNACION_ID)
 
-    // round(6/38*100) = round(15.78) = 16 — igual que la card del alumno.
-    expect(pct).toBe(16)
-    expect(prisma.aperturaSeccion.count).toHaveBeenCalledWith({
-      where: { asignacionId: ASIGNACION_ID },
-    })
-    // No debe consultar el plan: los voluntarios no tienen PlanEstudio.
+    // Completadas: S1 (bloque aprobado) + S3 (abierta sin bloques) = 2 de 3.
+    // round(2/3*100, 2) = 66.67 — misma vara que el ASIGNADO, ya no "aperturas/total".
+    expect(pct).toBe(66.67)
+    // El voluntario no tiene PlanEstudio: no se consulta el plan.
     expect(prisma.planEstudio.findUnique).not.toHaveBeenCalled()
   })
 
-  it("VOLUNTARIO: curso sin secciones (total=0) -> 0 (sin dividir por cero)", async () => {
+  it("VOLUNTARIO: catalogo del curso sin secciones -> 0 (sin dividir por cero)", async () => {
     prisma.asignacionCurso.findUnique.mockResolvedValue({
       rol: RolAsignacion.VOLUNTARIO,
       cursoId: CURSO_ID,
       colaboradorId: COLABORADOR_ID,
     })
-    prisma.aperturaSeccion.count.mockResolvedValue(0)
-    prisma.seccion.count.mockResolvedValue(0)
+    // El guard ahora es `seccion.findMany` vacio (ya no `seccion.count`).
+    prisma.seccion.findMany.mockResolvedValueOnce([])
 
     await expect(service.obtenerPorcentajeAvance(ASIGNACION_ID)).resolves.toBe(0)
+    // Con catalogo vacio corta antes de evaluar intentos y sin tocar el plan.
+    expect(prisma.intentoBloque.findMany).not.toHaveBeenCalled()
+    expect(prisma.planEstudio.findUnique).not.toHaveBeenCalled()
   })
 
   it("ASIGNADO sin PlanEstudio -> 0 (comportamiento preservado)", async () => {
