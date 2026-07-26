@@ -247,6 +247,8 @@ export type {
   ProfundidadEntrevista,
   TonoEntrevista,
 } from "./cursos/actualizar-entrevista-ia-curso.schema"
+export { actualizarVoluntariosCursoSchema } from "./cursos/actualizar-voluntarios-curso.schema"
+export type { ActualizarVoluntariosCursoInput } from "./cursos/actualizar-voluntarios-curso.schema"
 
 // Evaluacion inicial — Slice 5 P5a: tipos de la ficha de skills y su historico.
 export { origenNotaSkillSchema } from "./evaluacion-inicial/ficha.schema"
