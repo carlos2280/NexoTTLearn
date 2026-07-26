@@ -3,6 +3,7 @@ import type {
   CursoArbolModulo,
   DisponibilidadEntrevistaIaResponse,
   DisponibilidadTransversalResponse,
+  MeAvanceCursoResponse,
   ModoCursoParticipante,
   PlanResponseParticipante,
 } from "@nexott-learn/shared-types"
@@ -10,7 +11,7 @@ import { BloqueHitosSidebar } from "./bloque-hitos-sidebar"
 import { FooterAtajos } from "./footer-atajos"
 import { ModuloGrupo } from "./modulo-grupo"
 import { SidebarHeader } from "./sidebar-header"
-import { indexarPlanPorSeccion } from "./sidebar-plan.helpers"
+import { indexarEstadoAvancePorSeccion, indexarPlanPorSeccion } from "./sidebar-plan.helpers"
 import { SidebarShell } from "./sidebar-shell"
 
 type HitoTipo = "transversal" | "entrevistaIa"
@@ -27,12 +28,19 @@ interface SidebarPlanProps {
   readonly hitoActivo: HitoTipo | null
   readonly onAbrirHito: (hito: HitoTipo) => void
   /**
-   * Ids de secciones que el colaborador ha abierto. Fuente alterna a
-   * `plan?.completada` usada en modo voluntario (D-AS-1: voluntarios no
-   * tienen PlanEstudio, asi que el plan llega `undefined` y los checkmarks
-   * se calculan desde `AperturaSeccion`).
+   * Avance del curso. `seccionesEstado` es la fuente de "completada" y del
+   * conteo de bloques evaluables en modo VOLUNTARIO (D-AS-1: sin PlanEstudio,
+   * el plan llega `undefined`); el asignado sigue leyendo su plan. El contador
+   * usa los agregados. Todo sale del mismo calculo que el porcentaje, asi que
+   * no pueden contradecirse.
    */
-  readonly seccionesAbiertasIds: readonly string[]
+  readonly avance: MeAvanceCursoResponse | undefined
+  /**
+   * Error al cargar el avance. En modo voluntario el sidebar depende por
+   * completo de el: sin avance todas las filas caen a "pendiente", que es
+   * indistinguible de "no has hecho nada" — hay que avisarlo, no callarlo.
+   */
+  readonly errorAvance: Error | null
   /**
    * Curso cerrado. El sidebar deja de ser estado vivo y pasa a historico:
    * todas las secciones con check verde, contador en x/x, sin avance dinamico.
@@ -63,11 +71,11 @@ export function SidebarPlan({
   entrevistaIa,
   hitoActivo,
   onAbrirHito,
-  seccionesAbiertasIds,
+  avance,
+  errorAvance,
   soloLectura,
   atenuado,
 }: SidebarPlanProps) {
-  const seccionesAbiertasSet = new Set(seccionesAbiertasIds)
   const claseAtenuado = atenuado
     ? "pointer-events-none opacity-15 blur-[2px] transition-[opacity,filter] duration-cinematic ease-default"
     : "transition-[opacity,filter] duration-cinematic ease-default"
@@ -77,6 +85,18 @@ export function SidebarPlan({
       <SidebarShell claseAtenuado={claseAtenuado} eyebrow="Plan de estudio">
         <p className="text-body-sm text-danger-on-soft">
           No pudimos cargar el plan. Reintenta en un momento.
+        </p>
+      </SidebarShell>
+    )
+  }
+
+  // El voluntario lee su estado del avance: si falló, callar pintaría todo como
+  // pendiente y parecería que perdió su progreso.
+  if (modo === "voluntario" && !soloLectura && errorAvance && !avance) {
+    return (
+      <SidebarShell claseAtenuado={claseAtenuado} eyebrow="Contenido">
+        <p className="text-body-sm text-danger-on-soft">
+          No pudimos cargar tu avance. Reintenta en un momento.
         </p>
       </SidebarShell>
     )
@@ -93,6 +113,7 @@ export function SidebarPlan({
   }
 
   const planById = indexarPlanPorSeccion(plan)
+  const estadoAvanceById = indexarEstadoAvancePorSeccion(avance?.seccionesEstado)
   const totalSecciones = arbol.reduce((acc, modulo) => acc + modulo.secciones.length, 0)
 
   return (
@@ -107,7 +128,7 @@ export function SidebarPlan({
           modo={modo}
           soloLectura={soloLectura}
           plan={plan}
-          seccionesAbiertasSet={seccionesAbiertasSet}
+          avance={avance}
           totalSecciones={totalSecciones}
         />
         <nav aria-label="Contenido del curso" className="flex flex-col gap-0.5">
@@ -117,10 +138,10 @@ export function SidebarPlan({
               titulo={modulo.titulo}
               secciones={modulo.secciones}
               planById={planById}
+              estadoAvanceById={estadoAvanceById}
               modo={modo}
               seccionActivaId={seccionActivaId}
               onSeleccionar={onSeleccionar}
-              seccionesAbiertasSet={seccionesAbiertasSet}
               soloLectura={soloLectura}
             />
           ))}

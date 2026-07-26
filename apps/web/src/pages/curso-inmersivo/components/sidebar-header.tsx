@@ -1,4 +1,8 @@
-import type { ModoCursoParticipante, PlanResponseParticipante } from "@nexott-learn/shared-types"
+import type {
+  MeAvanceCursoResponse,
+  ModoCursoParticipante,
+  PlanResponseParticipante,
+} from "@nexott-learn/shared-types"
 import { ContadorSidebar } from "./contador-sidebar"
 import { eyebrowSidebar } from "./sidebar-plan.helpers"
 
@@ -6,7 +10,7 @@ interface SidebarHeaderProps {
   readonly modo: ModoCursoParticipante
   readonly soloLectura: boolean
   readonly plan: PlanResponseParticipante | undefined
-  readonly seccionesAbiertasSet: Set<string>
+  readonly avance: MeAvanceCursoResponse | undefined
   readonly totalSecciones: number
 }
 
@@ -20,7 +24,7 @@ export function SidebarHeader({
   modo,
   soloLectura,
   plan,
-  seccionesAbiertasSet,
+  avance,
   totalSecciones,
 }: SidebarHeaderProps) {
   return (
@@ -30,7 +34,7 @@ export function SidebarHeader({
         modo={modo}
         soloLectura={soloLectura}
         plan={plan}
-        seccionesAbiertasSet={seccionesAbiertasSet}
+        avance={avance}
         totalSecciones={totalSecciones}
       />
     </header>
