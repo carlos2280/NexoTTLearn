@@ -8,6 +8,7 @@ import type {
   ActualizarSkillsExigidasCursoInput,
   ActualizarTransversalCursoInput,
   ActualizarUmbralesLogroCursoInput,
+  ActualizarVoluntariosCursoInput,
   CerrarCursoInput,
   CrearCursoInput,
   CursoConfiguracionResponse,
@@ -214,6 +215,16 @@ export function actualizarEntrevistaIaCurso(
   motivo: string | undefined,
 ): Promise<CursoConfiguracionResponse> {
   return httpClient.patch<CursoConfiguracionResponse>(`/cursos/${cursoId}/entrevista-ia`, input, {
+    motivo,
+  })
+}
+
+export function actualizarVoluntariosCurso(
+  cursoId: string,
+  input: ActualizarVoluntariosCursoInput,
+  motivo: string | undefined,
+): Promise<CursoConfiguracionResponse> {
+  return httpClient.patch<CursoConfiguracionResponse>(`/cursos/${cursoId}/voluntarios`, input, {
     motivo,
   })
 }
