@@ -110,6 +110,7 @@ export function CursoInmersivoPage() {
       entrevistaIa={detalle.entrevistaIa}
       plan={detalle.plan}
       errorPlan={detalle.errorPlan}
+      errorAvance={detalle.errorAvance}
       seccionActiva={seccion.seccionActiva}
       hitoActivo={hitoActivo}
       onSeleccionarSeccion={seleccionarSeccion}
@@ -135,6 +136,7 @@ interface CursoInmersivoLayoutProps {
   readonly entrevistaIa: ReturnType<typeof useCursoInmersivo>["entrevistaIa"]
   readonly plan: ReturnType<typeof useCursoInmersivo>["plan"]
   readonly errorPlan: ReturnType<typeof useCursoInmersivo>["errorPlan"]
+  readonly errorAvance: ReturnType<typeof useCursoInmersivo>["errorAvance"]
   readonly seccionActiva: ReturnType<typeof useSeccionActiva>["seccionActiva"]
   readonly hitoActivo: HitoTipo | null
   readonly onSeleccionarSeccion: (seccionId: string) => void
@@ -159,6 +161,7 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
     entrevistaIa,
     plan,
     errorPlan,
+    errorAvance,
     seccionActiva,
     hitoActivo,
     onSeleccionarSeccion,
@@ -210,7 +213,8 @@ function CursoInmersivoLayout(props: CursoInmersivoLayoutProps) {
           entrevistaIa={entrevistaIa}
           hitoActivo={hitoActivo}
           onAbrirHito={onAbrirHito}
-          seccionesAbiertasIds={avance?.seccionesAbiertasIds ?? []}
+          avance={avance}
+          errorAvance={errorAvance}
           soloLectura={soloLectura}
           atenuado={modoFocus}
         />

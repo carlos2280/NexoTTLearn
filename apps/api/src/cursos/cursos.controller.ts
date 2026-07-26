@@ -22,6 +22,7 @@ import {
   ActualizarSkillsExigidasCursoInput,
   ActualizarTransversalCursoInput,
   ActualizarUmbralesLogroCursoInput,
+  ActualizarVoluntariosCursoInput,
   CerrarCursoInput,
   CrearCursoInput,
   CursoConfiguracionResponse,
@@ -43,6 +44,7 @@ import {
   actualizarSkillsExigidasCursoSchema,
   actualizarTransversalCursoSchema,
   actualizarUmbralesLogroCursoSchema,
+  actualizarVoluntariosCursoSchema,
   cerrarCursoSchema,
   crearCursoSchema,
   duplicarCursoSchema,
@@ -430,6 +432,23 @@ export class CursosController {
     @CurrentUser() usuario: SesionUsuario | undefined,
   ): Promise<CursoConfiguracionResponse> {
     return await this.cursosService.actualizarEntrevistaIa(
+      cursoId,
+      input,
+      motivo,
+      this.requireUsuario(usuario).usuarioId,
+    )
+  }
+
+  @Patch(":cursoId/voluntarios")
+  @Roles(RolUsuario.ADMIN)
+  async actualizarVoluntarios(
+    @Param("cursoId", ParseUUIDPipe) cursoId: string,
+    @Body(new ZodValidationPipe(actualizarVoluntariosCursoSchema))
+    input: ActualizarVoluntariosCursoInput,
+    @Motivo() motivo: string | undefined,
+    @CurrentUser() usuario: SesionUsuario | undefined,
+  ): Promise<CursoConfiguracionResponse> {
+    return await this.cursosService.actualizarVoluntarios(
       cursoId,
       input,
       motivo,

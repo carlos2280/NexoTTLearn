@@ -55,7 +55,7 @@ export function QuizPregunta({
           onClick={onAlternar}
           aria-expanded={expandida}
           aria-label={expandida ? "Plegar pregunta" : "Expandir pregunta"}
-          className="flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-fast ease-default hover:bg-subtle/40"
+          className="flex min-h-9 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-fast ease-default hover:bg-subtle/40"
         >
           <span className="text-text-tertiary">
             {expandida ? (
@@ -77,7 +77,9 @@ export function QuizPregunta({
         </button>
         <span
           className={cn(
-            "inline-flex shrink-0 items-center gap-1 rounded-pill px-2 py-0.5 text-caption",
+            // h-7 fija la altura del chip para que quede centrado con los
+            // controles de la fila (antes py-0.5 lo dejaba "flotando").
+            "inline-flex h-7 shrink-0 items-center gap-1 rounded-pill px-2.5 text-caption",
             completa
               ? "bg-success-soft text-success-on-soft"
               : "bg-warning-soft text-warning-on-soft",
@@ -97,7 +99,9 @@ export function QuizPregunta({
           size="icon"
           aria-label={`Eliminar pregunta ${numero}`}
           onClick={alEliminarDesdeCabecera}
-          className="text-text-tertiary hover:bg-danger-soft hover:text-danger-on-soft"
+          // h-9 w-9 compacta el icon button (default 40px) para igualarlo al
+          // boton de expandir y alinear la fila.
+          className="h-9 w-9 shrink-0 text-text-tertiary hover:bg-danger-soft hover:text-danger-on-soft"
         >
           <Trash2 className="h-4 w-4" strokeWidth={1.5} aria-hidden={true} />
         </Button>

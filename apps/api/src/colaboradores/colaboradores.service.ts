@@ -6,10 +6,15 @@ import {
   NotFoundException,
   NotImplementedException,
 } from "@nestjs/common"
+import { ConfigService } from "@nestjs/config"
 import {
+  AltaColaboradoresLoteResponse,
   CambiarRolResponse,
   ColaboradorAdminResumen,
+  ColaboradorLoteCreado,
+  ColaboradorLoteRechazado,
   CrearColaboradorInput,
+  CrearColaboradoresLoteInput,
   ExportarColaboradoresQuery,
   ListarColaboradoresQuery,
   Paginated,
@@ -21,6 +26,8 @@ import { ContextoHttpAuditoria } from "../common/audit/audit-log.types"
 import { FACTOR_BCRYPT } from "../common/auth/bcrypt.constants"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
+import { AppEnv } from "../config/env.validation"
+import { prepararLoteColaboradores } from "./colaboradores-lote.helpers"
 import { AltaColaboradorResponse, SELECT_COLABORADOR_ADMIN } from "./colaboradores.types"
 import { generarPasswordSegura } from "./password-generator"
 
@@ -29,6 +36,28 @@ type ColaboradorAdminRow = Prisma.ColaboradorGetPayload<{ select: typeof SELECT_
 const DIAS_CADUCIDAD_PASSWORD_INICIAL = 7
 const MS_POR_DIA = 24 * 60 * 60 * 1000
 
+/**
+ * Filas del alta masiva procesadas en paralelo a la vez. Cada fila paga un
+ * bcrypt(12) (usa el threadpool de libuv, default 4) + una transaccion Prisma.
+ * Un tope alineado con el threadpool evita saturar el proceso y el pool de
+ * conexiones (DoS) cuando la tanda llega al maximo (200).
+ */
+const CONCURRENCIA_LOTE = 4
+
+type ResultadoFilaLote =
+  | { readonly ok: true; readonly creado: ColaboradorLoteCreado }
+  | { readonly ok: false; readonly rechazado: ColaboradorLoteRechazado }
+
+/** True si el error es una violacion de unicidad de email (P2002 sobre `email`). */
+function esEmailDuplicado(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002" &&
+    Array.isArray(error.meta?.target) &&
+    (error.meta.target as readonly string[]).includes("email")
+  )
+}
+
 @Injectable()
 export class ColaboradoresService {
   private readonly logger = new Logger(ColaboradoresService.name)
@@ -36,6 +65,7 @@ export class ColaboradoresService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
+    private readonly config: ConfigService<AppEnv, true>,
   ) {}
 
   async crear(
@@ -126,6 +156,182 @@ export class ColaboradoresService {
         })
       }
       throw error
+    }
+  }
+
+  /**
+   * Alta masiva (P17). Crea varios colaboradores de una tanda con un rol comun.
+   * Cada cuenta nace con password autogenerada + `requiereCambioPassword=true`
+   * (nunca se persiste en claro); las passwords viajan SOLO en la respuesta para
+   * que el admin las entregue una vez. Filas invalidas (dominio no permitido,
+   * duplicadas en la tanda o email ya existente) NO abortan el resto: se
+   * reportan en `rechazados`. Procesamiento por fila (partial success).
+   */
+  async crearLote(
+    input: CrearColaboradoresLoteInput,
+    adminUsuarioId: string,
+    contexto: ContextoHttpAuditoria = {},
+  ): Promise<AltaColaboradoresLoteResponse> {
+    const configSistema = await this.prisma.configuracionSistema.findUnique({
+      where: { id: 1 },
+      select: { modoEntregaPassword: true },
+    })
+    const modo = configSistema?.modoEntregaPassword ?? ModoEntregaPassword.MANUAL
+    if (modo !== ModoEntregaPassword.MANUAL) {
+      throw new NotImplementedException({
+        code: apiErrorCodes.modoAutomaticoNoDisponible,
+        message: "El envio automatico por correo se implementa en la fase P10.",
+      })
+    }
+
+    const dominiosPermitidos = this.config.get("ALTA_LOTE_DOMINIOS", { infer: true })
+    const { validos, rechazados } = prepararLoteColaboradores(
+      input.colaboradores,
+      dominiosPermitidos,
+    )
+
+    const passwordInicialCaduca = new Date(
+      Date.now() + DIAS_CADUCIDAD_PASSWORD_INICIAL * MS_POR_DIA,
+    )
+
+    // Concurrencia acotada: procesamos en bloques de CONCURRENCIA_LOTE para no
+    // saturar el threadpool (bcrypt) ni el pool de conexiones de Prisma.
+    const resultados: ResultadoFilaLote[] = []
+    for (let i = 0; i < validos.length; i += CONCURRENCIA_LOTE) {
+      const bloque = validos.slice(i, i + CONCURRENCIA_LOTE)
+      const parciales = await Promise.all(
+        bloque.map((fila) =>
+          this.crearUnoDelLote({
+            fila,
+            rol: input.rol,
+            habilitarMfa: input.habilitarMfa,
+            passwordInicialCaduca,
+            adminUsuarioId,
+            contexto,
+          }),
+        ),
+      )
+      resultados.push(...parciales)
+    }
+
+    const creados: ColaboradorLoteCreado[] = []
+    const rechazadosTotales: ColaboradorLoteRechazado[] = [...rechazados]
+    for (const resultado of resultados) {
+      if (resultado.ok) {
+        creados.push(resultado.creado)
+      } else {
+        rechazadosTotales.push(resultado.rechazado)
+      }
+    }
+
+    this.logger.log(
+      `Alta masiva: ${creados.length} creados, ${rechazadosTotales.length} rechazados de ${input.colaboradores.length} filas`,
+    )
+
+    return {
+      creados,
+      rechazados: rechazadosTotales,
+      resumen: {
+        total: input.colaboradores.length,
+        creados: creados.length,
+        rechazados: rechazadosTotales.length,
+      },
+      requiereCambioPassword: true,
+      passwordInicialCaducaEn: passwordInicialCaduca.toISOString(),
+    }
+  }
+
+  /**
+   * Crea UNA cuenta de la tanda en su propia transaccion (colaborador + usuario
+   * + historico). Nunca lanza: devuelve un resultado discriminado. `ya_existe`
+   * si el email choca (P2002); `error_interno` ante cualquier otro fallo (se
+   * loguea para diagnostico). Asi una fila mala NO aborta la tanda ni pierde las
+   * passwords de las filas que si se crearon (el texto plano solo vive en la
+   * respuesta). La auditoria es best-effort: un fallo suyo no descarta el alta.
+   */
+  private async crearUnoDelLote(params: {
+    readonly fila: { readonly email: string; readonly nombre: string }
+    readonly rol: RolUsuario
+    readonly habilitarMfa: boolean
+    readonly passwordInicialCaduca: Date
+    readonly adminUsuarioId: string
+    readonly contexto: ContextoHttpAuditoria
+  }): Promise<ResultadoFilaLote> {
+    const { fila, rol, habilitarMfa, passwordInicialCaduca, adminUsuarioId, contexto } = params
+    const passwordTemporal = generarPasswordSegura()
+    try {
+      const passwordHash = await bcrypt.hash(passwordTemporal, FACTOR_BCRYPT)
+      const colaboradorId = await this.prisma.$transaction(async (tx) => {
+        const colaborador = await tx.colaborador.create({
+          data: { email: fila.email, nombre: fila.nombre },
+          select: { id: true },
+        })
+        const usuario = await tx.usuario.create({
+          data: {
+            colaboradorId: colaborador.id,
+            rol,
+            passwordHash,
+            requiereCambioPassword: true,
+            passwordInicialCaduca,
+            mfaHabilitado: false,
+            requiereSetupMfa: habilitarMfa,
+            intentosFallidos: 0,
+            bloqueado: false,
+          },
+          select: { id: true },
+        })
+        await tx.historicoPassword.create({
+          data: { usuarioId: usuario.id, hash: passwordHash },
+        })
+        return colaborador.id
+      })
+      await this.auditarAltaLote({ colaboradorId, rol, habilitarMfa, adminUsuarioId, contexto })
+      return { ok: true, creado: { email: fila.email, nombre: fila.nombre, passwordTemporal } }
+    } catch (error) {
+      if (esEmailDuplicado(error)) {
+        return {
+          ok: false,
+          rechazado: { email: fila.email, nombre: fila.nombre, motivo: "ya_existe" },
+        }
+      }
+      const detalle = error instanceof Error ? error.message : "desconocido"
+      this.logger.warn(`Alta masiva: la fila ${fila.email} fallo (${detalle})`)
+      return {
+        ok: false,
+        rechazado: { email: fila.email, nombre: fila.nombre, motivo: "error_interno" },
+      }
+    }
+  }
+
+  /**
+   * Auditoria best-effort del alta de un colaborador (individual o de una tanda).
+   * Registra el `rol` concedido y `requiereSetupMfa` (crear ADMINs en masa es
+   * accion de escalada de privilegios — OWASP A09). Un fallo aqui se loguea pero
+   * NO propaga: nunca debe descartar una cuenta ya creada.
+   */
+  private async auditarAltaLote(params: {
+    readonly colaboradorId: string
+    readonly rol: RolUsuario
+    readonly habilitarMfa: boolean
+    readonly adminUsuarioId: string
+    readonly contexto: ContextoHttpAuditoria
+  }): Promise<void> {
+    try {
+      await this.auditLog.record({
+        usuarioId: params.adminUsuarioId,
+        accion: AccionAuditoria.COLABORADOR_CREADO,
+        exito: true,
+        recursoTipo: "colaborador",
+        recursoId: params.colaboradorId,
+        metadata: {
+          rol: params.rol,
+          requiereSetupMfa: params.habilitarMfa,
+        } satisfies Prisma.InputJsonObject,
+        ...params.contexto,
+      })
+    } catch (error) {
+      const detalle = error instanceof Error ? error.message : "desconocido"
+      this.logger.warn(`Alta masiva: auditoria fallo para ${params.colaboradorId} (${detalle})`)
     }
   }
 

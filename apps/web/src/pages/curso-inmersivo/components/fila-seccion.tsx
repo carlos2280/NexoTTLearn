@@ -1,5 +1,9 @@
 import { cn } from "@/shared/lib/cn"
-import type { ModoCursoParticipante, SeccionPlanItemParticipante } from "@nexott-learn/shared-types"
+import type {
+  MeAvanceSeccionEstado,
+  ModoCursoParticipante,
+  SeccionPlanItemParticipante,
+} from "@nexott-learn/shared-types"
 import { BookOpen, Code2 } from "lucide-react"
 import { calcularSeccionCompletada } from "./calcular-seccion-completada"
 
@@ -8,7 +12,8 @@ interface FilaSeccionProps {
   readonly seccionId: string
   readonly modo: ModoCursoParticipante
   readonly plan: SeccionPlanItemParticipante | null
-  readonly abiertaPorAperturas: boolean
+  /** Estado de esta sección según el avance del curso. Null si aún no cargó. */
+  readonly estadoAvance: MeAvanceSeccionEstado | null
   readonly activa: boolean
   readonly onSeleccionar: (seccionId: string) => void
   readonly soloLectura: boolean
@@ -28,7 +33,7 @@ export function FilaSeccion({
   seccionId,
   modo,
   plan,
-  abiertaPorAperturas,
+  estadoAvance,
   activa,
   onSeleccionar,
   soloLectura,
@@ -37,10 +42,13 @@ export function FilaSeccion({
     modo,
     soloLectura,
     planCompletada: plan?.completada,
-    abiertaPorAperturas,
+    completadaSegunAvance: estadoAvance?.completada,
   })
   const esOpcional = plan?.caracter === "OPCIONAL"
-  const esReto = (plan?.avance?.bloquesTotales ?? 0) > 0
+  // El voluntario no recibe plan (D-AS-1), así que el conteo de bloques sale
+  // del avance. Sin esto veía TODAS las secciones como lectura (BookOpen) y no
+  // podía distinguir cuáles tienen reto.
+  const esReto = (plan?.avance.bloquesTotales ?? estadoAvance?.bloquesTotales ?? 0) > 0
   const IconoTipo = esReto ? Code2 : BookOpen
   const colorIcono = activa
     ? "text-accent"

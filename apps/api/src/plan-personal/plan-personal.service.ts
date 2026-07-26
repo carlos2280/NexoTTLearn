@@ -34,14 +34,16 @@ import { PrismaService } from "../common/prisma/prisma.service"
 import { SesionUsuario } from "../common/types/sesion.types"
 import { NotificacionesService } from "../notificaciones/notificaciones.service"
 import {
+  AVANCE_DETALLADO_VACIO,
   type ResultadoCalculo,
   calcularAvance,
   calcularDiffPlan,
   calcularPlan,
   decimalAsNumber,
+  toAvanceDetallado,
   toPlanResponse,
 } from "./plan-personal.helpers"
-import type { ModuloSeccionRef } from "./plan-personal.types"
+import type { AvanceDetallado, ModuloSeccionRef } from "./plan-personal.types"
 import { SELECT_PLAN_FIELDS, SELECT_PLAN_ITEM_FIELDS } from "./plan-personal.types"
 
 type PrismaTx = Prisma.TransactionClient | PrismaService
@@ -1148,15 +1150,30 @@ export class PlanPersonalService {
    *    con el asignado (dominio). Los ASIGNADOS no se ven afectados por el cambio.
    */
   async obtenerPorcentajeAvance(asignacionId: string): Promise<number> {
+    const { porcentaje } = await this.obtenerAvanceDetallado(asignacionId)
+    return porcentaje
+  }
+
+  /**
+   * Misma fuente canonica que `obtenerPorcentajeAvance`, pero devolviendo
+   * ademas el desglose POR SECCION. Existe una sola implementacion para que el
+   * numero agregado y el detalle no puedan divergir: quien pinta un check por
+   * seccion (sidebar del curso inmersivo) usa exactamente las secciones que
+   * definieron el porcentaje.
+   *
+   * El orden de `secciones` NO es estable (las queries no llevan `orderBy`):
+   * el consumidor debe indexar por `seccionId`, nunca asumir posiciones.
+   */
+  async obtenerAvanceDetallado(asignacionId: string): Promise<AvanceDetallado> {
     const asignacion = await this.prisma.asignacionCurso.findUnique({
       where: { id: asignacionId },
       select: { rol: true, cursoId: true, colaboradorId: true },
     })
     if (!asignacion) {
-      return 0
+      return AVANCE_DETALLADO_VACIO
     }
     if (asignacion.rol === RolAsignacion.VOLUNTARIO) {
-      return this.porcentajeAvanceVoluntario(
+      return this.avanceDetalladoVoluntario(
         asignacionId,
         asignacion.cursoId,
         asignacion.colaboradorId,
@@ -1167,14 +1184,14 @@ export class PlanPersonalService {
       select: { id: true },
     })
     if (!plan) {
-      return 0
+      return AVANCE_DETALLADO_VACIO
     }
     const items = await this.prisma.itemPlan.findMany({
       where: { planId: plan.id, caracter: "OBLIGATORIA" },
       select: { seccionId: true },
     })
     if (items.length === 0) {
-      return 0
+      return AVANCE_DETALLADO_VACIO
     }
     const secciones = await this.prisma.seccion.findMany({
       where: { id: { in: items.map((i) => i.seccionId) } },
@@ -1186,14 +1203,14 @@ export class PlanPersonalService {
         },
       },
     })
-    const { avancePlan } = await this.obtenerAvance(
+    const { avancePlan, porSeccion } = await this.obtenerAvance(
       this.prisma,
       asignacionId,
       asignacion.colaboradorId,
       items,
       secciones,
     )
-    return avancePlan.porcentaje
+    return toAvanceDetallado(avancePlan, porSeccion)
   }
 
   /**
@@ -1205,11 +1222,11 @@ export class PlanPersonalService {
    * el asignado. Antes se medía solo por aperturas (recorrido); ahora refleja
    * dominio y es comparable con el asignado. Solo aplica a VOLUNTARIO.
    */
-  private async porcentajeAvanceVoluntario(
+  private async avanceDetalladoVoluntario(
     asignacionId: string,
     cursoId: string,
     colaboradorId: string,
-  ): Promise<number> {
+  ): Promise<AvanceDetallado> {
     const secciones = await this.prisma.seccion.findMany({
       where: { modulo: { cursosModulosHabilitados: { some: { cursoId } } } },
       select: {
@@ -1221,17 +1238,17 @@ export class PlanPersonalService {
       },
     })
     if (secciones.length === 0) {
-      return 0
+      return AVANCE_DETALLADO_VACIO
     }
     const items = secciones.map((s) => ({ seccionId: s.id }))
-    const { avancePlan } = await this.obtenerAvance(
+    const { avancePlan, porSeccion } = await this.obtenerAvance(
       this.prisma,
       asignacionId,
       colaboradorId,
       items,
       secciones,
     )
-    return avancePlan.porcentaje
+    return toAvanceDetallado(avancePlan, porSeccion)
   }
 
   /**

@@ -3,6 +3,7 @@ import { RolAsignacion } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { PlanPersonalService } from "../plan-personal/plan-personal.service"
+import type { AvanceDetallado, AvanceSeccion } from "../plan-personal/plan-personal.types"
 import { MeAvanceService } from "./me-avance.service"
 
 interface PrismaMock {
@@ -53,11 +54,24 @@ function buildPrismaMock(): PrismaMock {
 }
 
 interface PlanServiceMock {
-  obtenerPorcentajeAvance: ReturnType<typeof vi.fn>
+  obtenerAvanceDetallado: ReturnType<typeof vi.fn>
+}
+
+/**
+ * Construye la salida del motor (`obtenerAvanceDetallado`). El agregado y el
+ * desglose salen del mismo calculo real, asi que los tests los fijan juntos.
+ */
+function detalleAvance(
+  porcentaje: number,
+  seccionesCompletadas = 0,
+  seccionesTotales = 0,
+  secciones: readonly AvanceSeccion[] = [],
+): AvanceDetallado {
+  return { porcentaje, seccionesCompletadas, seccionesTotales, secciones }
 }
 
 function buildPlanMock(): PlanServiceMock {
-  return { obtenerPorcentajeAvance: vi.fn().mockResolvedValue(45) }
+  return { obtenerAvanceDetallado: vi.fn().mockResolvedValue(detalleAvance(45)) }
 }
 
 const COLAB = "11111111-1111-1111-1111-111111111111"
@@ -391,18 +405,16 @@ describe("MeAvanceService.obtenerAvance — rol VOLUNTARIO (BUG-VOL-1)", () => {
     })
   })
 
-  it("voluntario: seccionesObligatorias = total del curso; el % viene del motor (regla del asignado)", async () => {
-    // El voluntario abrio 2 de 8 secciones del catalogo, pero el % ya NO es
-    // aperturas/total: lo aporta el motor unificado (misma vara que el asignado).
-    // Aqui el motor reporta 12.5% (solo 1 seccion realmente aprobada), distinto
-    // del 25% que daria contar aperturas. `seccionesCompletadas` sigue siendo el
-    // numero de aperturas abiertas (recorrido) y no cambia de fuente.
+  it("voluntario: completadas y denominador salen del motor, NO de las aperturas", async () => {
+    // BUG-VOL-2: el voluntario abrio 2 de 8 secciones del catalogo, pero solo
+    // APROBO 1. Antes `seccionesCompletadas` contaba aperturas (2) y contradecia
+    // al `porcentajeAvance` (12.5% = 1/8) en el mismo payload. Ahora ambos salen
+    // del mismo calculo.
     prisma.aperturaSeccion.findMany.mockResolvedValueOnce([
       { seccionId: "sec-a" },
       { seccionId: "sec-b" },
     ])
-    prisma.seccion.count.mockResolvedValueOnce(8)
-    plan.obtenerPorcentajeAvance.mockResolvedValueOnce(12.5)
+    plan.obtenerAvanceDetallado.mockResolvedValueOnce(detalleAvance(12.5, 1, 8))
     prisma.seccion.findMany.mockResolvedValueOnce([
       { id: "sec-a", titulo: "A", orden: 1, moduloId: "m1", modulo: { titulo: "Modulo 1" } },
       { id: "sec-b", titulo: "B", orden: 2, moduloId: "m1", modulo: { titulo: "Modulo 1" } },
@@ -411,9 +423,11 @@ describe("MeAvanceService.obtenerAvance — rol VOLUNTARIO (BUG-VOL-1)", () => {
 
     const response = await service.obtenerAvance(COLAB, CURSO)
 
-    expect(response.seccionesCompletadas).toBe(2) // aperturas abiertas (recorrido)
+    expect(response.seccionesCompletadas).toBe(1) // aprobadas, no las 2 abiertas
     expect(response.seccionesObligatorias).toBe(8) // total del catalogo
-    expect(response.porcentajeAvance).toBe(12.5) // del motor, no aperturas/total
+    expect(response.porcentajeAvance).toBe(12.5)
+    // El recorrido sigue viajando aparte: sirve para "por donde paso", no para
+    // marcar superada una seccion.
     expect(response.seccionesAbiertasIds).toEqual(["sec-a", "sec-b"])
     // Siguiente seccion: primera no abierta del catalogo.
     expect(response.siguienteSeccion).toEqual({
@@ -421,27 +435,46 @@ describe("MeAvanceService.obtenerAvance — rol VOLUNTARIO (BUG-VOL-1)", () => {
       moduloId: "m1",
       titulo: "C",
     })
-    // Ahora el voluntario SI delega su % al motor unificado (por asignacion).
-    expect(plan.obtenerPorcentajeAvance).toHaveBeenCalledWith(ASIG)
+    expect(plan.obtenerAvanceDetallado).toHaveBeenCalledWith(ASIG)
   })
 
-  it("voluntario sin aperturas: 0% (motor) pero seccionesObligatorias > 0 (no 2 de 0)", async () => {
-    prisma.seccion.count.mockResolvedValueOnce(5)
-    plan.obtenerPorcentajeAvance.mockResolvedValueOnce(0)
+  it("voluntario: expone el estado por seccion con el detalle de bloques", async () => {
+    prisma.aperturaSeccion.findMany.mockResolvedValueOnce([{ seccionId: "sec-a" }])
+    plan.obtenerAvanceDetallado.mockResolvedValueOnce(
+      detalleAvance(50, 1, 2, [
+        { seccionId: "sec-a", completada: true, bloquesCompletados: 1, bloquesTotales: 1 },
+        { seccionId: "sec-b", completada: false, bloquesCompletados: 2, bloquesTotales: 3 },
+      ]),
+    )
+    prisma.seccion.findMany.mockResolvedValueOnce([])
+
+    const response = await service.obtenerAvance(COLAB, CURSO)
+
+    expect(response.seccionesEstado).toEqual([
+      { seccionId: "sec-a", completada: true, bloquesCompletados: 1, bloquesTotales: 1 },
+      { seccionId: "sec-b", completada: false, bloquesCompletados: 2, bloquesTotales: 3 },
+    ])
+  })
+
+  it("voluntario que abrio pero no aprobo: 0 completadas aunque tenga aperturas", async () => {
+    prisma.aperturaSeccion.findMany.mockResolvedValueOnce([
+      { seccionId: "sec-a" },
+      { seccionId: "sec-b" },
+    ])
+    plan.obtenerAvanceDetallado.mockResolvedValueOnce(detalleAvance(0, 0, 5))
+    prisma.seccion.findMany.mockResolvedValueOnce([])
     const response = await service.obtenerAvance(COLAB, CURSO)
     expect(response.seccionesCompletadas).toBe(0)
     expect(response.seccionesObligatorias).toBe(5)
     expect(response.porcentajeAvance).toBe(0)
   })
 
-  it("voluntario que recorrio y completo todo el curso: 100% (motor), sin siguiente seccion", async () => {
+  it("voluntario que completo todo el curso: 100% (motor), sin siguiente seccion", async () => {
     prisma.aperturaSeccion.findMany.mockResolvedValueOnce([
       { seccionId: "sec-a" },
       { seccionId: "sec-b" },
     ])
-    prisma.seccion.count.mockResolvedValueOnce(2)
-    // Todas las secciones abiertas y sin bloques pendientes -> el motor da 100.
-    plan.obtenerPorcentajeAvance.mockResolvedValueOnce(100)
+    plan.obtenerAvanceDetallado.mockResolvedValueOnce(detalleAvance(100, 2, 2))
     prisma.seccion.findMany.mockResolvedValueOnce([
       { id: "sec-a", titulo: "A", orden: 1, moduloId: "m1", modulo: { titulo: "M1" } },
       { id: "sec-b", titulo: "B", orden: 2, moduloId: "m1", modulo: { titulo: "M1" } },
@@ -452,11 +485,11 @@ describe("MeAvanceService.obtenerAvance — rol VOLUNTARIO (BUG-VOL-1)", () => {
   })
 
   it("voluntario en curso sin secciones declaradas: 0% (motor) sin division por cero", async () => {
-    prisma.seccion.count.mockResolvedValueOnce(0)
-    plan.obtenerPorcentajeAvance.mockResolvedValueOnce(0)
+    plan.obtenerAvanceDetallado.mockResolvedValueOnce(detalleAvance(0, 0, 0))
     const response = await service.obtenerAvance(COLAB, CURSO)
     expect(response.seccionesObligatorias).toBe(0)
     expect(response.porcentajeAvance).toBe(0)
+    expect(response.seccionesEstado).toEqual([])
   })
 })
 

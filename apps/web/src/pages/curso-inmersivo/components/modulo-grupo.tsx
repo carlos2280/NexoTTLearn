@@ -1,6 +1,7 @@
 import { cn } from "@/shared/lib/cn"
 import type {
   CursoArbolSeccion,
+  MeAvanceSeccionEstado,
   ModoCursoParticipante,
   SeccionPlanItemParticipante,
 } from "@nexott-learn/shared-types"
@@ -12,10 +13,10 @@ interface ModuloGrupoProps {
   readonly titulo: string
   readonly secciones: readonly CursoArbolSeccion[]
   readonly planById: ReadonlyMap<string, SeccionPlanItemParticipante>
+  readonly estadoAvanceById: ReadonlyMap<string, MeAvanceSeccionEstado>
   readonly modo: ModoCursoParticipante
   readonly seccionActivaId: string | null
   readonly onSeleccionar: (seccionId: string) => void
-  readonly seccionesAbiertasSet: ReadonlySet<string>
   readonly soloLectura: boolean
 }
 
@@ -30,10 +31,10 @@ export function ModuloGrupo({
   titulo,
   secciones,
   planById,
+  estadoAvanceById,
   modo,
   seccionActivaId,
   onSeleccionar,
-  seccionesAbiertasSet,
   soloLectura,
 }: ModuloGrupoProps) {
   const [abierto, setAbierto] = useState(true)
@@ -81,7 +82,7 @@ export function ModuloGrupo({
                 seccionId={seccion.seccionId}
                 modo={modo}
                 plan={plan}
-                abiertaPorAperturas={seccionesAbiertasSet.has(seccion.seccionId)}
+                estadoAvance={estadoAvanceById.get(seccion.seccionId) ?? null}
                 activa={seccion.seccionId === seccionActivaId}
                 onSeleccionar={onSeleccionar}
                 soloLectura={soloLectura}

@@ -9,8 +9,9 @@ import type {
   FormatoExportColaboradores,
   ListarColaboradoresQuery,
 } from "@nexott-learn/shared-types"
-import { Plus, Users } from "lucide-react"
+import { Plus, Upload, Users } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
+import { PersonaLoteDialog } from "./components/persona-lote-dialog"
 import { COLUMNAS_PERSONAS } from "./components/personas-columnas"
 import { PersonasDialogos } from "./components/personas-dialogos"
 import { PersonasExportarBoton } from "./components/personas-exportar-boton"
@@ -42,6 +43,15 @@ export function PersonasPage() {
   const [filtros, setFiltros] = useState<FiltrosPersonas>(FILTROS_PERSONAS_INICIAL)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState<number>(PAGE_SIZE_INICIAL)
+  const [loteAbierto, setLoteAbierto] = useState(false)
+  // `loteKey` remonta el diálogo en cada apertura → estado limpio, sin flash de
+  // las credenciales de la tanda anterior (react.dev: reset por key, no por efecto).
+  const [loteKey, setLoteKey] = useState(0)
+
+  function abrirLote() {
+    setLoteKey((k) => k + 1)
+    setLoteAbierto(true)
+  }
   const query = useMemo(() => aQuery(filtros, page, pageSize), [filtros, page, pageSize])
   const { data, isLoading } = useListarPersonas(query)
   const orq = usePersonasOrquestacion()
@@ -90,6 +100,10 @@ export function PersonasPage() {
           <PersonasFiltros valor={filtros} onCambio={actualizarFiltros} />
           <div className="flex shrink-0 items-center gap-2">
             <PersonasExportarBoton construirQuery={construirExportQuery} />
+            <Button variant="secondary" size="md" onClick={abrirLote}>
+              <Upload className="h-4 w-4" strokeWidth={1.75} aria-hidden={true} />
+              Carga masiva
+            </Button>
             <Button variant="primary" size="md" onClick={() => orq.abrir("crear")}>
               <Plus className="h-4 w-4" strokeWidth={1.75} aria-hidden={true} />
               Nuevo colaborador
@@ -135,6 +149,7 @@ export function PersonasPage() {
       </section>
 
       <PersonasDialogos orq={orq} />
+      <PersonaLoteDialog key={loteKey} abierto={loteAbierto} onCambiarAbierto={setLoteAbierto} />
     </div>
   )
 }

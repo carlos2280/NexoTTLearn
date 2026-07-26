@@ -83,7 +83,9 @@
   --color-success-rgb: 22 163 74;
   --color-warning: #d97706;
   --color-warning-soft: #fef3c7;
-  --color-warning-on-soft: #b45309;
+  /* #92400e (amber-800, = warmth-on-soft): sube el contraste sobre warning-soft
+     a ~6.4:1; el #b45309 anterior quedaba al filo de WCAG 1.4.3 AA (4.51:1). */
+  --color-warning-on-soft: #92400e;
   --color-danger: #dc2626;
   --color-danger-soft: #fee2e2;
   --color-danger-on-soft: #b91c1c;

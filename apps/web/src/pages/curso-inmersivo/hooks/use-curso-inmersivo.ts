@@ -28,6 +28,13 @@ export interface VistaCursoInmersivo {
   readonly cargandoBasico: boolean
   readonly errorBasico: ApiError | null
   readonly errorPlan: ApiError | null
+  /**
+   * Error del avance. Lo necesita el sidebar en modo voluntario: sin plan
+   * personal (D-AS-1) el avance es su unica fuente de estado, y callar el fallo
+   * pintaria todas las secciones como pendientes — indistinguible de "no has
+   * hecho nada".
+   */
+  readonly errorAvance: ApiError | null
   readonly noTieneAcceso: boolean
   readonly modo: ModoCursoParticipante | null
   readonly arbol: CursoArbolResponse | undefined
@@ -64,6 +71,7 @@ export function useCursoInmersivo(cursoId: string): VistaCursoInmersivo {
     cargandoBasico: arbolQuery.isLoading,
     errorBasico,
     errorPlan: plan.error ?? null,
+    errorAvance: avance.error ?? null,
     noTieneAcceso,
     modo,
     arbol,

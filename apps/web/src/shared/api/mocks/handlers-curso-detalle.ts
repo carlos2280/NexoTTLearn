@@ -413,7 +413,20 @@ const AVANCE_JAVA: MeAvanceCursoResponse = {
     moduloId: "mod-java-2",
     titulo: "APIs REST con Spring",
   },
-  seccionesAbiertasIds: [],
+  seccionesAbiertasIds: ["sec-j1-1", "sec-j1-2", "sec-j1-3", "sec-j2-1", "sec-j2-2"],
+  // 6 completadas de 9 — cuadra con `seccionesCompletadas`. `sec-j2-2` esta
+  // ABIERTA pero no completada: el caso que el sidebar pintaba en verde.
+  seccionesEstado: [
+    { seccionId: "sec-j1-1", completada: true, bloquesCompletados: 4, bloquesTotales: 4 },
+    { seccionId: "sec-j1-2", completada: true, bloquesCompletados: 6, bloquesTotales: 6 },
+    { seccionId: "sec-j1-3", completada: true, bloquesCompletados: 5, bloquesTotales: 5 },
+    { seccionId: "sec-j2-1", completada: true, bloquesCompletados: 5, bloquesTotales: 5 },
+    { seccionId: "sec-j2-2", completada: false, bloquesCompletados: 2, bloquesTotales: 6 },
+    { seccionId: "sec-j2-3", completada: false, bloquesCompletados: 0, bloquesTotales: 4 },
+    { seccionId: "sec-j2-4", completada: true, bloquesCompletados: 0, bloquesTotales: 0 },
+    { seccionId: "sec-j3-1", completada: true, bloquesCompletados: 0, bloquesTotales: 0 },
+    { seccionId: "sec-j3-2", completada: false, bloquesCompletados: 1, bloquesTotales: 3 },
+  ],
   caminoHaciaApto: {
     faltantesParaApto: 4,
     estaListo: false,
@@ -465,7 +478,17 @@ const AVANCE_FULLSTACK: MeAvanceCursoResponse = {
     moduloId: "mod-fs-1",
     titulo: "TypeScript esencial",
   },
-  seccionesAbiertasIds: [],
+  seccionesAbiertasIds: ["sec-fs-1-1", "sec-fs-1-2", "sec-fs-1-3", "sec-fs-2-1"],
+  // 3 completadas de 7 — cuadra con `seccionesCompletadas`.
+  seccionesEstado: [
+    { seccionId: "sec-fs-1-1", completada: true, bloquesCompletados: 3, bloquesTotales: 3 },
+    { seccionId: "sec-fs-1-2", completada: true, bloquesCompletados: 0, bloquesTotales: 0 },
+    { seccionId: "sec-fs-1-3", completada: false, bloquesCompletados: 1, bloquesTotales: 4 },
+    { seccionId: "sec-fs-2-1", completada: true, bloquesCompletados: 0, bloquesTotales: 0 },
+    { seccionId: "sec-fs-2-quiz", completada: false, bloquesCompletados: 0, bloquesTotales: 1 },
+    { seccionId: "sec-fs-3-1", completada: false, bloquesCompletados: 0, bloquesTotales: 2 },
+    { seccionId: "sec-fs-3-2", completada: false, bloquesCompletados: 0, bloquesTotales: 0 },
+  ],
   caminoHaciaApto: {
     faltantesParaApto: 3,
     estaListo: false,
@@ -509,7 +532,13 @@ function buildAvanceFallback(cursoId: string): MeAvanceCursoResponse {
       { skillId: "sk-x1", etiqueta: "skill.demo", notaActual: 50, claseColor: "amarillo" },
     ],
     siguienteSeccion: null,
-    seccionesAbiertasIds: [],
+    seccionesAbiertasIds: ["sec-demo-1-1", "sec-demo-1-2"],
+    // 1 completada de 3 — `sec-demo-1-2` esta abierta pero no completada.
+    seccionesEstado: [
+      { seccionId: "sec-demo-1-1", completada: true, bloquesCompletados: 2, bloquesTotales: 2 },
+      { seccionId: "sec-demo-1-2", completada: false, bloquesCompletados: 1, bloquesTotales: 4 },
+      { seccionId: "sec-demo-1-3", completada: false, bloquesCompletados: 0, bloquesTotales: 5 },
+    ],
     caminoHaciaApto: {
       faltantesParaApto: 6,
       estaListo: false,
