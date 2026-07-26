@@ -277,10 +277,10 @@ export class MeBandejaService {
   ): Promise<readonly AsignacionEnriquecida[]> {
     return Promise.all(
       asignaciones.map(async (row): Promise<AsignacionEnriquecida> => {
-        const porcentajeAvance =
-          row.rol === RolAsignacion.ASIGNADO
-            ? await this.planPersonalService.obtenerPorcentajeAvance(row.id)
-            : 0
+        // P25: el motor bifurca por rol (ASIGNADO = plan; VOLUNTARIO = catalogo del
+        // curso con la misma regla). Antes se forzaba 0 al voluntario, que veia 0%
+        // en su bandeja pero su % real en "Mis cursos" y en el reporte admin.
+        const porcentajeAvance = await this.planPersonalService.obtenerPorcentajeAvance(row.id)
 
         const necesitaEvaluar =
           row.curso.transversalId !== null || row.curso.entrevistaIaId !== null

@@ -343,7 +343,7 @@ describe("E13 GET disponibilidad", () => {
     const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN_SESION)
     expect(r.disponible).toBe(false)
     expect(r.razon).toBe("PLAN_INCOMPLETO")
-    expect(r.motivoBloqueo).toBe("Completa primero tu plan de estudio.")
+    expect(r.motivoBloqueo).toBe("Completa primero el curso.")
   })
 
   it("DISPONIBLE happy path", async () => {

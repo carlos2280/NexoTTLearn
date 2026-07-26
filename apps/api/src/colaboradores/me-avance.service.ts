@@ -95,11 +95,12 @@ export class MeAvanceService {
     let porcentajeAvance: number
     let siguienteSeccion: MeAvanceSiguienteSeccion | null
     if (esVoluntario) {
+      // El % del voluntario se mide igual que el del asignado (regla de "seccion
+      // aprobada", no solo abierta): fuente unica en PlanPersonalService, para que
+      // "Mi avance", "Mis cursos", la bandeja y el reporte admin muestren el mismo
+      // numero. `seccionesObligatorias` = total del catalogo (denominador del voluntario).
       seccionesObligatorias = await this.contarSeccionesTotalesCurso(cursoId)
-      porcentajeAvance =
-        seccionesObligatorias === 0
-          ? 0
-          : Math.min(100, Math.round((seccionesCompletadas / seccionesObligatorias) * 100))
+      porcentajeAvance = await this.planPersonalService.obtenerPorcentajeAvance(asignacion.id)
       siguienteSeccion = await this.calcularSiguienteSeccionVoluntario(
         cursoId,
         seccionesAbiertasIds,

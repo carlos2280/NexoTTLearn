@@ -1139,12 +1139,13 @@ export class PlanPersonalService {
    *    OBLIGATORIAS completadas / obligatorias. Devuelve 0 si aun no tiene
    *    `PlanEstudio` (ASIGNADO antes de `calcularExplicito`) o si el plan no
    *    tiene obligatorias (sin metrica significativa).
-   *  - VOLUNTARIO: no tiene `PlanEstudio`; su avance se mide sobre el catalogo
-   *    completo (aperturas / total de secciones del curso), igual que en la
-   *    vista del propio alumno. Antes esta rama NO existia aqui y el reporte
-   *    admin + la matriz de cobertura mostraban 0% perpetuo para voluntarios
-   *    (FIX-P18a); `MeCursos`/`MeAvance` ya lo resolvian por su cuenta, lo que
-   *    provocaba que el admin viera 0% y el alumno su % real.
+   *  - VOLUNTARIO: no tiene `PlanEstudio`; su avance se mide sobre TODAS las
+   *    secciones del catalogo del curso con la MISMA regla del asignado (seccion
+   *    completada = bloques aprobados, o abierta si no tiene bloques evaluables).
+   *    Unificado (2026-07) para que voluntarios y asignados usen la misma vara
+   *    —base de la gamificacion y cierre de P25 (bandeja 0%)—. Antes se medía
+   *    solo por aperturas (recorrido), lo que inflaba el % e impedia compararlo
+   *    con el asignado (dominio). Los ASIGNADOS no se ven afectados por el cambio.
    */
   async obtenerPorcentajeAvance(asignacionId: string): Promise<number> {
     const asignacion = await this.prisma.asignacionCurso.findUnique({
@@ -1155,7 +1156,11 @@ export class PlanPersonalService {
       return 0
     }
     if (asignacion.rol === RolAsignacion.VOLUNTARIO) {
-      return this.porcentajeAvanceVoluntario(asignacionId, asignacion.cursoId)
+      return this.porcentajeAvanceVoluntario(
+        asignacionId,
+        asignacion.cursoId,
+        asignacion.colaboradorId,
+      )
     }
     const plan = await this.prisma.planEstudio.findUnique({
       where: { asignacionId },
@@ -1192,23 +1197,41 @@ export class PlanPersonalService {
   }
 
   /**
-   * Avance de un VOLUNTARIO (D-AS-1: sin `PlanEstudio`): denominador = total de
-   * secciones del curso (catalogo via `CursoModuloHabilitado`), numerador =
-   * secciones abiertas (`AperturaSeccion`). Redondeo a entero y clamp [0, 100]
-   * — misma formula que ve el alumno en `MeCursosService` / `MeAvanceService`,
-   * centralizada aqui para que el admin muestre exactamente el mismo numero.
+   * Avance de un VOLUNTARIO (D-AS-1: sin `PlanEstudio`). Se mide sobre TODAS las
+   * secciones del catalogo del curso (`CursoModuloHabilitado`) con la MISMA regla
+   * que el ASIGNADO, reutilizando `obtenerAvance` -> `calcularAvance`: una seccion
+   * cuenta como completada si sus bloques evaluables estan aprobados, o si esta
+   * abierta cuando no tiene bloques evaluables. Redondeo a 2 decimales, igual que
+   * el asignado. Antes se medía solo por aperturas (recorrido); ahora refleja
+   * dominio y es comparable con el asignado. Solo aplica a VOLUNTARIO.
    */
-  private async porcentajeAvanceVoluntario(asignacionId: string, cursoId: string): Promise<number> {
-    const [aperturas, total] = await Promise.all([
-      this.prisma.aperturaSeccion.count({ where: { asignacionId } }),
-      this.prisma.seccion.count({
-        where: { modulo: { cursosModulosHabilitados: { some: { cursoId } } } },
-      }),
-    ])
-    if (total === 0) {
+  private async porcentajeAvanceVoluntario(
+    asignacionId: string,
+    cursoId: string,
+    colaboradorId: string,
+  ): Promise<number> {
+    const secciones = await this.prisma.seccion.findMany({
+      where: { modulo: { cursosModulosHabilitados: { some: { cursoId } } } },
+      select: {
+        id: true,
+        bloques: {
+          where: { estado: "ACTIVO", esEvaluable: true },
+          select: { id: true, tipo: true, contenido: true },
+        },
+      },
+    })
+    if (secciones.length === 0) {
       return 0
     }
-    return Math.min(100, Math.round((aperturas / total) * 100))
+    const items = secciones.map((s) => ({ seccionId: s.id }))
+    const { avancePlan } = await this.obtenerAvance(
+      this.prisma,
+      asignacionId,
+      colaboradorId,
+      items,
+      secciones,
+    )
+    return avancePlan.porcentaje
   }
 
   /**

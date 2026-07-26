@@ -1,7 +1,9 @@
 import { Field } from "@/shared/components/ui/field"
 import { Input } from "@/shared/components/ui/input"
 import { Select, SelectItem } from "@/shared/components/ui/select"
+import { Switch } from "@/shared/components/ui/switch"
 import type { ClienteResponse } from "@nexott-learn/shared-types"
+import { descripcionVoluntarios } from "./config/config-voluntarios.helpers"
 import type { CursoNuevoForm, ErroresCursoNuevo } from "./curso-nuevo-form-validar"
 import { MAX_TITULO_CURSO } from "./curso-nuevo-form-validar"
 
@@ -78,6 +80,15 @@ export function CursoNuevoCampos({
             />
           )}
         </Field>
+      </div>
+      <div className="border-border border-t pt-4">
+        <Switch
+          id="curso-nuevo-voluntarios"
+          checked={form.permiteVoluntarios}
+          onCambio={(v) => onCambio({ ...form, permiteVoluntarios: v })}
+          label="Permitir voluntarios"
+          descripcion={descripcionVoluntarios(form.permiteVoluntarios)}
+        />
       </div>
     </>
   )

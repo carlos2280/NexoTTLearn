@@ -3,6 +3,7 @@ import {
   DesbloqueoCurso,
   EstadoAsignado,
   EstadoCurso,
+  EstadoVoluntario,
   Prisma,
   RolAsignacion,
   RolUsuario,
@@ -60,7 +61,11 @@ interface PrismaMock {
   usuario: { findUnique: ReturnType<typeof vi.fn>; findMany: ReturnType<typeof vi.fn> }
   planEstudio: { findUnique: ReturnType<typeof vi.fn> }
   itemPlan: { findMany: ReturnType<typeof vi.fn> }
+  // Fuente del "plan completo" del VOLUNTARIO: todo el catalogo del curso
+  // (secciones + bloques) mas sus aperturas de secciones sin bloques.
+  seccion: { findMany: ReturnType<typeof vi.fn> }
   intentoBloque: { findMany: ReturnType<typeof vi.fn> }
+  aperturaSeccion: { findMany: ReturnType<typeof vi.fn> }
   $transaction: ReturnType<typeof vi.fn>
 }
 
@@ -93,7 +98,9 @@ function buildPrismaMock(): PrismaMock {
     },
     planEstudio: { findUnique: vi.fn() },
     itemPlan: { findMany: vi.fn().mockResolvedValue([]) },
+    seccion: { findMany: vi.fn().mockResolvedValue([]) },
     intentoBloque: { findMany: vi.fn().mockResolvedValue([]) },
+    aperturaSeccion: { findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn(),
   }
   mock.$transaction.mockImplementation(
@@ -118,15 +125,18 @@ function configurarAsignacion(
     entrevistaIaId: string | null
     colaboradorId: string
     intentosExtra: number
+    rol: RolAsignacion
   }> = {},
 ): void {
+  const rol = overrides.rol ?? RolAsignacion.ASIGNADO
+  const esVoluntario = rol === RolAsignacion.VOLUNTARIO
   prisma.asignacionCurso.findUnique.mockResolvedValue({
     id: ASIGNACION_ID,
     colaboradorId: overrides.colaboradorId ?? COLABORADOR_ID,
     cursoId: CURSO_ID,
-    rol: RolAsignacion.ASIGNADO,
-    estadoAsignado: overrides.estadoAsignado ?? EstadoAsignado.EN_PROGRESO,
-    estadoVoluntario: null,
+    rol,
+    estadoAsignado: esVoluntario ? null : (overrides.estadoAsignado ?? EstadoAsignado.EN_PROGRESO),
+    estadoVoluntario: esVoluntario ? EstadoVoluntario.EN_PROGRESO : null,
     intentosExtraTransversal: overrides.intentosExtra ?? 0,
     curso: {
       id: CURSO_ID,
@@ -282,7 +292,54 @@ describe("E3. GET disponibilidad", () => {
     const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN)
     expect(r.disponible).toBe(false)
     expect(r.razon).toBe("BLOQUEADO_PLAN_INCOMPLETO")
-    expect(r.motivoBloqueo).toBe("Completa tu plan de estudio antes de empezar el transversal.")
+    expect(r.motivoBloqueo).toBe("Completa el curso antes de empezar el transversal.")
+  })
+
+  it("VOLUNTARIO + ENCADENADO con el catalogo del curso incompleto -> disponible=false", async () => {
+    // Cambio clave: antes un VOLUNTARIO devolvia planCompleto=true sin mirar el
+    // avance, asi que el transversal ENCADENADO quedaba disponible con 0%. Ahora
+    // se evalua sobre TODO el catalogo del curso, igual que el asignado su plan.
+    configurarAsignacion(prisma, {
+      desbloqueo: DesbloqueoCurso.ENCADENADO,
+      rol: RolAsignacion.VOLUNTARIO,
+    })
+    // Una seccion del catalogo con un bloque evaluable activo aun SIN aprobar.
+    prisma.seccion.findMany.mockResolvedValue([
+      { id: "seccion-1", bloques: [{ id: "bloque-1", tipo: "QUIZ", contenido: {} }] },
+    ])
+    prisma.intentoBloque.findMany.mockResolvedValue([]) // no hay mejor intento vigente
+    prisma.aperturaSeccion.findMany.mockResolvedValue([])
+
+    const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN)
+
+    expect(r.disponible).toBe(false)
+    expect(r.razon).toBe("BLOQUEADO_PLAN_INCOMPLETO")
+    expect(r.motivoBloqueo).toBe("Completa el curso antes de empezar el transversal.")
+  })
+
+  it("VOLUNTARIO + ENCADENADO con el catalogo completo -> disponible=true", async () => {
+    configurarAsignacion(prisma, {
+      desbloqueo: DesbloqueoCurso.ENCADENADO,
+      rol: RolAsignacion.VOLUNTARIO,
+    })
+    // Catalogo con dos secciones: una con bloque evaluable aprobado y otra sin
+    // bloques que se completa por estar abierta para la asignacion.
+    prisma.seccion.findMany.mockResolvedValue([
+      { id: "seccion-1", bloques: [{ id: "bloque-1", tipo: "QUIZ", contenido: {} }] },
+      { id: "seccion-2", bloques: [] },
+    ])
+    // Mejor intento vigente del bloque con nota >= umbral (fallback 60).
+    prisma.intentoBloque.findMany.mockResolvedValue([
+      { bloqueId: "bloque-1", nota: new Prisma.Decimal(80) },
+    ])
+    // La seccion sin bloques esta abierta para la asignacion del voluntario.
+    prisma.aperturaSeccion.findMany.mockResolvedValue([{ seccionId: "seccion-2" }])
+
+    const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN)
+
+    expect(r.disponible).toBe(true)
+    expect(r.razon).toBe("PLAN_COMPLETADO")
+    expect(r.motivoBloqueo).toBeNull()
   })
 })
 
