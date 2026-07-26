@@ -24,6 +24,28 @@ export interface MeAvanceSiguienteSeccion {
 }
 
 /**
+ * Estado de UNA seccion del curso para el colaborador en sesion, con la regla
+ * canonica de "seccion completada" (D-S7-B6): si tiene bloques evaluables
+ * activos, todos aprobados; si no tiene, basta con haberla abierto.
+ *
+ * Lo emite el mismo motor que calcula el porcentaje
+ * (`PlanPersonalService.obtenerAvanceDetallado`), por lo que el detalle SIEMPRE
+ * cuadra con `porcentajeAvance` — no son dos calculos distintos.
+ *
+ * Existe para los dos roles (D-AS-1): el VOLUNTARIO no tiene `PlanEstudio` y
+ * antes el frontend solo disponia de `seccionesAbiertasIds` (recorrido), lo que
+ * lo obligaba a pintar el sidebar por APERTURA mientras el backend ya media por
+ * DOMINIO. El resultado era un sidebar en verde conviviendo con un porcentaje
+ * menor al 100% (mismo sintoma que BUG-QA-3, esta vez en voluntarios).
+ */
+export interface MeAvanceSeccionEstado {
+  readonly seccionId: string
+  readonly completada: boolean
+  readonly bloquesCompletados: number
+  readonly bloquesTotales: number
+}
+
+/**
  * Nivel cualitativo de un area dentro del camino hacia apto.
  *
  *  - `solido`: todas las skills exigidas del area estan demostradas.
@@ -75,12 +97,17 @@ export interface MeAvanceCursoResponse {
   readonly caminoHaciaApto: CaminoHaciaApto
   /**
    * Ids de secciones que el colaborador ha abierto en este curso (lectura de
-   * `AperturaSeccion`). El frontend lo usa para pintar checkmarks en el
-   * sidebar inmersivo del modo voluntario (que no tiene `PlanEstudio`, ver
-   * D-AS-1). En modo asignado tambien se devuelve, aunque ahi el sidebar
-   * sigue prefiriendo `PlanResponseParticipante.items[].completada`.
+   * `AperturaSeccion`). Es RECORRIDO, no dominio: sirve para saber por donde
+   * paso, no para marcar una seccion como superada. Para eso esta
+   * `seccionesEstado`.
    */
   readonly seccionesAbiertasIds: readonly string[]
+  /**
+   * Estado por seccion con la regla canonica de completada. Cubre las mismas
+   * secciones que definen `porcentajeAvance` (las obligatorias del plan si es
+   * ASIGNADO, todo el catalogo del curso si es VOLUNTARIO).
+   */
+  readonly seccionesEstado: readonly MeAvanceSeccionEstado[]
   readonly notaGlobalFinal?: number
   readonly etiquetaCualitativaFinal?: EtiquetaCualitativa
 }

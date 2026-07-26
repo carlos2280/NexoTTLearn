@@ -39,8 +39,10 @@ const UMBRAL_NO_CUMPLE_FALLBACK = 10
  * `notaGlobalFinal` ni `etiquetaCualitativaFinal`. Esos campos solo aparecen
  * cuando el `Curso.estado === CERRADO` (flag `estaCerrado=true`).
  *
- * Reutiliza `PlanPersonalService.obtenerPorcentajeAvance` (FIX-P11b-avance)
- * para el porcentaje canonico — NO duplica la regla de seccion completada.
+ * Reutiliza `PlanPersonalService.obtenerAvanceDetallado` (FIX-P11b-avance, P28)
+ * como fuente unica: de ahi salen el porcentaje, el conteo de secciones y el
+ * desglose por seccion — NO duplica la regla de seccion completada ni permite
+ * que el agregado y el detalle se separen.
  */
 @Injectable()
 export class MeAvanceService {
@@ -86,30 +88,26 @@ export class MeAvanceService {
     const esVoluntario = asignacion.rol === RolAsignacion.VOLUNTARIO
 
     const seccionesAbiertasIds = await this.cargarSeccionesAbiertasIds(asignacion.id)
-    const seccionesCompletadas = seccionesAbiertasIds.length
 
-    // VOLUNTARIO (D-AS-1): no hay PlanEstudio. El denominador es el total de
-    // secciones del curso (catalogo) y el siguiente paso es la primera no
-    // abierta. Esto da feedback de progreso honesto sin generar plan artificial.
-    let seccionesObligatorias: number
-    let porcentajeAvance: number
-    let siguienteSeccion: MeAvanceSiguienteSeccion | null
-    if (esVoluntario) {
-      // El % del voluntario se mide igual que el del asignado (regla de "seccion
-      // aprobada", no solo abierta): fuente unica en PlanPersonalService, para que
-      // "Mi avance", "Mis cursos", la bandeja y el reporte admin muestren el mismo
-      // numero. `seccionesObligatorias` = total del catalogo (denominador del voluntario).
-      seccionesObligatorias = await this.contarSeccionesTotalesCurso(cursoId)
-      porcentajeAvance = await this.planPersonalService.obtenerPorcentajeAvance(asignacion.id)
-      siguienteSeccion = await this.calcularSiguienteSeccionVoluntario(
-        cursoId,
-        seccionesAbiertasIds,
-      )
-    } else {
-      seccionesObligatorias = await this.contarSeccionesObligatorias(asignacion.id)
-      porcentajeAvance = await this.planPersonalService.obtenerPorcentajeAvance(asignacion.id)
-      siguienteSeccion = await this.calcularSiguienteSeccion(asignacion.id, cursoId, colaboradorId)
-    }
+    // Fuente unica del avance para los DOS roles: agregado y desglose por
+    // seccion salen del mismo calculo (`PlanPersonalService`), asi el sidebar
+    // no puede pintar checks que contradigan al porcentaje. El motor ya bifurca
+    // por rol (D-AS-1: el VOLUNTARIO no tiene PlanEstudio y se mide contra todo
+    // el catalogo del curso, con la misma regla de "seccion completada").
+    const detalle = await this.planPersonalService.obtenerAvanceDetallado(asignacion.id)
+
+    // `seccionesCompletadas` cuenta secciones SUPERADAS. Contaba aperturas
+    // (recorrido), lo que contradecia a `porcentajeAvance` en el mismo payload.
+    const seccionesCompletadas = detalle.seccionesCompletadas
+    const seccionesObligatorias = detalle.seccionesTotales
+    const porcentajeAvance = detalle.porcentaje
+
+    // El "siguiente paso" sigue siendo por rol: al voluntario se le sugiere la
+    // primera seccion que no ha ABIERTO (no ha pasado por ahi todavia); al
+    // asignado, la primera de su plan que no ha COMPLETADO.
+    const siguienteSeccion: MeAvanceSiguienteSeccion | null = esVoluntario
+      ? await this.calcularSiguienteSeccionVoluntario(cursoId, seccionesAbiertasIds)
+      : await this.calcularSiguienteSeccion(asignacion.id, cursoId, colaboradorId)
 
     const exigidas = await this.cargarSkillsExigidasConArea(cursoId)
     const notas = await this.cargarNotasColaborador(
@@ -130,6 +128,7 @@ export class MeAvanceService {
       siguienteSeccion,
       caminoHaciaApto,
       seccionesAbiertasIds,
+      seccionesEstado: detalle.secciones,
     }
 
     if (!estaCerrado) {
@@ -154,37 +153,12 @@ export class MeAvanceService {
     }
   }
 
-  private async contarSeccionesObligatorias(asignacionId: string): Promise<number> {
-    const plan = await this.prisma.planEstudio.findUnique({
-      where: { asignacionId },
-      select: { id: true },
-    })
-    if (!plan) {
-      return 0
-    }
-    return this.prisma.itemPlan.count({
-      where: { planId: plan.id, caracter: "OBLIGATORIA" },
-    })
-  }
-
   private async cargarSeccionesAbiertasIds(asignacionId: string): Promise<readonly string[]> {
     const aperturas = await this.prisma.aperturaSeccion.findMany({
       where: { asignacionId },
       select: { seccionId: true },
     })
     return aperturas.map((a) => a.seccionId)
-  }
-
-  /**
-   * Total de secciones del curso (todos los modulos habilitados) usado como
-   * denominador del avance del VOLUNTARIO (D-AS-1: voluntarios no tienen
-   * PlanEstudio, el avance se calcula sobre el catalogo completo). La
-   * habilitacion de un modulo en un curso vive en `CursoModuloHabilitado`.
-   */
-  private contarSeccionesTotalesCurso(cursoId: string): Promise<number> {
-    return this.prisma.seccion.count({
-      where: { modulo: { cursosModulosHabilitados: { some: { cursoId } } } },
-    })
   }
 
   /**

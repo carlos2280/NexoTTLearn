@@ -608,6 +608,7 @@ export type {
   ClaseColorSkill,
   MeAvancePorSkill,
   MeAvanceSiguienteSeccion,
+  MeAvanceSeccionEstado,
   MeAvanceCursoResponse,
   NivelCaminoHaciaAptoArea,
   CaminoHaciaAptoPorArea,

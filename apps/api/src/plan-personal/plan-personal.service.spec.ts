@@ -748,6 +748,101 @@ describe("PlanPersonalService.obtenerPorcentajeAvance (bifurca por rol)", () => 
 })
 
 // =============================================================================
+// P28 — `obtenerAvanceDetallado` es la MISMA fuente que `obtenerPorcentajeAvance`
+// (este ultimo quedo como wrapper). Expone el desglose por seccion para que el
+// sidebar del curso inmersivo pinte checks que no puedan contradecir al
+// porcentaje: antes el voluntario lo pintaba por APERTURA (recorrido) mientras
+// el backend ya media por DOMINIO.
+// =============================================================================
+
+describe("PlanPersonalService.obtenerAvanceDetallado", () => {
+  it("VOLUNTARIO: el desglose por seccion cuadra con el porcentaje agregado", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      rol: RolAsignacion.VOLUNTARIO,
+      cursoId: CURSO_ID,
+      colaboradorId: COLABORADOR_ID,
+    })
+    prisma.seccion.findMany.mockResolvedValueOnce([
+      { id: SECCION_ID_1, bloques: [{ id: "b1", tipo: "QUIZ", contenido: {} }] },
+      { id: SECCION_ID_2, bloques: [{ id: "b2", tipo: "QUIZ", contenido: {} }] },
+      { id: SECCION_ID_3, bloques: [] },
+    ])
+    prisma.intentoBloque.findMany.mockResolvedValueOnce([
+      { bloqueId: "b1", nota: new Prisma.Decimal(80) },
+    ])
+    prisma.aperturaSeccion.findMany.mockResolvedValueOnce([
+      { seccionId: SECCION_ID_2 },
+      { seccionId: SECCION_ID_3 },
+    ])
+
+    const detalle = await service.obtenerAvanceDetallado(ASIGNACION_ID)
+
+    expect(detalle.porcentaje).toBe(66.67)
+    expect(detalle.seccionesCompletadas).toBe(2)
+    expect(detalle.seccionesTotales).toBe(3)
+    // El detalle no puede contradecir al agregado: tantas `completada: true`
+    // como `seccionesCompletadas`.
+    expect(detalle.secciones.filter((s) => s.completada)).toHaveLength(detalle.seccionesCompletadas)
+    // S2 esta ABIERTA pero su bloque no esta aprobado: recorrido != dominio.
+    // Es el caso que hacia que el sidebar del voluntario la pintara en verde.
+    expect(detalle.secciones).toEqual(
+      expect.arrayContaining([
+        { seccionId: SECCION_ID_2, completada: false, bloquesCompletados: 0, bloquesTotales: 1 },
+      ]),
+    )
+  })
+
+  it("VOLUNTARIO: catalogo vacio -> 0% con detalle vacio (nunca 100% vacuo)", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      rol: RolAsignacion.VOLUNTARIO,
+      cursoId: CURSO_ID,
+      colaboradorId: COLABORADOR_ID,
+    })
+    prisma.seccion.findMany.mockResolvedValueOnce([])
+
+    const detalle = await service.obtenerAvanceDetallado(ASIGNACION_ID)
+
+    expect(detalle).toEqual({
+      porcentaje: 0,
+      seccionesCompletadas: 0,
+      seccionesTotales: 0,
+      secciones: [],
+    })
+  })
+
+  it("ASIGNADO: solo describe las secciones OBLIGATORIAS de su plan", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      rol: RolAsignacion.ASIGNADO,
+      cursoId: CURSO_ID,
+      colaboradorId: COLABORADOR_ID,
+    })
+    prisma.planEstudio.findUnique.mockResolvedValue({ id: PLAN_ID })
+    prisma.itemPlan.findMany.mockResolvedValueOnce([{ seccionId: SECCION_ID_1 }])
+    prisma.seccion.findMany.mockResolvedValueOnce([
+      { id: SECCION_ID_1, bloques: [{ id: "b1", tipo: "QUIZ", contenido: {} }] },
+    ])
+    prisma.intentoBloque.findMany.mockResolvedValueOnce([
+      { bloqueId: "b1", nota: new Prisma.Decimal(90) },
+    ])
+    prisma.aperturaSeccion.findMany.mockResolvedValueOnce([])
+
+    const detalle = await service.obtenerAvanceDetallado(ASIGNACION_ID)
+
+    expect(detalle.porcentaje).toBe(100)
+    expect(detalle.secciones).toEqual([
+      { seccionId: SECCION_ID_1, completada: true, bloquesCompletados: 1, bloquesTotales: 1 },
+    ])
+  })
+
+  it("Asignacion inexistente -> detalle vacio (defensa)", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue(null)
+    const detalle = await service.obtenerAvanceDetallado(ASIGNACION_ID)
+    expect(detalle.seccionesTotales).toBe(0)
+    expect(detalle.secciones).toEqual([])
+  })
+})
+
+// =============================================================================
 // P11.5c (D-S11.5-C*) — cierre TODO(S11) en `crearAsignacionesAdmin` y
 // `convertirAAsignado`: `calcularSiAsignado` notifica al participante tras un
 // calculo exitoso reutilizando `notificarPlanRecalculado`.
