@@ -24,6 +24,7 @@ const ESTADO_INICIAL: CursoNuevoForm = {
   clienteId: "",
   fechaInicio: "",
   fechaDeadline: "",
+  permiteVoluntarios: true,
 }
 
 export function CursoNuevoDialog({
@@ -58,6 +59,7 @@ export function CursoNuevoDialog({
         clienteId: form.clienteId,
         fechaInicio: form.fechaInicio,
         fechaDeadline: form.fechaDeadline,
+        toggleVoluntarios: form.permiteVoluntarios,
       })
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {

@@ -304,12 +304,18 @@ describe("MeBandejaService.obtenerBandeja", () => {
         }),
       ])
       .mockResolvedValueOnce([])
-    plan.obtenerPorcentajeAvance.mockResolvedValueOnce(50)
+    // Cierre de P25: la bandeja ya no fuerza 0 al voluntario; pide el % real al
+    // motor para TODOS los roles. El motor responde por asignacion (50 asignado,
+    // 20 voluntario). El foco del test es el ORDEN: ASIGNADO antes que VOLUNTARIO.
+    plan.obtenerPorcentajeAvance.mockImplementation((asignacionId: string) =>
+      Promise.resolve(asignacionId === ASIG_2 ? 50 : 20),
+    )
 
     const out = await service.obtenerBandeja(USER)
     expect(out.pendientes[0]?.rol).toBe("ASIGNADO")
+    expect(out.pendientes[0]?.porcentajeAvance).toBe(50)
     expect(out.pendientes[1]?.rol).toBe("VOLUNTARIO")
-    expect(out.pendientes[1]?.porcentajeAvance).toBe(0)
+    expect(out.pendientes[1]?.porcentajeAvance).toBe(20)
   })
 
   it("contadores: pasa novedades y voluntariado al envelope", async () => {

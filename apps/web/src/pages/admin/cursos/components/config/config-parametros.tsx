@@ -15,14 +15,6 @@ interface Parametro {
 function construirParametros(curso: CursoDetalle): readonly Parametro[] {
   return [
     {
-      id: "voluntarios",
-      etiqueta: "Voluntarios habilitados",
-      valor: curso.toggleVoluntarios ? "Sí" : "No",
-      descripcion: curso.toggleVoluntarios
-        ? "Cualquier colaborador puede inscribirse al curso por su cuenta."
-        : "Solo los asignados explícitamente pueden cursarlo.",
-    },
-    {
       id: "cierre-auto",
       etiqueta: "Cierre automático",
       valor: curso.toggleCierreAutomatico ? "Sí" : "No",
@@ -53,11 +45,12 @@ export function ConfigParametros({ curso }: ConfigParametrosProps) {
         <div className="flex flex-col">
           <h2 className="text-h3 text-text-primary">Parámetros del curso</h2>
           <p className="text-body-sm text-text-secondary">
-            Comportamiento básico del curso. La edición se habilitará en una próxima iteración.
+            Comportamiento básico del curso. El cierre automático y el desbloqueo aún no son
+            editables (próxima iteración).
           </p>
         </div>
       </header>
-      <dl className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+      <dl className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         {params.map((p) => (
           <div key={p.id} className="flex flex-col gap-1.5">
             <dt className="nx-eyebrow text-text-tertiary">{p.etiqueta}</dt>

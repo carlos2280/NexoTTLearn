@@ -7,6 +7,14 @@ import type { AyudaContenido } from "@/shared/components/ui/ayuda-popover"
  * qué pasa al cambiarlo y un ejemplo típico. Lenguaje claro, sin jerga.
  */
 export const AYUDAS_CONFIG_CURSO = {
+  voluntarios: {
+    queEs:
+      "Con voluntarios habilitados, cualquier colaborador puede autoinscribirse al curso desde el catálogo, sin que un admin se lo asigne. Apagado, solo cursan quienes tienen una asignación explícita.",
+    siCambias:
+      "Al apagarlo, el curso deja de aparecer en el catálogo abierto y nadie nuevo puede autoinscribirse; los voluntarios ya inscritos siguen su curso. Al encenderlo, vuelve a ofrecerse a todos.",
+    ejemplo:
+      "Curso de formación general abierto a quien quiera → ON. Programa cerrado para un cliente o un grupo específico → OFF.",
+  },
   pesos: {
     queEs:
       "La nota final de cada skill viene de tres fuentes: clases (bloques), proyecto transversal y entrevista IA. Aquí decides cuánto pesa cada una.",

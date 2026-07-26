@@ -13,7 +13,7 @@ const MOTIVO_BASE: ReadonlyMap<RazonDisponibilidadTransversal, string | null> = 
   ["SIEMPRE", null],
   ["PLAN_COMPLETADO", null],
   ["DESDE_FECHA", null],
-  ["BLOQUEADO_PLAN_INCOMPLETO", "Completa tu plan de estudio antes de empezar el transversal."],
+  ["BLOQUEADO_PLAN_INCOMPLETO", "Completa el curso antes de empezar el transversal."],
 ])
 
 export function motivoTransversal(
