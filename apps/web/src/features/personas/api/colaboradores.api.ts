@@ -1,8 +1,10 @@
 import { httpClient } from "@/shared/api/http-client"
 import type {
+  AltaColaboradoresLoteResponse,
   CambiarRolResponse,
   ColaboradorAdminResumen,
   CrearColaboradorInput,
+  CrearColaboradoresLoteInput,
   FichaResponse,
   ListarColaboradoresQuery,
   Paginated,
@@ -58,6 +60,12 @@ export function listarColaboradores(
 
 export function crearColaborador(input: CrearColaboradorInput): Promise<AltaColaboradorResponse> {
   return httpClient.post<AltaColaboradorResponse>("/colaboradores", input)
+}
+
+export function crearColaboradoresLote(
+  input: CrearColaboradoresLoteInput,
+): Promise<AltaColaboradoresLoteResponse> {
+  return httpClient.post<AltaColaboradoresLoteResponse>("/colaboradores/lote", input)
 }
 
 export function obtenerFichaColaborador(colaboradorId: string): Promise<FichaResponse> {

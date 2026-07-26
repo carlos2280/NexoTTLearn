@@ -1,10 +1,16 @@
 import type {
   CrearColaboradorInput,
+  CrearColaboradoresLoteInput,
   PatchSkillRequest,
   RolUsuario,
 } from "@nexott-learn/shared-types"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { cambiarRolColaborador, crearColaborador, editarNotaSkill } from "../api/colaboradores.api"
+import {
+  cambiarRolColaborador,
+  crearColaborador,
+  crearColaboradoresLote,
+  editarNotaSkill,
+} from "../api/colaboradores.api"
 import { PERSONAS_QUERY_KEY } from "./use-listar-personas"
 
 function useInvalidarPersonas() {
@@ -16,6 +22,14 @@ export function useCrearPersona() {
   const invalidar = useInvalidarPersonas()
   return useMutation({
     mutationFn: (input: CrearColaboradorInput) => crearColaborador(input),
+    onSuccess: () => invalidar(),
+  })
+}
+
+export function useCrearPersonasLote() {
+  const invalidar = useInvalidarPersonas()
+  return useMutation({
+    mutationFn: (input: CrearColaboradoresLoteInput) => crearColaboradoresLote(input),
     onSuccess: () => invalidar(),
   })
 }
