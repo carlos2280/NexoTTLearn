@@ -17,6 +17,7 @@ import {
   ActualizarSkillsExigidasCursoInput,
   ActualizarTransversalCursoInput,
   ActualizarUmbralesLogroCursoInput,
+  ActualizarVoluntariosCursoInput,
   CerrarCursoInput,
   CrearCursoInput,
   CursoConfiguracionResponse,
@@ -2114,6 +2115,44 @@ export class CursosService {
           autorUsuarioId,
           accion: AccionLogCurso.TOGGLE_ENTREVISTA,
           motivo: this.resolverMotivoLog(motivo, "Configuracion entrevista IA"),
+          previewImpacto,
+        },
+      })
+      return this.releerCursoDetalle(tx, cursoId)
+    })
+    return { ...toCursoDetalle(detalle), umbralesLogro: parseUmbralesLogro(detalle.umbralesLogro) }
+  }
+
+  /**
+   * Endpoint 8 — PATCH /api/v1/cursos/:id/voluntarios. Habilita o corta la
+   * autoinscripcion de voluntarios (`Curso.toggleVoluntarios`). A diferencia del
+   * PATCH general del curso (`actualizar`, solo BORRADOR), reusa
+   * `leerCursoParaConfigurar` para admitir tambien ACTIVO con motivo (D-CUR-4
+   * P4b). Apagar el flag NO expulsa a los ya inscritos (decision de producto):
+   * solo corta nuevas autoinscripciones y saca el curso del catalogo abierto.
+   */
+  async actualizarVoluntarios(
+    cursoId: string,
+    input: ActualizarVoluntariosCursoInput,
+    motivo: string | undefined,
+    autorUsuarioId: string,
+  ): Promise<CursoConfiguracionResponse> {
+    const detalle = await this.prisma.$transaction(async (tx) => {
+      const actual = await this.leerCursoParaConfigurar(tx, cursoId, motivo)
+      await tx.curso.update({
+        where: { id: cursoId },
+        data: { toggleVoluntarios: input.toggleVoluntarios },
+      })
+      const previewImpacto: Prisma.InputJsonValue = {
+        anterior: actual.toggleVoluntarios,
+        nuevo: input.toggleVoluntarios,
+      }
+      await tx.logCambioCurso.create({
+        data: {
+          cursoId,
+          autorUsuarioId,
+          accion: AccionLogCurso.OTRO,
+          motivo: this.resolverMotivoLog(motivo, "Configuracion voluntarios"),
           previewImpacto,
         },
       })

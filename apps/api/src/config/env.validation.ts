@@ -87,6 +87,19 @@ const envSchema = z
           .map((origin) => origin.trim())
           .filter((origin) => origin.length > 0),
       ),
+    // Dominios de email permitidos en el alta masiva de colaboradores (P17).
+    // Lista separada por comas; `*` permite cualquier dominio. Default: solo el
+    // dominio corporativo → evita altas fuera de la organizacion por typo.
+    // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
+    ALTA_LOTE_DOMINIOS: z
+      .string()
+      .default("emeal.nttdata.com")
+      .transform((value) =>
+        value
+          .split(",")
+          .map((dominio) => dominio.trim().toLowerCase())
+          .filter((dominio) => dominio.length > 0),
+      ),
     // biome-ignore lint/style/useNamingConvention: nombre de variable de entorno (POSIX).
     SECRETS_ENCRYPTION_KEY: z
       .string()

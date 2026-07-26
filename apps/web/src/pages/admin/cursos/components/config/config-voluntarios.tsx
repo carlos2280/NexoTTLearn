@@ -1,4 +1,4 @@
-import { useActualizarCurso } from "@/features/cursos/hooks/use-mutaciones-curso"
+import { useActualizarVoluntariosCurso } from "@/features/cursos/hooks/use-mutaciones-config-curso"
 import { Switch } from "@/shared/components/ui/switch"
 import type { CursoDetalle } from "@nexott-learn/shared-types"
 import { useEffect, useState } from "react"
@@ -12,7 +12,7 @@ interface ConfigVoluntariosProps {
 }
 
 export function ConfigVoluntarios({ curso, bloqueado }: ConfigVoluntariosProps) {
-  const mutacion = useActualizarCurso()
+  const mutacion = useActualizarVoluntariosCurso()
   const [permite, setPermite] = useState(curso.toggleVoluntarios)
   const [solicitudGuardar, setSolicitudGuardar] = useState(0)
 
@@ -22,7 +22,7 @@ export function ConfigVoluntarios({ curso, bloqueado }: ConfigVoluntariosProps) 
 
   async function guardar(motivo: string | undefined) {
     await mutacion.mutateAsync({
-      id: curso.id,
+      cursoId: curso.id,
       input: construirInputVoluntarios(permite),
       motivo,
     })

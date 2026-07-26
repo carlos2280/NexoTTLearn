@@ -5,9 +5,9 @@ describe("calcularSeccionCompletada", () => {
   describe("soloLectura (curso CERRADO)", () => {
     it("siempre marca completada, independiente del modo y del plan", () => {
       const escenarios = [
-        { modo: "asignado" as const, planCompletada: false, abiertaPorAperturas: false },
-        { modo: "voluntario" as const, planCompletada: undefined, abiertaPorAperturas: false },
-        { modo: "preview" as const, planCompletada: undefined, abiertaPorAperturas: false },
+        { modo: "asignado" as const, planCompletada: false, completadaSegunAvance: false },
+        { modo: "voluntario" as const, planCompletada: undefined, completadaSegunAvance: false },
+        { modo: "preview" as const, planCompletada: undefined, completadaSegunAvance: undefined },
       ]
       for (const input of escenarios) {
         expect(calcularSeccionCompletada({ ...input, soloLectura: true })).toBe(true)
@@ -21,7 +21,7 @@ describe("calcularSeccionCompletada", () => {
           modo: "asignado",
           soloLectura: true,
           planCompletada: true,
-          abiertaPorAperturas: false,
+          completadaSegunAvance: false,
         }),
       ).toBe(true)
     })
@@ -34,18 +34,20 @@ describe("calcularSeccionCompletada", () => {
           modo: "asignado",
           soloLectura: false,
           planCompletada: true,
-          abiertaPorAperturas: false,
+          completadaSegunAvance: false,
         }),
       ).toBe(true)
     })
 
-    it("NO marca completada si solo está abierta por AperturaSeccion (evita contradicción 9/22 con 22 checks)", () => {
+    it("el plan manda sobre el avance: si el plan dice que no, no se marca", () => {
+      // El asignado sigue leyendo su PlanEstudio (fuente historica). El avance
+      // solo aporta el conteo de bloques para el icono de reto.
       expect(
         calcularSeccionCompletada({
           modo: "asignado",
           soloLectura: false,
           planCompletada: false,
-          abiertaPorAperturas: true,
+          completadaSegunAvance: true,
         }),
       ).toBe(false)
     })
@@ -56,31 +58,45 @@ describe("calcularSeccionCompletada", () => {
           modo: "asignado",
           soloLectura: false,
           planCompletada: undefined,
-          abiertaPorAperturas: true,
+          completadaSegunAvance: true,
         }),
       ).toBe(false)
     })
   })
 
   describe("modo voluntario (D-AS-1: sin plan personal)", () => {
-    it("marca completada cuando hay AperturaSeccion", () => {
+    it("marca completada cuando el avance dice que la superó", () => {
       expect(
         calcularSeccionCompletada({
           modo: "voluntario",
           soloLectura: false,
           planCompletada: undefined,
-          abiertaPorAperturas: true,
+          completadaSegunAvance: true,
         }),
       ).toBe(true)
     })
 
-    it("no marca completada si la sección nunca se abrió", () => {
+    it("P28: abrir la sección ya NO la marca completada si quedan bloques sin aprobar", () => {
+      // El caso que rompia: el voluntario abria las 38 secciones y las veia
+      // todas en verde, conviviendo con "92% completado" y el transversal
+      // bloqueado sin explicacion. El avance (dominio) es ahora la fuente.
       expect(
         calcularSeccionCompletada({
           modo: "voluntario",
           soloLectura: false,
           planCompletada: undefined,
-          abiertaPorAperturas: false,
+          completadaSegunAvance: false,
+        }),
+      ).toBe(false)
+    })
+
+    it("no marca completada si el avance aún no llegó (nunca inventa un verde)", () => {
+      expect(
+        calcularSeccionCompletada({
+          modo: "voluntario",
+          soloLectura: false,
+          planCompletada: undefined,
+          completadaSegunAvance: undefined,
         }),
       ).toBe(false)
     })
@@ -93,7 +109,7 @@ describe("calcularSeccionCompletada", () => {
           modo: "preview",
           soloLectura: false,
           planCompletada: undefined,
-          abiertaPorAperturas: true,
+          completadaSegunAvance: true,
         }),
       ).toBe(false)
     })

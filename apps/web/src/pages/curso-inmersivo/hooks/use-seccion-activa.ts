@@ -1,10 +1,12 @@
 import type {
   CursoArbolResponse,
   MeAvanceCursoResponse,
+  MeAvanceSeccionEstado,
   PlanResponseParticipante,
   SeccionPlanItemParticipante,
 } from "@nexott-learn/shared-types"
 import { useEffect, useMemo, useState } from "react"
+import { indexarEstadoAvancePorSeccion } from "../components/sidebar-plan.helpers"
 
 export interface SeccionActiva {
   readonly seccionId: string
@@ -16,9 +18,13 @@ export interface SeccionActiva {
   readonly titulo: string
   /** Solo presente en modo asignado (proviene del plan personal). */
   readonly caracter: SeccionPlanItemParticipante["caracter"] | null
-  /** Solo true en modo asignado cuando el plan la marca como completada. */
+  /**
+   * Sección superada. Sale del plan personal (asignado) o, si no hay plan
+   * (voluntario, D-AS-1), del estado por sección del avance. Misma prioridad
+   * que `FilaSeccion` para que el canvas y el sidebar no se contradigan.
+   */
   readonly completada: boolean
-  /** Solo presente en modo asignado. */
+  /** Conteo de bloques evaluables, del plan o del avance. */
   readonly avance: SeccionPlanItemParticipante["avance"] | null
 }
 
@@ -54,10 +60,14 @@ export function useSeccionActiva(input: UseSeccionActivaInput): UseSeccionActiva
   const [seleccionada, setSeleccionada] = useState<string | null>(null)
 
   const indicePlan = useMemo(() => indexarPlan(plan), [plan])
+  const indiceAvance = useMemo(
+    () => indexarEstadoAvancePorSeccion(avance?.seccionesEstado),
+    [avance?.seccionesEstado],
+  )
 
   const indice = useMemo(() => {
-    return indexarArbol(arbol, indicePlan)
-  }, [arbol, indicePlan])
+    return indexarArbol(arbol, indicePlan, indiceAvance)
+  }, [arbol, indicePlan, indiceAvance])
 
   const idDefault = useMemo(() => calcularDefault(arbol, plan, avance), [arbol, plan, avance])
 
@@ -123,6 +133,7 @@ function indexarPlan(plan: PlanResponseParticipante | undefined): Map<string, An
 function indexarArbol(
   arbol: CursoArbolResponse | undefined,
   anotacionPlan: ReadonlyMap<string, AnotacionPlan>,
+  estadoAvance: ReadonlyMap<string, MeAvanceSeccionEstado>,
 ): Map<string, SeccionActiva> {
   const map = new Map<string, SeccionActiva>()
   if (!arbol) {
@@ -131,6 +142,11 @@ function indexarArbol(
   for (const [indiceModulo, modulo] of arbol.modulos.entries()) {
     for (const seccion of modulo.secciones) {
       const plan = anotacionPlan.get(seccion.seccionId)
+      // El voluntario no tiene plan (D-AS-1): sin este fallback el canvas
+      // anunciaba "Sección de lectura — se marca como completada al abrirla"
+      // en secciones CON reto, justo mientras el sidebar la mantenia pendiente
+      // por tener bloques sin aprobar (P28).
+      const estado = estadoAvance.get(seccion.seccionId)
       map.set(seccion.seccionId, {
         seccionId: seccion.seccionId,
         moduloId: modulo.moduloId,
@@ -138,12 +154,25 @@ function indexarArbol(
         moduloTitulo: modulo.titulo,
         titulo: seccion.titulo,
         caracter: plan?.caracter ?? null,
-        completada: plan?.completada ?? false,
-        avance: plan?.avance ?? null,
+        completada: plan?.completada ?? estado?.completada ?? false,
+        avance: plan?.avance ?? anotacionAvance(estado),
       })
     }
   }
   return map
+}
+
+/** Adapta el estado del avance a la forma `{ bloquesCompletados, bloquesTotales }`. */
+function anotacionAvance(
+  estado: MeAvanceSeccionEstado | undefined,
+): SeccionPlanItemParticipante["avance"] | null {
+  if (!estado) {
+    return null
+  }
+  return {
+    bloquesCompletados: estado.bloquesCompletados,
+    bloquesTotales: estado.bloquesTotales,
+  }
 }
 
 function calcularDefault(

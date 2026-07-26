@@ -27,6 +27,7 @@ import type {
 } from "@nexott-learn/shared-types"
 import { CaracterItemPlan, Prisma, RazonItemPlan, RolUsuario } from "@prisma/client"
 import type {
+  AvanceDetallado,
   AvancePlan,
   AvanceSeccion,
   ItemPlanCalculado,
@@ -35,6 +36,39 @@ import type {
 
 const PORCENTAJE_TOTAL = 100
 const PRECISION_PORCENTAJE = 2
+
+/**
+ * Avance de una asignacion sobre la que no hay metrica: sin plan (ASIGNADO
+ * antes de `calcularExplicito`), plan sin obligatorias, curso sin secciones o
+ * asignacion inexistente. 0% con detalle vacio — nunca 100% vacuo, que le
+ * abriria el transversal a alguien que no curso nada.
+ */
+export const AVANCE_DETALLADO_VACIO: AvanceDetallado = Object.freeze({
+  porcentaje: 0,
+  seccionesCompletadas: 0,
+  seccionesTotales: 0,
+  // Congelado: el provider es scope DEFAULT, asi que esta misma instancia (y
+  // este mismo array) viaja a la respuesta de todos los requests que caigan en
+  // el caso vacio. `readonly` solo protege en compilacion.
+  secciones: Object.freeze([]),
+})
+
+/**
+ * Adapta la salida de `calcularAvance` al contrato `AvanceDetallado`. El orden
+ * de `secciones` es el de insercion del Map (el de las secciones evaluadas);
+ * el consumidor debe indexar por `seccionId`, no por posicion.
+ */
+export function toAvanceDetallado(
+  avancePlan: AvancePlan,
+  porSeccion: ReadonlyMap<string, AvanceSeccion>,
+): AvanceDetallado {
+  return {
+    porcentaje: avancePlan.porcentaje,
+    seccionesCompletadas: avancePlan.seccionesCompletadas,
+    seccionesTotales: avancePlan.seccionesObligatorias,
+    secciones: [...porSeccion.values()],
+  }
+}
 
 const ORIGEN_NOTA_VALORES = [
   "ENTREVISTA_INICIAL",

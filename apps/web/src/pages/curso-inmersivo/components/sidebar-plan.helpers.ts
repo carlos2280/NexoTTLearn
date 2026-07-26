@@ -1,4 +1,5 @@
 import type {
+  MeAvanceSeccionEstado,
   ModoCursoParticipante,
   PlanResponseParticipante,
   SeccionPlanItemParticipante,
@@ -36,4 +37,21 @@ export function indexarPlanPorSeccion(
     }
   }
   return map
+}
+
+/**
+ * Indexa el estado por sección del avance (`seccionesEstado`) para consultarlo
+ * en O(1) desde cada fila. Es la fuente de "completada" del voluntario, que no
+ * tiene plan personal (D-AS-1), y del ícono de reto en ambos modos.
+ *
+ * Devuelve un mapa vacío mientras el avance no ha cargado: las filas caen a
+ * "pendiente", nunca a un verde inventado.
+ */
+export function indexarEstadoAvancePorSeccion(
+  seccionesEstado: readonly MeAvanceSeccionEstado[] | undefined,
+): ReadonlyMap<string, MeAvanceSeccionEstado> {
+  if (!seccionesEstado) {
+    return new Map()
+  }
+  return new Map(seccionesEstado.map((s) => [s.seccionId, s]))
 }

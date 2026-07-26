@@ -16,10 +16,12 @@ import {
 } from "@nestjs/common"
 import { Throttle } from "@nestjs/throttler"
 import {
+  AltaColaboradoresLoteResponse,
   CambiarRolInput,
   CambiarRolResponse,
   ColaboradorAdminResumen,
   CrearColaboradorInput,
+  CrearColaboradoresLoteInput,
   EntradaHistoricoNotaSkill,
   ExportarColaboradoresQuery,
   FichaResponse,
@@ -30,6 +32,7 @@ import {
   PatchSkillResponse,
   cambiarRolSchema,
   crearColaboradorSchema,
+  crearColaboradoresLoteSchema,
   exportarColaboradoresQuerySchema,
   listarColaboradoresQuerySchema,
   paginacionQuerySchema,
@@ -129,6 +132,25 @@ export class ColaboradoresController {
     @Req() req: Request,
   ): Promise<AltaColaboradorResponse> {
     return await this.colaboradoresService.crear(
+      input,
+      this.requireUsuario(admin).usuarioId,
+      extractContextoHttp(req),
+    )
+  }
+
+  @Post("lote")
+  @Roles(RolUsuario.ADMIN)
+  @HttpCode(HttpStatus.CREATED)
+  // Override del throttler "long" (definido en app.module) a 5/min: el nombre
+  // debe coincidir con uno registrado; "default" seria dead code. El "short"
+  // (10/1s) sigue aplicando. El alta masiva es cara (bcrypt por fila).
+  @Throttle({ long: { ttl: 60_000, limit: 5 } })
+  async crearLote(
+    @Body(new ZodValidationPipe(crearColaboradoresLoteSchema)) input: CrearColaboradoresLoteInput,
+    @CurrentUser() admin: SesionUsuario | undefined,
+    @Req() req: Request,
+  ): Promise<AltaColaboradoresLoteResponse> {
+    return await this.colaboradoresService.crearLote(
       input,
       this.requireUsuario(admin).usuarioId,
       extractContextoHttp(req),

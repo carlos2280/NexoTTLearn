@@ -1,6 +1,10 @@
 import type {
+  AltaColaboradoresLoteResponse,
   ColaboradorAdminResumen,
+  ColaboradorLoteCreado,
+  ColaboradorLoteRechazado,
   CrearColaboradorInput,
+  CrearColaboradoresLoteInput,
   ListarColaboradoresQuery,
   Paginated,
 } from "@nexott-learn/shared-types"
@@ -9,6 +13,8 @@ import { type MockHandler, type MockRequest, defineRoute } from "./router"
 
 const RTE_LISTAR = /^\/colaboradores(\?.*)?$/
 const RTE_CREAR = /^\/colaboradores$/
+const RTE_CREAR_LOTE = /^\/colaboradores\/lote$/
+const DOMINIOS_MOCK = ["emeal.nttdata.com", "nexott.local"]
 const RTE_FICHA = /^\/colaboradores\/[^/]+\/ficha$/
 const RTE_REGENERAR = /^\/auth\/regenerar-password-inicial$/
 const RTE_DESBLOQUEAR = /^\/auth\/desbloquear$/
@@ -205,6 +211,66 @@ const crearHandler: MockHandler = (req: MockRequest) => {
   }
 }
 
+const crearLoteHandler: MockHandler = (req: MockRequest) => {
+  const input = req.body as CrearColaboradoresLoteInput
+  const creados: ColaboradorLoteCreado[] = []
+  const rechazados: ColaboradorLoteRechazado[] = []
+  const vistos = new Set<string>()
+  const existentes = new Set(Array.from(store.values()).map((p) => p.email.toLowerCase()))
+
+  for (const fila of input.colaboradores) {
+    const email = fila.email.trim().toLowerCase()
+    const nombre = fila.nombre.trim()
+    const dominio = email.slice(email.lastIndexOf("@") + 1)
+    if (!DOMINIOS_MOCK.includes(dominio)) {
+      rechazados.push({ email, nombre, motivo: "dominio_no_permitido" })
+      continue
+    }
+    if (vistos.has(email)) {
+      rechazados.push({ email, nombre, motivo: "duplicado_en_lote" })
+      continue
+    }
+    if (existentes.has(email)) {
+      rechazados.push({ email, nombre, motivo: "ya_existe" })
+      continue
+    }
+    vistos.add(email)
+    const id = nuevoUuid()
+    store.set(id, {
+      id,
+      nombre,
+      email,
+      estadoEmpleado: "ACTIVO",
+      fechaOffBoarding: null,
+      createdAt: new Date().toISOString(),
+      usuario: {
+        id: `usr-${id.slice(0, 8)}`,
+        rol: input.rol,
+        bloqueado: false,
+        mfaHabilitado: false,
+        requiereCambioPassword: true,
+        requiereSetupMfa: input.habilitarMfa,
+        intentosFallidos: 0,
+        ultimoLogin: null,
+      },
+    })
+    creados.push({ email, nombre, passwordTemporal: "Inicial1234!" })
+  }
+
+  const respuesta: AltaColaboradoresLoteResponse = {
+    creados,
+    rechazados,
+    resumen: {
+      total: input.colaboradores.length,
+      creados: creados.length,
+      rechazados: rechazados.length,
+    },
+    requiereCambioPassword: true,
+    passwordInicialCaducaEn: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+  }
+  return respuesta
+}
+
 const fichaHandler: MockHandler = () => ({
   colaboradorId: "mock",
   nombre: "Mock",
@@ -241,6 +307,7 @@ const desbloquearHandler: MockHandler = (req: MockRequest) => {
 
 export const handlersPersonas = [
   defineRoute("GET", RTE_LISTAR, listarHandler),
+  defineRoute("POST", RTE_CREAR_LOTE, crearLoteHandler),
   defineRoute("POST", RTE_CREAR, crearHandler),
   defineRoute("GET", RTE_FICHA, fichaHandler),
   defineRoute("POST", RTE_REGENERAR, regenerarHandler),

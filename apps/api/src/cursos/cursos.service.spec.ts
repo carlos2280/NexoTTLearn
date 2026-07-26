@@ -1421,6 +1421,57 @@ describe("CursosService.actualizarEntrevistaIa", () => {
   })
 })
 
+describe("CursosService.actualizarVoluntarios", () => {
+  it("ACTIVO con motivo: apaga el flag (el bug que rechazaba editar en ACTIVO)", async () => {
+    prisma.curso.findUnique
+      .mockResolvedValueOnce(buildCursoConfigRow({ estado: EstadoCurso.ACTIVO }))
+      .mockResolvedValueOnce(buildCursoConfigRow({ estado: EstadoCurso.ACTIVO }))
+    await service.actualizarVoluntarios(
+      CURSO_ID,
+      { toggleVoluntarios: false },
+      "Restringimos a asignados",
+      ADMIN_ID,
+    )
+    expect(prisma.curso.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { toggleVoluntarios: false } }),
+    )
+    expect(prisma.logCambioCurso.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          accion: AccionLogCurso.OTRO,
+          previewImpacto: { anterior: true, nuevo: false },
+        }),
+      }),
+    )
+  })
+
+  it("BORRADOR: habilita el flag sin exigir motivo", async () => {
+    prisma.curso.findUnique
+      .mockResolvedValueOnce(buildCursoConfigRow({ estado: EstadoCurso.BORRADOR }))
+      .mockResolvedValueOnce(buildCursoConfigRow({ estado: EstadoCurso.BORRADOR }))
+    await service.actualizarVoluntarios(CURSO_ID, { toggleVoluntarios: true }, undefined, ADMIN_ID)
+    expect(prisma.curso.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { toggleVoluntarios: true } }),
+    )
+  })
+
+  it("ACTIVO sin motivo: 422 motivoRequerido", async () => {
+    prisma.curso.findUnique.mockResolvedValue(buildCursoConfigRow({ estado: EstadoCurso.ACTIVO }))
+    await expect(
+      service.actualizarVoluntarios(CURSO_ID, { toggleVoluntarios: false }, undefined, ADMIN_ID),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.motivoRequerido } })
+  })
+
+  it("ARCHIVADO: 409 conflictCursoEstado (la config no aplica en ese estado)", async () => {
+    prisma.curso.findUnique.mockResolvedValue(
+      buildCursoConfigRow({ estado: EstadoCurso.ARCHIVADO }),
+    )
+    await expect(
+      service.actualizarVoluntarios(CURSO_ID, { toggleVoluntarios: false }, "motivo", ADMIN_ID),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.conflictCursoEstado } })
+  })
+})
+
 // =============================================================================
 // P4c — Publicacion BORRADOR -> ACTIVO (D63, D-CUR-9)
 // =============================================================================

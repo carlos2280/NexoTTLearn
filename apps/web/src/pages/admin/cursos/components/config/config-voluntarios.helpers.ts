@@ -1,4 +1,4 @@
-import type { ActualizarCursoInput } from "@nexott-learn/shared-types"
+import type { ActualizarVoluntariosCursoInput } from "@nexott-learn/shared-types"
 
 /**
  * Copy del estado del toggle de voluntarios. Se muestra bajo el switch para
@@ -11,12 +11,13 @@ export function descripcionVoluntarios(permite: boolean): string {
 }
 
 /**
- * Construye el input del PATCH del curso para el toggle de voluntarios.
+ * Construye el input del PATCH de configuracion de voluntarios.
  *
- * Solo viaja `toggleVoluntarios` (edicion atomica): el resto de campos del
- * curso queda intacto. Fijar este contrato evita que un cambio futuro mande
- * el curso entero por accidente.
+ * Usa el contrato dedicado `ActualizarVoluntariosCursoInput` (endpoint
+ * `/cursos/:id/voluntarios`, que admite BORRADOR y ACTIVO), no el PATCH general
+ * del curso (solo BORRADOR). Solo viaja `toggleVoluntarios`: el schema `.strict()`
+ * impide arrastrar cualquier otro campo del curso por accidente.
  */
-export function construirInputVoluntarios(permite: boolean): ActualizarCursoInput {
+export function construirInputVoluntarios(permite: boolean): ActualizarVoluntariosCursoInput {
   return { toggleVoluntarios: permite }
 }
