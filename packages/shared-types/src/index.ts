@@ -12,6 +12,17 @@ export { aceptarAvisoPrivacidadSchema } from "./auth/aceptar-aviso.schema"
 export type { AceptarAvisoPrivacidadInput } from "./auth/aceptar-aviso.schema"
 export { crearColaboradorSchema } from "./auth/crear-colaborador.schema"
 export type { CrearColaboradorInput } from "./auth/crear-colaborador.schema"
+export {
+  crearColaboradoresLoteSchema,
+  MAX_COLABORADORES_LOTE,
+} from "./auth/crear-colaboradores-lote.schema"
+export type {
+  AltaColaboradoresLoteResponse,
+  ColaboradorLoteCreado,
+  ColaboradorLoteRechazado,
+  CrearColaboradoresLoteInput,
+  MotivoRechazoLote,
+} from "./auth/crear-colaboradores-lote.schema"
 export { regenerarPasswordInicialSchema } from "./auth/regenerar-password.schema"
 export type { RegenerarPasswordInicialInput } from "./auth/regenerar-password.schema"
 export { desbloquearSchema } from "./auth/desbloquear.schema"

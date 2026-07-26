@@ -4,12 +4,14 @@ import {
   NotFoundException,
   NotImplementedException,
 } from "@nestjs/common"
+import { ConfigService } from "@nestjs/config"
 import { AccionAuditoria, ModoEntregaPassword, Prisma, RolUsuario } from "@prisma/client"
 import bcrypt from "bcrypt"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AuditLogService } from "../common/audit/audit-log.service"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
+import { AppEnv } from "../config/env.validation"
 import { ColaboradoresService } from "./colaboradores.service"
 
 interface MockPrisma {
@@ -45,14 +47,18 @@ const ADMIN_ID = "admin-1"
 
 let prisma: MockPrisma
 let auditLog: MockAuditLog
+let config: { get: ReturnType<typeof vi.fn> }
 let service: ColaboradoresService
 
 beforeEach(() => {
   prisma = buildPrismaMock()
   auditLog = buildAuditLogMock()
+  // ConfigService stub: dominios permitidos del alta masiva (ALTA_LOTE_DOMINIOS).
+  config = { get: vi.fn().mockReturnValue(["emeal.nttdata.com"]) }
   service = new ColaboradoresService(
     prisma as unknown as PrismaService,
     auditLog as unknown as AuditLogService,
+    config as unknown as ConfigService<AppEnv, true>,
   )
 })
 
@@ -290,6 +296,179 @@ describe("ColaboradoresService.crear", () => {
     )
     expect(requiereSetupPersistido).toBe(false)
     expect(result.usuario.requiereSetupMfa).toBe(false)
+  })
+})
+
+describe("ColaboradoresService.crearLote", () => {
+  function stubTransaccionOk(): void {
+    prisma.$transaction.mockImplementation(
+      async (cb: (tx: unknown) => Promise<unknown>) =>
+        await cb({
+          colaborador: { create: vi.fn().mockResolvedValue({ id: "col-x" }) },
+          usuario: { create: vi.fn().mockResolvedValue({ id: "usr-x" }) },
+          historicoPassword: { create: vi.fn().mockResolvedValue(undefined) },
+        }),
+    )
+  }
+
+  it("happy path: crea las filas validas y devuelve sus passwords fuertes", async () => {
+    stubTransaccionOk()
+    const result = await service.crearLote(
+      {
+        rol: RolUsuario.PARTICIPANTE,
+        habilitarMfa: false,
+        colaboradores: [
+          { email: "ana@emeal.nttdata.com", nombre: "Ana" },
+          { email: "beto@emeal.nttdata.com", nombre: "Beto" },
+        ],
+      },
+      ADMIN_ID,
+    )
+    expect(result.resumen).toEqual({ total: 2, creados: 2, rechazados: 0 })
+    expect(result.creados).toHaveLength(2)
+    expect(result.creados.every((c) => REGEX_FORTALEZA.test(c.passwordTemporal))).toBe(true)
+    expect(result.requiereCambioPassword).toBe(true)
+    expect(auditLog.record).toHaveBeenCalledTimes(2)
+  })
+
+  it("rechaza dominio no permitido sin abortar el resto", async () => {
+    stubTransaccionOk()
+    const result = await service.crearLote(
+      {
+        rol: RolUsuario.PARTICIPANTE,
+        habilitarMfa: false,
+        colaboradores: [
+          { email: "ok@emeal.nttdata.com", nombre: "Ok" },
+          { email: "fuera@gmail.com", nombre: "Fuera" },
+        ],
+      },
+      ADMIN_ID,
+    )
+    expect(result.resumen).toEqual({ total: 2, creados: 1, rechazados: 1 })
+    expect(result.rechazados).toContainEqual({
+      email: "fuera@gmail.com",
+      nombre: "Fuera",
+      motivo: "dominio_no_permitido",
+    })
+  })
+
+  it("deduplica emails repetidos en la tanda (case-insensitive)", async () => {
+    stubTransaccionOk()
+    const result = await service.crearLote(
+      {
+        rol: RolUsuario.PARTICIPANTE,
+        habilitarMfa: false,
+        colaboradores: [
+          { email: "ana@emeal.nttdata.com", nombre: "Ana" },
+          { email: "ANA@emeal.nttdata.com", nombre: "Ana duplicada" },
+        ],
+      },
+      ADMIN_ID,
+    )
+    expect(result.resumen.creados).toBe(1)
+    expect(result.rechazados).toContainEqual({
+      email: "ana@emeal.nttdata.com",
+      nombre: "Ana duplicada",
+      motivo: "duplicado_en_lote",
+    })
+  })
+
+  it("email ya existente (P2002): lo reporta como ya_existe sin abortar la tanda", async () => {
+    prisma.$transaction.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("Unique violation", {
+        code: "P2002",
+        clientVersion: "test",
+        meta: { target: ["email"] },
+      }),
+    )
+    const result = await service.crearLote(
+      {
+        rol: RolUsuario.PARTICIPANTE,
+        habilitarMfa: false,
+        colaboradores: [{ email: "existe@emeal.nttdata.com", nombre: "Existe" }],
+      },
+      ADMIN_ID,
+    )
+    expect(result.resumen).toEqual({ total: 1, creados: 0, rechazados: 1 })
+    expect(result.rechazados[0]?.motivo).toBe("ya_existe")
+  })
+
+  it("modo AUTOMATICO: 501 MODO_AUTOMATICO_NO_DISPONIBLE", async () => {
+    prisma.configuracionSistema.findUnique.mockResolvedValue({
+      modoEntregaPassword: ModoEntregaPassword.AUTOMATICO,
+    })
+    await expect(
+      service.crearLote(
+        {
+          rol: RolUsuario.PARTICIPANTE,
+          habilitarMfa: false,
+          colaboradores: [{ email: "x@emeal.nttdata.com", nombre: "X" }],
+        },
+        ADMIN_ID,
+      ),
+    ).rejects.toBeInstanceOf(NotImplementedException)
+  })
+
+  it("habilitarMfa=true: persiste requiereSetupMfa=true por fila", async () => {
+    let requiereSetupPersistido: boolean | undefined
+    prisma.$transaction.mockImplementation(
+      async (cb: (tx: unknown) => Promise<unknown>) =>
+        await cb({
+          colaborador: { create: vi.fn().mockResolvedValue({ id: "col-x" }) },
+          usuario: {
+            create: vi.fn().mockImplementation((args: { data: { requiereSetupMfa: boolean } }) => {
+              requiereSetupPersistido = args.data.requiereSetupMfa
+              return Promise.resolve({ id: "usr-x" })
+            }),
+          },
+          historicoPassword: { create: vi.fn().mockResolvedValue(undefined) },
+        }),
+    )
+    const result = await service.crearLote(
+      {
+        rol: RolUsuario.PARTICIPANTE,
+        habilitarMfa: true,
+        colaboradores: [{ email: "ana@emeal.nttdata.com", nombre: "Ana" }],
+      },
+      ADMIN_ID,
+    )
+    expect(result.resumen.creados).toBe(1)
+    expect(requiereSetupPersistido).toBe(true)
+  })
+
+  it("error inesperado en una fila: la marca error_interno sin abortar la tanda", async () => {
+    prisma.$transaction.mockRejectedValue(new Error("db down"))
+    const result = await service.crearLote(
+      {
+        rol: RolUsuario.PARTICIPANTE,
+        habilitarMfa: false,
+        colaboradores: [{ email: "ana@emeal.nttdata.com", nombre: "Ana" }],
+      },
+      ADMIN_ID,
+    )
+    expect(result.resumen).toEqual({ total: 1, creados: 0, rechazados: 1 })
+    expect(result.rechazados[0]?.motivo).toBe("error_interno")
+  })
+
+  it("lote mixto: creados + rechazados === total y las passwords solo van en creados", async () => {
+    stubTransaccionOk()
+    const result = await service.crearLote(
+      {
+        rol: RolUsuario.PARTICIPANTE,
+        habilitarMfa: false,
+        colaboradores: [
+          { email: "ana@emeal.nttdata.com", nombre: "Ana" },
+          { email: "fuera@gmail.com", nombre: "Fuera" },
+          { email: "ana@emeal.nttdata.com", nombre: "Ana dup" },
+          { email: "beto@emeal.nttdata.com", nombre: "Beto" },
+        ],
+      },
+      ADMIN_ID,
+    )
+    expect(result.resumen.total).toBe(4)
+    expect(result.resumen.creados + result.resumen.rechazados).toBe(4)
+    expect(result.creados).toHaveLength(2)
+    expect(result.creados.every((c) => c.passwordTemporal.length > 0)).toBe(true)
   })
 })
 
