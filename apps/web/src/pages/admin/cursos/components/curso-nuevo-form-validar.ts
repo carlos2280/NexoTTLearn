@@ -11,6 +11,7 @@ export interface CursoNuevoForm {
   readonly clienteId: string
   readonly fechaInicio: string
   readonly fechaDeadline: string
+  readonly permiteVoluntarios: boolean
 }
 
 export const MAX_TITULO_CURSO = 200
