@@ -1,11 +1,14 @@
-import { type ResultadoEjecucionSuite, useEjecutarCodigo } from "@/features/codigo-ejecucion"
+import {
+  type ResultadoEjecucionSuite,
+  resumirValidacionReferencia,
+  useEjecutarCodigo,
+} from "@/features/codigo-ejecucion"
 import { Banner } from "@/shared/components/ui/banner"
 import { Button } from "@/shared/components/ui/button"
 import { lenguajeEjecutableSchema } from "@nexott-learn/shared-types"
 import { Play } from "lucide-react"
 import { useMemo, useState } from "react"
 import type { TestUnit } from "./codigo-test-fila"
-import { resumirValidacionReferencia } from "./resumir-validacion-referencia"
 
 interface ValidarReferenciaProps {
   readonly solucionReferencia: string

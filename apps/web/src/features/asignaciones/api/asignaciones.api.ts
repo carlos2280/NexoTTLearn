@@ -1,6 +1,7 @@
 import { httpClient } from "@/shared/api/http-client"
 import type {
   Asignacion,
+  AsignacionConAvance,
   AsignacionDetallada,
   AsignacionHistoricoEntrada,
   AutoInscripcionRequest,
@@ -30,6 +31,11 @@ function buildListarQuery(query: ListarAsignacionesQuery): string {
   pushIfDefined(params, "rol", query.rol)
   pushIfDefined(params, "estado", query.estado)
   pushIfDefined(params, "q", query.q?.trim())
+  // Solo se manda cuando es `true`: el backend ya oculta los retirados por
+  // defecto y mandar "false" seria ruido en la URL.
+  if (query.incluirRetirados) {
+    params.set("incluirRetirados", "true")
+  }
   return `?${params.toString()}`
 }
 
@@ -43,8 +49,8 @@ function buildPaginacionQuery(query: PaginacionQuery): string {
 export function listarAsignacionesPorCurso(
   cursoId: string,
   query: ListarAsignacionesQuery,
-): Promise<Paginated<Asignacion>> {
-  return httpClient.get<Paginated<Asignacion>>(
+): Promise<Paginated<AsignacionConAvance>> {
+  return httpClient.get<Paginated<AsignacionConAvance>>(
     `/cursos/${cursoId}/asignaciones${buildListarQuery(query)}`,
   )
 }

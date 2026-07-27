@@ -129,6 +129,7 @@ const COLABORADOR_ID = "00000000-0000-0000-0000-00000000cccc"
 const OTRO_COLABORADOR_ID = "00000000-0000-0000-0000-00000000dddd"
 const CURSO_ID = "11111111-1111-1111-1111-111111111111"
 const ASIGNACION_ID = "22222222-2222-2222-2222-222222222222"
+const OTRA_ASIGNACION_ID = "33333333-3333-3333-3333-333333333333"
 const FECHA = new Date("2026-05-11T10:00:00Z")
 
 const ADMIN: SesionUsuario = { usuarioId: ADMIN_ID, rol: RolUsuario.ADMIN }
@@ -179,6 +180,9 @@ const planPersonalMock = {
   calcularSiAsignado: vi.fn(async () => {
     /* noop */
   }),
+  // El listado del curso muestra el % de avance de cada fila; lo calcula el
+  // mismo motor que el reporte de avance por curso.
+  obtenerPorcentajeAvance: vi.fn(async () => 0),
 }
 
 beforeEach(async () => {
@@ -187,6 +191,7 @@ beforeEach(async () => {
   notificaciones = buildNotificacionesMock()
   const notifSpy = notificaciones
   planPersonalMock.calcularSiAsignado.mockClear()
+  planPersonalMock.obtenerPorcentajeAvance.mockClear()
   moduleRef = await Test.createTestingModule({
     providers: [
       {
@@ -516,7 +521,11 @@ describe("AsignacionesService.listarPorCurso scope PARTICIPANTE", () => {
     // asignacionCurso (+ el guard previo de `curso.findUnique`).
     prisma.asignacionCurso.findFirst.mockResolvedValue(asignacionRow())
 
-    const res = await service.listarPorCurso(CURSO_ID, { page: 1, pageSize: 20 }, PARTICIPANTE)
+    const res = await service.listarPorCurso(
+      CURSO_ID,
+      { page: 1, pageSize: 20, incluirRetirados: false },
+      PARTICIPANTE,
+    )
     expect(res.data).toHaveLength(1)
     expect(res.meta.total).toBe(1)
     expect(prisma.asignacionCurso.findFirst).toHaveBeenCalledWith({
@@ -532,7 +541,11 @@ describe("AsignacionesService.listarPorCurso scope PARTICIPANTE", () => {
   it("PARTICIPANTE no inscrito: devuelve listado vacio (total=0), no 404", async () => {
     prisma.asignacionCurso.findFirst.mockResolvedValue(null)
 
-    const res = await service.listarPorCurso(CURSO_ID, { page: 1, pageSize: 20 }, PARTICIPANTE)
+    const res = await service.listarPorCurso(
+      CURSO_ID,
+      { page: 1, pageSize: 20, incluirRetirados: false },
+      PARTICIPANTE,
+    )
     expect(res.data).toHaveLength(0)
     expect(res.meta.total).toBe(0)
   })
@@ -540,8 +553,122 @@ describe("AsignacionesService.listarPorCurso scope PARTICIPANTE", () => {
   it("404 si el curso no existe (incluso para PARTICIPANTE)", async () => {
     prisma.curso.findUnique.mockResolvedValue(null)
     await expect(
-      service.listarPorCurso(CURSO_ID, { page: 1, pageSize: 20 }, PARTICIPANTE),
+      service.listarPorCurso(
+        CURSO_ID,
+        { page: 1, pageSize: 20, incluirRetirados: false },
+        PARTICIPANTE,
+      ),
     ).rejects.toBeInstanceOf(NotFoundException)
+  })
+})
+
+describe("AsignacionesService.listarPorCurso filtro de retirados", () => {
+  beforeEach(() => {
+    prisma.curso.findUnique.mockResolvedValue({ id: CURSO_ID })
+    prisma.asignacionCurso.findMany.mockResolvedValue([])
+    prisma.asignacionCurso.count.mockResolvedValue(0)
+  })
+
+  function whereUsado(): Record<string, unknown> {
+    const llamada = prisma.asignacionCurso.findMany.mock.calls[0]?.[0] as
+      | { where: Record<string, unknown> }
+      | undefined
+    return llamada?.where ?? {}
+  }
+
+  it("por defecto oculta a los retirados listando los estados visibles de AMBOS roles", async () => {
+    await service.listarPorCurso(
+      CURSO_ID,
+      { page: 1, pageSize: 20, incluirRetirados: false },
+      ADMIN,
+    )
+
+    // En positivo, no con un NOT: `estado_asignado <> 'RETIRADO'` sobre la
+    // columna NULL de un voluntario da UNKNOWN y lo dejaria fuera del listado.
+    expect(whereUsado().OR).toEqual([
+      { estadoAsignado: { in: expect.arrayContaining(["ASIGNADO", "EN_PROGRESO", "APTO"]) } },
+      {
+        estadoVoluntario: { in: expect.arrayContaining(["INSCRITO", "EN_PROGRESO", "COMPLETADO"]) },
+      },
+    ])
+    const or = whereUsado().OR as readonly { estadoAsignado?: { in: string[] } }[]
+    expect(or[0]?.estadoAsignado?.in).not.toContain("RETIRADO")
+  })
+
+  it("con incluirRetirados no filtra por estado en absoluto", async () => {
+    await service.listarPorCurso(CURSO_ID, { page: 1, pageSize: 20, incluirRetirados: true }, ADMIN)
+
+    expect(whereUsado().OR).toBeUndefined()
+    expect(whereUsado()).toEqual({ cursoId: CURSO_ID })
+  })
+
+  it("pedir estado=RETIRADO manda sobre el ocultamiento por defecto", async () => {
+    await service.listarPorCurso(
+      CURSO_ID,
+      { page: 1, pageSize: 20, incluirRetirados: false, estado: "RETIRADO" },
+      ADMIN,
+    )
+
+    expect(whereUsado().OR).toEqual([
+      { estadoAsignado: "RETIRADO" },
+      { estadoVoluntario: "RETIRADO" },
+    ])
+  })
+})
+
+describe("AsignacionesService.listarPorCurso porcentaje de avance", () => {
+  beforeEach(() => {
+    prisma.curso.findUnique.mockResolvedValue({ id: CURSO_ID })
+  })
+
+  it("adjunta a cada fila el % que calcula el motor de plan-personal", async () => {
+    prisma.asignacionCurso.findMany.mockResolvedValue([
+      asignacionRow({ id: ASIGNACION_ID }),
+      asignacionRow({ id: OTRA_ASIGNACION_ID, colaboradorId: OTRO_COLABORADOR_ID }),
+    ])
+    prisma.asignacionCurso.count.mockResolvedValue(2)
+    planPersonalMock.obtenerPorcentajeAvance.mockResolvedValueOnce(42).mockResolvedValueOnce(100)
+
+    const res = await service.listarPorCurso(
+      CURSO_ID,
+      { page: 1, pageSize: 20, incluirRetirados: false },
+      ADMIN,
+    )
+
+    expect(res.data.map((f) => f.porcentajeAvance)).toEqual([42, 100])
+    // Uno por fila de la PAGINA, no por asignacion del curso: el costo lo
+    // acota el `take`, no el total.
+    expect(planPersonalMock.obtenerPorcentajeAvance).toHaveBeenCalledTimes(2)
+    expect(planPersonalMock.obtenerPorcentajeAvance).toHaveBeenCalledWith(ASIGNACION_ID)
+    expect(planPersonalMock.obtenerPorcentajeAvance).toHaveBeenCalledWith(OTRA_ASIGNACION_ID)
+  })
+
+  it("el PARTICIPANTE tambien recibe su propio % en el listado", async () => {
+    prisma.asignacionCurso.findFirst.mockResolvedValue(asignacionRow())
+    planPersonalMock.obtenerPorcentajeAvance.mockResolvedValueOnce(73)
+
+    const res = await service.listarPorCurso(
+      CURSO_ID,
+      { page: 1, pageSize: 20, incluirRetirados: false },
+      PARTICIPANTE,
+    )
+
+    expect(res.data[0]?.porcentajeAvance).toBe(73)
+    expect(planPersonalMock.obtenerPorcentajeAvance).toHaveBeenCalledTimes(1)
+  })
+
+  it("listado vacio no invoca al motor de avance", async () => {
+    prisma.asignacionCurso.findMany.mockResolvedValue([])
+    prisma.asignacionCurso.count.mockResolvedValue(0)
+
+    const res = await service.listarPorCurso(
+      CURSO_ID,
+      { page: 1, pageSize: 20, incluirRetirados: false },
+      ADMIN,
+    )
+
+    expect(res.data).toHaveLength(0)
+    expect(planPersonalMock.obtenerPorcentajeAvance).not.toHaveBeenCalled()
   })
 })
 
