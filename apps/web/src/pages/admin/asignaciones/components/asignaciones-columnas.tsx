@@ -36,8 +36,8 @@ export function construirColumnasAsignaciones(
     },
     {
       id: "rol",
-      cabecera: "Rol",
-      anchoFijo: "140px",
+      cabecera: "Participación",
+      anchoFijo: "160px",
       accesor: (a) => (
         <Badge tono={a.rol === "ASIGNADO" ? "acento" : "info"}>
           {a.rol === "ASIGNADO" ? "Asignado" : "Voluntario"}

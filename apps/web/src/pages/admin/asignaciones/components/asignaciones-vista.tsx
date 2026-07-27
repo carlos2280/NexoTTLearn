@@ -95,7 +95,7 @@ export function AsignacionesVista({ cursoId, nombreCurso, tieneEntregaACliente }
         items={ORDEN_TABS.map((id) => ({ id, etiqueta: etiquetaTab(id) }))}
         activa={rolTab}
         onCambiar={cambiarTab}
-        etiquetaAria="Rol de asignación"
+        etiquetaAria="Participación en el curso"
       />
 
       <div className="flex flex-wrap items-center gap-3">

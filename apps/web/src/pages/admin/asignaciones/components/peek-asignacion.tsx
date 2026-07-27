@@ -59,7 +59,7 @@ function CuerpoDetalle({ detalle, tieneEntregaACliente }: CuerpoProps) {
         <div className="grid grid-cols-2 gap-4">
           <Campo etiqueta="Email" valor={detalle.colaborador.email} />
           <Campo
-            etiqueta="Rol"
+            etiqueta="Participación"
             valor={
               <Badge tono={detalle.rol === "ASIGNADO" ? "acento" : "info"}>
                 {detalle.rol === "ASIGNADO" ? "Asignado" : "Voluntario"}
