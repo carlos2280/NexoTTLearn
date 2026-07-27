@@ -65,9 +65,15 @@ export function AsignacionesVista({ cursoId, nombreCurso, tieneEntregaACliente }
     ...filtroEstado,
   })
 
+  const filas = useMemo(() => listadoQuery.data?.data ?? [], [listadoQuery.data])
+  // La columna Cierre solo dice algo en filas cerradas o retiradas. Con el
+  // filtro por defecto en "Activos" no hay ninguna, y una columna de guiones
+  // roba ancho al avance.
+  const mostrarCierre = useMemo(() => filas.some((a) => a.fechaCierre !== null), [filas])
+
   const columnas = useMemo(
-    () => construirColumnasAsignaciones(tieneEntregaACliente),
-    [tieneEntregaACliente],
+    () => construirColumnasAsignaciones(tieneEntregaACliente, mostrarCierre),
+    [tieneEntregaACliente, mostrarCierre],
   )
 
   function disparar(accion: DialogoAbierto["accion"], asignacion?: Asignacion) {
@@ -139,7 +145,7 @@ export function AsignacionesVista({ cursoId, nombreCurso, tieneEntregaACliente }
 
       <DataTable
         columnas={columnas}
-        filas={listadoQuery.data?.data ?? []}
+        filas={filas}
         obtenerKey={(a) => a.id}
         cargando={listadoQuery.isLoading && !listadoQuery.data}
         vacioIcono={Users}

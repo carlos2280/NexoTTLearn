@@ -1,9 +1,9 @@
+import { AvanceBarra } from "@/features/asignaciones/components/avance-barra"
 import type { FilaAvanceCurso } from "@nexott-learn/shared-types"
 import type { ReactNode } from "react"
 import { etiquetaRolFila } from "../avance-curso.filtros"
 import { obtenerEstado } from "../avance-curso.types"
 import { AvanceAlertasChips } from "./avance-alertas-chips"
-import { AvanceBarra } from "./avance-barra"
 
 interface AvanceTablaProps {
   readonly filas: readonly FilaAvanceCurso[]

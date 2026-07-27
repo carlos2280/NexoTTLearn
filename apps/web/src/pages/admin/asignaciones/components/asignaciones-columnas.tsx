@@ -1,7 +1,8 @@
+import { AvanceBarra } from "@/features/asignaciones/components/avance-barra"
 import { AvatarIniciales } from "@/shared/components/ui/avatar-iniciales"
 import { Badge } from "@/shared/components/ui/badge"
 import type { ColumnaTabla } from "@/shared/components/ui/data-table"
-import type { Asignacion } from "@nexott-learn/shared-types"
+import type { AsignacionConAvance } from "@nexott-learn/shared-types"
 import { BadgeEstadoAsignacion } from "./badge-estado-asignacion"
 
 function formatearFechaCorta(iso: string | null): string {
@@ -15,10 +16,16 @@ function formatearFechaCorta(iso: string | null): string {
   return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short" })
 }
 
+/**
+ * @param mostrarCierre solo cuando alguna fila de la pagina tiene fecha de
+ *   cierre. Con el filtro por defecto en "Activos" nadie la tiene, y una
+ *   columna de guiones roba ancho al avance sin decir nada.
+ */
 export function construirColumnasAsignaciones(
   tieneEntregaACliente: boolean,
-): readonly ColumnaTabla<Asignacion>[] {
-  return [
+  mostrarCierre: boolean,
+): readonly ColumnaTabla<AsignacionConAvance>[] {
+  const columnas: ColumnaTabla<AsignacionConAvance>[] = [
     {
       id: "persona",
       cabecera: "Persona",
@@ -53,6 +60,14 @@ export function construirColumnasAsignaciones(
       ),
     },
     {
+      id: "avance",
+      cabecera: "Avance",
+      anchoFijo: "180px",
+      // Mismo motor y mismo componente que el reporte de avance por curso:
+      // las dos pantallas tienen que mostrar el mismo numero.
+      accesor: (a) => <AvanceBarra porcentaje={a.porcentajeAvance} />,
+    },
+    {
       id: "inicio",
       cabecera: "Inicio",
       anchoFijo: "100px",
@@ -60,13 +75,18 @@ export function construirColumnasAsignaciones(
         <span className="tabular text-text-secondary">{formatearFechaCorta(a.fechaInicio)}</span>
       ),
     },
-    {
+  ]
+
+  if (mostrarCierre) {
+    columnas.push({
       id: "cierre",
       cabecera: "Cierre",
       anchoFijo: "100px",
       accesor: (a) => (
         <span className="tabular text-text-secondary">{formatearFechaCorta(a.fechaCierre)}</span>
       ),
-    },
-  ]
+    })
+  }
+
+  return columnas
 }
