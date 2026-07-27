@@ -1,4 +1,4 @@
-import type { ResultadoEjecucionSuite } from "@/features/codigo-ejecucion"
+import type { ResultadoEjecucionSuite } from "./types"
 
 export interface FalloValidacion {
   /** Posición 1-based del test, igual que la numeración del editor. */

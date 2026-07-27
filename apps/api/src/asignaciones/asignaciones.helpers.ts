@@ -81,6 +81,26 @@ export function esEstadoVoluntario(estado: string): estado is EstadoVoluntarioPr
 }
 
 /**
+ * Estados que se muestran cuando el listado oculta a los retirados (default).
+ *
+ * Se derivan del enum en vez de escribirse a mano: si mañana se agrega un
+ * estado nuevo aparecera solo, en lugar de desaparecer en silencio de la
+ * tabla del admin.
+ *
+ * Se usan en POSITIVO a proposito. `estadoAsignado` y `estadoVoluntario` son
+ * excluyentes (CHECK `chk_asig_rol_estado`): en cada fila una esta poblada y
+ * la otra es NULL. Un `NOT estado = 'RETIRADO'` sobre la columna NULL da
+ * UNKNOWN, no true, asi que filtraria tambien las filas del otro rol.
+ */
+export const ESTADOS_ASIGNADO_VISIBLES: readonly EstadoAsignadoPrisma[] = Object.values(
+  EstadoAsignadoPrisma,
+).filter((estado) => estado !== EstadoAsignadoPrisma.RETIRADO)
+
+export const ESTADOS_VOLUNTARIO_VISIBLES: readonly EstadoVoluntarioPrisma[] = Object.values(
+  EstadoVoluntarioPrisma,
+).filter((estado) => estado !== EstadoVoluntarioPrisma.RETIRADO)
+
+/**
  * Predicado de "estado cerrado" para `reabrirCaso`: cierra ASIGNADO en
  * `APTO`/`NO_APTO` y VOLUNTARIO en `COMPLETADO` (cap. 12.5). Extraido como
  * helper para mantener el ejecutor de `runOnce` por debajo del umbral de

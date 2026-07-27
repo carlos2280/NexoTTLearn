@@ -1,10 +1,17 @@
 import { useListarAsignaciones } from "@/features/asignaciones/hooks/use-listar-asignaciones"
+import {
+  ESTADO_ACTIVOS,
+  opcionesSelectorEstado,
+  parsearSeleccionEstado,
+  resolverFiltroEstado,
+} from "@/features/asignaciones/lib/estados-filtro"
 import { BandaEvaluacionInicial } from "@/features/evaluacion-inicial/components/banda-evaluacion-inicial"
 import { Button } from "@/shared/components/ui/button"
 import { DataTable } from "@/shared/components/ui/data-table"
 import { MenuAcciones } from "@/shared/components/ui/menu-acciones"
 import { Pagination } from "@/shared/components/ui/pagination"
 import { SearchField } from "@/shared/components/ui/search-field"
+import { Select, SelectItem } from "@/shared/components/ui/select"
 import { Tabs } from "@/shared/components/ui/tabs"
 import type { Asignacion, RolAsignacion } from "@nexott-learn/shared-types"
 import { UserPlus, Users } from "lucide-react"
@@ -43,21 +50,30 @@ interface Props {
 
 export function AsignacionesVista({ cursoId, nombreCurso, tieneEntregaACliente }: Props) {
   const [rolTab, setRolTab] = useState<TabRol>("TODOS")
+  const [estadoSel, setEstadoSel] = useState<string>(ESTADO_ACTIVOS)
   const [busqueda, setBusqueda] = useState("")
   const [page, setPage] = useState(1)
   const [dialogo, setDialogo] = useState<DialogoAbierto | null>(null)
   const [peekId, setPeekId] = useState<string | null>(null)
 
+  const filtroEstado = resolverFiltroEstado(estadoSel)
   const listadoQuery = useListarAsignaciones(cursoId, {
     page,
     pageSize: PAGE_SIZE,
     rol: rolTab === "TODOS" ? undefined : rolTab,
     q: busqueda.trim().length >= 2 ? busqueda.trim() : undefined,
+    ...filtroEstado,
   })
 
+  const filas = useMemo(() => listadoQuery.data?.data ?? [], [listadoQuery.data])
+  // La columna Cierre solo dice algo en filas cerradas o retiradas. Con el
+  // filtro por defecto en "Activos" no hay ninguna, y una columna de guiones
+  // roba ancho al avance.
+  const mostrarCierre = useMemo(() => filas.some((a) => a.fechaCierre !== null), [filas])
+
   const columnas = useMemo(
-    () => construirColumnasAsignaciones(tieneEntregaACliente),
-    [tieneEntregaACliente],
+    () => construirColumnasAsignaciones(tieneEntregaACliente, mostrarCierre),
+    [tieneEntregaACliente, mostrarCierre],
   )
 
   function disparar(accion: DialogoAbierto["accion"], asignacion?: Asignacion) {
@@ -66,6 +82,14 @@ export function AsignacionesVista({ cursoId, nombreCurso, tieneEntregaACliente }
 
   function cambiarTab(nuevo: TabRol) {
     setRolTab(nuevo)
+    // Un estado que no existe en el rol nuevo (p. ej. APTO al pasar a
+    // voluntarios) dejaria la tabla vacia como si no hubiera nadie.
+    setEstadoSel((actual) => parsearSeleccionEstado(actual, nuevo))
+    setPage(1)
+  }
+
+  function cambiarEstado(nuevo: string) {
+    setEstadoSel(nuevo)
     setPage(1)
   }
 
@@ -77,7 +101,7 @@ export function AsignacionesVista({ cursoId, nombreCurso, tieneEntregaACliente }
         items={ORDEN_TABS.map((id) => ({ id, etiqueta: etiquetaTab(id) }))}
         activa={rolTab}
         onCambiar={cambiarTab}
-        etiquetaAria="Rol de asignación"
+        etiquetaAria="Participación en el curso"
       />
 
       <div className="flex flex-wrap items-center gap-3">
@@ -89,6 +113,23 @@ export function AsignacionesVista({ cursoId, nombreCurso, tieneEntregaACliente }
           }}
           placeholder="Buscar por nombre o email…"
         />
+        <div className="flex items-center gap-2">
+          <span className="nx-eyebrow text-text-tertiary">Estado</span>
+          <Select
+            variant="ghost"
+            compact={true}
+            value={estadoSel}
+            onValueChange={cambiarEstado}
+            aria-label="Filtrar por estado"
+            className="w-auto"
+          >
+            {opcionesSelectorEstado(rolTab).map((o) => (
+              <SelectItem key={o.id} value={o.id}>
+                {o.etiqueta}
+              </SelectItem>
+            ))}
+          </Select>
+        </div>
         <div className="ms-auto">
           <Button
             variant="primary"
@@ -104,7 +145,7 @@ export function AsignacionesVista({ cursoId, nombreCurso, tieneEntregaACliente }
 
       <DataTable
         columnas={columnas}
-        filas={listadoQuery.data?.data ?? []}
+        filas={filas}
         obtenerKey={(a) => a.id}
         cargando={listadoQuery.isLoading && !listadoQuery.data}
         vacioIcono={Users}

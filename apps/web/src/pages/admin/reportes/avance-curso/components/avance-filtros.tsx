@@ -1,16 +1,18 @@
+import { estadosDisponibles } from "@/features/asignaciones/lib/estados-filtro"
 import { type AyudaContenido, AyudaPopover } from "@/shared/components/ui/ayuda-popover"
 import { SearchField } from "@/shared/components/ui/search-field"
 import { Select, SelectItem } from "@/shared/components/ui/select"
 import type { RolAvanceFiltro } from "@nexott-learn/shared-types"
 import { ListFilter, type LucideIcon, Users } from "lucide-react"
-import { ROLES_FILTRO, estadosDisponibles } from "../avance-curso.filtros"
+import { ROLES_FILTRO } from "../avance-curso.filtros"
 
 // Radix Select prohibe un item con value="". Usamos un centinela para la opcion
 // "todos los estados" y lo traducimos a "" (sin filtro) de cara al hook.
 const ESTADO_TODOS = "__todos__"
 
-// Ayudas para que el admin distinga ROL (como entro la persona) de ESTADO (en
-// que etapa va). Son la misma palabra "Asignado" en dos ejes distintos.
+// Ayudas para que el admin distinga PARTICIPACION (como entro la persona) de
+// ESTADO (en que etapa va). Son la misma palabra "Asignado" en dos ejes
+// distintos. "Rol" se reserva para ADMIN/PARTICIPANTE (RolUsuario).
 const AYUDA_ROL: AyudaContenido = {
   queEs:
     "Cómo llegó la persona al curso. Asignado: la empresa se lo asignó y va camino a un veredicto (Apto o No apto). Voluntario: se inscribió por su cuenta, sin veredicto.",
@@ -58,12 +60,12 @@ export function AvanceFiltros({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
         <SelectFiltro
           icono={Users}
-          etiqueta="Rol"
+          etiqueta="Participación"
           ayuda={AYUDA_ROL}
           valor={rol}
           opciones={ROLES_FILTRO}
           onCambio={(v) => onCambiarRol(v as RolAvanceFiltro)}
-          ariaLabel="Filtrar por rol de asignación"
+          ariaLabel="Filtrar por tipo de participación"
         />
         <SelectFiltro
           icono={ListFilter}

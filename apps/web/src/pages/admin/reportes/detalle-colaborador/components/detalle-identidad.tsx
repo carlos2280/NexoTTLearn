@@ -45,8 +45,8 @@ export function DetalleIdentidad({ nombre, email, asignacion }: DetalleIdentidad
 
       <dl className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <Metrica eyebrow="Estado">{legibleEstado(asignacion.estado)}</Metrica>
-        <Metrica eyebrow="Rol">{legibleEstado(asignacion.rolAsignacion)}</Metrica>
-        <Metrica eyebrow="Inscrito">{formatearFecha(asignacion.fechaInscripcion)}</Metrica>
+        <Metrica eyebrow="Participación">{legibleEstado(asignacion.rolAsignacion)}</Metrica>
+        <Metrica eyebrow="Inscripción">{formatearFecha(asignacion.fechaInscripcion)}</Metrica>
         <Metrica eyebrow="Cierre">{formatearFecha(asignacion.fechaCierre)}</Metrica>
       </dl>
     </Card>

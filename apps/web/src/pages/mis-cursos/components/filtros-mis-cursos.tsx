@@ -16,7 +16,7 @@ const OPCIONES_ESTADO: readonly { readonly value: FiltroEstadoCurso; readonly la
 ]
 
 const OPCIONES_ROL: readonly { readonly value: FiltroRolAsignacion; readonly label: string }[] = [
-  { value: "TODOS", label: "Todos los roles" },
+  { value: "TODOS", label: "Todos" },
   { value: "ASIGNADO", label: "Asignados" },
   { value: "VOLUNTARIO", label: "Voluntarios" },
 ]
@@ -40,7 +40,7 @@ export function FiltrosMisCursosForm({
       />
       <FiltroPill
         id={rolId}
-        etiqueta="Rol"
+        etiqueta="Participación"
         value={filtros.rol}
         opciones={OPCIONES_ROL}
         onChange={(v) => onRolChange(v as FiltroRolAsignacion)}

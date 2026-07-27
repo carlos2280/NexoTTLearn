@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common"
 import {
   Asignacion,
+  AsignacionConAvance,
   AsignacionDetallada,
   AsignacionHistoricoEntrada,
   AsignacionRechazada,
@@ -37,6 +38,8 @@ import { ResultadoCierre } from "../notificaciones/payload/resultado-cierre.payl
 import { PlanPersonalService } from "../plan-personal/plan-personal.service"
 import { AsignacionesNotificacionesService } from "./asignaciones-notificaciones.service"
 import {
+  ESTADOS_ASIGNADO_VISIBLES,
+  ESTADOS_VOLUNTARIO_VISIBLES,
   HISTORICO_LITERAL_ASIGNADO_ASIGNADO,
   SELECT_ASIGNACION_DETALLE_FIELDS,
   SELECT_ASIGNACION_FIELDS,
@@ -99,7 +102,7 @@ export class AsignacionesService {
     cursoId: string,
     query: ListarAsignacionesQuery,
     usuario: SesionUsuario,
-  ): Promise<Paginated<Asignacion>> {
+  ): Promise<Paginated<AsignacionConAvance>> {
     const curso = await this.prisma.curso.findUnique({
       where: { id: cursoId },
       select: { id: true },
@@ -125,9 +128,15 @@ export class AsignacionesService {
         select: SELECT_ASIGNACION_FIELDS,
       })
       if (!propia) {
-        return buildPaginatedResponse<Asignacion>([], 0, page, pageSize)
+        return buildPaginatedResponse<AsignacionConAvance>([], 0, page, pageSize)
       }
-      return buildPaginatedResponse([toAsignacion(propia)], 1, page, pageSize)
+      const avancePropio = await this.planPersonal.obtenerPorcentajeAvance(propia.id)
+      return buildPaginatedResponse(
+        [{ ...toAsignacion(propia), porcentajeAvance: avancePropio }],
+        1,
+        page,
+        pageSize,
+      )
     }
 
     const where = this.buildWhereListado(cursoId, query)
@@ -142,7 +151,19 @@ export class AsignacionesService {
       this.prisma.asignacionCurso.count({ where }),
     ])
 
-    return buildPaginatedResponse(rows.map(toAsignacion), total, page, pageSize)
+    // El % se calcula en paralelo reusando el motor de plan-personal (misma
+    // vara que el reporte de avance por curso: las dos pantallas deben dar el
+    // mismo numero). La cardinalidad esta acotada por `take` —una pagina—, no
+    // por el total de asignaciones del curso.
+    const porcentajes = await Promise.all(
+      rows.map((row) => this.planPersonal.obtenerPorcentajeAvance(row.id)),
+    )
+    const filas: AsignacionConAvance[] = rows.map((row, i) => ({
+      ...toAsignacion(row),
+      porcentajeAvance: porcentajes[i] ?? 0,
+    }))
+
+    return buildPaginatedResponse(filas, total, page, pageSize)
   }
 
   async obtenerPorId(asignacionId: string, usuario: SesionUsuario): Promise<AsignacionDetallada> {
@@ -1260,6 +1281,14 @@ export class AsignacionesService {
         branches.push({ estadoVoluntario: query.estado })
       }
       where.OR = branches
+    } else if (!query.incluirRetirados) {
+      // Los retirados se ocultan salvo que se pidan. Va en POSITIVO (ver el
+      // porque en `ESTADOS_*_VISIBLES`): un NOT sobre RETIRADO se llevaria por
+      // delante las filas del otro rol, donde esa columna es NULL.
+      where.OR = [
+        { estadoAsignado: { in: [...ESTADOS_ASIGNADO_VISIBLES] } },
+        { estadoVoluntario: { in: [...ESTADOS_VOLUNTARIO_VISIBLES] } },
+      ]
     }
     if (query.q) {
       const contains = query.q

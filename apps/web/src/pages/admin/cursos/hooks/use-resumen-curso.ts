@@ -14,7 +14,15 @@ interface UseResumenCursoResult {
 }
 
 export function useResumenCurso(cursoId: string): UseResumenCursoResult {
-  const { data, isLoading } = useListarAsignaciones(cursoId, { page: 1, pageSize: PAGE_SIZE })
+  // Con retirados a proposito: el Resumen es la foto COMPLETA del curso (los
+  // KPIs y la "Distribucion por estado" cuentan el estado Retirado). Quien los
+  // oculta por defecto es el listado operativo de Colaboradores, donde una
+  // fila retirada no ofrece ninguna accion.
+  const { data, isLoading } = useListarAsignaciones(cursoId, {
+    page: 1,
+    pageSize: PAGE_SIZE,
+    incluirRetirados: true,
+  })
   const items = data?.data ?? []
   const total = data?.meta.total ?? 0
   const kpis = useMemo(() => calcularResumenCurso(items), [items])

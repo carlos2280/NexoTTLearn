@@ -48,6 +48,12 @@ function etiqueta(estado: string): string {
 }
 
 function etiquetaAsignado(estado: EstadoAsignado, tieneEntregaACliente: boolean): string {
+  // "Sin iniciar" y no "Asignado": en esta misma pantalla "Asignado" ya es el
+  // ROL (sub-pestana), asi que la columna Estado repetia la palabra para decir
+  // otra cosa. Mismo criterio que el filtro del reporte de avance por curso.
+  if (estado === "ASIGNADO") {
+    return "Sin iniciar"
+  }
   if (!tieneEntregaACliente) {
     if (estado === "APTO") {
       return "Aprobado"
