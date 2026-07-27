@@ -37,6 +37,8 @@ import { ResultadoCierre } from "../notificaciones/payload/resultado-cierre.payl
 import { PlanPersonalService } from "../plan-personal/plan-personal.service"
 import { AsignacionesNotificacionesService } from "./asignaciones-notificaciones.service"
 import {
+  ESTADOS_ASIGNADO_VISIBLES,
+  ESTADOS_VOLUNTARIO_VISIBLES,
   HISTORICO_LITERAL_ASIGNADO_ASIGNADO,
   SELECT_ASIGNACION_DETALLE_FIELDS,
   SELECT_ASIGNACION_FIELDS,
@@ -1260,6 +1262,14 @@ export class AsignacionesService {
         branches.push({ estadoVoluntario: query.estado })
       }
       where.OR = branches
+    } else if (!query.incluirRetirados) {
+      // Los retirados se ocultan salvo que se pidan. Va en POSITIVO (ver el
+      // porque en `ESTADOS_*_VISIBLES`): un NOT sobre RETIRADO se llevaria por
+      // delante las filas del otro rol, donde esa columna es NULL.
+      where.OR = [
+        { estadoAsignado: { in: [...ESTADOS_ASIGNADO_VISIBLES] } },
+        { estadoVoluntario: { in: [...ESTADOS_VOLUNTARIO_VISIBLES] } },
+      ]
     }
     if (query.q) {
       const contains = query.q

@@ -516,7 +516,11 @@ describe("AsignacionesService.listarPorCurso scope PARTICIPANTE", () => {
     // asignacionCurso (+ el guard previo de `curso.findUnique`).
     prisma.asignacionCurso.findFirst.mockResolvedValue(asignacionRow())
 
-    const res = await service.listarPorCurso(CURSO_ID, { page: 1, pageSize: 20 }, PARTICIPANTE)
+    const res = await service.listarPorCurso(
+      CURSO_ID,
+      { page: 1, pageSize: 20, incluirRetirados: false },
+      PARTICIPANTE,
+    )
     expect(res.data).toHaveLength(1)
     expect(res.meta.total).toBe(1)
     expect(prisma.asignacionCurso.findFirst).toHaveBeenCalledWith({
@@ -532,7 +536,11 @@ describe("AsignacionesService.listarPorCurso scope PARTICIPANTE", () => {
   it("PARTICIPANTE no inscrito: devuelve listado vacio (total=0), no 404", async () => {
     prisma.asignacionCurso.findFirst.mockResolvedValue(null)
 
-    const res = await service.listarPorCurso(CURSO_ID, { page: 1, pageSize: 20 }, PARTICIPANTE)
+    const res = await service.listarPorCurso(
+      CURSO_ID,
+      { page: 1, pageSize: 20, incluirRetirados: false },
+      PARTICIPANTE,
+    )
     expect(res.data).toHaveLength(0)
     expect(res.meta.total).toBe(0)
   })
@@ -540,8 +548,66 @@ describe("AsignacionesService.listarPorCurso scope PARTICIPANTE", () => {
   it("404 si el curso no existe (incluso para PARTICIPANTE)", async () => {
     prisma.curso.findUnique.mockResolvedValue(null)
     await expect(
-      service.listarPorCurso(CURSO_ID, { page: 1, pageSize: 20 }, PARTICIPANTE),
+      service.listarPorCurso(
+        CURSO_ID,
+        { page: 1, pageSize: 20, incluirRetirados: false },
+        PARTICIPANTE,
+      ),
     ).rejects.toBeInstanceOf(NotFoundException)
+  })
+})
+
+describe("AsignacionesService.listarPorCurso filtro de retirados", () => {
+  beforeEach(() => {
+    prisma.curso.findUnique.mockResolvedValue({ id: CURSO_ID })
+    prisma.asignacionCurso.findMany.mockResolvedValue([])
+    prisma.asignacionCurso.count.mockResolvedValue(0)
+  })
+
+  function whereUsado(): Record<string, unknown> {
+    const llamada = prisma.asignacionCurso.findMany.mock.calls[0]?.[0] as
+      | { where: Record<string, unknown> }
+      | undefined
+    return llamada?.where ?? {}
+  }
+
+  it("por defecto oculta a los retirados listando los estados visibles de AMBOS roles", async () => {
+    await service.listarPorCurso(
+      CURSO_ID,
+      { page: 1, pageSize: 20, incluirRetirados: false },
+      ADMIN,
+    )
+
+    // En positivo, no con un NOT: `estado_asignado <> 'RETIRADO'` sobre la
+    // columna NULL de un voluntario da UNKNOWN y lo dejaria fuera del listado.
+    expect(whereUsado().OR).toEqual([
+      { estadoAsignado: { in: expect.arrayContaining(["ASIGNADO", "EN_PROGRESO", "APTO"]) } },
+      {
+        estadoVoluntario: { in: expect.arrayContaining(["INSCRITO", "EN_PROGRESO", "COMPLETADO"]) },
+      },
+    ])
+    const or = whereUsado().OR as readonly { estadoAsignado?: { in: string[] } }[]
+    expect(or[0]?.estadoAsignado?.in).not.toContain("RETIRADO")
+  })
+
+  it("con incluirRetirados no filtra por estado en absoluto", async () => {
+    await service.listarPorCurso(CURSO_ID, { page: 1, pageSize: 20, incluirRetirados: true }, ADMIN)
+
+    expect(whereUsado().OR).toBeUndefined()
+    expect(whereUsado()).toEqual({ cursoId: CURSO_ID })
+  })
+
+  it("pedir estado=RETIRADO manda sobre el ocultamiento por defecto", async () => {
+    await service.listarPorCurso(
+      CURSO_ID,
+      { page: 1, pageSize: 20, incluirRetirados: false, estado: "RETIRADO" },
+      ADMIN,
+    )
+
+    expect(whereUsado().OR).toEqual([
+      { estadoAsignado: "RETIRADO" },
+      { estadoVoluntario: "RETIRADO" },
+    ])
   })
 })
 
