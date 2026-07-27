@@ -13,6 +13,7 @@ export type {
   EstadoVoluntario,
   ResultadoEntrevistaCliente,
   Asignacion,
+  AsignacionConAvance,
   AsignacionDetallada,
   AsignacionColaboradorEmbed,
   AsignacionHistoricoEntrada,

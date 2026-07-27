@@ -79,6 +79,22 @@ export interface AsignacionDetallada extends Asignacion {
 }
 
 /**
+ * Fila del listado de colaboradores de un curso. Extiende `Asignacion` con el
+ * avance para que el admin no tenga que salir al reporte por cada persona.
+ *
+ * Vive aparte y NO en `Asignacion` a proposito: el tipo base lo devuelven
+ * tambien las mutaciones (crear, retirar, transicionar), donde calcular un
+ * porcentaje seria caro y no lo consume nadie. El costo se paga solo en el
+ * listado, acotado por la pagina.
+ *
+ * Mismo motor y mismo nombre de campo que `FilaAvanceCurso.porcentajeAvance`
+ * (`PlanPersonalService`): las dos pantallas deben mostrar el mismo numero.
+ */
+export interface AsignacionConAvance extends Asignacion {
+  readonly porcentajeAvance: number
+}
+
+/**
  * Pintura compacta de un area embebida en payloads externos (D-CAT-AREA-1).
  * `codigo` es el slug estable que el frontend usa para resolver tinta + glow
  * (token CSS `--color-area-<codigo>` / `--shadow-glow-area-<codigo>`).

@@ -14,6 +14,7 @@ import {
 } from "@nestjs/common"
 import {
   Asignacion,
+  AsignacionConAvance,
   AsignacionDetallada,
   AsignacionHistoricoEntrada,
   AutoInscripcionRequest,
@@ -96,7 +97,7 @@ export class AsignacionesController {
     @Query(new ZodValidationPipe(listarAsignacionesQuerySchema))
     query: ListarAsignacionesQuery,
     @CurrentUser() usuario: SesionUsuario | undefined,
-  ): Promise<Paginated<Asignacion>> {
+  ): Promise<Paginated<AsignacionConAvance>> {
     return await this.asignacionesService.listarPorCurso(
       cursoId,
       query,

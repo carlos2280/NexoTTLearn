@@ -129,6 +129,7 @@ const COLABORADOR_ID = "00000000-0000-0000-0000-00000000cccc"
 const OTRO_COLABORADOR_ID = "00000000-0000-0000-0000-00000000dddd"
 const CURSO_ID = "11111111-1111-1111-1111-111111111111"
 const ASIGNACION_ID = "22222222-2222-2222-2222-222222222222"
+const OTRA_ASIGNACION_ID = "33333333-3333-3333-3333-333333333333"
 const FECHA = new Date("2026-05-11T10:00:00Z")
 
 const ADMIN: SesionUsuario = { usuarioId: ADMIN_ID, rol: RolUsuario.ADMIN }
@@ -179,6 +180,9 @@ const planPersonalMock = {
   calcularSiAsignado: vi.fn(async () => {
     /* noop */
   }),
+  // El listado del curso muestra el % de avance de cada fila; lo calcula el
+  // mismo motor que el reporte de avance por curso.
+  obtenerPorcentajeAvance: vi.fn(async () => 0),
 }
 
 beforeEach(async () => {
@@ -187,6 +191,7 @@ beforeEach(async () => {
   notificaciones = buildNotificacionesMock()
   const notifSpy = notificaciones
   planPersonalMock.calcularSiAsignado.mockClear()
+  planPersonalMock.obtenerPorcentajeAvance.mockClear()
   moduleRef = await Test.createTestingModule({
     providers: [
       {
@@ -608,6 +613,62 @@ describe("AsignacionesService.listarPorCurso filtro de retirados", () => {
       { estadoAsignado: "RETIRADO" },
       { estadoVoluntario: "RETIRADO" },
     ])
+  })
+})
+
+describe("AsignacionesService.listarPorCurso porcentaje de avance", () => {
+  beforeEach(() => {
+    prisma.curso.findUnique.mockResolvedValue({ id: CURSO_ID })
+  })
+
+  it("adjunta a cada fila el % que calcula el motor de plan-personal", async () => {
+    prisma.asignacionCurso.findMany.mockResolvedValue([
+      asignacionRow({ id: ASIGNACION_ID }),
+      asignacionRow({ id: OTRA_ASIGNACION_ID, colaboradorId: OTRO_COLABORADOR_ID }),
+    ])
+    prisma.asignacionCurso.count.mockResolvedValue(2)
+    planPersonalMock.obtenerPorcentajeAvance.mockResolvedValueOnce(42).mockResolvedValueOnce(100)
+
+    const res = await service.listarPorCurso(
+      CURSO_ID,
+      { page: 1, pageSize: 20, incluirRetirados: false },
+      ADMIN,
+    )
+
+    expect(res.data.map((f) => f.porcentajeAvance)).toEqual([42, 100])
+    // Uno por fila de la PAGINA, no por asignacion del curso: el costo lo
+    // acota el `take`, no el total.
+    expect(planPersonalMock.obtenerPorcentajeAvance).toHaveBeenCalledTimes(2)
+    expect(planPersonalMock.obtenerPorcentajeAvance).toHaveBeenCalledWith(ASIGNACION_ID)
+    expect(planPersonalMock.obtenerPorcentajeAvance).toHaveBeenCalledWith(OTRA_ASIGNACION_ID)
+  })
+
+  it("el PARTICIPANTE tambien recibe su propio % en el listado", async () => {
+    prisma.asignacionCurso.findFirst.mockResolvedValue(asignacionRow())
+    planPersonalMock.obtenerPorcentajeAvance.mockResolvedValueOnce(73)
+
+    const res = await service.listarPorCurso(
+      CURSO_ID,
+      { page: 1, pageSize: 20, incluirRetirados: false },
+      PARTICIPANTE,
+    )
+
+    expect(res.data[0]?.porcentajeAvance).toBe(73)
+    expect(planPersonalMock.obtenerPorcentajeAvance).toHaveBeenCalledTimes(1)
+  })
+
+  it("listado vacio no invoca al motor de avance", async () => {
+    prisma.asignacionCurso.findMany.mockResolvedValue([])
+    prisma.asignacionCurso.count.mockResolvedValue(0)
+
+    const res = await service.listarPorCurso(
+      CURSO_ID,
+      { page: 1, pageSize: 20, incluirRetirados: false },
+      ADMIN,
+    )
+
+    expect(res.data).toHaveLength(0)
+    expect(planPersonalMock.obtenerPorcentajeAvance).not.toHaveBeenCalled()
   })
 })
 
