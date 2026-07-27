@@ -1,7 +1,10 @@
 {
   "name": "nexott-learn",
   "private": true,
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "turbo dev",
     "dev:web": "turbo dev --filter=@nexott-learn/web",
@@ -31,8 +34,12 @@
     "pnpm": ">=10"
   },
   "lint-staged": {
-    "*.{ts,js,json,md}": ["biome check --write --no-errors-on-unmatched"],
-    "*.{tsx,jsx}": ["biome format --write --no-errors-on-unmatched"]
+    "*.{ts,js,json,md}": [
+      "biome check --write --no-errors-on-unmatched"
+    ],
+    "*.{tsx,jsx}": [
+      "biome format --write --no-errors-on-unmatched"
+    ]
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -59,5 +66,6 @@
       "immutable@<4.3.9": "^4.3.9",
       "linkify-it@<5.0.2": "^5.0.2"
     }
-  }
+  },
+  "version": "1.0.0"
 }
