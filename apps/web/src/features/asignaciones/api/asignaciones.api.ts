@@ -30,6 +30,11 @@ function buildListarQuery(query: ListarAsignacionesQuery): string {
   pushIfDefined(params, "rol", query.rol)
   pushIfDefined(params, "estado", query.estado)
   pushIfDefined(params, "q", query.q?.trim())
+  // Solo se manda cuando es `true`: el backend ya oculta los retirados por
+  // defecto y mandar "false" seria ruido en la URL.
+  if (query.incluirRetirados) {
+    params.set("incluirRetirados", "true")
+  }
   return `?${params.toString()}`
 }
 

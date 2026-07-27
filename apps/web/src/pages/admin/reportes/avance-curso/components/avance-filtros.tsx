@@ -1,9 +1,10 @@
+import { estadosDisponibles } from "@/features/asignaciones/lib/estados-filtro"
 import { type AyudaContenido, AyudaPopover } from "@/shared/components/ui/ayuda-popover"
 import { SearchField } from "@/shared/components/ui/search-field"
 import { Select, SelectItem } from "@/shared/components/ui/select"
 import type { RolAvanceFiltro } from "@nexott-learn/shared-types"
 import { ListFilter, type LucideIcon, Users } from "lucide-react"
-import { ROLES_FILTRO, estadosDisponibles } from "../avance-curso.filtros"
+import { ROLES_FILTRO } from "../avance-curso.filtros"
 
 // Radix Select prohibe un item con value="". Usamos un centinela para la opcion
 // "todos los estados" y lo traducimos a "" (sin filtro) de cara al hook.

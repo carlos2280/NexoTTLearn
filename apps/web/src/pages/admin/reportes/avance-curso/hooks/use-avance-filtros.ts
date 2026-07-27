@@ -1,7 +1,8 @@
+import { parsearEstado } from "@/features/asignaciones/lib/estados-filtro"
 import type { AvanceCursoQuery, RolAvanceFiltro } from "@nexott-learn/shared-types"
 import { useCallback, useEffect, useMemo } from "react"
 import { useSearchParams } from "react-router-dom"
-import { parsearEstado, parsearRol } from "../avance-curso.filtros"
+import { parsearRol } from "../avance-curso.filtros"
 import type { CursoOpcion, VistaAvance } from "../avance-curso.types"
 
 const VISTAS_VALIDAS: readonly VistaAvance[] = ["ACTUAL", "FOTOGRAFIA_CIERRE", "HISTORICO"]

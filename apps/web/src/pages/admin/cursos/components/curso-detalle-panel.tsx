@@ -5,7 +5,7 @@ import { CursoDetalleResumen } from "./curso-detalle-resumen"
 import { PanelEvaluaciones } from "./panel-evaluaciones/panel-evaluaciones"
 import { PanelRetos } from "./panel-retos/panel-retos"
 
-export type TabDetalle = "resumen" | "asignados" | "evaluaciones" | "retos" | "configuracion"
+export type TabDetalle = "resumen" | "colaboradores" | "evaluaciones" | "retos" | "configuracion"
 
 interface CursoDetallePanelProps {
   readonly tab: TabDetalle
@@ -16,7 +16,7 @@ export function CursoDetallePanel({ tab, curso }: CursoDetallePanelProps) {
   if (tab === "resumen") {
     return <CursoDetalleResumen curso={curso} />
   }
-  if (tab === "asignados") {
+  if (tab === "colaboradores") {
     return (
       <AsignacionesVista
         cursoId={curso.id}
