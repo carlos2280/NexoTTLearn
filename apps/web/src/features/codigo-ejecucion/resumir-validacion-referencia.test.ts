@@ -1,6 +1,6 @@
-import type { ResultadoEjecucionSuite, ResultadoTestUI } from "@/features/codigo-ejecucion"
 import { describe, expect, it } from "vitest"
 import { resumirValidacionReferencia } from "./resumir-validacion-referencia"
+import type { ResultadoEjecucionSuite, ResultadoTestUI } from "./types"
 
 function testUi(overrides: Partial<ResultadoTestUI>): ResultadoTestUI {
   return {
