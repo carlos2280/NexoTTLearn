@@ -53,6 +53,7 @@ function buildTx() {
 let tx: ReturnType<typeof buildTx>
 let prisma: {
   curso: { findUnique: ReturnType<typeof vi.fn> }
+  asignacionCurso: { count: ReturnType<typeof vi.fn> }
   $transaction: ReturnType<typeof vi.fn>
 }
 let audit: { record: ReturnType<typeof vi.fn> }
@@ -63,6 +64,7 @@ beforeEach(async () => {
   tx = buildTx()
   prisma = {
     curso: { findUnique: vi.fn().mockResolvedValue(cursoRow()) },
+    asignacionCurso: { count: vi.fn().mockResolvedValue(4) },
     $transaction: vi.fn(async (cb: (t: typeof tx) => Promise<unknown>) => await cb(tx)),
   }
   audit = { record: vi.fn().mockResolvedValue(undefined) }
@@ -187,5 +189,29 @@ describe("RepararSkillsCursoService.reparar", () => {
     prisma.curso.findUnique.mockResolvedValue(cursoRow({ estado: EstadoCurso.CERRADO }))
     await expect(service.reparar("c1", "admin-1")).rejects.toBeInstanceOf(ConflictException)
     expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+})
+
+describe("RepararSkillsCursoService.previsualizar", () => {
+  it("cuenta lo que cambiaría sin escribir nada", async () => {
+    const res = await service.previsualizar("c1")
+
+    expect(res).toEqual({
+      cursoId: "c1",
+      bloques: 1,
+      secciones: 2,
+      skillsExigidas: 1,
+      areaExigida: true,
+      planes: 4,
+    })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+    expect(prisma.asignacionCurso.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({ cursoId: "c1", rol: "ASIGNADO" }),
+    })
+  })
+
+  it("curso cerrado: 409", async () => {
+    prisma.curso.findUnique.mockResolvedValue(cursoRow({ estado: EstadoCurso.CERRADO }))
+    await expect(service.previsualizar("c1")).rejects.toBeInstanceOf(ConflictException)
   })
 })

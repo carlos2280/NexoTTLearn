@@ -602,4 +602,19 @@ describe.runIf(RUN_E2E)("plan-personal e2e (P7a + P7c — FIX-P7-cierre)", () =>
     // `asignacionAjenaId` queda como fixture documentada para futuros tests.
     expect(asignacionAjenaId.length).toBeGreaterThan(0)
   })
+
+  it("reparar-skills (PARTICIPANTE): 403 en el resumen y en aplicar, sin tocar el curso", async () => {
+    const previa = await agentePart.get(`/api/v1/cursos/${cursoId}/reparar-skills`)
+    expect(previa.status).toBe(403)
+    const aplicar = await agentePart
+      .post(`/api/v1/cursos/${cursoId}/reparar-skills`)
+      .set("X-XSRF-TOKEN", csrfPart)
+    expect(aplicar.status).toBe(403)
+  })
+
+  it("reparar-skills GET (ADMIN): 200 con el resumen de lo que cambiaría", async () => {
+    const res = await agenteAdmin.get(`/api/v1/cursos/${cursoId}/reparar-skills`)
+    expect(res.status).toBe(200)
+    expect(res.body).toMatchObject({ cursoId, planes: expect.any(Number) })
+  })
 })

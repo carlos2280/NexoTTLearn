@@ -16,3 +16,17 @@ export interface RepararSkillsCursoResponse {
     readonly fallidos: number
   }
 }
+
+/**
+ * GET /api/v1/cursos/:cursoId/reparar-skills — ADMIN. Lo que cambiaria
+ * `POST` sin escribir nada, para mostrarlo antes de confirmar.
+ */
+export interface RepararSkillsCursoPreview {
+  readonly cursoId: string
+  readonly bloques: number
+  readonly secciones: number
+  readonly skillsExigidas: number
+  readonly areaExigida: boolean
+  /** Asignados cuyo plan se recalcula (y que reciben la notificacion). */
+  readonly planes: number
+}

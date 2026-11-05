@@ -1,6 +1,16 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common"
-import type { RepararSkillsCursoResponse } from "@nexott-learn/shared-types"
-import { AccionAuditoria, EstadoBloque, EstadoCurso, type Prisma } from "@prisma/client"
+import type {
+  RepararSkillsCursoPreview,
+  RepararSkillsCursoResponse,
+} from "@nexott-learn/shared-types"
+import {
+  AccionAuditoria,
+  EstadoAsignado,
+  EstadoBloque,
+  EstadoCurso,
+  type Prisma,
+  RolAsignacion,
+} from "@prisma/client"
 
 import { AuditLogService } from "../../common/audit/audit-log.service"
 import { apiErrorCodes } from "../../common/errors/api-error.codes"
@@ -81,17 +91,37 @@ export class RepararSkillsCursoService {
     private readonly recalculo: PlanPersonalRecalculoService,
   ) {}
 
+  /** Lo que haria `reparar`, sin escribir. Para el resumen previo del boton. */
+  async previsualizar(cursoId: string): Promise<RepararSkillsCursoPreview> {
+    const row = await this.cargarOExplotar(cursoId)
+    const d = diagnosticar(row)
+    const planes = await this.prisma.asignacionCurso.count({
+      where: {
+        cursoId,
+        rol: RolAsignacion.ASIGNADO,
+        // Mismo filtro que PlanPersonalRecalculoService.recalcularMasivo.
+        estadoAsignado: {
+          in: [EstadoAsignado.ASIGNADO, EstadoAsignado.EN_PROGRESO, EstadoAsignado.LISTO],
+        },
+      },
+    })
+    return {
+      cursoId,
+      bloques: d.bloques,
+      secciones: d.secciones,
+      skillsExigidas: d.skillsExigidas,
+      areaExigida: d.areaExigida,
+      planes: hayCambios(d) ? planes : 0,
+    }
+  }
+
   async reparar(cursoId: string, autorUsuarioId: string): Promise<RepararSkillsCursoResponse> {
     const row = await this.cargarOExplotar(cursoId)
-    const curso = aCursoAReparar(row)
-    const sinSkill = bloquesSinSkill(curso)
-    const filasPrevias = planificarSeccionSkills(curso, new Map())
-    const exigidasActuales = new Set(row.skillsExigidas.map((e) => e.skillId))
-    const faltaExigida = filasPrevias.some((f) => !exigidasActuales.has(f.skillId))
-
-    if (sinSkill.length === 0 && filasPrevias.length === 0 && !faltaExigida) {
+    if (!hayCambios(diagnosticar(row))) {
       return vacio(cursoId)
     }
+    const curso = aCursoAReparar(row)
+    const exigidasActuales = new Set(row.skillsExigidas.map((e) => e.skillId))
 
     const r = await this.prisma.$transaction(async (tx) =>
       this.aplicar(tx, row, curso, exigidasActuales),
@@ -253,6 +283,35 @@ function aCursoAReparar(row: CursoRow): CursoAReparar {
       })),
     })),
   }
+}
+
+interface Diagnostico {
+  readonly bloques: number
+  readonly secciones: number
+  readonly skillsExigidas: number
+  readonly areaExigida: boolean
+}
+
+/**
+ * Cuenta lo que falta usando ids provisionales para las skills que aun no
+ * existen («nueva:‹etiqueta›»): las mismas funciones que aplica `reparar`.
+ */
+function diagnosticar(row: CursoRow): Diagnostico {
+  const curso = aCursoAReparar(row)
+  const sinSkill = bloquesSinSkill(curso)
+  const provisional = new Map(sinSkill.map((b) => [b.bloqueId, `nueva:${b.etiqueta}`]))
+  const filas = planificarSeccionSkills(curso, provisional)
+  const exigidas = new Set(row.skillsExigidas.map((e) => e.skillId))
+  return {
+    bloques: sinSkill.length,
+    secciones: new Set(filas.map((f) => f.seccionId)).size,
+    skillsExigidas: new Set(filas.map((f) => f.skillId).filter((id) => !exigidas.has(id))).size,
+    areaExigida: row.areasExigidas.length === 0 && filas.length > 0,
+  }
+}
+
+function hayCambios(d: Diagnostico): boolean {
+  return d.bloques > 0 || d.secciones > 0 || d.skillsExigidas > 0
 }
 
 function vacio(cursoId: string): RepararSkillsCursoResponse {
