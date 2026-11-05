@@ -874,7 +874,16 @@ const MOTIVO_ENTREVISTA_IA: ReadonlyMap<Exclude<RazonDisp, "DISPONIBLE">, string
 // (por ejemplo, si un endpoint sólo conoce el curso).
 export const _internalAsignacionDesdeCursoId = asignacionDesdeCursoId
 
+// Reparar skills: los cursos simulados ya vienen completos (sin nada que reparar).
+const RTE_REPARAR_SKILLS = /^\/cursos\/([^/]+)\/reparar-skills$/
+
+function handlerPreviewRepararSkills(req: MockRequest) {
+  const cursoId = RTE_REPARAR_SKILLS.exec(req.path)?.[1] ?? ""
+  return { cursoId, bloques: 0, secciones: 0, skillsExigidas: 0, areaExigida: false, planes: 0 }
+}
+
 export const handlersCursoDetalle = [
+  defineRoute("GET", RTE_REPARAR_SKILLS, handlerPreviewRepararSkills),
   defineRoute("GET", RTE_ARBOL_CURSO, handlerArbolCurso),
   defineRoute("GET", RTE_CURSO_DETALLE, handlerCursoDetalle),
   defineRoute("GET", RTE_AVANCE_CURSO, handlerAvanceCurso),
