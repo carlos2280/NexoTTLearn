@@ -206,6 +206,9 @@ export type {
 export { listarLogCambiosQuerySchema } from "./cursos/log-cambios.query.schema"
 export type { ListarLogCambiosQuery } from "./cursos/log-cambios.query.schema"
 
+// Cursos — reparar skills de un curso ya cargado.
+export type { RepararSkillsCursoResponse } from "./cursos/reparar-skills-curso.types"
+
 // Cursos — importar curso desde Markdown (D-IMP-1).
 export {
   importarCursoSchema,
