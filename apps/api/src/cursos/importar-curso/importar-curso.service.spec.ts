@@ -31,12 +31,17 @@ interface MockTx {
 }
 
 interface MockPrisma {
-  cliente: { findFirst: ReturnType<typeof vi.fn> }
+  cliente: { findMany: ReturnType<typeof vi.fn> }
   $transaction: ReturnType<typeof vi.fn>
 }
 
 // El id de skill se deriva de la etiqueta para poder verificar el mapeo
 // etiqueta → SeccionSkill → CursoSkillExigida en las aserciones.
+const CLIENTES = [
+  { id: "cliente-1", nombre: "NTT Data Iberia" },
+  { id: "cliente-2", nombre: "NTT Data — Frontend Practice" },
+]
+
 function skillIdDe(etiqueta: string): string {
   return `skill:${etiqueta}`
 }
@@ -62,7 +67,7 @@ function buildTxMock(): MockTx {
 
 function buildPrismaMock(tx: MockTx): MockPrisma {
   const mock: MockPrisma = {
-    cliente: { findFirst: vi.fn() },
+    cliente: { findMany: vi.fn() },
     $transaction: vi.fn(),
   }
   mock.$transaction.mockImplementation(async (cb: (tx: MockTx) => Promise<string>) => await cb(tx))
@@ -273,7 +278,7 @@ beforeEach(async () => {
 describe("ImportarCursoService.importar", () => {
   it("happy path: persiste curso + módulo + sección + bloque y área exigida", async () => {
     vi.mocked(parsearCursoMd).mockReturnValue(buildParsedInput())
-    prisma.cliente.findFirst.mockResolvedValue({ id: "cliente-1" })
+    prisma.cliente.findMany.mockResolvedValue(CLIENTES)
 
     const res = await service.importar({ contenidoMd: "# Curso\n..." })
 
@@ -303,7 +308,7 @@ describe("ImportarCursoService.importar", () => {
 
   it("cliente no encontrado: lanza NotFoundException CLIENTE_NO_ENCONTRADO sin abrir transacción", async () => {
     vi.mocked(parsearCursoMd).mockReturnValue(buildParsedInput())
-    prisma.cliente.findFirst.mockResolvedValue(null)
+    prisma.cliente.findMany.mockResolvedValue(CLIENTES.slice(1))
 
     try {
       await service.importar({ contenidoMd: "# Curso\n..." })
@@ -320,7 +325,7 @@ describe("ImportarCursoService.importar", () => {
     vi.mocked(parsearCursoMd).mockReturnValue(
       buildParsedInputConCodigo("TypeScript · Narrowing y control de flujo"),
     )
-    prisma.cliente.findFirst.mockResolvedValue({ id: "cliente-1" })
+    prisma.cliente.findMany.mockResolvedValue(CLIENTES)
 
     const res = await service.importar({ contenidoMd: "# Curso\n..." })
 
@@ -342,7 +347,7 @@ describe("ImportarCursoService.importar", () => {
 
   it("skill nueva: se auto-crea bajo el área del curso (no falla)", async () => {
     vi.mocked(parsearCursoMd).mockReturnValue(buildParsedInputConCodigo("Skill totalmente nueva"))
-    prisma.cliente.findFirst.mockResolvedValue({ id: "cliente-1" })
+    prisma.cliente.findMany.mockResolvedValue(CLIENTES)
 
     const res = await service.importar({ contenidoMd: "# Curso\n..." })
 
@@ -357,7 +362,7 @@ describe("ImportarCursoService.importar", () => {
 
   it("bloque SQL: crea SQL_EJERCICIO + SQL_TESTS y setea skillQueMideId en el ejercicio", async () => {
     vi.mocked(parsearCursoMd).mockReturnValue(buildParsedInputConSql("Postgres · Modelado y JOINs"))
-    prisma.cliente.findFirst.mockResolvedValue({ id: "cliente-1" })
+    prisma.cliente.findMany.mockResolvedValue(CLIENTES)
 
     const res = await service.importar({ contenidoMd: "# Curso\n..." })
 
@@ -378,7 +383,7 @@ describe("ImportarCursoService.importar", () => {
 
   it("herencia de skill: lecturas y quiz fundacional heredan la concreta; la fundacional queda fuera de exigidas", async () => {
     vi.mocked(parsearCursoMd).mockReturnValue(buildParsedInputModuloConHerencia())
-    prisma.cliente.findFirst.mockResolvedValue({ id: "cliente-1" })
+    prisma.cliente.findMany.mockResolvedValue(CLIENTES)
 
     await service.importar({ contenidoMd: "# Curso\n..." })
 
@@ -414,7 +419,7 @@ describe("ImportarCursoService.importar", () => {
     vi.mocked(parsearCursoMd).mockReturnValue(
       buildParsedInputConCodigo("Arquitectura del panel · Fundamentos"),
     )
-    prisma.cliente.findFirst.mockResolvedValue({ id: "cliente-1" })
+    prisma.cliente.findMany.mockResolvedValue(CLIENTES)
 
     await service.importar({ contenidoMd: "# Curso\n..." })
 
@@ -434,7 +439,7 @@ describe("ImportarCursoService.importar", () => {
 
   it("P2002 dentro de la transacción: se mapea a ConflictException CONFLICT", async () => {
     vi.mocked(parsearCursoMd).mockReturnValue(buildParsedInput())
-    prisma.cliente.findFirst.mockResolvedValue({ id: "cliente-1" })
+    prisma.cliente.findMany.mockResolvedValue(CLIENTES)
     prisma.$transaction.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError("Unique violation", {
         code: "P2002",
@@ -454,7 +459,7 @@ describe("ImportarCursoService.importar", () => {
 
   it("P2003 dentro de la transacción: se mapea a BadRequestException INVALID_BODY", async () => {
     vi.mocked(parsearCursoMd).mockReturnValue(buildParsedInput())
-    prisma.cliente.findFirst.mockResolvedValue({ id: "cliente-1" })
+    prisma.cliente.findMany.mockResolvedValue(CLIENTES)
     prisma.$transaction.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError("FK violation", {
         code: "P2003",
@@ -470,5 +475,46 @@ describe("ImportarCursoService.importar", () => {
       const r = (error as BadRequestException).getResponse() as { code: string }
       expect(r.code).toBe(apiErrorCodes.invalidBody)
     }
+  })
+  it("cliente escrito distinto (mayúsculas, tildes, guion): lo encuentra igual", async () => {
+    const input = buildParsedInput()
+    vi.mocked(parsearCursoMd).mockReturnValue({
+      ...input,
+      curso: { ...input.curso, cliente: "ntt data - frontend práctice" },
+    })
+    prisma.cliente.findMany.mockResolvedValue(CLIENTES)
+
+    await service.importar({ contenidoMd: "# Curso\n..." })
+
+    expect(tx.curso.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ clienteId: "cliente-2" }) }),
+    )
+  })
+
+  it("cliente no encontrado: el mensaje lista los clientes que sí existen", async () => {
+    vi.mocked(parsearCursoMd).mockReturnValue(buildParsedInput())
+    prisma.cliente.findMany.mockResolvedValue(CLIENTES.slice(1))
+
+    await expect(service.importar({ contenidoMd: "# Curso\n..." })).rejects.toMatchObject({
+      response: { message: expect.stringContaining("NTT Data — Frontend Practice") },
+    })
+  })
+
+  it("evaluable sin skill: recibe la skill «curso · módulo» y el curso entra al plan", async () => {
+    vi.mocked(parsearCursoMd).mockReturnValue(buildParsedInputConCodigo())
+    prisma.cliente.findMany.mockResolvedValue(CLIENTES)
+
+    await service.importar({ contenidoMd: "# Curso\n..." })
+
+    const etiqueta = "Curso con reto · Modulo uno"
+    expect(tx.bloque.create.mock.calls[0]?.[0]).toMatchObject({
+      data: { skillQueMideId: skillIdDe(etiqueta) },
+    })
+    expect(tx.seccionSkill.createMany).toHaveBeenCalledWith({
+      data: [{ seccionId: "sec-1", skillId: skillIdDe(etiqueta) }],
+    })
+    expect(tx.cursoSkillExigida.createMany).toHaveBeenCalledWith({
+      data: [{ cursoId: "curso-1", skillId: skillIdDe(etiqueta), notaMinima: 60 }],
+    })
   })
 })

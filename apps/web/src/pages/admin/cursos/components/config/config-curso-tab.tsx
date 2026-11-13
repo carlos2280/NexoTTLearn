@@ -9,6 +9,7 @@ import { ConfigSkillsExigidas } from "./config-skills-exigidas"
 import { ConfigTransversal } from "./config-transversal"
 import { ConfigUmbralesLogro } from "./config-umbrales-logro"
 import { ConfigVoluntarios } from "./config-voluntarios"
+import { RepararSkillsAviso } from "./reparar-skills-aviso"
 
 interface ConfigCursoTabProps {
   readonly curso: CursoDetalle & Partial<Pick<CursoConfiguracionResponse, "umbralesLogro">>
@@ -20,6 +21,7 @@ export function ConfigCursoTab({ curso }: ConfigCursoTabProps) {
   return (
     <div className="flex flex-col gap-6">
       <ConfigHeader />
+      <RepararSkillsAviso cursoId={curso.id} bloqueado={bloqueado} />
       <ConfigParametros curso={curso} />
       <ConfigVoluntarios curso={curso} bloqueado={bloqueado} />
       <ConfigAreasExigidas curso={curso} bloqueado={bloqueado} />

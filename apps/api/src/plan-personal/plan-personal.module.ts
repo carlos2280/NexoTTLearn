@@ -23,6 +23,6 @@ import { PlanPersonalService } from "./plan-personal.service"
   imports: [PrismaModule, NotificacionesModule],
   controllers: [PlanPersonalController],
   providers: [PlanPersonalService, PlanPersonalRecalculoService],
-  exports: [PlanPersonalService],
+  exports: [PlanPersonalService, PlanPersonalRecalculoService],
 })
 export class PlanPersonalModule {}

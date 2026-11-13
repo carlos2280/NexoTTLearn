@@ -10,7 +10,7 @@
 export const PLANTILLA_CURSO_MD = `---
 curso:
   titulo: "Mi Curso de Ejemplo"
-  cliente: "NTT Data Iberia"        # debe existir ya en la plataforma
+  cliente: "CAMBIA ESTO"             # nombre de un cliente que ya exista en la plataforma
   fechaInicio: "2026-06-15"          # YYYY-MM-DD
   fechaDeadline: "2026-09-15"
   desbloqueo: "ENCADENADO"           # ENCADENADO | LIBRE | DESDE_FECHA (opcional)
@@ -33,7 +33,9 @@ Este es un callout informativo. La variante puede ser \`info\`, \`warning\` o \`
 
 ## Sección 1.2: Tu primer quiz
 
-::: quiz notaMinima=70
+<!-- skill="…" (opcional) = la habilidad que mide la pregunta o el reto.
+     Si no la escribes, se usa "título del curso · título del módulo". -->
+::: quiz notaMinima=70 skill="React · Componentes"
 - enunciado: ¿Qué es un componente React?
   tipo: OPCION_UNICA
   opciones:
@@ -50,7 +52,7 @@ Este es un callout informativo. La variante puede ser \`info\`, \`warning\` o \`
 
 ## Sección 1.3: Tu primer reto de código
 
-::: codigo
+::: codigo skill="JavaScript · Funciones"
 lenguaje: javascript                 # javascript | typescript | python
 enunciado: |
   Implementa una función \`sumar(a, b)\` que devuelva la suma de los dos.

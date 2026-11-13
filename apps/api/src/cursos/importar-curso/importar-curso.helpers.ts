@@ -1,4 +1,11 @@
-import type { BloqueImportado, ModuloImportado, SeccionImportada } from "@nexott-learn/shared-types"
+import type {
+  BloqueImportado,
+  ImportarCursoInput,
+  ModuloImportado,
+  SeccionImportada,
+} from "@nexott-learn/shared-types"
+
+import { etiquetaSkillPorDefecto } from "../skill-por-defecto"
 
 /**
  * Logica pura que decide, a partir del `.md` parseado, que skills se asignan a
@@ -88,4 +95,51 @@ export function etiquetasSkillDeSeccion(
     return [...new Set(concretasPropias)]
   }
   return representanteModulo ? [representanteModulo] : []
+}
+
+/**
+ * Da a cada bloque evaluable (QUIZ, CODIGO, SQL) que no declaro `skill="…"` la
+ * skill por defecto de su modulo: «‹titulo del curso› · ‹titulo del modulo›».
+ * Sin skill, el bloque no admite intentos (`bloqueSinSkillMedida`) y la seccion
+ * queda fuera del plan, asi que el % del asignado nunca se mueve. La plantilla
+ * descargable no pedia la skill, y asi se cargaron cursos reales.
+ * Devuelve un input nuevo; no muta el recibido.
+ */
+export function completarSkillsFaltantes(input: ImportarCursoInput): ImportarCursoInput {
+  return {
+    ...input,
+    modulos: input.modulos.map((modulo) => {
+      const porDefecto = etiquetaSkillPorDefecto(input.curso.titulo, modulo.titulo)
+      return {
+        ...modulo,
+        secciones: modulo.secciones.map((seccion) => ({
+          ...seccion,
+          bloques: seccion.bloques.map((bloque) => conSkillPorDefecto(bloque, porDefecto)),
+        })),
+      }
+    }),
+  }
+}
+
+function conSkillPorDefecto(bloque: BloqueImportado, porDefecto: string): BloqueImportado {
+  const esEvaluable = bloque.tipo === "QUIZ" || bloque.tipo === "CODIGO" || bloque.tipo === "SQL"
+  if (!esEvaluable || bloque.skillEtiqueta) {
+    return bloque
+  }
+  return { ...bloque, skillEtiqueta: porDefecto }
+}
+
+/**
+ * Forma comparable del nombre de un cliente: sin mayusculas, sin tildes, con
+ * un solo tipo de guion y sin espacios repetidos. Los nombres reales mezclan
+ * «-» y «—», y escribirlos exactos a mano en el `.md` es facil de errar.
+ */
+export function normalizarNombreCliente(nombre: string): string {
+  return nombre
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[\u2010-\u2015\u2212]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
 }
