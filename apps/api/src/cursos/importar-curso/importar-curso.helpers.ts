@@ -5,6 +5,8 @@ import type {
   SeccionImportada,
 } from "@nexott-learn/shared-types"
 
+import { etiquetaSkillPorDefecto } from "../skill-por-defecto"
+
 /**
  * Logica pura que decide, a partir del `.md` parseado, que skills se asignan a
  * cada seccion (`SeccionSkill`) y cuales quedan exigidas por el curso
@@ -95,9 +97,6 @@ export function etiquetasSkillDeSeccion(
   return representanteModulo ? [representanteModulo] : []
 }
 
-// Tope de `skillEtiqueta` en el schema de importacion (importar-curso.schema.ts).
-const MAX_ETIQUETA_SKILL = 200
-
 /**
  * Da a cada bloque evaluable (QUIZ, CODIGO, SQL) que no declaro `skill="…"` la
  * skill por defecto de su modulo: «‹titulo del curso› · ‹titulo del modulo›».
@@ -110,7 +109,7 @@ export function completarSkillsFaltantes(input: ImportarCursoInput): ImportarCur
   return {
     ...input,
     modulos: input.modulos.map((modulo) => {
-      const porDefecto = `${input.curso.titulo} · ${modulo.titulo}`.slice(0, MAX_ETIQUETA_SKILL)
+      const porDefecto = etiquetaSkillPorDefecto(input.curso.titulo, modulo.titulo)
       return {
         ...modulo,
         secciones: modulo.secciones.map((seccion) => ({
