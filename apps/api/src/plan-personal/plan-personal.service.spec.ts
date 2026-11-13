@@ -62,7 +62,9 @@ interface MockPrisma {
   asignacionCurso: {
     findUnique: ReturnType<typeof vi.fn>
     findUniqueOrThrow: ReturnType<typeof vi.fn>
+    updateMany: ReturnType<typeof vi.fn>
   }
+  historicoEstadoAsignacion: { create: ReturnType<typeof vi.fn> }
   curso: {
     findUnique: ReturnType<typeof vi.fn>
     findUniqueOrThrow: ReturnType<typeof vi.fn>
@@ -100,6 +102,7 @@ interface MockPrisma {
   aperturaSeccion: {
     findMany: ReturnType<typeof vi.fn>
     findUnique: ReturnType<typeof vi.fn>
+    findFirst: ReturnType<typeof vi.fn>
     create: ReturnType<typeof vi.fn>
     count: ReturnType<typeof vi.fn>
   }
@@ -113,7 +116,9 @@ function buildPrismaMock(): MockPrisma {
     asignacionCurso: {
       findUnique: vi.fn(),
       findUniqueOrThrow: vi.fn(),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    historicoEstadoAsignacion: { create: vi.fn().mockResolvedValue({}) },
     curso: {
       findUnique: vi.fn(),
       findUniqueOrThrow: vi.fn(),
@@ -151,6 +156,7 @@ function buildPrismaMock(): MockPrisma {
     aperturaSeccion: {
       findMany: vi.fn().mockResolvedValue([]),
       findUnique: vi.fn(),
+      findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn(),
       count: vi.fn().mockResolvedValue(0),
     },
@@ -1767,4 +1773,99 @@ describe("PlanPersonalService.obtenerAvanceDetallado — bloques que no son preg
     expect(detalle.porcentaje).toBe(100)
     expect(detalle.secciones[0]?.bloquesTotales).toBe(1)
   })
+})
+
+// «Sin iniciar» con avance (13-11-2026): la asignacion pasa a EN_PROGRESO
+// tambien cuando la persona abre una seccion, no solo con su primera
+// respuesta. Mismo guard por estado origen, mismo historico (con su propio
+// motivo) y sin notificaciones.
+describe("PlanPersonalService.registrarApertura — pasa a EN_PROGRESO", () => {
+  const primera = new Date("2026-11-10T12:00:00Z")
+
+  function mockAsignacion(rol: RolAsignacion, estado: string): void {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      cursoId: CURSO_ID,
+      colaboradorId: COLABORADOR_ID,
+      rol,
+      estadoAsignado: rol === RolAsignacion.ASIGNADO ? estado : null,
+      estadoVoluntario: rol === RolAsignacion.VOLUNTARIO ? estado : null,
+    })
+    prisma.cursoModuloHabilitado.findFirst.mockResolvedValue({ moduloId: MODULO_ID_1 })
+    prisma.aperturaSeccion.findFirst.mockResolvedValue({ primeraAperturaAt: primera })
+  }
+
+  it("ASIGNADO sin iniciar: primera apertura -> EN_PROGRESO con fechaInicio = primera apertura + historico", async () => {
+    mockAsignacion(RolAsignacion.ASIGNADO, "ASIGNADO")
+    prisma.aperturaSeccion.create.mockResolvedValue({ primeraAperturaAt: primera })
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+
+    await service.registrarApertura(ASIGNACION_ID, SECCION_ID_1, participantePropio())
+
+    expect(prisma.asignacionCurso.updateMany).toHaveBeenCalledWith({
+      where: { id: ASIGNACION_ID, rol: RolAsignacion.ASIGNADO, estadoAsignado: "ASIGNADO" },
+      data: { estadoAsignado: "EN_PROGRESO", fechaInicio: primera },
+    })
+    expect(prisma.historicoEstadoAsignacion.create).toHaveBeenCalledWith({
+      data: {
+        asignacionId: ASIGNACION_ID,
+        estadoAnterior: "ASIGNADO:ASIGNADO",
+        estadoNuevo: "ASIGNADO:EN_PROGRESO",
+        motivo: "TRANSICION_AUTOMATICA_POR_APERTURA",
+        autorUsuarioId: PARTICIPANTE_USER_ID,
+      },
+    })
+    expect(notificaciones.crear).not.toHaveBeenCalled()
+  })
+
+  it("VOLUNTARIO inscrito: apertura -> EN_PROGRESO", async () => {
+    mockAsignacion(RolAsignacion.VOLUNTARIO, "INSCRITO")
+    prisma.aperturaSeccion.create.mockResolvedValue({ primeraAperturaAt: primera })
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+
+    await service.registrarApertura(ASIGNACION_ID, SECCION_ID_1, participantePropio())
+
+    expect(prisma.asignacionCurso.updateMany).toHaveBeenCalledWith({
+      where: { id: ASIGNACION_ID, rol: RolAsignacion.VOLUNTARIO, estadoVoluntario: "INSCRITO" },
+      data: { estadoVoluntario: "EN_PROGRESO", fechaInicio: primera },
+    })
+    expect(prisma.historicoEstadoAsignacion.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          estadoAnterior: "VOLUNTARIO:INSCRITO",
+          estadoNuevo: "VOLUNTARIO:EN_PROGRESO",
+          motivo: "TRANSICION_AUTOMATICA_POR_APERTURA",
+        }),
+      }),
+    )
+  })
+
+  it("reabrir una seccion ya abierta tambien corrige a quien quedo sin iniciar", async () => {
+    mockAsignacion(RolAsignacion.ASIGNADO, "ASIGNADO")
+    prisma.aperturaSeccion.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("dup", { code: "P2002", clientVersion: "test" }),
+    )
+    prisma.aperturaSeccion.findUnique.mockResolvedValue({ primeraAperturaAt: primera })
+    prisma.asignacionCurso.updateMany.mockResolvedValue({ count: 1 })
+
+    const res = await service.registrarApertura(ASIGNACION_ID, SECCION_ID_1, participantePropio())
+
+    expect(res.yaEstaba).toBe(true)
+    expect(prisma.historicoEstadoAsignacion.create).toHaveBeenCalledTimes(1)
+  })
+
+  it("ya EN_PROGRESO: no toca el estado ni escribe historico", async () => {
+    mockAsignacion(RolAsignacion.ASIGNADO, "EN_PROGRESO")
+    prisma.aperturaSeccion.create.mockResolvedValue({ primeraAperturaAt: primera })
+
+    await service.registrarApertura(ASIGNACION_ID, SECCION_ID_1, participantePropio())
+
+    expect(prisma.asignacionCurso.updateMany).not.toHaveBeenCalled()
+    expect(prisma.historicoEstadoAsignacion.create).not.toHaveBeenCalled()
+  })
+
+  function participantePropio(): SesionUsuario {
+    prisma.usuario.findUnique.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
+    return PARTICIPANTE
+  }
 })
