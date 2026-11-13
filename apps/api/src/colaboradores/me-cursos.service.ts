@@ -39,9 +39,8 @@ const CATALOGO_VACIO: CatalogoCursoEntry = {
  * `TODOS`) y `rol` de asignacion (`ASIGNADO` / `VOLUNTARIO` / `TODOS`).
  *
  * El porcentaje se obtiene del motor canonico `PlanPersonalService.obtenerPorcentajeAvance`
- * (D-S7-B6), que bifurca por rol internamente: ASIGNADO -> plan (secciones
- * obligatorias); VOLUNTARIO (D-AS-1: sin PlanEstudio) -> aperturas sobre el
- * total de secciones del curso (catalogo via `CursoModuloHabilitado`). Ese
+ * (D-S7-B6), que mide ASIGNADO y VOLUNTARIO con la misma regla sobre todas
+ * las secciones del curso (catalogo via `CursoModuloHabilitado`). Ese
  * mismo motor lo consume el reporte admin, asi que alumno y admin muestran el
  * mismo numero (FIX-P18a). No se duplica la regla aqui.
  *
@@ -214,9 +213,9 @@ export class MeCursosService {
     row: AsignacionRow,
     catalogo: CatalogoCursoEntry,
   ): Promise<MeCursoResumen> {
-    // `obtenerPorcentajeAvance` bifurca por rol internamente (ASIGNADO -> plan;
-    // VOLUNTARIO -> mismas secciones del catalogo con la misma regla del asignado,
-    // "seccion aprobada"), asi que ya no duplicamos la formula del voluntario aqui.
+    // `obtenerPorcentajeAvance` mide los dos roles sobre las secciones del
+    // catalogo con la misma regla ("seccion aprobada"), asi que no se duplica
+    // la formula aqui.
     const porcentajeAvance = await this.planPersonalService.obtenerPorcentajeAvance(row.id)
     return {
       asignacionId: row.id,

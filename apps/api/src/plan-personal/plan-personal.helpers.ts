@@ -54,6 +54,16 @@ export const AVANCE_DETALLADO_VACIO: AvanceDetallado = Object.freeze({
 })
 
 /**
+ * Agregado del plan cuando no hay metrica (curso sin secciones): 0 de 0, 0%.
+ * Mismo criterio que `AVANCE_DETALLADO_VACIO`: nunca 100% vacuo.
+ */
+export const AVANCE_PLAN_VACIO: AvancePlan = Object.freeze({
+  seccionesCompletadas: 0,
+  seccionesObligatorias: 0,
+  porcentaje: 0,
+})
+
+/**
  * Adapta la salida de `calcularAvance` al contrato `AvanceDetallado`. El orden
  * de `secciones` es el de insercion del Map (el de las secciones evaluadas);
  * el consumidor debe indexar por `seccionId`, no por posicion.

@@ -728,19 +728,6 @@ describe("PlanPersonalService.obtenerPorcentajeAvance (bifurca por rol)", () => 
     expect(prisma.planEstudio.findUnique).not.toHaveBeenCalled()
   })
 
-  it("ASIGNADO sin PlanEstudio -> 0 (comportamiento preservado)", async () => {
-    prisma.asignacionCurso.findUnique.mockResolvedValue({
-      rol: RolAsignacion.ASIGNADO,
-      cursoId: CURSO_ID,
-      colaboradorId: COLABORADOR_ID,
-    })
-    prisma.planEstudio.findUnique.mockResolvedValue(null)
-
-    await expect(service.obtenerPorcentajeAvance(ASIGNACION_ID)).resolves.toBe(0)
-    // Un asignado NO usa la formula del voluntario.
-    expect(prisma.aperturaSeccion.count).not.toHaveBeenCalled()
-  })
-
   it("Asignacion inexistente -> 0 (defensa)", async () => {
     prisma.asignacionCurso.findUnique.mockResolvedValue(null)
     await expect(service.obtenerPorcentajeAvance(ASIGNACION_ID)).resolves.toBe(0)
@@ -808,30 +795,6 @@ describe("PlanPersonalService.obtenerAvanceDetallado", () => {
       seccionesTotales: 0,
       secciones: [],
     })
-  })
-
-  it("ASIGNADO: solo describe las secciones OBLIGATORIAS de su plan", async () => {
-    prisma.asignacionCurso.findUnique.mockResolvedValue({
-      rol: RolAsignacion.ASIGNADO,
-      cursoId: CURSO_ID,
-      colaboradorId: COLABORADOR_ID,
-    })
-    prisma.planEstudio.findUnique.mockResolvedValue({ id: PLAN_ID })
-    prisma.itemPlan.findMany.mockResolvedValueOnce([{ seccionId: SECCION_ID_1 }])
-    prisma.seccion.findMany.mockResolvedValueOnce([
-      { id: SECCION_ID_1, bloques: [{ id: "b1", tipo: "QUIZ", contenido: {} }] },
-    ])
-    prisma.intentoBloque.findMany.mockResolvedValueOnce([
-      { bloqueId: "b1", nota: new Prisma.Decimal(90) },
-    ])
-    prisma.aperturaSeccion.findMany.mockResolvedValueOnce([])
-
-    const detalle = await service.obtenerAvanceDetallado(ASIGNACION_ID)
-
-    expect(detalle.porcentaje).toBe(100)
-    expect(detalle.secciones).toEqual([
-      { seccionId: SECCION_ID_1, completada: true, bloquesCompletados: 1, bloquesTotales: 1 },
-    ])
   })
 
   it("Asignacion inexistente -> detalle vacio (defensa)", async () => {
@@ -1377,6 +1340,56 @@ describe("PlanPersonalService.registrarApertura (P7c)", () => {
     })
   })
 
+  it("apertura que completa las obligatorias pero deja secciones del curso pendientes NO emite PLAN_RECALCULADO", async () => {
+    // Con destinatario resoluble: si el codigo considerara el plan completo,
+    // la notificacion SI se emitiria.
+    prisma.asignacionCurso.findUnique.mockImplementation(
+      (args: { select?: Record<string, unknown> }) =>
+        Promise.resolve(
+          args.select && "curso" in args.select
+            ? {
+                curso: { titulo: "Curso de prueba" },
+                colaborador: { usuario: { id: USUARIO_PARTICIPANTE } },
+              }
+            : {
+                id: ASIGNACION_ID,
+                cursoId: CURSO_ID,
+                colaboradorId: COLABORADOR_ID,
+                rol: RolAsignacion.ASIGNADO,
+                estadoAsignado: EstadoAsignado.EN_PROGRESO,
+                estadoVoluntario: null,
+              },
+        ),
+    )
+    prisma.cursoModuloHabilitado.findFirst.mockResolvedValue({ moduloId: MODULO_ID_1 })
+    prisma.aperturaSeccion.create.mockResolvedValue({
+      primeraAperturaAt: new Date("2026-11-13T10:00:00Z"),
+    })
+    prisma.planEstudio.findUnique.mockResolvedValue({ id: "plan-1" })
+    // Unica obligatoria del plan: S1, que se acaba de abrir.
+    prisma.itemPlan.findMany.mockResolvedValue([{ seccionId: SECCION_ID_1 }])
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue({
+      colaboradorId: COLABORADOR_ID,
+      cursoId: CURSO_ID,
+    })
+    // El curso tiene ademas S2 (opcional o fuera del plan), sin abrir: 50%.
+    prisma.seccion.findMany.mockImplementation((args: { where?: { id?: unknown } }) =>
+      Promise.resolve(
+        args.where?.id
+          ? [{ id: SECCION_ID_1, bloques: [] }]
+          : [
+              { id: SECCION_ID_1, bloques: [] },
+              { id: SECCION_ID_2, bloques: [] },
+            ],
+      ),
+    )
+    prisma.aperturaSeccion.findMany.mockResolvedValue([{ seccionId: SECCION_ID_1 }])
+
+    await service.registrarApertura(ASIGNACION_ID, SECCION_ID_1, ADMIN)
+
+    expect(notificaciones.crear).not.toHaveBeenCalled()
+  })
+
   it("apertura replay (yaEstaba=true) NO emite PLAN_RECALCULADO (§5.123)", async () => {
     mockAsignacionActiva()
     const fecha = new Date("2026-05-12T10:00:00Z")
@@ -1563,10 +1576,12 @@ describe("PlanPersonalService.ajustarPlan -> notificacion PLAN_RECALCULADO", () 
   })
 })
 
-describe("PlanPersonalService.obtenerPorcentajeAvance (ASIGNADO, % del plan)", () => {
-  // El % del asignado se calcula sobre las obligatorias del plan. Tras FIX-P18a
-  // el metodo lee primero la asignacion (para bifurcar por rol) y toma el
-  // `colaboradorId` de ahi, por lo que ya no usa `findUniqueOrThrow`.
+describe("PlanPersonalService.obtenerPorcentajeAvance (ASIGNADO, misma vara que el voluntario)", () => {
+  // Regla unica (13-11-2026): el % de un ASIGNADO se mide sobre TODAS las
+  // secciones del curso, igual que el del voluntario. El plan personal guia
+  // (obligatoria/opcional) pero no cambia el %: una seccion que pasa a OPCIONAL
+  // por aprobar su skill sigue contando, y las secciones sin skill (fuera del
+  // plan) tambien cuentan.
   function mockAsignado(): void {
     prisma.asignacionCurso.findUnique.mockResolvedValue({
       rol: RolAsignacion.ASIGNADO,
@@ -1575,61 +1590,126 @@ describe("PlanPersonalService.obtenerPorcentajeAvance (ASIGNADO, % del plan)", (
     })
   }
 
-  it("sin plan -> 0 sin lanzar (no consulta items ni secciones)", async () => {
+  it("cuenta las secciones aprobadas aunque el plan las marque opcionales o no las incluya", async () => {
     mockAsignado()
-    prisma.planEstudio.findUnique.mockResolvedValueOnce(null)
-
-    const porcentaje = await service.obtenerPorcentajeAvance(ASIGNACION_ID)
-
-    expect(porcentaje).toBe(0)
-    expect(prisma.itemPlan.findMany).not.toHaveBeenCalled()
-    expect(prisma.seccion.findMany).not.toHaveBeenCalled()
-  })
-
-  it("plan sin items obligatorios -> 0 (mismo criterio que planEstaCompleto)", async () => {
-    mockAsignado()
-    prisma.planEstudio.findUnique.mockResolvedValueOnce({ id: "plan-1" })
-    prisma.itemPlan.findMany.mockResolvedValueOnce([])
-
-    const porcentaje = await service.obtenerPorcentajeAvance(ASIGNACION_ID)
-
-    expect(porcentaje).toBe(0)
-    expect(prisma.seccion.findMany).not.toHaveBeenCalled()
-  })
-
-  it("plan con 2 obligatorias y 1 completada -> 50", async () => {
-    mockAsignado()
-    prisma.planEstudio.findUnique.mockResolvedValueOnce({ id: "plan-1" })
-    prisma.itemPlan.findMany.mockResolvedValueOnce([
-      { seccionId: SECCION_ID_1 },
-      { seccionId: SECCION_ID_2 },
-    ])
-    prisma.seccion.findMany.mockResolvedValueOnce([
+    // Si el codigo aun leyera el plan, veria solo S3 como obligatoria.
+    prisma.planEstudio.findUnique.mockResolvedValue({ id: PLAN_ID })
+    prisma.itemPlan.findMany.mockResolvedValue([{ seccionId: SECCION_ID_3 }])
+    // Catalogo del curso: S1 (opcional, aprobada), S2 (fuera del plan, abierta y
+    // sin preguntas), S3 (obligatoria, sin aprobar).
+    prisma.seccion.findMany.mockResolvedValue([
       { id: SECCION_ID_1, bloques: [{ id: "b1", tipo: "QUIZ", contenido: {} }] },
-      { id: SECCION_ID_2, bloques: [{ id: "b2", tipo: "QUIZ", contenido: {} }] },
+      { id: SECCION_ID_2, bloques: [] },
+      { id: SECCION_ID_3, bloques: [{ id: "b3", tipo: "QUIZ", contenido: {} }] },
     ])
-    // Solo b1 tiene mejor-intento; b2 queda sin intento -> 1/2 = 50%.
-    // El umbral se resuelve via `umbralAprobacionBloque` desde el contenido.
-    prisma.intentoBloque.findMany.mockResolvedValueOnce([
-      { bloqueId: "b1", nota: new Prisma.Decimal(80) },
+    prisma.intentoBloque.findMany.mockResolvedValue([
+      { bloqueId: "b1", nota: new Prisma.Decimal(100) },
     ])
-    prisma.aperturaSeccion.findMany.mockResolvedValueOnce([])
+    prisma.aperturaSeccion.findMany.mockResolvedValue([{ seccionId: SECCION_ID_2 }])
 
     const porcentaje = await service.obtenerPorcentajeAvance(ASIGNACION_ID)
 
-    expect(porcentaje).toBe(50)
+    // 2 de 3 secciones del curso (no 0 de 1 obligatoria).
+    expect(porcentaje).toBe(66.67)
   })
 
-  it("plan con 1 obligatoria sin bloques pero con apertura -> 100", async () => {
+  it("sin plan todavia: igual se mide sobre el curso", async () => {
     mockAsignado()
-    prisma.planEstudio.findUnique.mockResolvedValueOnce({ id: "plan-1" })
-    prisma.itemPlan.findMany.mockResolvedValueOnce([{ seccionId: SECCION_ID_1 }])
-    prisma.seccion.findMany.mockResolvedValueOnce([{ id: SECCION_ID_1, bloques: [] }])
-    prisma.intentoBloque.findMany.mockResolvedValueOnce([])
-    prisma.aperturaSeccion.findMany.mockResolvedValueOnce([{ seccionId: SECCION_ID_1 }])
+    prisma.planEstudio.findUnique.mockResolvedValue(null)
+    prisma.seccion.findMany.mockResolvedValue([
+      { id: SECCION_ID_1, bloques: [] },
+      { id: SECCION_ID_2, bloques: [] },
+    ])
+    prisma.aperturaSeccion.findMany.mockResolvedValue([{ seccionId: SECCION_ID_1 }])
 
-    const porcentaje = await service.obtenerPorcentajeAvance(ASIGNACION_ID)
+    await expect(service.obtenerPorcentajeAvance(ASIGNACION_ID)).resolves.toBe(50)
+  })
 
-    expect(porcentaje).toBe(100)
+  it("curso sin secciones -> 0 (sin dividir por cero ni 100 vacuo)", async () => {
+    mockAsignado()
+    prisma.seccion.findMany.mockResolvedValue([])
+
+    await expect(service.obtenerPorcentajeAvance(ASIGNACION_ID)).resolves.toBe(0)
+    expect(prisma.intentoBloque.findMany).not.toHaveBeenCalled()
+  })
+
+  it("el desglose por seccion cubre todo el curso y cuadra con el %", async () => {
+    mockAsignado()
+    prisma.seccion.findMany.mockResolvedValue([
+      { id: SECCION_ID_1, bloques: [{ id: "b1", tipo: "QUIZ", contenido: {} }] },
+      { id: SECCION_ID_2, bloques: [] },
+    ])
+    prisma.intentoBloque.findMany.mockResolvedValue([
+      { bloqueId: "b1", nota: new Prisma.Decimal(90) },
+    ])
+
+    const detalle = await service.obtenerAvanceDetallado(ASIGNACION_ID)
+
+    expect(detalle.porcentaje).toBe(50)
+    expect(detalle.seccionesTotales).toBe(2)
+    expect(detalle.secciones).toEqual(
+      expect.arrayContaining([
+        { seccionId: SECCION_ID_1, completada: true, bloquesCompletados: 1, bloquesTotales: 1 },
+        { seccionId: SECCION_ID_2, completada: false, bloquesCompletados: 0, bloquesTotales: 0 },
+      ]),
+    )
+  })
+})
+
+describe("PlanPersonalService.obtener — avance del plan con la regla unica", () => {
+  it("el avance es sobre el curso y una opcional aprobada sale completada", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIGNACION_ID,
+      rol: RolAsignacion.ASIGNADO,
+      colaboradorId: COLABORADOR_ID,
+    })
+    prisma.usuario.findUnique.mockResolvedValue({ colaboradorId: COLABORADOR_ID })
+    prisma.planEstudio.findUnique.mockResolvedValue({
+      id: PLAN_ID,
+      asignacionId: ASIGNACION_ID,
+      fechaCalculo: new Date("2026-11-13T10:00:00Z"),
+      fichaSnapshot: null,
+      estaDesactualizado: false,
+    })
+    prisma.itemPlan.findMany.mockResolvedValue([
+      {
+        moduloId: MODULO_ID_1,
+        seccionId: SECCION_ID_1,
+        caracter: "OBLIGATORIA",
+        razon: "SKILL_FALTANTE",
+      },
+      {
+        moduloId: MODULO_ID_1,
+        seccionId: SECCION_ID_2,
+        caracter: "OPCIONAL",
+        razon: "SKILL_YA_CUMPLE",
+      },
+    ])
+    prisma.asignacionCurso.findUniqueOrThrow.mockResolvedValue({
+      colaboradorId: COLABORADOR_ID,
+      cursoId: CURSO_ID,
+    })
+    const modulo = { id: MODULO_ID_1, titulo: "Modulo 1" }
+    const quiz = (id: string) => [{ id, tipo: "QUIZ", contenido: {} }]
+    // S3 no esta en el plan (sin skill), pero es parte del curso.
+    prisma.seccion.findMany.mockResolvedValue([
+      { id: SECCION_ID_1, titulo: "S1", moduloId: MODULO_ID_1, modulo, bloques: quiz("b1") },
+      { id: SECCION_ID_2, titulo: "S2", moduloId: MODULO_ID_1, modulo, bloques: quiz("b2") },
+      { id: SECCION_ID_3, titulo: "S3", moduloId: MODULO_ID_1, modulo, bloques: [] },
+    ])
+    prisma.intentoBloque.findMany.mockResolvedValue([
+      { bloqueId: "b1", nota: new Prisma.Decimal(80) },
+      { bloqueId: "b2", nota: new Prisma.Decimal(100) },
+    ])
+
+    const res = (await service.obtener(ASIGNACION_ID, PARTICIPANTE)) as PlanResponseParticipante
+
+    expect(res.avance).toEqual({
+      seccionesCompletadas: 2,
+      seccionesObligatorias: 3,
+      porcentaje: 66.67,
+    })
+    const s2 = res.items.flatMap((m) => m.secciones).find((s) => s.seccionId === SECCION_ID_2)
+    expect(s2?.completada).toBe(true)
   })
 })
