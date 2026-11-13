@@ -64,6 +64,7 @@ export const apiErrorCodes = {
   bloqueOrdenInvalido: "BLOQUE_ORDEN_INVALIDO",
   bloqueTipoEdicionInvalido: "BLOQUE_TIPO_EDICION_INVALIDO",
   bloqueSkillObligatoriaEvaluable: "BLOQUE_SKILL_OBLIGATORIA_EVALUABLE",
+  bloqueTipoNoEvaluable: "BLOQUE_TIPO_NO_EVALUABLE",
   bloqueYaEliminado: "BLOQUE_YA_ELIMINADO",
   conflictClienteNombreDuplicado: "CONFLICT_CLIENTE_NOMBRE_DUPLICADO",
   conflictClienteConCursos: "CONFLICT_CLIENTE_CON_CURSOS",

@@ -21,6 +21,22 @@ export const tipoBloqueSchema = z.enum([
 ])
 export type TipoBloque = z.infer<typeof tipoBloqueSchema>
 
+/**
+ * Tipos de bloque que reciben intentos con nota: los unicos que pueden ser
+ * evaluables (`esEvaluable=true`) y contar como pregunta en el avance. Un
+ * PARRAFO o un RECURSO marcado evaluable no se puede responder nunca y deja
+ * su seccion sin completarse. Fuente unica para API y web.
+ */
+export const TIPOS_BLOQUE_EVALUABLES = [
+  "QUIZ",
+  "CODIGO_PREGUNTAS",
+  "SQL_EJERCICIO",
+] as const satisfies readonly TipoBloque[]
+
+export function esTipoBloqueEvaluable(tipo: string): boolean {
+  return (TIPOS_BLOQUE_EVALUABLES as readonly string[]).includes(tipo)
+}
+
 export const estadoBloqueSchema = z.enum(["ACTIVO", "ELIMINADO"])
 export type EstadoBloque = z.infer<typeof estadoBloqueSchema>
 

@@ -7,6 +7,7 @@ import {
   EstadoAsignado,
   EstadoVoluntario,
   RolAsignacion,
+  esTipoBloqueEvaluable,
 } from "@nexott-learn/shared-types"
 import {
   EstadoAsignado as EstadoAsignadoPrisma,
@@ -323,7 +324,12 @@ async function seccionesDelCurso(
       },
     },
   })
-  return secciones.map((s) => ({ seccionId: s.id, bloques: s.bloques }))
+  // Solo cuentan como pregunta los tipos que reciben intentos (mismo criterio
+  // que `PlanPersonalService.obtenerAvance`).
+  return secciones.map((s) => ({
+    seccionId: s.id,
+    bloques: s.bloques.filter((b) => esTipoBloqueEvaluable(b.tipo)),
+  }))
 }
 
 /**

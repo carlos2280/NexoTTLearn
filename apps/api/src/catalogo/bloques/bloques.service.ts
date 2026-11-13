@@ -16,6 +16,7 @@ import {
   PreviewImpactoEliminarBloque,
   ReordenarBloquesInput,
   TipoBloque,
+  esTipoBloqueEvaluable,
   validarContenidoBloque,
 } from "@nexott-learn/shared-types"
 import { AccionAuditoria, EstadoBloque, EstadoSkill, Prisma } from "@prisma/client"
@@ -215,6 +216,9 @@ export class BloquesService {
       })
     }
     this.validarContenidoOrThrow(input.tipo, input.contenido)
+    if (input.esEvaluable) {
+      this.validarTipoEvaluableOrThrow(input.tipo)
+    }
     const fila = await this.prisma.$transaction(async (tx) => {
       if (input.skillQueMideId) {
         await this.validarSkillActiva(tx, input.skillQueMideId)
@@ -264,6 +268,20 @@ export class BloquesService {
       ...contexto,
     })
     return toBloqueDetalleResponse(fila)
+  }
+
+  /**
+   * Solo los tipos que reciben intentos (`TIPOS_BLOQUE_EVALUABLES`) pueden
+   * marcarse evaluables: un PARRAFO o RECURSO evaluable no se puede responder
+   * y deja su seccion sin completarse nunca. Desmarcar siempre se permite.
+   */
+  private validarTipoEvaluableOrThrow(tipo: string): void {
+    if (!esTipoBloqueEvaluable(tipo)) {
+      throw new BadRequestException({
+        code: apiErrorCodes.bloqueTipoNoEvaluable,
+        message: "Solo los bloques QUIZ, CODIGO_PREGUNTAS y SQL_EJERCICIO pueden ser evaluables.",
+      })
+    }
   }
 
   /**
@@ -380,6 +398,9 @@ export class BloquesService {
         },
         HttpStatus.UNPROCESSABLE_ENTITY,
       )
+    }
+    if (input.esEvaluable === true) {
+      this.validarTipoEvaluableOrThrow(actual.tipo)
     }
     if (input.esEvaluable !== undefined) {
       const nuevoSkill = input.skillQueMideId ?? actual.skillQueMideId

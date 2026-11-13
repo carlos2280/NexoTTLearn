@@ -12,6 +12,7 @@ import {
   type IntentoBloqueResponse,
   type ListarIntentosBloqueQuery,
   type ListarIntentosCursoBloqueQuery,
+  esTipoBloqueEvaluable,
 } from "@nexott-learn/shared-types"
 import {
   EstadoAsignado,
@@ -820,12 +821,7 @@ export class IntentosBloqueService {
         message: "Los bloques de tests no aceptan intentos directos.",
       })
     }
-    const aceptados: readonly TipoBloque[] = [
-      TipoBloque.QUIZ,
-      TipoBloque.CODIGO_PREGUNTAS,
-      TipoBloque.SQL_EJERCICIO,
-    ]
-    if (!aceptados.includes(tipo)) {
+    if (!esTipoBloqueEvaluable(tipo)) {
       throw new ConflictException({
         code: apiErrorCodes.bloqueNoEvaluable,
         message: "Solo se aceptan intentos en bloques QUIZ, CODIGO_PREGUNTAS o SQL_EJERCICIO.",
