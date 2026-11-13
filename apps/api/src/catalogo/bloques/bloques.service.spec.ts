@@ -576,3 +576,83 @@ describe("BloquesService.listarPorSeccion (FIX-pre-S12)", () => {
     expect(findManyArg.orderBy).toEqual({ orden: "asc" })
   })
 })
+
+// Solo QUIZ, CODIGO_PREGUNTAS y SQL_EJERCICIO reciben intentos. Un PARRAFO o un
+// RECURSO marcado evaluable nunca se puede responder y deja su seccion sin
+// completarse nunca (caso 8.1 de Azure Basico, 13-11-2026).
+describe("BloquesService — solo los tipos con intento se pueden marcar evaluables", () => {
+  it("crear PARRAFO evaluable: 400 BLOQUE_TIPO_NO_EVALUABLE y no crea", async () => {
+    prisma.seccion.findUnique.mockResolvedValue({ id: SEC_ID })
+    prisma.skill.findUnique.mockResolvedValue({ id: SKILL_ID, estado: EstadoSkill.ACTIVA })
+    await expect(
+      service.crear(
+        SEC_ID,
+        {
+          tipo: TipoBloque.PARRAFO,
+          esEvaluable: true,
+          skillQueMideId: SKILL_ID,
+          contenido: CONTENIDO_PARRAFO_VACIO,
+        },
+        ADMIN_ID,
+      ),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.bloqueTipoNoEvaluable } })
+    expect(prisma.bloque.create).not.toHaveBeenCalled()
+  })
+
+  it("marcar evaluable un RECURSO existente: 400 BLOQUE_TIPO_NO_EVALUABLE y no actualiza", async () => {
+    prisma.bloque.findUnique.mockResolvedValue({
+      id: BLO_ID,
+      version: 1,
+      estado: EstadoBloque.ACTIVO,
+      esEvaluable: false,
+      skillQueMideId: null,
+      tipo: TipoBloque.RECURSO,
+    })
+    await expect(
+      service.patch(
+        BLO_ID,
+        {
+          tipoEdicion: "CAMBIA_EVALUACION",
+          contenido: {},
+          esEvaluable: true,
+          skillQueMideId: SKILL_ID,
+        },
+        "motivo",
+        ADMIN_ID,
+      ),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.bloqueTipoNoEvaluable } })
+    expect(prisma.bloque.update).not.toHaveBeenCalled()
+  })
+
+  it("desmarcar un PARRAFO que quedo evaluable: se permite (limpieza del dato)", async () => {
+    prisma.bloque.findUnique.mockResolvedValue({
+      id: BLO_ID,
+      version: 2,
+      estado: EstadoBloque.ACTIVO,
+      esEvaluable: true,
+      skillQueMideId: SKILL_ID,
+      tipo: TipoBloque.PARRAFO,
+    })
+    prisma.bloque.update.mockResolvedValue(
+      buildDetalleRow({ version: 3, tipo: TipoBloque.PARRAFO, contenido: CONTENIDO_PARRAFO_VACIO }),
+    )
+    prisma.intentoBloque.updateMany.mockResolvedValue({ count: 0 })
+
+    const res = await service.patch(
+      BLO_ID,
+      {
+        tipoEdicion: "CAMBIA_EVALUACION",
+        contenido: CONTENIDO_PARRAFO_VACIO,
+        esEvaluable: false,
+        skillQueMideId: null,
+      },
+      "parrafo no se evalua",
+      ADMIN_ID,
+    )
+
+    expect(res.versionNueva).toBe(3)
+    expect(prisma.bloque.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ esEvaluable: false }) }),
+    )
+  })
+})

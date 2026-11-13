@@ -7,12 +7,12 @@ import {
   EstadoAsignado,
   EstadoVoluntario,
   RolAsignacion,
+  esTipoBloqueEvaluable,
 } from "@nexott-learn/shared-types"
 import {
   EstadoAsignado as EstadoAsignadoPrisma,
   EstadoVoluntario as EstadoVoluntarioPrisma,
   Prisma,
-  RolAsignacion as RolAsignacionPrisma,
   TipoBloque,
 } from "@prisma/client"
 import { z } from "zod"
@@ -120,12 +120,9 @@ export function esEstadoCerradoParaReabrir(previa: {
 /**
  * D-AS-10 — Evalua las condiciones de cap. 12.3 para pasar a `LISTO`.
  *
- * `planCompleto` consulta el avance del plan personal (Slice 7):
- *  - VOLUNTARIO: planCompleto=true por diseno (los voluntarios no tienen plan
- *    personal — D-AS-1).
- *  - ASIGNADO sin plan -> planCompleto=false + faltante PLAN_INCOMPLETO.
- *  - ASIGNADO con plan: completo si % avance >= 100 sobre secciones
- *    obligatorias (D-S7-B6). 0 obligatorias -> 100% vacuamente.
+ * `planCompleto` usa la regla unica del avance (13-11-2026), igual para
+ * ASIGNADO y VOLUNTARIO: todas las secciones del curso completadas. Si no,
+ * faltante PLAN_INCOMPLETO.
  *
  * Transversal/IA conservan los placeholders S6: `NO_APLICA` / `TODO_S*`.
  */
@@ -289,74 +286,34 @@ interface SeccionPlanCompleto {
 }
 
 /**
- * "Plan completo" = todas las secciones que definen el avance estan completadas
- * (D-S7-B6: seccion con bloques evaluables -> todos aprobados; sin bloques ->
- * abierta). La fuente de secciones depende del rol:
- *  - ASIGNADO: obligatorias de su PlanEstudio (sin plan -> no completo).
- *  - VOLUNTARIO (D-AS-1, sin plan): TODO el catalogo del curso. Antes esta rama
- *    devolvia `true` sin mirar nada, lo que desbloqueaba el transversal y la
- *    graduacion con 0% de avance; ahora el voluntario debe completar el curso
- *    igual que el asignado su plan. Los ASIGNADOS conservan el mismo calculo.
+ * "Plan completo" = todas las secciones del curso estan completadas (D-S7-B6:
+ * seccion con bloques evaluables -> todos aprobados; sin bloques -> abierta).
+ * Regla unica para los dos roles (13-11-2026), la misma que el porcentaje de
+ * `PlanPersonalService.obtenerAvanceDetallado`: el plan personal del ASIGNADO
+ * guia, pero completar solo sus obligatorias ya no basta. Antes el VOLUNTARIO
+ * devolvia `true` sin mirar nada y el ASIGNADO miraba solo sus obligatorias.
  */
 async function calcularPlanCompleto(prisma: PrismaService, asignacionId: string): Promise<boolean> {
   const asignacion = await prisma.asignacionCurso.findUnique({
     where: { id: asignacionId },
-    select: { rol: true, colaboradorId: true, cursoId: true },
+    select: { colaboradorId: true, cursoId: true },
   })
   if (!asignacion) {
     return false
   }
-  const secciones = await seccionesParaPlanCompleto(
-    prisma,
-    asignacion.rol,
-    asignacionId,
-    asignacion.cursoId,
-  )
-  if (secciones === null) {
-    // ASIGNADO sin PlanEstudio: no hay metrica -> no completo.
-    return false
-  }
+  const secciones = await seccionesDelCurso(prisma, asignacion.cursoId)
   if (secciones.length === 0) {
-    // Plan sin obligatorias o curso sin secciones: vacuamente completo.
+    // Curso sin secciones: vacuamente completo.
     return true
   }
   return seccionesTodasCompletas(prisma, asignacionId, asignacion.colaboradorId, secciones)
 }
 
-/**
- * Secciones (con sus bloques evaluables activos) que definen el "plan completo"
- * segun el rol. `null` = ASIGNADO sin PlanEstudio (no evaluable).
- */
-async function seccionesParaPlanCompleto(
+/** Secciones del catalogo del curso con sus bloques evaluables activos. */
+async function seccionesDelCurso(
   prisma: PrismaService,
-  rol: RolAsignacionPrisma,
-  asignacionId: string,
   cursoId: string,
-): Promise<SeccionPlanCompleto[] | null> {
-  if (rol === RolAsignacionPrisma.ASIGNADO) {
-    const plan = await prisma.planEstudio.findUnique({
-      where: { asignacionId },
-      select: { id: true },
-    })
-    if (!plan) {
-      return null
-    }
-    const items = await prisma.itemPlan.findMany({
-      where: { planId: plan.id, caracter: "OBLIGATORIA" },
-      select: {
-        seccionId: true,
-        seccion: {
-          select: {
-            bloques: {
-              where: { estado: "ACTIVO", esEvaluable: true },
-              select: { id: true, tipo: true, contenido: true },
-            },
-          },
-        },
-      },
-    })
-    return items.map((i) => ({ seccionId: i.seccionId, bloques: i.seccion.bloques }))
-  }
+): Promise<SeccionPlanCompleto[]> {
   const secciones = await prisma.seccion.findMany({
     where: { modulo: { cursosModulosHabilitados: { some: { cursoId } } } },
     select: {
@@ -367,7 +324,12 @@ async function seccionesParaPlanCompleto(
       },
     },
   })
-  return secciones.map((s) => ({ seccionId: s.id, bloques: s.bloques }))
+  // Solo cuentan como pregunta los tipos que reciben intentos (mismo criterio
+  // que `PlanPersonalService.obtenerAvance`).
+  return secciones.map((s) => ({
+    seccionId: s.id,
+    bloques: s.bloques.filter((b) => esTipoBloqueEvaluable(b.tipo)),
+  }))
 }
 
 /**

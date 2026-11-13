@@ -7,6 +7,7 @@ import type { BloqueDetalleResponse } from "@nexott-learn/shared-types"
 import { ShieldAlert } from "lucide-react"
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
+import { casillaEvaluable } from "./editar-evaluacion-bloque.helpers"
 
 interface EditarEvaluacionBloqueProps {
   readonly bloque: BloqueDetalleResponse
@@ -36,6 +37,7 @@ export function EditarEvaluacionBloque({ bloque }: EditarEvaluacionBloqueProps) 
     (esEvaluable ? skillId !== (bloque.skillQueMideId ?? "") : false)
 
   const invariante = esEvaluable ? skillId.length > 0 : true
+  const casilla = casillaEvaluable(bloque.tipo, bloque.esEvaluable)
 
   async function guardarConMotivo(motivo: string) {
     if (!(tieneCambios && invariante)) {
@@ -59,6 +61,10 @@ export function EditarEvaluacionBloque({ bloque }: EditarEvaluacionBloqueProps) 
     }
   }
 
+  if (!casilla.visible) {
+    return null
+  }
+
   return (
     <div className="flex flex-col gap-3 border-border border-t py-3">
       <span className="text-caption text-text-tertiary">Evaluación</span>
@@ -67,6 +73,7 @@ export function EditarEvaluacionBloque({ bloque }: EditarEvaluacionBloqueProps) 
         <input
           type="checkbox"
           checked={esEvaluable}
+          disabled={!(esEvaluable || casilla.puedeMarcar)}
           onChange={(e) => {
             const v = e.target.checked
             setEsEvaluable(v)

@@ -13,7 +13,7 @@ import type {
   PlanResponseAdmin,
   PlanResponseParticipante,
 } from "@nexott-learn/shared-types"
-import { fichaSnapshotV1Schema } from "@nexott-learn/shared-types"
+import { esTipoBloqueEvaluable, fichaSnapshotV1Schema } from "@nexott-learn/shared-types"
 import {
   AccionAjustePlan,
   AccionAuditoria,
@@ -35,6 +35,7 @@ import { SesionUsuario } from "../common/types/sesion.types"
 import { NotificacionesService } from "../notificaciones/notificaciones.service"
 import {
   AVANCE_DETALLADO_VACIO,
+  AVANCE_PLAN_VACIO,
   type ResultadoCalculo,
   calcularAvance,
   calcularDiffPlan,
@@ -43,7 +44,7 @@ import {
   toAvanceDetallado,
   toPlanResponse,
 } from "./plan-personal.helpers"
-import type { AvanceDetallado, ModuloSeccionRef } from "./plan-personal.types"
+import type { AvanceDetallado, AvanceSeccion, ModuloSeccionRef } from "./plan-personal.types"
 import { SELECT_PLAN_FIELDS, SELECT_PLAN_ITEM_FIELDS } from "./plan-personal.types"
 
 type PrismaTx = Prisma.TransactionClient | PrismaService
@@ -784,25 +785,24 @@ export class PlanPersonalService {
         titulo: true,
         moduloId: true,
         modulo: { select: { id: true, titulo: true } },
-        bloques: {
-          where: { estado: "ACTIVO", esEvaluable: true },
-          select: { id: true, tipo: true, contenido: true },
-        },
       },
     })
 
     const asignacion = await tx.asignacionCurso.findUniqueOrThrow({
       where: { id: asignacionId },
-      select: { colaboradorId: true },
+      select: { colaboradorId: true, cursoId: true },
     })
 
-    const { avancePlan, porSeccion } = await this.obtenerAvance(
+    // Regla unica (13-11-2026): el avance que muestra el plan es el del CURSO,
+    // el mismo que la bandeja y los reportes. El caracter de cada item solo guia.
+    const avanceCurso = await this.avanceDelCurso(
       tx,
       asignacionId,
+      asignacion.cursoId,
       asignacion.colaboradorId,
-      items.filter((i) => i.caracter === "OBLIGATORIA"),
-      secciones,
     )
+    const avancePlan = avanceCurso?.avancePlan ?? AVANCE_PLAN_VACIO
+    const porSeccion = avanceCurso?.porSeccion ?? new Map<string, AvanceSeccion>()
 
     const modulosSecciones: ModuloSeccionRef[] = secciones.map((s) => ({
       moduloId: s.moduloId,
@@ -884,15 +884,20 @@ export class PlanPersonalService {
     // Resuelve el umbral por bloque a partir de su contenido. Los bloques
     // viajan al helper `calcularAvance` ya enriquecidos con `umbralAprobacion`
     // para evitar que el helper conozca el contrato JSONB del contenido.
+    // Solo cuentan como pregunta los tipos que reciben intentos: un PARRAFO o
+    // RECURSO con `esEvaluable=true` (dato heredado) no se puede responder, y
+    // su seccion se completa al abrirla, como una seccion sin preguntas.
     const seccionPorId = new Map(
       secciones.map((s) => [
         s.id,
         {
           id: s.id,
-          bloques: s.bloques.map((b) => ({
-            id: b.id,
-            umbralAprobacion: umbralAprobacionBloque(b.tipo, b.contenido),
-          })),
+          bloques: s.bloques
+            .filter((b) => esTipoBloqueEvaluable(b.tipo))
+            .map((b) => ({
+              id: b.id,
+              umbralAprobacion: umbralAprobacionBloque(b.tipo, b.contenido),
+            })),
         },
       ]),
     )
@@ -1136,18 +1141,12 @@ export class PlanPersonalService {
    * admin (`ReportesService.avanceCursoActual` + `obtenerCoberturaCurso`) — no
    * se duplica la regla de "seccion completada".
    *
-   * Bifurca por rol (D-AS-1):
-   *  - ASIGNADO: % del plan vigente via `obtenerAvance` (D-S7-B6) = secciones
-   *    OBLIGATORIAS completadas / obligatorias. Devuelve 0 si aun no tiene
-   *    `PlanEstudio` (ASIGNADO antes de `calcularExplicito`) o si el plan no
-   *    tiene obligatorias (sin metrica significativa).
-   *  - VOLUNTARIO: no tiene `PlanEstudio`; su avance se mide sobre TODAS las
-   *    secciones del catalogo del curso con la MISMA regla del asignado (seccion
-   *    completada = bloques aprobados, o abierta si no tiene bloques evaluables).
-   *    Unificado (2026-07) para que voluntarios y asignados usen la misma vara
-   *    —base de la gamificacion y cierre de P25 (bandeja 0%)—. Antes se medía
-   *    solo por aperturas (recorrido), lo que inflaba el % e impedia compararlo
-   *    con el asignado (dominio). Los ASIGNADOS no se ven afectados por el cambio.
+   * Regla unica para los dos roles (13-11-2026): secciones completadas sobre
+   * TODAS las secciones del catalogo del curso. Seccion completada = sus bloques
+   * evaluables aprobados, o abierta si no tiene bloques evaluables. El plan
+   * personal del ASIGNADO guia (obligatoria/opcional) pero no cambia el %:
+   * antes solo contaban sus obligatorias, y aprobar una skill sacaba del avance
+   * las secciones que la volvian opcional.
    */
   async obtenerPorcentajeAvance(asignacionId: string): Promise<number> {
     const { porcentaje } = await this.obtenerAvanceDetallado(asignacionId)
@@ -1167,67 +1166,33 @@ export class PlanPersonalService {
   async obtenerAvanceDetallado(asignacionId: string): Promise<AvanceDetallado> {
     const asignacion = await this.prisma.asignacionCurso.findUnique({
       where: { id: asignacionId },
-      select: { rol: true, cursoId: true, colaboradorId: true },
+      select: { cursoId: true, colaboradorId: true },
     })
     if (!asignacion) {
       return AVANCE_DETALLADO_VACIO
     }
-    if (asignacion.rol === RolAsignacion.VOLUNTARIO) {
-      return this.avanceDetalladoVoluntario(
-        asignacionId,
-        asignacion.cursoId,
-        asignacion.colaboradorId,
-      )
-    }
-    const plan = await this.prisma.planEstudio.findUnique({
-      where: { asignacionId },
-      select: { id: true },
-    })
-    if (!plan) {
-      return AVANCE_DETALLADO_VACIO
-    }
-    const items = await this.prisma.itemPlan.findMany({
-      where: { planId: plan.id, caracter: "OBLIGATORIA" },
-      select: { seccionId: true },
-    })
-    if (items.length === 0) {
-      return AVANCE_DETALLADO_VACIO
-    }
-    const secciones = await this.prisma.seccion.findMany({
-      where: { id: { in: items.map((i) => i.seccionId) } },
-      select: {
-        id: true,
-        bloques: {
-          where: { estado: "ACTIVO", esEvaluable: true },
-          select: { id: true, tipo: true, contenido: true },
-        },
-      },
-    })
-    const { avancePlan, porSeccion } = await this.obtenerAvance(
+    const avance = await this.avanceDelCurso(
       this.prisma,
       asignacionId,
+      asignacion.cursoId,
       asignacion.colaboradorId,
-      items,
-      secciones,
     )
-    return toAvanceDetallado(avancePlan, porSeccion)
+    return avance ? toAvanceDetallado(avance.avancePlan, avance.porSeccion) : AVANCE_DETALLADO_VACIO
   }
 
   /**
-   * Avance de un VOLUNTARIO (D-AS-1: sin `PlanEstudio`). Se mide sobre TODAS las
-   * secciones del catalogo del curso (`CursoModuloHabilitado`) con la MISMA regla
-   * que el ASIGNADO, reutilizando `obtenerAvance` -> `calcularAvance`: una seccion
-   * cuenta como completada si sus bloques evaluables estan aprobados, o si esta
-   * abierta cuando no tiene bloques evaluables. Redondeo a 2 decimales, igual que
-   * el asignado. Antes se medía solo por aperturas (recorrido); ahora refleja
-   * dominio y es comparable con el asignado. Solo aplica a VOLUNTARIO.
+   * Avance de la asignacion sobre TODAS las secciones del catalogo del curso
+   * (`CursoModuloHabilitado`), con `obtenerAvance` -> `calcularAvance`. Es el
+   * unico lugar que decide que secciones cuentan. `null` si el curso no tiene
+   * secciones: sin metrica, que cada caller traduce (0%, nunca 100% vacuo).
    */
-  private async avanceDetalladoVoluntario(
+  private async avanceDelCurso(
+    tx: PrismaTx,
     asignacionId: string,
     cursoId: string,
     colaboradorId: string,
-  ): Promise<AvanceDetallado> {
-    const secciones = await this.prisma.seccion.findMany({
+  ): Promise<ReturnType<typeof calcularAvance> | null> {
+    const secciones = await tx.seccion.findMany({
       where: { modulo: { cursosModulosHabilitados: { some: { cursoId } } } },
       select: {
         id: true,
@@ -1238,24 +1203,23 @@ export class PlanPersonalService {
       },
     })
     if (secciones.length === 0) {
-      return AVANCE_DETALLADO_VACIO
+      return null
     }
-    const items = secciones.map((s) => ({ seccionId: s.id }))
-    const { avancePlan, porSeccion } = await this.obtenerAvance(
-      this.prisma,
+    return this.obtenerAvance(
+      tx,
       asignacionId,
       colaboradorId,
-      items,
+      secciones.map((s) => ({ seccionId: s.id })),
       secciones,
     )
-    return toAvanceDetallado(avancePlan, porSeccion)
   }
 
   /**
-   * §5.123: comprueba si la asignacion tiene un plan al 100%. Reutiliza el
-   * motor `obtenerAvance` para no duplicar la regla de "seccion completada"
-   * (D-S7-B6). Retorna `planId` si esta completo, `null` si no hay plan o
-   * el porcentaje es menor a 100. Errores propagan al caller.
+   * §5.123: comprueba si la asignacion tiene un plan al 100%. "Al 100%" usa la
+   * regla unica del avance (todas las secciones del curso, `avanceDelCurso`),
+   * no solo las obligatorias del plan. Retorna `planId` si esta completo,
+   * `null` si no hay plan, el curso no tiene secciones o el porcentaje es menor
+   * a 100. Errores propagan al caller.
    */
   private async planEstaCompleto(asignacionId: string): Promise<string | null> {
     const plan = await this.prisma.planEstudio.findUnique({
@@ -1265,38 +1229,18 @@ export class PlanPersonalService {
     if (!plan) {
       return null
     }
-    const items = await this.prisma.itemPlan.findMany({
-      where: { planId: plan.id, caracter: "OBLIGATORIA" },
-      select: { seccionId: true },
-    })
-    if (items.length === 0) {
-      // Sin obligatorias el porcentaje seria 100 vacuamente, pero no hay
-      // transicion provocada por la apertura: no emitir.
-      return null
-    }
-    const secciones = await this.prisma.seccion.findMany({
-      where: { id: { in: items.map((i) => i.seccionId) } },
-      select: {
-        id: true,
-        bloques: {
-          where: { estado: "ACTIVO", esEvaluable: true },
-          select: { id: true, tipo: true, contenido: true },
-        },
-      },
-    })
     const asignacion = await this.prisma.asignacionCurso.findUniqueOrThrow({
       where: { id: asignacionId },
-      select: { colaboradorId: true },
+      select: { colaboradorId: true, cursoId: true },
     })
-    const { avancePlan } = await this.obtenerAvance(
+    const avance = await this.avanceDelCurso(
       this.prisma,
       asignacionId,
+      asignacion.cursoId,
       asignacion.colaboradorId,
-      items,
-      secciones,
     )
     // 100 = porcentaje completo (espejo de PORCENTAJE_TOTAL en plan-personal.helpers).
-    return avancePlan.porcentaje >= 100 ? plan.id : null
+    return avance && avance.avancePlan.porcentaje >= 100 ? plan.id : null
   }
 
   /**

@@ -534,3 +534,100 @@ describe("MeAvanceService.obtenerAvanceDeUsuario", () => {
     )
   })
 })
+
+// Regla unica (13-11-2026): el % del asignado cuenta todo el curso, asi que la
+// "siguiente seccion" no puede quedar en null mientras falte algo. Primero se
+// sugieren las obligatorias del plan (el plan guia); sin obligatorias
+// pendientes, la primera seccion del curso que aun no esta completada.
+describe("MeAvanceService.obtenerAvance — siguiente seccion del ASIGNADO", () => {
+  let prisma: PrismaMock
+  let plan: PlanServiceMock
+  let service: MeAvanceService
+
+  function seccionEstado(seccionId: string, completada: boolean): AvanceSeccion {
+    return { seccionId, completada, bloquesCompletados: 0, bloquesTotales: 0 }
+  }
+
+  beforeEach(() => {
+    prisma = buildPrismaMock()
+    plan = buildPlanMock()
+    service = new MeAvanceService(
+      prisma as unknown as PrismaService,
+      plan as unknown as PlanPersonalService,
+    )
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      id: ASIG,
+      rol: RolAsignacion.ASIGNADO,
+      curso: { id: CURSO, estado: "ACTIVO" },
+    })
+    prisma.planEstudio.findUnique.mockResolvedValue({ id: "plan-1" })
+    prisma.cursoModuloHabilitado.findMany.mockResolvedValue([{ moduloId: "m1", orden: 1 }])
+    prisma.seccion.findMany.mockResolvedValue([
+      { id: "sec-a", titulo: "A", orden: 1, moduloId: "m1" },
+      { id: "sec-b", titulo: "B", orden: 2, moduloId: "m1" },
+      { id: "sec-c", titulo: "C", orden: 3, moduloId: "m1" },
+    ])
+  })
+
+  it("con una obligatoria pendiente, la sugiere aunque haya otras antes en el curso", async () => {
+    prisma.itemPlan.findMany.mockResolvedValue([
+      {
+        seccionId: "sec-c",
+        moduloId: "m1",
+        seccion: { id: "sec-c", titulo: "C", orden: 3, bloques: [] },
+      },
+    ])
+    plan.obtenerAvanceDetallado.mockResolvedValue(
+      detalleAvance(0, 0, 3, [
+        seccionEstado("sec-a", false),
+        seccionEstado("sec-b", false),
+        seccionEstado("sec-c", false),
+      ]),
+    )
+
+    const response = await service.obtenerAvance(COLAB, CURSO)
+
+    expect(response.siguienteSeccion).toEqual({ seccionId: "sec-c", moduloId: "m1", titulo: "C" })
+  })
+
+  it("sin obligatorias pendientes, sugiere la primera seccion del curso sin completar", async () => {
+    prisma.itemPlan.findMany.mockResolvedValue([
+      {
+        seccionId: "sec-a",
+        moduloId: "m1",
+        seccion: { id: "sec-a", titulo: "A", orden: 1, bloques: [] },
+      },
+    ])
+    prisma.aperturaSeccion.findMany.mockResolvedValue([{ seccionId: "sec-a" }])
+    plan.obtenerAvanceDetallado.mockResolvedValue(
+      detalleAvance(33.33, 1, 3, [
+        seccionEstado("sec-a", true),
+        seccionEstado("sec-b", false),
+        seccionEstado("sec-c", false),
+      ]),
+    )
+
+    const response = await service.obtenerAvance(COLAB, CURSO)
+
+    expect(response.siguienteSeccion).toEqual({ seccionId: "sec-b", moduloId: "m1", titulo: "B" })
+  })
+
+  it("con todo el curso completado, no hay siguiente seccion", async () => {
+    prisma.aperturaSeccion.findMany.mockResolvedValue([
+      { seccionId: "sec-a" },
+      { seccionId: "sec-b" },
+      { seccionId: "sec-c" },
+    ])
+    plan.obtenerAvanceDetallado.mockResolvedValue(
+      detalleAvance(100, 3, 3, [
+        seccionEstado("sec-a", true),
+        seccionEstado("sec-b", true),
+        seccionEstado("sec-c", true),
+      ]),
+    )
+
+    const response = await service.obtenerAvance(COLAB, CURSO)
+
+    expect(response.siguienteSeccion).toBeNull()
+  })
+})

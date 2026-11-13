@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { tipoBloqueSchema } from "./listar-bloques.schema"
+import { esTipoBloqueEvaluable, tipoBloqueSchema } from "./listar-bloques.schema"
 
 /**
  * Tipos de edicion de bloque (D-CAT-14, §5.6 del modelo conceptual).
@@ -34,6 +34,10 @@ export const crearBloqueSchema = z
       path: ["skillQueMideId"],
     },
   )
+  .refine((v) => !v.esEvaluable || esTipoBloqueEvaluable(v.tipo), {
+    message: "Solo QUIZ, CODIGO_PREGUNTAS y SQL_EJERCICIO pueden ser evaluables.",
+    path: ["esEvaluable"],
+  })
 
 export type CrearBloqueInput = z.infer<typeof crearBloqueSchema>
 

@@ -12,14 +12,8 @@
  *  - Secciones que ya tienen skills no se tocan: la reparacion solo agrega.
  */
 
+import { esTipoBloqueEvaluable } from "@nexott-learn/shared-types"
 import { etiquetaSkillPorDefecto } from "../skill-por-defecto"
-
-// Tipos de bloque que miden una skill (los que admiten intentos con nota).
-const TIPOS_QUE_MIDEN_SKILL: ReadonlySet<string> = new Set([
-  "QUIZ",
-  "CODIGO_PREGUNTAS",
-  "SQL_EJERCICIO",
-])
 
 export interface BloqueAReparar {
   readonly id: string
@@ -56,7 +50,8 @@ export interface FilaSeccionSkill {
 }
 
 function mideSkill(bloque: BloqueAReparar): boolean {
-  return bloque.esEvaluable && TIPOS_QUE_MIDEN_SKILL.has(bloque.tipo)
+  // Solo miden skill los tipos que admiten intentos con nota.
+  return bloque.esEvaluable && esTipoBloqueEvaluable(bloque.tipo)
 }
 
 /** Bloques evaluables sin skill, con la etiqueta por defecto de su modulo. */
