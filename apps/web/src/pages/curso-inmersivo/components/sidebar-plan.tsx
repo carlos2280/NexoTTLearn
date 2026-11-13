@@ -28,9 +28,9 @@ interface SidebarPlanProps {
   readonly hitoActivo: HitoTipo | null
   readonly onAbrirHito: (hito: HitoTipo) => void
   /**
-   * Avance del curso. `seccionesEstado` es la fuente de "completada" y del
-   * conteo de bloques evaluables en modo VOLUNTARIO (D-AS-1: sin PlanEstudio,
-   * el plan llega `undefined`); el asignado sigue leyendo su plan. El contador
+   * Avance del curso. `seccionesEstado` es la fuente de "completada" para los
+   * dos roles (regla única, #83) y del conteo de bloques evaluables en modo
+   * VOLUNTARIO (D-AS-1: sin PlanEstudio, el plan llega `undefined`). El contador
    * usa los agregados. Todo sale del mismo calculo que el porcentaje, asi que
    * no pueden contradecirse.
    */

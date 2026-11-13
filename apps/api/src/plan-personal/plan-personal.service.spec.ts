@@ -1713,3 +1713,58 @@ describe("PlanPersonalService.obtener — avance del plan con la regla unica", (
     expect(s2?.completada).toBe(true)
   })
 })
+
+describe("PlanPersonalService.obtenerAvanceDetallado — bloques que no son pregunta", () => {
+  // Un PARRAFO o RECURSO con `esEvaluable=true` (dato heredado del editor) no
+  // se puede responder: no cuenta como pregunta. Su seccion se completa como
+  // una seccion sin preguntas, al abrirla (caso 8.1 de Azure Basico).
+  it("una seccion cuyo unico 'evaluable' es un PARRAFO se completa al abrirla", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      rol: RolAsignacion.ASIGNADO,
+      cursoId: CURSO_ID,
+      colaboradorId: COLABORADOR_ID,
+    })
+    prisma.seccion.findMany.mockResolvedValue([
+      {
+        id: SECCION_ID_1,
+        bloques: [
+          { id: "parrafo", tipo: "PARRAFO", contenido: {} },
+          { id: "recurso", tipo: "RECURSO", contenido: {} },
+        ],
+      },
+    ])
+    prisma.aperturaSeccion.findMany.mockResolvedValue([{ seccionId: SECCION_ID_1 }])
+
+    const detalle = await service.obtenerAvanceDetallado(ASIGNACION_ID)
+
+    expect(detalle.porcentaje).toBe(100)
+    expect(detalle.secciones).toEqual([
+      { seccionId: SECCION_ID_1, completada: true, bloquesCompletados: 0, bloquesTotales: 0 },
+    ])
+  })
+
+  it("un QUIZ junto a un PARRAFO marcado: cuenta solo el QUIZ", async () => {
+    prisma.asignacionCurso.findUnique.mockResolvedValue({
+      rol: RolAsignacion.VOLUNTARIO,
+      cursoId: CURSO_ID,
+      colaboradorId: COLABORADOR_ID,
+    })
+    prisma.seccion.findMany.mockResolvedValue([
+      {
+        id: SECCION_ID_1,
+        bloques: [
+          { id: "parrafo", tipo: "PARRAFO", contenido: {} },
+          { id: "quiz", tipo: "QUIZ", contenido: {} },
+        ],
+      },
+    ])
+    prisma.intentoBloque.findMany.mockResolvedValue([
+      { bloqueId: "quiz", nota: new Prisma.Decimal(90) },
+    ])
+
+    const detalle = await service.obtenerAvanceDetallado(ASIGNACION_ID)
+
+    expect(detalle.porcentaje).toBe(100)
+    expect(detalle.secciones[0]?.bloquesTotales).toBe(1)
+  })
+})

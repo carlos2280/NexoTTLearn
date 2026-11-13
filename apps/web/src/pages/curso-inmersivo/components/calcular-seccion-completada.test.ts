@@ -27,8 +27,23 @@ describe("calcularSeccionCompletada", () => {
     })
   })
 
-  describe("modo asignado (BUG-QA-3: la apertura sola NO marca completada)", () => {
-    it("completada solo cuando PlanEstudio.completada === true", () => {
+  describe("modo asignado (regla unica del avance, #83)", () => {
+    // Desde el #83 el % del asignado cuenta TODAS las secciones del curso, y el
+    // estado por seccion del avance las cubre todas. El check sale de ahi, igual
+    // que en el voluntario: si no, una seccion fuera del plan (sin skill) que ya
+    // cuenta en el % y en el contador nunca se pintaria en verde.
+    it("marca completada una seccion fuera del plan cuando el avance la da por superada", () => {
+      expect(
+        calcularSeccionCompletada({
+          modo: "asignado",
+          soloLectura: false,
+          planCompletada: undefined,
+          completadaSegunAvance: true,
+        }),
+      ).toBe(true)
+    })
+
+    it("el avance manda sobre el plan", () => {
       expect(
         calcularSeccionCompletada({
           modo: "asignado",
@@ -36,29 +51,27 @@ describe("calcularSeccionCompletada", () => {
           planCompletada: true,
           completadaSegunAvance: false,
         }),
-      ).toBe(true)
+      ).toBe(false)
     })
 
-    it("el plan manda sobre el avance: si el plan dice que no, no se marca", () => {
-      // El asignado sigue leyendo su PlanEstudio (fuente historica). El avance
-      // solo aporta el conteo de bloques para el icono de reto.
+    it("mientras el avance no llega, usa el plan", () => {
       expect(
         calcularSeccionCompletada({
           modo: "asignado",
           soloLectura: false,
-          planCompletada: false,
-          completadaSegunAvance: true,
+          planCompletada: true,
+          completadaSegunAvance: undefined,
         }),
-      ).toBe(false)
+      ).toBe(true)
     })
 
-    it("no marca completada si el plan aún no llegó", () => {
+    it("sin avance ni plan no marca nada (nunca inventa un verde)", () => {
       expect(
         calcularSeccionCompletada({
           modo: "asignado",
           soloLectura: false,
           planCompletada: undefined,
-          completadaSegunAvance: true,
+          completadaSegunAvance: undefined,
         }),
       ).toBe(false)
     })
