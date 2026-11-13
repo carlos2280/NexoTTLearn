@@ -13,7 +13,7 @@ import type {
   PlanResponseAdmin,
   PlanResponseParticipante,
 } from "@nexott-learn/shared-types"
-import { fichaSnapshotV1Schema } from "@nexott-learn/shared-types"
+import { esTipoBloqueEvaluable, fichaSnapshotV1Schema } from "@nexott-learn/shared-types"
 import {
   AccionAjustePlan,
   AccionAuditoria,
@@ -884,15 +884,20 @@ export class PlanPersonalService {
     // Resuelve el umbral por bloque a partir de su contenido. Los bloques
     // viajan al helper `calcularAvance` ya enriquecidos con `umbralAprobacion`
     // para evitar que el helper conozca el contrato JSONB del contenido.
+    // Solo cuentan como pregunta los tipos que reciben intentos: un PARRAFO o
+    // RECURSO con `esEvaluable=true` (dato heredado) no se puede responder, y
+    // su seccion se completa al abrirla, como una seccion sin preguntas.
     const seccionPorId = new Map(
       secciones.map((s) => [
         s.id,
         {
           id: s.id,
-          bloques: s.bloques.map((b) => ({
-            id: b.id,
-            umbralAprobacion: umbralAprobacionBloque(b.tipo, b.contenido),
-          })),
+          bloques: s.bloques
+            .filter((b) => esTipoBloqueEvaluable(b.tipo))
+            .map((b) => ({
+              id: b.id,
+              umbralAprobacion: umbralAprobacionBloque(b.tipo, b.contenido),
+            })),
         },
       ]),
     )

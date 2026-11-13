@@ -79,3 +79,22 @@ describe("evaluarCondicionesListo — ASIGNADO con la regla unica", () => {
     expect(res.cumple).toBe(true)
   })
 })
+
+describe("evaluarCondicionesListo — bloques que no son pregunta", () => {
+  it("una seccion cuyo unico 'evaluable' es un PARRAFO cuenta como completa al abrirla", async () => {
+    const prisma = buildPrisma()
+    prisma.seccion.findMany.mockResolvedValue([
+      { id: SECCION_1, bloques: [{ id: "parrafo", tipo: "PARRAFO", contenido: {} }] },
+    ])
+    prisma.intentoBloque.findMany.mockResolvedValue([])
+    prisma.aperturaSeccion.findMany.mockResolvedValue([{ seccionId: SECCION_1 }])
+
+    const res = await evaluarCondicionesListo(
+      prisma as unknown as PrismaService,
+      ASIGNACION_ID,
+      SIN_TRANSVERSAL,
+    )
+
+    expect(res.planCompleto).toBe(true)
+  })
+})

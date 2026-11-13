@@ -98,6 +98,8 @@ export {
   listarBloquesQuerySchema,
   tipoBloqueSchema,
   estadoBloqueSchema,
+  TIPOS_BLOQUE_EVALUABLES,
+  esTipoBloqueEvaluable,
 } from "./catalogo/bloques/listar-bloques.schema"
 export type {
   ListarBloquesQuery,
