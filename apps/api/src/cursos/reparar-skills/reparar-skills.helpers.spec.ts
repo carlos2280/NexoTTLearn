@@ -4,7 +4,6 @@ import {
   type BloqueAReparar,
   type CursoAReparar,
   bloquesSinSkill,
-  etiquetaSkillPorDefecto,
   planificarSeccionSkills,
 } from "./reparar-skills.helpers"
 
@@ -40,13 +39,6 @@ function curso(): CursoAReparar {
     ],
   }
 }
-
-describe("etiquetaSkillPorDefecto", () => {
-  it("es «curso · módulo», recortada a 200", () => {
-    expect(etiquetaSkillPorDefecto("C", "M")).toBe("C · M")
-    expect(etiquetaSkillPorDefecto("C", "x".repeat(250))).toHaveLength(200)
-  })
-})
 
 describe("bloquesSinSkill", () => {
   it("lista solo los evaluables sin skill, con la etiqueta de su módulo", () => {

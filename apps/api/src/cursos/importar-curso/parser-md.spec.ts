@@ -1,6 +1,7 @@
 import type { BloqueImportado, ImportarCursoInput } from "@nexott-learn/shared-types"
 import { describe, expect, it } from "vitest"
 import { ParserCursoMdError, parsearCursoMd } from "./parser-md"
+import { PLANTILLA_CURSO_MD } from "./plantilla-ejemplo"
 
 const FRONTMATTER_VALIDO = `---
 curso:
@@ -454,5 +455,19 @@ x
         ),
       ).toThrow(ParserCursoMdError)
     })
+  })
+})
+
+describe("plantilla descargable", () => {
+  it("se parsea tal cual y sus evaluables declaran skill", () => {
+    const parsed = parsearCursoMd(PLANTILLA_CURSO_MD)
+    const evaluables = parsed.modulos
+      .flatMap((m) => m.secciones)
+      .flatMap((s) => s.bloques)
+      .filter((b) => b.tipo === "QUIZ" || b.tipo === "CODIGO")
+    expect(evaluables.length).toBeGreaterThan(0)
+    for (const bloque of evaluables) {
+      expect(bloque).toHaveProperty("skillEtiqueta")
+    }
   })
 })

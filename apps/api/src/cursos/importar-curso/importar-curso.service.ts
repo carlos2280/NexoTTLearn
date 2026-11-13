@@ -18,8 +18,10 @@ import { Prisma, TipoBloque } from "@prisma/client"
 import { apiErrorCodes } from "../../common/errors/api-error.codes"
 import { PrismaService } from "../../common/prisma/prisma.service"
 import {
+  completarSkillsFaltantes,
   etiquetasEvaluablesDeSeccion,
   etiquetasSkillDeSeccion,
+  normalizarNombreCliente,
   representanteDeModulo,
 } from "./importar-curso.helpers"
 import { ParserCursoMdError, parsearCursoMd } from "./parser-md"
@@ -42,8 +44,10 @@ const NOTA_MINIMA_SKILL = 60
  * habilitaciones + skills/área/exigidas) desde un `.md` enviado por el admin.
  * El flujo es:
  *
- *  1. Parsear el MD a `ImportarCursoInput` (parser + Zod final).
- *  2. Resolver el cliente por nombre (`cliente: "NTT Data Iberia"` ↦ id).
+ *  1. Parsear el MD a `ImportarCursoInput` (parser + Zod final) y dar la skill
+ *     por defecto del modulo a los evaluables que no declaran `skill=`.
+ *  2. Resolver el cliente por nombre normalizado (sin mayusculas, tildes ni
+ *     diferencias de guion) ↦ id.
  *  3. Abrir transacción Prisma y crear:
  *      - Una Área (nombre = título del curso) que agrupa las skills del curso.
  *      - Las Skills declaradas por los bloques evaluables (upsert idempotente).
@@ -70,7 +74,7 @@ export class ImportarCursoService {
   constructor(private readonly prisma: PrismaService) {}
 
   async importar(body: ImportarCursoBody): Promise<ImportarCursoResponse> {
-    const parsed = this.parsearOExplotar(body.contenidoMd)
+    const parsed = completarSkillsFaltantes(this.parsearOExplotar(body.contenidoMd))
     const clienteId = await this.resolverClienteOExplotar(parsed.curso.cliente)
     return await this.persistir(parsed, clienteId)
   }
@@ -90,17 +94,25 @@ export class ImportarCursoService {
   }
 
   private async resolverClienteOExplotar(nombreCliente: string): Promise<string> {
-    const cliente = await this.prisma.cliente.findFirst({
-      where: { nombre: nombreCliente },
-      select: { id: true },
+    const clientes = await this.prisma.cliente.findMany({
+      where: { deletedAt: null },
+      select: { id: true, nombre: true, activo: true },
+      orderBy: { nombre: "asc" },
     })
-    if (!cliente) {
-      throw new NotFoundException({
-        code: apiErrorCodes.clienteNoEncontrado,
-        message: `Cliente "${nombreCliente}" no encontrado. Crea el cliente antes de importar el curso.`,
-      })
+    const buscado = normalizarNombreCliente(nombreCliente)
+    const coincidencias = clientes.filter((c) => normalizarNombreCliente(c.nombre) === buscado)
+    const [unico] = coincidencias
+    if (unico && coincidencias.length === 1) {
+      return unico.id
     }
-    return cliente.id
+    const disponibles = clientes
+      .filter((c) => c.activo !== false)
+      .map((c) => `"${c.nombre}"`)
+      .join(", ")
+    throw new NotFoundException({
+      code: apiErrorCodes.clienteNoEncontrado,
+      message: `Cliente "${nombreCliente}" no encontrado. Escribe en "cliente:" uno de los existentes: ${disponibles || "(no hay clientes; crea uno antes de importar)"}.`,
+    })
   }
 
   private async persistir(
