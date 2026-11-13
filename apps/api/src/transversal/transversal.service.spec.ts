@@ -288,7 +288,8 @@ describe("E3. GET disponibilidad", () => {
 
   it("ENCADENADO sin plan completo -> BLOQUEADO_PLAN_INCOMPLETO + motivo", async () => {
     configurarAsignacion(prisma, { desbloqueo: DesbloqueoCurso.ENCADENADO })
-    prisma.planEstudio.findUnique.mockResolvedValue(null)
+    // Regla unica: el curso tiene una seccion sin abrir y sin preguntas.
+    prisma.seccion.findMany.mockResolvedValue([{ id: "seccion-1", bloques: [] }])
     const r = await service.obtenerDisponibilidad(ASIGNACION_ID, ADMIN)
     expect(r.disponible).toBe(false)
     expect(r.razon).toBe("BLOQUEADO_PLAN_INCOMPLETO")
@@ -344,9 +345,9 @@ describe("E3. GET disponibilidad", () => {
 })
 
 describe("E4. POST intento", () => {
-  it("409 si transversal no disponible (ENCADENADO sin plan)", async () => {
+  it("409 si transversal no disponible (ENCADENADO con el curso incompleto)", async () => {
     configurarAsignacion(prisma, { desbloqueo: DesbloqueoCurso.ENCADENADO })
-    prisma.planEstudio.findUnique.mockResolvedValue(null)
+    prisma.seccion.findMany.mockResolvedValue([{ id: "seccion-1", bloques: [] }])
     await expect(
       service.crearIntento({
         asignacionId: ASIGNACION_ID,

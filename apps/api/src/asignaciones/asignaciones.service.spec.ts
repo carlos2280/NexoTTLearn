@@ -53,15 +53,16 @@ interface MockPrisma {
     findUnique: ReturnType<typeof vi.fn>
     findMany: ReturnType<typeof vi.fn>
   }
-  // Plan personal (S7): los mocks por defecto simulan "sin items
-  // obligatorios" para que `evaluarCondicionesListo` devuelva planCompleto=true
-  // y los tests existentes de marcarListo/reabrirCaso sigan verdes.
+  // Plan personal (S7). "Plan completo" mira las secciones del curso (`seccion`,
+  // default vacio -> planCompleto=true) para que los tests de
+  // marcarListo/reabrirCaso sigan verdes.
   planEstudio: {
     findUnique: ReturnType<typeof vi.fn>
     updateMany: ReturnType<typeof vi.fn>
     count: ReturnType<typeof vi.fn>
   }
   itemPlan: { findMany: ReturnType<typeof vi.fn> }
+  seccion: { findMany: ReturnType<typeof vi.fn> }
   intentoBloque: { findMany: ReturnType<typeof vi.fn> }
   aperturaSeccion: { findMany: ReturnType<typeof vi.fn> }
   // P8c (D-S8-F1) — `evaluarCondicionesListo` ahora consulta intentos
@@ -93,9 +94,8 @@ function buildPrismaMock(): MockPrisma {
       findMany: vi.fn().mockResolvedValue([]),
     },
     planEstudio: {
-      // Default: plan existente con 0 items obligatorios -> planCompleto=true
-      // vacuamente. Los tests que necesiten "sin plan" sobreescriben con
-      // `mockResolvedValueOnce(null)`.
+      // Default: plan existente. Los tests que necesiten "sin plan"
+      // sobreescriben con `mockResolvedValueOnce(null)`.
       findUnique: vi.fn().mockResolvedValue({ id: "plan-mock" }),
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       // P11.5b: notificarPlanesDesactualizadosPorReabrir cuenta planes
@@ -104,6 +104,9 @@ function buildPrismaMock(): MockPrisma {
       count: vi.fn().mockResolvedValue(0),
     },
     itemPlan: { findMany: vi.fn().mockResolvedValue([]) },
+    // Regla unica del avance: "plan completo" mira las secciones del curso.
+    // Default: curso sin secciones -> completo vacuamente.
+    seccion: { findMany: vi.fn().mockResolvedValue([]) },
     intentoBloque: { findMany: vi.fn().mockResolvedValue([]) },
     aperturaSeccion: { findMany: vi.fn().mockResolvedValue([]) },
     // P8c default: ningun intento transversal/entrevista vigente. Los tests

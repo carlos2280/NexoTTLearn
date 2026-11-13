@@ -9,11 +9,11 @@ import type {
   MeAvanceSiguienteSeccion,
   NivelCaminoHaciaAptoArea,
 } from "@nexott-learn/shared-types"
-import { type Prisma, RolAsignacion } from "@prisma/client"
-import { umbralAprobacionBloque } from "../catalogo/bloques/umbral-aprobacion"
+import { RolAsignacion } from "@prisma/client"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { PrismaService } from "../common/prisma/prisma.service"
 import { PlanPersonalService } from "../plan-personal/plan-personal.service"
+import type { AvanceDetallado } from "../plan-personal/plan-personal.types"
 import {
   etiquetaCualitativaPorNota,
   parseCierreSnapshotMinimo,
@@ -104,10 +104,11 @@ export class MeAvanceService {
 
     // El "siguiente paso" sigue siendo por rol: al voluntario se le sugiere la
     // primera seccion que no ha ABIERTO (no ha pasado por ahi todavia); al
-    // asignado, la primera de su plan que no ha COMPLETADO.
+    // asignado, la primera de su plan que no ha COMPLETADO y, sin obligatorias
+    // pendientes, la primera del curso que no ha completado.
     const siguienteSeccion: MeAvanceSiguienteSeccion | null = esVoluntario
-      ? await this.calcularSiguienteSeccionVoluntario(cursoId, seccionesAbiertasIds)
-      : await this.calcularSiguienteSeccion(asignacion.id, cursoId, colaboradorId)
+      ? await this.primeraSeccionDelCursoFuera(cursoId, new Set(seccionesAbiertasIds))
+      : await this.calcularSiguienteSeccion(asignacion.id, cursoId, detalle.secciones)
 
     const exigidas = await this.cargarSkillsExigidasConArea(cursoId)
     const notas = await this.cargarNotasColaborador(
@@ -162,17 +163,17 @@ export class MeAvanceService {
   }
 
   /**
-   * Para voluntarios: primera seccion del catalogo que el colaborador aun no
-   * ha abierto. Orden: por `CursoModuloHabilitado.orden` (orden del modulo
-   * dentro del curso, configurable) + `Seccion.orden` (orden de la seccion
-   * dentro del modulo). Antes se ordenaba por `Modulo.titulo.localeCompare`
-   * — fragil si hay "Modulo 10" o se renombra.
+   * Primera seccion del catalogo del curso que NO esta en `excluidas`. Al
+   * voluntario se le pasan las abiertas; al asignado sin obligatorias
+   * pendientes, las completadas. Orden: por `CursoModuloHabilitado.orden`
+   * (orden del modulo dentro del curso, configurable) + `Seccion.orden` (orden
+   * de la seccion dentro del modulo). Antes se ordenaba por
+   * `Modulo.titulo.localeCompare` — fragil si hay "Modulo 10" o se renombra.
    */
-  private async calcularSiguienteSeccionVoluntario(
+  private async primeraSeccionDelCursoFuera(
     cursoId: string,
-    seccionesAbiertasIds: readonly string[],
+    excluidas: ReadonlySet<string>,
   ): Promise<MeAvanceSiguienteSeccion | null> {
-    const aperturasSet = new Set(seccionesAbiertasIds)
     const ordenModulos = await this.cargarOrdenModulosCurso(cursoId)
     const secciones = await this.prisma.seccion.findMany({
       where: { modulo: { cursosModulosHabilitados: { some: { cursoId } } } },
@@ -184,7 +185,7 @@ export class MeAvanceService {
       },
     })
     const pendiente = [...secciones]
-      .filter((s) => !aperturasSet.has(s.id))
+      .filter((s) => !excluidas.has(s.id))
       .sort((a, b) => {
         const ordA = ordenModulos.get(a.moduloId) ?? Number.MAX_SAFE_INTEGER
         const ordB = ordenModulos.get(b.moduloId) ?? Number.MAX_SAFE_INTEGER
@@ -257,21 +258,32 @@ export class MeAvanceService {
   }
 
   /**
-   * Siguiente seccion del plan para un asignado. Criterio:
-   *  - Primera seccion OBLIGATORIA del plan que NO esté completada.
-   *  - "Completada" = mismo criterio que el sidebar (check verde):
-   *      • si la seccion tiene bloques evaluables: TODOS aprobados (mejor
-   *        intento vigente con `nota >= umbralAprobacion`).
-   *      • si NO tiene bloques evaluables: hay fila `AperturaSeccion`.
+   * Siguiente seccion para un asignado. Criterio:
+   *  - Primera seccion OBLIGATORIA del plan que NO esté completada: el plan
+   *    guia el recorrido.
+   *  - Sin obligatorias pendientes (o sin plan), la primera seccion del curso
+   *    que no esté completada: el avance cuenta todo el curso (regla unica,
+   *    13-11-2026), asi que no se deja al asignado sin siguiente paso por
+   *    debajo del 100%.
+   *  - "Completada" sale del mismo detalle que el porcentaje y los checks del
+   *    sidebar (`obtenerAvanceDetallado`), sin recalcularla aqui.
    *  - Orden: por `CursoModuloHabilitado.orden` y, dentro del modulo, por
-   *    `Seccion.orden`. El orden alfabetico por titulo era frágil (rompía
-   *    con "Modulo 10") y castigaba al usuario por abrir secciones para
-   *    explorar (filtraba por "no abierta" en vez de "no completada").
+   *    `Seccion.orden`.
    */
   private async calcularSiguienteSeccion(
     asignacionId: string,
     cursoId: string,
-    colaboradorId: string,
+    seccionesEstado: AvanceDetallado["secciones"],
+  ): Promise<MeAvanceSiguienteSeccion | null> {
+    const completadas = new Set(seccionesEstado.filter((s) => s.completada).map((s) => s.seccionId))
+    const obligatoria = await this.primeraObligatoriaPendiente(asignacionId, cursoId, completadas)
+    return obligatoria ?? this.primeraSeccionDelCursoFuera(cursoId, completadas)
+  }
+
+  private async primeraObligatoriaPendiente(
+    asignacionId: string,
+    cursoId: string,
+    completadas: ReadonlySet<string>,
   ): Promise<MeAvanceSiguienteSeccion | null> {
     const plan = await this.prisma.planEstudio.findUnique({
       where: { asignacionId },
@@ -285,41 +297,22 @@ export class MeAvanceService {
       select: {
         seccionId: true,
         moduloId: true,
-        seccion: {
-          select: {
-            id: true,
-            titulo: true,
-            orden: true,
-            bloques: {
-              where: { estado: "ACTIVO", esEvaluable: true },
-              select: { id: true, tipo: true, contenido: true },
-            },
-          },
-        },
+        seccion: { select: { id: true, titulo: true, orden: true } },
       },
     })
-    if (items.length === 0) {
+    const pendientes = items.filter((i) => !completadas.has(i.seccionId))
+    if (pendientes.length === 0) {
       return null
     }
-
     const ordenModulos = await this.cargarOrdenModulosCurso(cursoId)
-    const completadasSet = await this.cargarSeccionesCompletadasAsignado({
-      asignacionId,
-      colaboradorId,
-      items,
-    })
-
-    const pendiente = [...items]
-      .filter((i) => !completadasSet.has(i.seccionId))
-      .sort((a, b) => {
-        const ordA = ordenModulos.get(a.moduloId) ?? Number.MAX_SAFE_INTEGER
-        const ordB = ordenModulos.get(b.moduloId) ?? Number.MAX_SAFE_INTEGER
-        if (ordA !== ordB) {
-          return ordA - ordB
-        }
-        return a.seccion.orden - b.seccion.orden
-      })[0]
-
+    const pendiente = pendientes.sort((a, b) => {
+      const ordA = ordenModulos.get(a.moduloId) ?? Number.MAX_SAFE_INTEGER
+      const ordB = ordenModulos.get(b.moduloId) ?? Number.MAX_SAFE_INTEGER
+      if (ordA !== ordB) {
+        return ordA - ordB
+      }
+      return a.seccion.orden - b.seccion.orden
+    })[0]
     if (!pendiente) {
       return null
     }
@@ -328,77 +321,6 @@ export class MeAvanceService {
       moduloId: pendiente.moduloId,
       titulo: pendiente.seccion.titulo,
     }
-  }
-
-  /**
-   * Devuelve el Set de seccionIds completadas para un asignado. Aplica el
-   * mismo criterio que el sidebar del inmersivo (calcular-seccion-completada):
-   * todos los bloques evaluables aprobados, o `AperturaSeccion` si la sección
-   * no tiene bloques.
-   */
-  private async cargarSeccionesCompletadasAsignado(input: {
-    readonly asignacionId: string
-    readonly colaboradorId: string
-    readonly items: ReadonlyArray<{
-      readonly seccionId: string
-      readonly seccion: {
-        readonly bloques: ReadonlyArray<{
-          readonly id: string
-          readonly tipo: import("@prisma/client").TipoBloque
-          readonly contenido: Prisma.JsonValue
-        }>
-      }
-    }>
-  }): Promise<ReadonlySet<string>> {
-    const bloqueIds = input.items.flatMap((i) => i.seccion.bloques.map((b) => b.id))
-
-    const [mejoresIntentos, aperturas] = await Promise.all([
-      bloqueIds.length === 0
-        ? Promise.resolve([] as { bloqueId: string; nota: Prisma.Decimal }[])
-        : this.prisma.intentoBloque.findMany({
-            where: {
-              colaboradorId: input.colaboradorId,
-              bloqueId: { in: bloqueIds },
-              esMejorIntento: true,
-              estaInvalidado: false,
-            },
-            select: { bloqueId: true, nota: true },
-          }),
-      this.prisma.aperturaSeccion.findMany({
-        where: { asignacionId: input.asignacionId },
-        select: { seccionId: true },
-      }),
-    ])
-
-    const notaPorBloque = new Map<string, number>(
-      mejoresIntentos.map((m) => [m.bloqueId, Number(m.nota.toString())]),
-    )
-    const aperturasSet = new Set(aperturas.map((a) => a.seccionId))
-
-    // `seccion.bloques` ya viene filtrado a `esEvaluable: true` y
-    // `estado: ACTIVO` por la query del caller — coincide con el set de
-    // bloques que cuentan en `calcularAvance` de plan-personal.helpers.
-    const completadas = new Set<string>()
-    for (const item of input.items) {
-      const bloques = item.seccion.bloques
-      if (bloques.length === 0) {
-        if (aperturasSet.has(item.seccionId)) {
-          completadas.add(item.seccionId)
-        }
-        continue
-      }
-      const todosAprobados = bloques.every((b) => {
-        const nota = notaPorBloque.get(b.id)
-        if (nota === undefined) {
-          return false
-        }
-        return nota >= umbralAprobacionBloque(b.tipo, b.contenido)
-      })
-      if (todosAprobados) {
-        completadas.add(item.seccionId)
-      }
-    }
-    return completadas
   }
 }
 

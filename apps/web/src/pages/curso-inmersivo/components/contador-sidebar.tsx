@@ -16,8 +16,9 @@ interface ContadorSidebarProps {
  * Contador "x/y" del header del sidebar. Cada modo usa una metrica distinta:
  *
  * - `soloLectura` (CERRADO): total/total — todo el recorrido cuenta como visto.
- * - `asignado`: `plan.avance.seccionesCompletadas/seccionesObligatorias` —
- *   solo cuenta lo del plan personal, no las opcionales abiertas.
+ * - `asignado`: `plan.avance.seccionesCompletadas/seccionesObligatorias`. Pese
+ *   al nombre del campo, cuenta TODAS las secciones del curso (regla unica del
+ *   avance, igual que el voluntario): el plan guia, pero no cambia el numero.
  * - `voluntario`: `avance.seccionesCompletadas/seccionesObligatorias` tal cual
  *   los manda el backend, que es el mismo calculo del que sale el porcentaje
  *   del statusbar. Contaba aperturas (recorrido), lo que mostraba "38/38" junto
