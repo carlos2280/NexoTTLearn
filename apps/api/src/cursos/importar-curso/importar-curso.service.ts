@@ -76,7 +76,32 @@ export class ImportarCursoService {
   async importar(body: ImportarCursoBody): Promise<ImportarCursoResponse> {
     const parsed = completarSkillsFaltantes(this.parsearOExplotar(body.contenidoMd))
     const clienteId = await this.resolverClienteOExplotar(parsed.curso.cliente)
+    if (body.confirmarDuplicado !== true) {
+      await this.explotarSiTituloExiste(parsed.curso.titulo)
+    }
     return await this.persistir(parsed, clienteId)
+  }
+
+  /**
+   * Aviso antes de duplicar (2A): si ya hay un curso con el mismo titulo (sin
+   * distinguir mayusculas, en cualquier estado), responde 409 con la lista
+   * para que el admin confirme. No es una regla de unicidad: confirmando se
+   * crea otro curso igual que antes.
+   */
+  private async explotarSiTituloExiste(titulo: string): Promise<void> {
+    const existentes = await this.prisma.curso.findMany({
+      where: { titulo: { equals: titulo.trim(), mode: "insensitive" } },
+      select: { id: true, titulo: true, estado: true },
+      orderBy: { createdAt: "asc" },
+    })
+    if (existentes.length === 0) {
+      return
+    }
+    throw new ConflictException({
+      code: apiErrorCodes.cursoTituloDuplicado,
+      message: `Ya existe un curso llamado "${titulo.trim()}". Si importas, se creará otro con el mismo título.`,
+      details: { cursosExistentes: existentes },
+    })
   }
 
   private parsearOExplotar(contenidoMd: string): ImportarCursoInput {

@@ -19,6 +19,7 @@ export const apiErrorCodes = {
   motivoInvalido: "MOTIVO_INVALIDO",
   rateLimit: "RATE_LIMIT",
   conflict: "CONFLICT",
+  cursoTituloDuplicado: "CURSO_TITULO_DUPLICADO",
   credencialesInvalidas: "CREDENCIALES_INVALIDAS",
   usuarioBloqueado: "USUARIO_BLOQUEADO",
   usuarioExEmpleado: "USUARIO_EX_EMPLEADO",

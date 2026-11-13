@@ -1,14 +1,15 @@
-import { descargarPlantillaCurso } from "@/features/cursos/api/importar-curso.api"
 import { ApiError } from "@/shared/api/api-error"
 import { Banner } from "@/shared/components/ui/banner"
 import { Button } from "@/shared/components/ui/button"
 import { RUTAS } from "@/shared/constants/rutas"
-import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
+import { AvisoCursoDuplicado } from "./components/aviso-curso-duplicado"
 import { PreviewArchivo } from "./components/preview-archivo"
 import { ZonaUpload } from "./components/zona-upload"
 import { useArchivoMd } from "./hooks/use-archivo-md"
+import { useDescargarPlantilla } from "./hooks/use-descargar-plantilla"
 import { useImportarCurso } from "./hooks/use-importar-curso"
+import { cursosDuplicadosDelError } from "./lib/curso-duplicado"
 
 /**
  * Página `/admin/catalogo/importar` — flujo "Importar curso desde Markdown".
@@ -25,29 +26,14 @@ export function ImportarCursoPage() {
   const navigate = useNavigate()
   const { archivo, error: errorArchivo, cargarDesdeFile, limpiar } = useArchivoMd()
   const { importar, isPending, resultado, error: errorImport, reset } = useImportarCurso()
-  const [descargandoPlantilla, setDescargandoPlantilla] = useState(false)
+  const { descargar: handleDescargarPlantilla, descargando: descargandoPlantilla } =
+    useDescargarPlantilla()
 
-  const handleDescargarPlantilla = async () => {
-    setDescargandoPlantilla(true)
-    try {
-      const md = await descargarPlantillaCurso()
-      const blob = new Blob([md], { type: "text/markdown;charset=utf-8" })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement("a")
-      link.href = url
-      link.download = "curso-plantilla.md"
-      link.click()
-      URL.revokeObjectURL(url)
-    } finally {
-      setDescargandoPlantilla(false)
-    }
-  }
-
-  const handleImportar = async () => {
+  const handleImportar = async (confirmarDuplicado = false) => {
     if (!archivo) {
       return
     }
-    const res = await importar(archivo.contenido).catch(() => null)
+    const res = await importar(archivo.contenido, confirmarDuplicado).catch(() => null)
     if (res) {
       navigate(RUTAS.admin.cursoDetalle(res.cursoId))
     }
@@ -58,8 +44,10 @@ export function ImportarCursoPage() {
     reset()
   }
 
-  const mensajeError =
-    errorImport instanceof ApiError
+  const duplicados = cursosDuplicadosDelError(errorImport)
+  const mensajeError = duplicados
+    ? null
+    : errorImport instanceof ApiError
       ? errorImport.message
       : (errorImport?.message ?? errorArchivo ?? null)
 
@@ -87,6 +75,15 @@ export function ImportarCursoPage() {
           Se creó el curso con {resultado.modulosCreados} módulos, {resultado.seccionesCreadas}{" "}
           secciones y {resultado.bloquesCreados} bloques. Redirigiendo al detalle…
         </Banner>
+      ) : null}
+
+      {duplicados ? (
+        <AvisoCursoDuplicado
+          cursos={duplicados}
+          importando={isPending}
+          onConfirmar={() => handleImportar(true)}
+          onCancelar={reset}
+        />
       ) : null}
 
       {mensajeError ? (
@@ -132,7 +129,11 @@ export function ImportarCursoPage() {
           <Button type="button" variant="ghost" onClick={handleReiniciar} disabled={isPending}>
             Cancelar
           </Button>
-          <Button type="button" onClick={handleImportar} disabled={isPending}>
+          <Button
+            type="button"
+            onClick={() => handleImportar()}
+            disabled={isPending || duplicados !== null}
+          >
             {isPending ? "Importando…" : "Importar curso"}
           </Button>
         </section>
