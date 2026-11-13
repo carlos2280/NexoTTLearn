@@ -12,8 +12,7 @@
  *  - Secciones que ya tienen skills no se tocan: la reparacion solo agrega.
  */
 
-// Tope de `etiquetaVisible` aceptado al importar (importar-curso.schema.ts).
-const MAX_ETIQUETA_SKILL = 200
+import { etiquetaSkillPorDefecto } from "../skill-por-defecto"
 
 // Tipos de bloque que miden una skill (los que admiten intentos con nota).
 const TIPOS_QUE_MIDEN_SKILL: ReadonlySet<string> = new Set([
@@ -54,10 +53,6 @@ export interface BloqueSinSkill {
 export interface FilaSeccionSkill {
   readonly seccionId: string
   readonly skillId: string
-}
-
-export function etiquetaSkillPorDefecto(tituloCurso: string, tituloModulo: string): string {
-  return `${tituloCurso} · ${tituloModulo}`.slice(0, MAX_ETIQUETA_SKILL)
 }
 
 function mideSkill(bloque: BloqueAReparar): boolean {
