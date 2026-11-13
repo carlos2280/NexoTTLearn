@@ -6,8 +6,8 @@ export interface CalcularSeccionCompletadaInput {
   readonly planCompletada: boolean | undefined
   /**
    * `completada` de `MeAvanceCursoResponse.seccionesEstado` para esta seccion.
-   * `undefined` cuando el avance todavia no cargo o la seccion no entra en el
-   * calculo (por ejemplo una opcional fuera del plan del asignado).
+   * `undefined` cuando el avance todavia no cargo. Desde la regla unica (#83)
+   * el avance cubre todas las secciones del curso, para los dos roles.
    */
   readonly completadaSegunAvance: boolean | undefined
 }
@@ -16,10 +16,11 @@ export interface CalcularSeccionCompletadaInput {
  * Decide si una sección del sidebar se pinta como completada (check verde).
  *
  * - `soloLectura` (curso CERRADO) → siempre completada.
- * - `asignado` → `PlanEstudio.completada`. La apertura sola no cuenta: el
- *   contador del header usa `plan.avance.seccionesCompletadas` y marcar verde
- *   por apertura genera la contradicción "9/22" con 22 checks (BUG-QA-3 del
- *   informe QA viaje-colaborador 2026-05-17).
+ * - `asignado` → el estado por sección del avance, igual que el voluntario
+ *   (regla única del avance, #83): cubre TODAS las secciones del curso, también
+ *   las que no están en su plan, y sale del mismo cálculo que el contador y el
+ *   porcentaje. Mientras el avance no llega, usa `PlanEstudio.completada`. La
+ *   apertura sola nunca cuenta (BUG-QA-3).
  * - `voluntario` → no hay plan personal (D-AS-1), así que usa el estado por
  *   sección del avance, que aplica la MISMA regla que el plan del asignado.
  *   Antes se pintaba por `AperturaSeccion` (recorrido) mientras el backend ya
@@ -40,7 +41,7 @@ export function calcularSeccionCompletada({
     return true
   }
   if (modo === "asignado") {
-    return planCompletada ?? false
+    return completadaSegunAvance ?? planCompletada ?? false
   }
   if (modo === "voluntario") {
     return completadaSegunAvance ?? false
