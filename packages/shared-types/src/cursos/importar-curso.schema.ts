@@ -174,6 +174,12 @@ export type ImportarCursoInput = z.infer<typeof importarCursoSchema>
 export const importarCursoBodySchema = z
   .object({
     contenidoMd: z.string().min(1).max(2_000_000),
+    /**
+     * Si ya existe un curso con el mismo titulo, el backend responde 409
+     * `CURSO_TITULO_DUPLICADO` y no crea nada. El admin confirma reenviando
+     * con `confirmarDuplicado: true` ("ya existe; se creara otro").
+     */
+    confirmarDuplicado: z.boolean().optional(),
   })
   .strict()
 export type ImportarCursoBody = z.infer<typeof importarCursoBodySchema>
@@ -182,6 +188,13 @@ export type ImportarCursoBody = z.infer<typeof importarCursoBodySchema>
  * Respuesta del endpoint de importación. Devuelve identificadores de lo
  * creado para que el frontend pueda redirigir al detalle del curso.
  */
+/** Curso con el mismo titulo, en `details.cursosExistentes` del 409. */
+export interface CursoTituloDuplicado {
+  readonly id: string
+  readonly titulo: string
+  readonly estado: string
+}
+
 export interface ImportarCursoResponse {
   readonly cursoId: string
   readonly modulosCreados: number

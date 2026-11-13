@@ -223,6 +223,7 @@ export type {
   ImportarCursoInput,
   ImportarCursoBody,
   ImportarCursoResponse,
+  CursoTituloDuplicado,
   CursoImportadoMeta,
   ModuloImportado,
   SeccionImportada,

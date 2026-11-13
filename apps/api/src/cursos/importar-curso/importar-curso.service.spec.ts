@@ -32,6 +32,7 @@ interface MockTx {
 
 interface MockPrisma {
   cliente: { findMany: ReturnType<typeof vi.fn> }
+  curso: { findMany: ReturnType<typeof vi.fn> }
   $transaction: ReturnType<typeof vi.fn>
 }
 
@@ -68,6 +69,8 @@ function buildTxMock(): MockTx {
 function buildPrismaMock(tx: MockTx): MockPrisma {
   const mock: MockPrisma = {
     cliente: { findMany: vi.fn() },
+    // Default: no hay otro curso con el mismo titulo.
+    curso: { findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn(),
   }
   mock.$transaction.mockImplementation(async (cb: (tx: MockTx) => Promise<string>) => await cb(tx))
@@ -516,5 +519,47 @@ describe("ImportarCursoService.importar", () => {
     expect(tx.cursoSkillExigida.createMany).toHaveBeenCalledWith({
       data: [{ cursoId: "curso-1", skillId: skillIdDe(etiqueta), notaMinima: 60 }],
     })
+  })
+})
+
+// Aviso antes de duplicar (2A, 13-11-2026): si ya existe un curso con el mismo
+// titulo, la importacion no crea nada hasta que el admin lo confirme.
+describe("ImportarCursoService.importar — titulo ya existente", () => {
+  const existente = { id: "curso-viejo", titulo: "Curso de prueba", estado: "ACTIVO" }
+
+  it("sin confirmar: 409 CURSO_TITULO_DUPLICADO con los cursos existentes y sin transaccion", async () => {
+    vi.mocked(parsearCursoMd).mockReturnValue(buildParsedInput())
+    prisma.cliente.findMany.mockResolvedValue(CLIENTES)
+    prisma.curso.findMany.mockResolvedValue([existente])
+
+    try {
+      await service.importar({ contenidoMd: "# Curso\n..." })
+      throw new Error("expected throw")
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConflictException)
+      const r = (error as ConflictException).getResponse() as {
+        code: string
+        details: { cursosExistentes: unknown }
+      }
+      expect(r.code).toBe(apiErrorCodes.cursoTituloDuplicado)
+      expect(r.details.cursosExistentes).toEqual([existente])
+    }
+    expect(prisma.curso.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { titulo: { equals: "Curso de prueba", mode: "insensitive" } },
+      }),
+    )
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it("con confirmarDuplicado=true: crea el curso igual", async () => {
+    vi.mocked(parsearCursoMd).mockReturnValue(buildParsedInput())
+    prisma.cliente.findMany.mockResolvedValue(CLIENTES)
+    prisma.curso.findMany.mockResolvedValue([existente])
+
+    const res = await service.importar({ contenidoMd: "# Curso\n...", confirmarDuplicado: true })
+
+    expect(res.cursoId).toBe("curso-1")
+    expect(tx.curso.create).toHaveBeenCalledTimes(1)
   })
 })

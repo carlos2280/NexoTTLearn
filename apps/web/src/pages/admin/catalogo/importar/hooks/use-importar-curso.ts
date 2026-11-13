@@ -3,7 +3,10 @@ import type { ImportarCursoResponse } from "@nexott-learn/shared-types"
 import { useMutation } from "@tanstack/react-query"
 
 interface UseImportarCursoResult {
-  readonly importar: (contenidoMd: string) => Promise<ImportarCursoResponse>
+  readonly importar: (
+    contenidoMd: string,
+    confirmarDuplicado?: boolean,
+  ) => Promise<ImportarCursoResponse>
   readonly isPending: boolean
   readonly resultado: ImportarCursoResponse | null
   readonly error: Error | null
@@ -17,11 +20,17 @@ interface UseImportarCursoResult {
  */
 export function useImportarCurso(): UseImportarCursoResult {
   const mutation = useMutation({
-    mutationFn: (contenidoMd: string) => importarCurso({ contenidoMd }),
+    mutationFn: (vars: { contenidoMd: string; confirmarDuplicado: boolean }) =>
+      importarCurso(
+        vars.confirmarDuplicado
+          ? { contenidoMd: vars.contenidoMd, confirmarDuplicado: true }
+          : { contenidoMd: vars.contenidoMd },
+      ),
   })
 
   return {
-    importar: async (contenidoMd) => await mutation.mutateAsync(contenidoMd),
+    importar: async (contenidoMd, confirmarDuplicado = false) =>
+      await mutation.mutateAsync({ contenidoMd, confirmarDuplicado }),
     isPending: mutation.isPending,
     resultado: mutation.data ?? null,
     error: mutation.error ?? null,
