@@ -24,6 +24,10 @@ import {
   RolUsuario,
   TipoBloque,
 } from "@prisma/client"
+import {
+  MOTIVO_TRANSICION_POR_INTENTO,
+  pasarAEnProgresoSiCorresponde,
+} from "../asignaciones/transicion-en-progreso"
 import { umbralAprobacionBloque } from "../catalogo/bloques/umbral-aprobacion"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
 import { Paginated, buildPaginatedResponse, resolvePaginacion } from "../common/http/paginated"
@@ -48,11 +52,6 @@ import { SqlEvaluadorService } from "./sql-evaluador.service"
 
 const IDEMPOTENCY_SCOPE = "intento-bloque"
 const HTTP_CREATED = 201
-const HISTORICO_LITERAL_ASIGNADO_ASIGNADO = "ASIGNADO:ASIGNADO" as const
-const HISTORICO_LITERAL_ASIGNADO_EN_PROGRESO = "ASIGNADO:EN_PROGRESO" as const
-const HISTORICO_LITERAL_VOLUNTARIO_INSCRITO = "VOLUNTARIO:INSCRITO" as const
-const HISTORICO_LITERAL_VOLUNTARIO_EN_PROGRESO = "VOLUNTARIO:EN_PROGRESO" as const
-const MOTIVO_TRANSICION_AUTOMATICA = "TRANSICION_AUTOMATICA_POR_INTENTO" as const
 
 type PrismaTx = Prisma.TransactionClient
 
@@ -302,10 +301,12 @@ export class IntentosBloqueService {
             evento: "CREADO",
           },
         })
-        await this.transicionarAsignacionSiCorresponde(tx, {
+        await pasarAEnProgresoSiCorresponde(tx, {
           asignacionId: asignacion.id,
           rol: asignacion.rol,
           autorUsuarioId: input.usuario.usuarioId,
+          motivo: MOTIVO_TRANSICION_POR_INTENTO,
+          fechaInicio: new Date(),
         })
         // Releemos el intento para recoger `esMejorIntento` actualizado.
         const intentoFinal = await tx.intentoBloque.findUniqueOrThrow({
@@ -930,57 +931,6 @@ export class IntentosBloqueService {
     }
     // Si la nueva nota no supera la actual, el nuevo intento se queda con
     // `esMejorIntento=false` (estado inicial del INSERT).
-  }
-
-  private async transicionarAsignacionSiCorresponde(
-    tx: PrismaTx,
-    input: {
-      readonly asignacionId: string
-      readonly rol: RolAsignacion
-      readonly autorUsuarioId: string
-    },
-  ): Promise<void> {
-    if (input.rol === RolAsignacion.ASIGNADO) {
-      const { count } = await tx.asignacionCurso.updateMany({
-        where: {
-          id: input.asignacionId,
-          rol: RolAsignacion.ASIGNADO,
-          estadoAsignado: EstadoAsignado.ASIGNADO,
-        },
-        data: { estadoAsignado: EstadoAsignado.EN_PROGRESO, fechaInicio: new Date() },
-      })
-      if (count === 1) {
-        await tx.historicoEstadoAsignacion.create({
-          data: {
-            asignacionId: input.asignacionId,
-            estadoAnterior: HISTORICO_LITERAL_ASIGNADO_ASIGNADO,
-            estadoNuevo: HISTORICO_LITERAL_ASIGNADO_EN_PROGRESO,
-            motivo: MOTIVO_TRANSICION_AUTOMATICA,
-            autorUsuarioId: input.autorUsuarioId,
-          },
-        })
-      }
-      return
-    }
-    const { count } = await tx.asignacionCurso.updateMany({
-      where: {
-        id: input.asignacionId,
-        rol: RolAsignacion.VOLUNTARIO,
-        estadoVoluntario: EstadoVoluntario.INSCRITO,
-      },
-      data: { estadoVoluntario: EstadoVoluntario.EN_PROGRESO, fechaInicio: new Date() },
-    })
-    if (count === 1) {
-      await tx.historicoEstadoAsignacion.create({
-        data: {
-          asignacionId: input.asignacionId,
-          estadoAnterior: HISTORICO_LITERAL_VOLUNTARIO_INSCRITO,
-          estadoNuevo: HISTORICO_LITERAL_VOLUNTARIO_EN_PROGRESO,
-          motivo: MOTIVO_TRANSICION_AUTOMATICA,
-          autorUsuarioId: input.autorUsuarioId,
-        },
-      })
-    }
   }
 }
 
