@@ -20,6 +20,7 @@ export const apiErrorCodes = {
   rateLimit: "RATE_LIMIT",
   conflict: "CONFLICT",
   cursoTituloDuplicado: "CURSO_TITULO_DUPLICADO",
+  cursoNoReemplazable: "CURSO_NO_REEMPLAZABLE",
   credencialesInvalidas: "CREDENCIALES_INVALIDAS",
   usuarioBloqueado: "USUARIO_BLOQUEADO",
   usuarioExEmpleado: "USUARIO_EX_EMPLEADO",

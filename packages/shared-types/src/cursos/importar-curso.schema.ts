@@ -180,6 +180,12 @@ export const importarCursoBodySchema = z
      * con `confirmarDuplicado: true` ("ya existe; se creara otro").
      */
     confirmarDuplicado: z.boolean().optional(),
+    /**
+     * Reemplaza el contenido de ese curso en vez de crear otro (2B). Solo
+     * vale para un curso en BORRADOR sin asignaciones ni intentos; si no,
+     * 409 `CURSO_NO_REEMPLAZABLE`. Conserva el id y la configuracion.
+     */
+    reemplazarCursoId: z.string().uuid().optional(),
   })
   .strict()
 export type ImportarCursoBody = z.infer<typeof importarCursoBodySchema>
@@ -193,6 +199,8 @@ export interface CursoTituloDuplicado {
   readonly id: string
   readonly titulo: string
   readonly estado: string
+  /** BORRADOR sin asignaciones ni intentos: se ofrece "Reemplazar este curso". */
+  readonly reemplazable: boolean
 }
 
 export interface ImportarCursoResponse {
@@ -200,4 +208,8 @@ export interface ImportarCursoResponse {
   readonly modulosCreados: number
   readonly seccionesCreadas: number
   readonly bloquesCreados: number
+  /** `true` si se reemplazo el contenido de un curso existente (2B). */
+  readonly reemplazado: boolean
+  /** Modulos viejos que eran solo de ese curso y quedaron archivados. */
+  readonly modulosArchivados: number
 }

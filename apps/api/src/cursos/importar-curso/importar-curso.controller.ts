@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Header, HttpCode, HttpStatus, Post } from "@nestjs/common"
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  HttpCode,
+  HttpStatus,
+  InternalServerErrorException,
+  Post,
+} from "@nestjs/common"
 import { Throttle } from "@nestjs/throttler"
 import {
   type ImportarCursoBody,
@@ -7,8 +16,11 @@ import {
 } from "@nexott-learn/shared-types"
 import { RolUsuario } from "@prisma/client"
 
+import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { Roles } from "../../common/decorators/roles.decorator"
+import { apiErrorCodes } from "../../common/errors/api-error.codes"
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe"
+import { SesionUsuario } from "../../common/types/sesion.types"
 import { ImportarCursoService } from "./importar-curso.service"
 import { PLANTILLA_CURSO_MD } from "./plantilla-ejemplo"
 
@@ -41,7 +53,16 @@ export class ImportarCursoController {
   @Throttle({ short: { ttl: 60_000, limit: 3 } })
   async importar(
     @Body(new ZodValidationPipe(importarCursoBodySchema)) body: ImportarCursoBody,
+    @CurrentUser() usuario: SesionUsuario | undefined,
   ): Promise<ImportarCursoResponse> {
-    return await this.importarCursoService.importar(body)
+    if (!usuario) {
+      throw new InternalServerErrorException({
+        code: apiErrorCodes.errorInterno,
+        message: "Sesion invalida tras pasar guards.",
+      })
+    }
+    // El autor queda en el log del curso y en el historico de los modulos
+    // archivados cuando la importacion reemplaza un curso (2B).
+    return await this.importarCursoService.importar(body, usuario.usuarioId)
   }
 }

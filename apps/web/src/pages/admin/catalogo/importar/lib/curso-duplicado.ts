@@ -3,7 +3,7 @@ import type { CursoTituloDuplicado } from "@nexott-learn/shared-types"
 
 const CODIGO_TITULO_DUPLICADO = "CURSO_TITULO_DUPLICADO"
 
-function esCursoDuplicado(valor: unknown): valor is CursoTituloDuplicado {
+function esCursoDuplicado(valor: unknown): valor is Omit<CursoTituloDuplicado, "reemplazable"> {
   if (typeof valor !== "object" || valor === null) {
     return false
   }
@@ -25,5 +25,11 @@ export function cursosDuplicadosDelError(error: unknown): readonly CursoTituloDu
   if (!(Array.isArray(lista) && lista.length > 0 && lista.every(esCursoDuplicado))) {
     return null
   }
-  return lista
+  // Sin el dato, el curso no se ofrece para reemplazar (lo seguro).
+  return lista.map((c) => ({
+    id: c.id,
+    titulo: c.titulo,
+    estado: c.estado,
+    reemplazable: (c as { reemplazable?: unknown }).reemplazable === true,
+  }))
 }
