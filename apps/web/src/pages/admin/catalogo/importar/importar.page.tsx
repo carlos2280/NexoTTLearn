@@ -8,7 +8,7 @@ import { PreviewArchivo } from "./components/preview-archivo"
 import { ZonaUpload } from "./components/zona-upload"
 import { useArchivoMd } from "./hooks/use-archivo-md"
 import { useDescargarPlantilla } from "./hooks/use-descargar-plantilla"
-import { useImportarCurso } from "./hooks/use-importar-curso"
+import { type OpcionesImportar, useImportarCurso } from "./hooks/use-importar-curso"
 import { cursosDuplicadosDelError } from "./lib/curso-duplicado"
 
 /**
@@ -29,11 +29,11 @@ export function ImportarCursoPage() {
   const { descargar: handleDescargarPlantilla, descargando: descargandoPlantilla } =
     useDescargarPlantilla()
 
-  const handleImportar = async (confirmarDuplicado = false) => {
+  const handleImportar = async (opciones: OpcionesImportar = {}) => {
     if (!archivo) {
       return
     }
-    const res = await importar(archivo.contenido, confirmarDuplicado).catch(() => null)
+    const res = await importar(archivo.contenido, opciones).catch(() => null)
     if (res) {
       navigate(RUTAS.admin.cursoDetalle(res.cursoId))
     }
@@ -45,6 +45,9 @@ export function ImportarCursoPage() {
   }
 
   const duplicados = cursosDuplicadosDelError(errorImport)
+  const tituloExito = resultado?.reemplazado
+    ? "Curso reemplazado correctamente"
+    : "Curso importado correctamente"
   const mensajeError = duplicados
     ? null
     : errorImport instanceof ApiError
@@ -71,8 +74,8 @@ export function ImportarCursoPage() {
       </header>
 
       {resultado ? (
-        <Banner tone="success" title="Curso importado correctamente">
-          Se creó el curso con {resultado.modulosCreados} módulos, {resultado.seccionesCreadas}{" "}
+        <Banner tone="success" title={tituloExito}>
+          El curso quedó con {resultado.modulosCreados} módulos, {resultado.seccionesCreadas}{" "}
           secciones y {resultado.bloquesCreados} bloques. Redirigiendo al detalle…
         </Banner>
       ) : null}
@@ -81,7 +84,8 @@ export function ImportarCursoPage() {
         <AvisoCursoDuplicado
           cursos={duplicados}
           importando={isPending}
-          onConfirmar={() => handleImportar(true)}
+          onConfirmar={() => handleImportar({ confirmarDuplicado: true })}
+          onReemplazar={(cursoId) => handleImportar({ reemplazarCursoId: cursoId })}
           onCancelar={reset}
         />
       ) : null}

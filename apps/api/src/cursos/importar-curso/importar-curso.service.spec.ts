@@ -25,7 +25,7 @@ interface MockTx {
     findUnique: ReturnType<typeof vi.fn>
     update: ReturnType<typeof vi.fn>
   }
-  modulo: { create: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> }
+  modulo: { create: ReturnType<typeof vi.fn>; updateMany: ReturnType<typeof vi.fn> }
   historicoEstadoModulo: { create: ReturnType<typeof vi.fn> }
   seccion: { create: ReturnType<typeof vi.fn> }
   seccionSkill: { createMany: ReturnType<typeof vi.fn> }
@@ -75,7 +75,7 @@ function buildTxMock(): MockTx {
     },
     modulo: {
       create: vi.fn().mockResolvedValue({ id: "mod-1" }),
-      update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     historicoEstadoModulo: { create: vi.fn().mockResolvedValue({}) },
     seccion: { create: vi.fn().mockResolvedValue({ id: "sec-1" }) },
@@ -323,6 +323,8 @@ describe("ImportarCursoService.importar", () => {
       modulosCreados: 1,
       seccionesCreadas: 1,
       bloquesCreados: 1,
+      reemplazado: false,
+      modulosArchivados: 0,
     })
     expect(tx.area.upsert).toHaveBeenCalledTimes(1)
     expect(tx.curso.create).toHaveBeenCalledTimes(1)
@@ -663,14 +665,12 @@ describe("ImportarCursoService.importar — reemplazar un curso", () => {
     })
     expect(tx.cursoSkillExigida.deleteMany).toHaveBeenCalledWith({ where: { cursoId: cursoViejo } })
     expect(tx.cursoAreaExigida.deleteMany).toHaveBeenCalledWith({ where: { cursoId: cursoViejo } })
-    // Solo el exclusivo se archiva, con su historico.
-    expect(tx.modulo.update).toHaveBeenCalledTimes(1)
-    expect(tx.modulo.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "mod-exclusivo", estado: "ACTIVO" },
-        data: { estado: "ARCHIVADO" },
-      }),
-    )
+    // Solo el exclusivo se archiva (si sigue ACTIVO), con su historico.
+    expect(tx.modulo.updateMany).toHaveBeenCalledTimes(1)
+    expect(tx.modulo.updateMany).toHaveBeenCalledWith({
+      where: { id: "mod-exclusivo", estado: "ACTIVO" },
+      data: { estado: "ARCHIVADO" },
+    })
     expect(tx.historicoEstadoModulo.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         moduloId: "mod-exclusivo",

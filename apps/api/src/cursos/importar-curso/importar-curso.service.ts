@@ -13,7 +13,7 @@ import type {
   ModuloImportado,
   SeccionImportada,
 } from "@nexott-learn/shared-types"
-import { Prisma, TipoBloque } from "@prisma/client"
+import { AccionLogCurso, EstadoCurso, EstadoModulo, Prisma, TipoBloque } from "@prisma/client"
 
 import { apiErrorCodes } from "../../common/errors/api-error.codes"
 import { PrismaService } from "../../common/prisma/prisma.service"
@@ -73,13 +73,20 @@ export class ImportarCursoService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async importar(body: ImportarCursoBody): Promise<ImportarCursoResponse> {
+  async importar(body: ImportarCursoBody, autorUsuarioId: string): Promise<ImportarCursoResponse> {
     const parsed = completarSkillsFaltantes(this.parsearOExplotar(body.contenidoMd))
     const clienteId = await this.resolverClienteOExplotar(parsed.curso.cliente)
+    if (body.reemplazarCursoId) {
+      return await this.persistir(parsed, clienteId, {
+        tipo: "reemplazar",
+        cursoId: body.reemplazarCursoId,
+        autorUsuarioId,
+      })
+    }
     if (body.confirmarDuplicado !== true) {
       await this.explotarSiTituloExiste(parsed.curso.titulo)
     }
-    return await this.persistir(parsed, clienteId)
+    return await this.persistir(parsed, clienteId, { tipo: "nuevo" })
   }
 
   /**
@@ -89,14 +96,25 @@ export class ImportarCursoService {
    * crea otro curso igual que antes.
    */
   private async explotarSiTituloExiste(titulo: string): Promise<void> {
-    const existentes = await this.prisma.curso.findMany({
+    const filas = await this.prisma.curso.findMany({
       where: { titulo: { equals: titulo.trim(), mode: "insensitive" } },
-      select: { id: true, titulo: true, estado: true },
+      select: {
+        id: true,
+        titulo: true,
+        estado: true,
+        _count: { select: { asignaciones: true, intentosBloque: true } },
+      },
       orderBy: { createdAt: "asc" },
     })
-    if (existentes.length === 0) {
+    if (filas.length === 0) {
       return
     }
+    const existentes = filas.map((c) => ({
+      id: c.id,
+      titulo: c.titulo,
+      estado: c.estado,
+      reemplazable: esReemplazable(c),
+    }))
     throw new ConflictException({
       code: apiErrorCodes.cursoTituloDuplicado,
       message: `Ya existe un curso llamado "${titulo.trim()}". Si importas, se creará otro con el mismo título.`,
@@ -143,27 +161,36 @@ export class ImportarCursoService {
   private async persistir(
     parsed: ImportarCursoInput,
     clienteId: string,
+    destino: DestinoImportacion,
   ): Promise<ImportarCursoResponse> {
     let totalSecciones = 0
     let totalBloques = 0
 
     let cursoId: string
+    let modulosArchivados = 0
     try {
-      cursoId = await this.prisma.$transaction(
+      const resultado = await this.prisma.$transaction(
         async (tx) => {
+          const datosCurso = {
+            titulo: parsed.curso.titulo,
+            clienteId,
+            fechaInicio: this.aFechaUtc(parsed.curso.fechaInicio),
+            fechaDeadline: this.aFechaUtc(parsed.curso.fechaDeadline),
+            ...(parsed.curso.desbloqueo ? { desbloqueo: parsed.curso.desbloqueo } : {}),
+          }
+          let archivados = 0
+          let curso: { id: string }
+          if (destino.tipo === "reemplazar") {
+            // Comprobar y vaciar ANTES de crear nada: si no es reemplazable,
+            // la transaccion no deja rastro.
+            archivados = await this.vaciarCursoParaReemplazo(tx, destino, parsed.curso.titulo)
+            await tx.curso.update({ where: { id: destino.cursoId }, data: datosCurso })
+            curso = { id: destino.cursoId }
+          } else {
+            curso = await tx.curso.create({ data: datosCurso, select: { id: true } })
+          }
           const areaId = await this.asegurarArea(tx, parsed.curso.titulo)
           const skillPorEtiqueta = await this.asegurarSkills(tx, parsed, areaId)
-
-          const curso = await tx.curso.create({
-            data: {
-              titulo: parsed.curso.titulo,
-              clienteId,
-              fechaInicio: this.aFechaUtc(parsed.curso.fechaInicio),
-              fechaDeadline: this.aFechaUtc(parsed.curso.fechaDeadline),
-              ...(parsed.curso.desbloqueo ? { desbloqueo: parsed.curso.desbloqueo } : {}),
-            },
-            select: { id: true },
-          })
 
           // Acumuladores para escribir las relaciones en lote (`createMany`) y
           // no encadenar cientos de INSERT dentro de la transacción (evita
@@ -198,16 +225,33 @@ export class ImportarCursoService {
           }
           await this.persistirExigidas(tx, curso.id, areaId, exigidas, skillPorEtiqueta)
 
-          return curso.id
+          if (destino.tipo === "reemplazar") {
+            await tx.logCambioCurso.create({
+              data: {
+                cursoId: curso.id,
+                autorUsuarioId: destino.autorUsuarioId,
+                accion: AccionLogCurso.CAMBIO_MODULOS,
+                motivo: "Contenido reemplazado desde un archivo .md (importar curso).",
+                previewImpacto: {
+                  modulosArchivados: archivados,
+                  modulosNuevos: parsed.modulos.length,
+                },
+              },
+            })
+          }
+
+          return { cursoId: curso.id, archivados }
         },
         { timeout: TX_TIMEOUT_MS, maxWait: TX_MAX_WAIT_MS },
       )
+      cursoId = resultado.cursoId
+      modulosArchivados = resultado.archivados
     } catch (err) {
       throw this.aHttpErrorPrismaConocido(err)
     }
 
     this.logger.log(
-      `Curso importado | cursoId=${cursoId} | modulos=${parsed.modulos.length} | secciones=${totalSecciones} | bloques=${totalBloques}`,
+      `Curso ${destino.tipo === "reemplazar" ? "reemplazado" : "importado"} | cursoId=${cursoId} | archivados=${modulosArchivados} | modulos=${parsed.modulos.length} | secciones=${totalSecciones} | bloques=${totalBloques}`,
     )
 
     return {
@@ -215,7 +259,82 @@ export class ImportarCursoService {
       modulosCreados: parsed.modulos.length,
       seccionesCreadas: totalSecciones,
       bloquesCreados: totalBloques,
+      reemplazado: destino.tipo === "reemplazar",
+      modulosArchivados,
     }
+  }
+
+  /**
+   * Reemplazo (2B): comprueba DENTRO de la transaccion que el curso siga en
+   * BORRADOR sin asignaciones ni intentos, le quita habilitaciones y exigidas,
+   * y archiva (ACTIVO -> ARCHIVADO, con historico) los modulos viejos que ya no
+   * quedan en ningun otro curso. Los compartidos solo se desenganchan. Nada se
+   * borra de verdad: un modulo archivado se puede desarchivar desde el catalogo.
+   * Devuelve cuantos modulos archivo.
+   */
+  private async vaciarCursoParaReemplazo(
+    tx: Prisma.TransactionClient,
+    destino: { readonly cursoId: string; readonly autorUsuarioId: string },
+    tituloNuevo: string,
+  ): Promise<number> {
+    const curso = await tx.curso.findUnique({
+      where: { id: destino.cursoId },
+      select: {
+        id: true,
+        estado: true,
+        _count: { select: { asignaciones: true, intentosBloque: true } },
+      },
+    })
+    if (!curso) {
+      throw new NotFoundException({
+        code: apiErrorCodes.cursoNoEncontrado,
+        message: "El curso a reemplazar no existe.",
+      })
+    }
+    if (!esReemplazable(curso)) {
+      throw new ConflictException({
+        code: apiErrorCodes.cursoNoReemplazable,
+        message:
+          "Solo se puede reemplazar un curso en borrador, sin personas asignadas y sin respuestas.",
+        details: {
+          estado: curso.estado,
+          asignaciones: curso._count.asignaciones,
+          intentos: curso._count.intentosBloque,
+        },
+      })
+    }
+    const viejos = await tx.cursoModuloHabilitado.findMany({
+      where: { cursoId: destino.cursoId },
+      select: { moduloId: true },
+    })
+    await tx.cursoModuloHabilitado.deleteMany({ where: { cursoId: destino.cursoId } })
+    await tx.cursoSkillExigida.deleteMany({ where: { cursoId: destino.cursoId } })
+    await tx.cursoAreaExigida.deleteMany({ where: { cursoId: destino.cursoId } })
+
+    let archivados = 0
+    for (const { moduloId } of viejos) {
+      const enOtrosCursos = await tx.cursoModuloHabilitado.count({ where: { moduloId } })
+      if (enOtrosCursos > 0) {
+        continue
+      }
+      const { count } = await tx.modulo.updateMany({
+        where: { id: moduloId, estado: EstadoModulo.ACTIVO },
+        data: { estado: EstadoModulo.ARCHIVADO },
+      })
+      if (count === 1) {
+        await tx.historicoEstadoModulo.create({
+          data: {
+            moduloId,
+            estadoAnterior: EstadoModulo.ACTIVO,
+            estadoNuevo: EstadoModulo.ARCHIVADO,
+            autorUsuarioId: destino.autorUsuarioId,
+            motivo: `Reemplazado al importar de nuevo el curso "${tituloNuevo}".`,
+          },
+        })
+        archivados += 1
+      }
+    }
+    return archivados
   }
 
   /**
@@ -518,4 +637,20 @@ export class ImportarCursoService {
   private aFechaUtc(yyyyMmDd: string): Date {
     return new Date(`${yyyyMmDd}T00:00:00.000Z`)
   }
+}
+
+type DestinoImportacion =
+  | { readonly tipo: "nuevo" }
+  | { readonly tipo: "reemplazar"; readonly cursoId: string; readonly autorUsuarioId: string }
+
+/** 2B: solo un curso en BORRADOR, sin asignaciones ni intentos, se reemplaza. */
+function esReemplazable(curso: {
+  readonly estado: EstadoCurso
+  readonly _count: { readonly asignaciones: number; readonly intentosBloque: number }
+}): boolean {
+  return (
+    curso.estado === EstadoCurso.BORRADOR &&
+    curso._count.asignaciones === 0 &&
+    curso._count.intentosBloque === 0
+  )
 }

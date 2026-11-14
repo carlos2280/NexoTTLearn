@@ -1,7 +1,9 @@
 import { Banner } from "@/shared/components/ui/banner"
 import { Button } from "@/shared/components/ui/button"
+import { ConfirmDialog } from "@/shared/components/ui/confirm-dialog"
 import { RUTAS } from "@/shared/constants/rutas"
 import type { CursoTituloDuplicado } from "@nexott-learn/shared-types"
+import { useState } from "react"
 import { Link } from "react-router-dom"
 
 interface AvisoCursoDuplicadoProps {
@@ -9,6 +11,8 @@ interface AvisoCursoDuplicadoProps {
   readonly importando: boolean
   readonly onConfirmar: () => void
   readonly onCancelar: () => void
+  /** 2B: reemplazar el contenido de ese curso (solo si es `reemplazable`). */
+  readonly onReemplazar: (cursoId: string) => Promise<void>
 }
 
 function etiquetaEstado(estado: string): string {
@@ -33,8 +37,10 @@ export function AvisoCursoDuplicado({
   importando,
   onConfirmar,
   onCancelar,
+  onReemplazar,
 }: AvisoCursoDuplicadoProps) {
   const titulo = cursos[0]?.titulo ?? ""
+  const [aReemplazar, setAReemplazar] = useState<string | null>(null)
   return (
     <Banner tone="warning" title={`Ya existe un curso llamado «${titulo}»`}>
       <div className="flex flex-col gap-3">
@@ -49,6 +55,18 @@ export function AvisoCursoDuplicado({
                 {c.titulo}
               </Link>{" "}
               · {etiquetaEstado(c.estado)}
+              {c.reemplazable ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="ml-2"
+                  onClick={() => setAReemplazar(c.id)}
+                  disabled={importando}
+                >
+                  Reemplazar este curso
+                </Button>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -67,6 +85,20 @@ export function AvisoCursoDuplicado({
           </Button>
         </div>
       </div>
+      <ConfirmDialog
+        abierto={aReemplazar !== null}
+        onCambiarAbierto={(abierto) => (abierto ? null : setAReemplazar(null))}
+        titulo="Reemplazar el curso"
+        descripcion="El curso queda con el contenido de este archivo, con el mismo enlace y la misma configuración. Sus módulos anteriores se archivan en el catálogo (se pueden recuperar)."
+        textoConfirmar="Reemplazar"
+        enviando={importando}
+        onConfirmar={async () => {
+          if (aReemplazar) {
+            await onReemplazar(aReemplazar)
+          }
+          setAReemplazar(null)
+        }}
+      />
     </Banner>
   )
 }
