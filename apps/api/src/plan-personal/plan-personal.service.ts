@@ -27,6 +27,10 @@ import {
   TipoBloque,
   TipoEventoNotif,
 } from "@prisma/client"
+import {
+  MOTIVO_TRANSICION_POR_APERTURA,
+  pasarAEnProgresoSiCorresponde,
+} from "../asignaciones/transicion-en-progreso"
 import { umbralAprobacionBloque } from "../catalogo/bloques/umbral-aprobacion"
 import { AuditLogService } from "../common/audit/audit-log.service"
 import { apiErrorCodes } from "../common/errors/api-error.codes"
@@ -575,6 +579,7 @@ export class PlanPersonalService {
         data: { asignacionId, seccionId },
         select: { primeraAperturaAt: true },
       })
+      await this.pasarAEnProgresoPorApertura(asignacion, usuario.usuarioId)
       // §5.123: la apertura quedo persistida. Si esto deja el plan al 100%,
       // emitir PLAN_RECALCULADO best-effort. No emitir en replay (yaEstaba=true).
       await this.notificarSiAperturaCompletoPlan(asignacionId)
@@ -596,6 +601,9 @@ export class PlanPersonalService {
         if (!existente) {
           throw error
         }
+        // Reabrir tambien corrige a quien quedo "sin iniciar" con secciones
+        // abiertas antes de esta regla: la transicion es idempotente.
+        await this.pasarAEnProgresoPorApertura(asignacion, usuario.usuarioId)
         return {
           asignacionId,
           seccionId,
@@ -1120,6 +1128,43 @@ export class PlanPersonalService {
       return { ...base, skillId: dto.skillId }
     }
     return { ...base, seccionId: dto.seccionId }
+  }
+
+  /**
+   * «Sin iniciar» con avance (13-11-2026): abrir una seccion es actividad real
+   * en el curso, igual que responder. Si la asignacion sigue en su estado
+   * inicial (ASIGNADO / INSCRITO), pasa a EN_PROGRESO con `fechaInicio` = su
+   * primera apertura y deja historico. Sin notificaciones.
+   */
+  private async pasarAEnProgresoPorApertura(
+    asignacion: {
+      readonly id: string
+      readonly rol: RolAsignacion
+      readonly estadoAsignado: EstadoAsignado | null
+      readonly estadoVoluntario: EstadoVoluntario | null
+    },
+    autorUsuarioId: string,
+  ): Promise<void> {
+    const sinIniciar =
+      asignacion.estadoAsignado === EstadoAsignado.ASIGNADO ||
+      asignacion.estadoVoluntario === EstadoVoluntario.INSCRITO
+    if (!sinIniciar) {
+      return
+    }
+    const primera = await this.prisma.aperturaSeccion.findFirst({
+      where: { asignacionId: asignacion.id },
+      orderBy: { primeraAperturaAt: "asc" },
+      select: { primeraAperturaAt: true },
+    })
+    await this.prisma.$transaction((tx) =>
+      pasarAEnProgresoSiCorresponde(tx, {
+        asignacionId: asignacion.id,
+        rol: asignacion.rol,
+        autorUsuarioId,
+        motivo: MOTIVO_TRANSICION_POR_APERTURA,
+        fechaInicio: primera?.primeraAperturaAt ?? new Date(),
+      }),
+    )
   }
 
   /**

@@ -20,23 +20,37 @@ vi.mock("./parser-md", async () => {
 interface MockTx {
   area: { upsert: ReturnType<typeof vi.fn> }
   skill: { upsert: ReturnType<typeof vi.fn> }
-  curso: { create: ReturnType<typeof vi.fn> }
-  modulo: { create: ReturnType<typeof vi.fn> }
+  curso: {
+    create: ReturnType<typeof vi.fn>
+    findUnique: ReturnType<typeof vi.fn>
+    update: ReturnType<typeof vi.fn>
+  }
+  modulo: { create: ReturnType<typeof vi.fn>; updateMany: ReturnType<typeof vi.fn> }
+  historicoEstadoModulo: { create: ReturnType<typeof vi.fn> }
   seccion: { create: ReturnType<typeof vi.fn> }
   seccionSkill: { createMany: ReturnType<typeof vi.fn> }
   bloque: { create: ReturnType<typeof vi.fn> }
-  cursoModuloHabilitado: { createMany: ReturnType<typeof vi.fn> }
-  cursoSkillExigida: { createMany: ReturnType<typeof vi.fn> }
-  cursoAreaExigida: { create: ReturnType<typeof vi.fn> }
+  cursoModuloHabilitado: {
+    createMany: ReturnType<typeof vi.fn>
+    findMany: ReturnType<typeof vi.fn>
+    deleteMany: ReturnType<typeof vi.fn>
+    count: ReturnType<typeof vi.fn>
+  }
+  cursoSkillExigida: { createMany: ReturnType<typeof vi.fn>; deleteMany: ReturnType<typeof vi.fn> }
+  cursoAreaExigida: { create: ReturnType<typeof vi.fn>; deleteMany: ReturnType<typeof vi.fn> }
+  logCambioCurso: { create: ReturnType<typeof vi.fn> }
 }
 
 interface MockPrisma {
   cliente: { findMany: ReturnType<typeof vi.fn> }
+  curso: { findMany: ReturnType<typeof vi.fn> }
   $transaction: ReturnType<typeof vi.fn>
 }
 
 // El id de skill se deriva de la etiqueta para poder verificar el mapeo
 // etiqueta → SeccionSkill → CursoSkillExigida en las aserciones.
+const ADMIN_ID = "9000000a-0000-0000-0000-000000000001"
+
 const CLIENTES = [
   { id: "cliente-1", nombre: "NTT Data Iberia" },
   { id: "cliente-2", nombre: "NTT Data — Frontend Practice" },
@@ -54,20 +68,42 @@ function buildTxMock(): MockTx {
         id: skillIdDe(args.where.etiquetaVisible),
       })),
     },
-    curso: { create: vi.fn().mockResolvedValue({ id: "curso-1" }) },
-    modulo: { create: vi.fn().mockResolvedValue({ id: "mod-1" }) },
+    curso: {
+      create: vi.fn().mockResolvedValue({ id: "curso-1" }),
+      findUnique: vi.fn(),
+      update: vi.fn().mockResolvedValue({}),
+    },
+    modulo: {
+      create: vi.fn().mockResolvedValue({ id: "mod-1" }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    historicoEstadoModulo: { create: vi.fn().mockResolvedValue({}) },
     seccion: { create: vi.fn().mockResolvedValue({ id: "sec-1" }) },
     seccionSkill: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
     bloque: { create: vi.fn().mockResolvedValue({ id: "bloq-1" }) },
-    cursoModuloHabilitado: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
-    cursoSkillExigida: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
-    cursoAreaExigida: { create: vi.fn().mockResolvedValue(undefined) },
+    cursoModuloHabilitado: {
+      createMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findMany: vi.fn().mockResolvedValue([]),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      count: vi.fn().mockResolvedValue(0),
+    },
+    cursoSkillExigida: {
+      createMany: vi.fn().mockResolvedValue({ count: 0 }),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    cursoAreaExigida: {
+      create: vi.fn().mockResolvedValue(undefined),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    logCambioCurso: { create: vi.fn().mockResolvedValue({}) },
   }
 }
 
 function buildPrismaMock(tx: MockTx): MockPrisma {
   const mock: MockPrisma = {
     cliente: { findMany: vi.fn() },
+    // Default: no hay otro curso con el mismo titulo.
+    curso: { findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn(),
   }
   mock.$transaction.mockImplementation(async (cb: (tx: MockTx) => Promise<string>) => await cb(tx))
@@ -280,13 +316,15 @@ describe("ImportarCursoService.importar", () => {
     vi.mocked(parsearCursoMd).mockReturnValue(buildParsedInput())
     prisma.cliente.findMany.mockResolvedValue(CLIENTES)
 
-    const res = await service.importar({ contenidoMd: "# Curso\n..." })
+    const res = await service.importar({ contenidoMd: "# Curso\n..." }, ADMIN_ID)
 
     expect(res).toEqual({
       cursoId: "curso-1",
       modulosCreados: 1,
       seccionesCreadas: 1,
       bloquesCreados: 1,
+      reemplazado: false,
+      modulosArchivados: 0,
     })
     expect(tx.area.upsert).toHaveBeenCalledTimes(1)
     expect(tx.curso.create).toHaveBeenCalledTimes(1)
@@ -311,7 +349,7 @@ describe("ImportarCursoService.importar", () => {
     prisma.cliente.findMany.mockResolvedValue(CLIENTES.slice(1))
 
     try {
-      await service.importar({ contenidoMd: "# Curso\n..." })
+      await service.importar({ contenidoMd: "# Curso\n..." }, ADMIN_ID)
       throw new Error("expected throw")
     } catch (error) {
       expect(error).toBeInstanceOf(NotFoundException)
@@ -327,7 +365,7 @@ describe("ImportarCursoService.importar", () => {
     )
     prisma.cliente.findMany.mockResolvedValue(CLIENTES)
 
-    const res = await service.importar({ contenidoMd: "# Curso\n..." })
+    const res = await service.importar({ contenidoMd: "# Curso\n..." }, ADMIN_ID)
 
     expect(res.bloquesCreados).toBe(2)
     expect(tx.skill.upsert).toHaveBeenCalledWith(
@@ -349,7 +387,7 @@ describe("ImportarCursoService.importar", () => {
     vi.mocked(parsearCursoMd).mockReturnValue(buildParsedInputConCodigo("Skill totalmente nueva"))
     prisma.cliente.findMany.mockResolvedValue(CLIENTES)
 
-    const res = await service.importar({ contenidoMd: "# Curso\n..." })
+    const res = await service.importar({ contenidoMd: "# Curso\n..." }, ADMIN_ID)
 
     expect(res.bloquesCreados).toBe(2)
     expect(tx.skill.upsert).toHaveBeenCalledWith(
@@ -364,7 +402,7 @@ describe("ImportarCursoService.importar", () => {
     vi.mocked(parsearCursoMd).mockReturnValue(buildParsedInputConSql("Postgres · Modelado y JOINs"))
     prisma.cliente.findMany.mockResolvedValue(CLIENTES)
 
-    const res = await service.importar({ contenidoMd: "# Curso\n..." })
+    const res = await service.importar({ contenidoMd: "# Curso\n..." }, ADMIN_ID)
 
     expect(res.bloquesCreados).toBe(2)
     const ejercicio = tx.bloque.create.mock.calls[0]?.[0] as {
@@ -385,7 +423,7 @@ describe("ImportarCursoService.importar", () => {
     vi.mocked(parsearCursoMd).mockReturnValue(buildParsedInputModuloConHerencia())
     prisma.cliente.findMany.mockResolvedValue(CLIENTES)
 
-    await service.importar({ contenidoMd: "# Curso\n..." })
+    await service.importar({ contenidoMd: "# Curso\n..." }, ADMIN_ID)
 
     const concreta = "TypeScript · Narrowing y control de flujo"
     const fundacional = "TypeScript · Fundamentos senior"
@@ -421,7 +459,7 @@ describe("ImportarCursoService.importar", () => {
     )
     prisma.cliente.findMany.mockResolvedValue(CLIENTES)
 
-    await service.importar({ contenidoMd: "# Curso\n..." })
+    await service.importar({ contenidoMd: "# Curso\n..." }, ADMIN_ID)
 
     expect(tx.seccionSkill.createMany).toHaveBeenCalledWith({
       data: [{ seccionId: "sec-1", skillId: skillIdDe("Arquitectura del panel · Fundamentos") }],
@@ -448,7 +486,7 @@ describe("ImportarCursoService.importar", () => {
     )
 
     try {
-      await service.importar({ contenidoMd: "# Curso\n..." })
+      await service.importar({ contenidoMd: "# Curso\n..." }, ADMIN_ID)
       throw new Error("expected throw")
     } catch (error) {
       expect(error).toBeInstanceOf(ConflictException)
@@ -468,7 +506,7 @@ describe("ImportarCursoService.importar", () => {
     )
 
     try {
-      await service.importar({ contenidoMd: "# Curso\n..." })
+      await service.importar({ contenidoMd: "# Curso\n..." }, ADMIN_ID)
       throw new Error("expected throw")
     } catch (error) {
       expect(error).toBeInstanceOf(BadRequestException)
@@ -484,7 +522,7 @@ describe("ImportarCursoService.importar", () => {
     })
     prisma.cliente.findMany.mockResolvedValue(CLIENTES)
 
-    await service.importar({ contenidoMd: "# Curso\n..." })
+    await service.importar({ contenidoMd: "# Curso\n..." }, ADMIN_ID)
 
     expect(tx.curso.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ clienteId: "cliente-2" }) }),
@@ -495,16 +533,18 @@ describe("ImportarCursoService.importar", () => {
     vi.mocked(parsearCursoMd).mockReturnValue(buildParsedInput())
     prisma.cliente.findMany.mockResolvedValue(CLIENTES.slice(1))
 
-    await expect(service.importar({ contenidoMd: "# Curso\n..." })).rejects.toMatchObject({
-      response: { message: expect.stringContaining("NTT Data — Frontend Practice") },
-    })
+    await expect(service.importar({ contenidoMd: "# Curso\n..." }, ADMIN_ID)).rejects.toMatchObject(
+      {
+        response: { message: expect.stringContaining("NTT Data — Frontend Practice") },
+      },
+    )
   })
 
   it("evaluable sin skill: recibe la skill «curso · módulo» y el curso entra al plan", async () => {
     vi.mocked(parsearCursoMd).mockReturnValue(buildParsedInputConCodigo())
     prisma.cliente.findMany.mockResolvedValue(CLIENTES)
 
-    await service.importar({ contenidoMd: "# Curso\n..." })
+    await service.importar({ contenidoMd: "# Curso\n..." }, ADMIN_ID)
 
     const etiqueta = "Curso con reto · Modulo uno"
     expect(tx.bloque.create.mock.calls[0]?.[0]).toMatchObject({
@@ -516,5 +556,191 @@ describe("ImportarCursoService.importar", () => {
     expect(tx.cursoSkillExigida.createMany).toHaveBeenCalledWith({
       data: [{ cursoId: "curso-1", skillId: skillIdDe(etiqueta), notaMinima: 60 }],
     })
+  })
+})
+
+// Aviso antes de duplicar (2A, 13-11-2026): si ya existe un curso con el mismo
+// titulo, la importacion no crea nada hasta que el admin lo confirme.
+describe("ImportarCursoService.importar — titulo ya existente", () => {
+  const existente = { id: "curso-viejo", titulo: "Curso de prueba", estado: "ACTIVO" }
+  const filaExistente = { ...existente, _count: { asignaciones: 0, intentosBloque: 0 } }
+
+  it("sin confirmar: 409 CURSO_TITULO_DUPLICADO con los cursos existentes y sin transaccion", async () => {
+    vi.mocked(parsearCursoMd).mockReturnValue(buildParsedInput())
+    prisma.cliente.findMany.mockResolvedValue(CLIENTES)
+    prisma.curso.findMany.mockResolvedValue([filaExistente])
+
+    try {
+      await service.importar({ contenidoMd: "# Curso\n..." }, ADMIN_ID)
+      throw new Error("expected throw")
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConflictException)
+      const r = (error as ConflictException).getResponse() as {
+        code: string
+        details: { cursosExistentes: unknown }
+      }
+      expect(r.code).toBe(apiErrorCodes.cursoTituloDuplicado)
+      // ACTIVO: no se puede reemplazar (solo BORRADOR sin personas).
+      expect(r.details.cursosExistentes).toEqual([{ ...existente, reemplazable: false }])
+    }
+    expect(prisma.curso.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { titulo: { equals: "Curso de prueba", mode: "insensitive" } },
+      }),
+    )
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it("con confirmarDuplicado=true: crea el curso igual", async () => {
+    vi.mocked(parsearCursoMd).mockReturnValue(buildParsedInput())
+    prisma.cliente.findMany.mockResolvedValue(CLIENTES)
+    prisma.curso.findMany.mockResolvedValue([filaExistente])
+
+    const res = await service.importar(
+      { contenidoMd: "# Curso\n...", confirmarDuplicado: true },
+      ADMIN_ID,
+    )
+
+    expect(res.cursoId).toBe("curso-1")
+    expect(tx.curso.create).toHaveBeenCalledTimes(1)
+  })
+})
+
+// Reemplazar un curso en borrador y sin personas (2B, 13-11-2026). Mismo
+// curso (mismo id y configuracion): se quita el contenido viejo, se archivan
+// los modulos que eran solo suyos, se desenganchan los compartidos y se carga
+// el contenido nuevo. Todo en una transaccion, con registro en el log.
+describe("ImportarCursoService.importar — reemplazar un curso", () => {
+  const cursoViejo = "c0000000-0000-0000-0000-00000000beef"
+
+  function cursoEnTx(estado: string, asignaciones = 0, intentosBloque = 0): void {
+    tx.curso.findUnique.mockResolvedValue({
+      id: cursoViejo,
+      estado,
+      _count: { asignaciones, intentosBloque },
+    })
+  }
+
+  beforeEach(() => {
+    vi.mocked(parsearCursoMd).mockReturnValue(buildParsedInput())
+    prisma.cliente.findMany.mockResolvedValue(CLIENTES)
+  })
+
+  it("en borrador y sin personas: reemplaza en el mismo curso, archiva el modulo exclusivo y registra", async () => {
+    cursoEnTx("BORRADOR")
+    tx.cursoModuloHabilitado.findMany.mockResolvedValue([
+      { moduloId: "mod-exclusivo" },
+      { moduloId: "mod-compartido" },
+    ])
+    // Tras quitar las habilitaciones del curso, el compartido sigue en otro.
+    tx.cursoModuloHabilitado.count.mockImplementation(
+      async (args: { where: { moduloId: string } }) =>
+        args.where.moduloId === "mod-compartido" ? 1 : 0,
+    )
+
+    const res = await service.importar(
+      { contenidoMd: "# Curso\n...", reemplazarCursoId: cursoViejo },
+      ADMIN_ID,
+    )
+
+    expect(res).toEqual({
+      cursoId: cursoViejo,
+      modulosCreados: 1,
+      seccionesCreadas: 1,
+      bloquesCreados: 1,
+      reemplazado: true,
+      modulosArchivados: 1,
+    })
+    // No se busca titulo repetido ni se crea otro curso.
+    expect(prisma.curso.findMany).not.toHaveBeenCalled()
+    expect(tx.curso.create).not.toHaveBeenCalled()
+    expect(tx.curso.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: cursoViejo },
+        data: expect.objectContaining({ titulo: "Curso de prueba", clienteId: "cliente-1" }),
+      }),
+    )
+    expect(tx.cursoModuloHabilitado.deleteMany).toHaveBeenCalledWith({
+      where: { cursoId: cursoViejo },
+    })
+    expect(tx.cursoSkillExigida.deleteMany).toHaveBeenCalledWith({ where: { cursoId: cursoViejo } })
+    expect(tx.cursoAreaExigida.deleteMany).toHaveBeenCalledWith({ where: { cursoId: cursoViejo } })
+    // Solo el exclusivo se archiva (si sigue ACTIVO), con su historico.
+    expect(tx.modulo.updateMany).toHaveBeenCalledTimes(1)
+    expect(tx.modulo.updateMany).toHaveBeenCalledWith({
+      where: { id: "mod-exclusivo", estado: "ACTIVO" },
+      data: { estado: "ARCHIVADO" },
+    })
+    expect(tx.historicoEstadoModulo.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        moduloId: "mod-exclusivo",
+        estadoAnterior: "ACTIVO",
+        estadoNuevo: "ARCHIVADO",
+        autorUsuarioId: ADMIN_ID,
+      }),
+    })
+    // El contenido nuevo cuelga del mismo curso.
+    expect(tx.cursoModuloHabilitado.createMany).toHaveBeenCalledWith({
+      data: [{ cursoId: cursoViejo, moduloId: "mod-1", orden: 0 }],
+    })
+    expect(tx.logCambioCurso.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        cursoId: cursoViejo,
+        autorUsuarioId: ADMIN_ID,
+        accion: "CAMBIO_MODULOS",
+      }),
+    })
+  })
+
+  it.each([
+    ["curso ACTIVO", "ACTIVO", 0, 0],
+    ["con asignaciones", "BORRADOR", 2, 0],
+    ["con intentos", "BORRADOR", 0, 3],
+  ])("%s: 409 CURSO_NO_REEMPLAZABLE y no toca nada", async (_n, estado, asig, intentos) => {
+    cursoEnTx(estado, asig, intentos)
+
+    await expect(
+      service.importar({ contenidoMd: "# Curso\n...", reemplazarCursoId: cursoViejo }, ADMIN_ID),
+    ).rejects.toMatchObject({ response: { code: apiErrorCodes.cursoNoReemplazable } })
+    expect(tx.cursoModuloHabilitado.deleteMany).not.toHaveBeenCalled()
+    expect(tx.curso.update).not.toHaveBeenCalled()
+  })
+
+  it("curso inexistente: 404 CURSO_NO_ENCONTRADO", async () => {
+    tx.curso.findUnique.mockResolvedValue(null)
+
+    await expect(
+      service.importar({ contenidoMd: "# Curso\n...", reemplazarCursoId: cursoViejo }, ADMIN_ID),
+    ).rejects.toBeInstanceOf(NotFoundException)
+  })
+
+  it("el aviso de titulo repetido marca reemplazable solo al borrador sin personas", async () => {
+    prisma.curso.findMany.mockResolvedValue([
+      {
+        id: "a",
+        titulo: "Curso de prueba",
+        estado: "BORRADOR",
+        _count: { asignaciones: 0, intentosBloque: 0 },
+      },
+      {
+        id: "b",
+        titulo: "Curso de prueba",
+        estado: "BORRADOR",
+        _count: { asignaciones: 1, intentosBloque: 0 },
+      },
+    ])
+
+    await expect(service.importar({ contenidoMd: "# Curso\n..." }, ADMIN_ID)).rejects.toMatchObject(
+      {
+        response: {
+          details: {
+            cursosExistentes: [
+              { id: "a", titulo: "Curso de prueba", estado: "BORRADOR", reemplazable: true },
+              { id: "b", titulo: "Curso de prueba", estado: "BORRADOR", reemplazable: false },
+            ],
+          },
+        },
+      },
+    )
   })
 })
